@@ -1,0 +1,3304 @@
+﻿province_id,province_name,initial_owner_id,initial_owner_name,initial_owner_color,core_country_id,captured_day0_owner_id,core_matches_captured_owner
+0,Las Palmas,24,Spain,#CCA373,24,24,True
+1,Murmansk,1,Finland,#6E8F93,1,1,True
+2,Apatity,1,Finland,#6E8F93,1,1,True
+3,Ivalo,1,Finland,#6E8F93,1,1,True
+4,Enontekiö,1,Finland,#6E8F93,1,1,True
+5,Rovaniemi,1,Finland,#6E8F93,1,1,True
+6,Oulu,1,Finland,#6E8F93,1,1,True
+7,Kokkola,1,Finland,#6E8F93,1,1,True
+8,Vaasa,1,Finland,#6E8F93,1,1,True
+9,Pori,1,Finland,#6E8F93,1,1,True
+10,Manchester,21,United Kingdom,#7A8054,21,21,True
+11,Turku,1,Finland,#6E8F93,1,1,True
+12,Jyväskylä,1,Finland,#6E8F93,1,1,True
+13,Tampere,1,Finland,#6E8F93,1,1,True
+14,Helsinki,1,Finland,#6E8F93,1,1,True
+15,Lappeenranta,1,Finland,#6E8F93,1,1,True
+16,Joensuu,1,Finland,#6E8F93,1,1,True
+17,Kem,1,Finland,#6E8F93,1,1,True
+18,Iisalmi,1,Finland,#6E8F93,1,1,True
+19,Kuusamo,1,Finland,#6E8F93,1,1,True
+20,Loukhi,1,Finland,#6E8F93,1,1,True
+21,Tetrino,1,Finland,#6E8F93,1,1,True
+22,Kiruna,180,Sweden,#5D758B,180,180,True
+23,Luleå,180,Sweden,#5D758B,180,180,True
+24,Arjeborg,180,Sweden,#5D758B,180,180,True
+25,Umeå,180,Sweden,#5D758B,180,180,True
+26,Vilhelmina,180,Sweden,#5D758B,180,180,True
+27,Östersund,180,Sweden,#5D758B,180,180,True
+28,Stockholm,180,Sweden,#5D758B,180,180,True
+29,Malmö,180,Sweden,#5D758B,180,180,True
+30,Härnösand,180,Sweden,#5D758B,180,180,True
+31,Falun,180,Sweden,#5D758B,180,180,True
+32,Lofsdalen,180,Sweden,#5D758B,180,180,True
+33,Mora,180,Sweden,#5D758B,180,180,True
+34,Karlstad,180,Sweden,#5D758B,180,180,True
+35,Gothenburg,180,Sweden,#5D758B,180,180,True
+36,Linköping,180,Sweden,#5D758B,180,180,True
+37,Växjö,180,Sweden,#5D758B,180,180,True
+38,Visby,180,Sweden,#5D758B,180,180,True
+39,Rosenheim,15,Germany,#93412F,15,15,True
+40,Narvik,2,Norway,#678C6D,2,2,True
+41,Brześć,5,Poland,#7D9081,5,5,True
+42,Alta,2,Norway,#678C6D,2,2,True
+43,Bodø,2,Norway,#678C6D,2,2,True
+44,Steinkjer,2,Norway,#678C6D,2,2,True
+45,Trondheim,2,Norway,#678C6D,2,2,True
+46,Oslo,2,Norway,#678C6D,2,2,True
+47,Dęblin,5,Poland,#7D9081,5,5,True
+48,Hamar,2,Norway,#678C6D,2,2,True
+49,Mazyr,3,Belarus,#608367,3,3,True
+50,Bergen,2,Norway,#678C6D,2,2,True
+51,Stryn,2,Norway,#678C6D,2,2,True
+52,Rjukan,2,Norway,#678C6D,2,2,True
+53,Kristiansand,2,Norway,#678C6D,2,2,True
+54,Tallinn,4,Lithuania,#B7B079,4,4,True
+55,Haapsalu,4,Lithuania,#B7B079,4,4,True
+57,Bern,14,Switzerland,#8E6941,14,14,True
+58,Pärnu,4,Lithuania,#B7B079,4,4,True
+59,Valga,4,Lithuania,#B7B079,4,4,True
+60,London,21,United Kingdom,#7A8054,21,21,True
+61,Cēsis,4,Lithuania,#B7B079,4,4,True
+62,Riga,4,Lithuania,#B7B079,4,4,True
+63,Ludza,4,Lithuania,#B7B079,4,4,True
+64,Daugavpils,4,Lithuania,#B7B079,4,4,True
+65,Vilnius,4,Lithuania,#B7B079,4,4,True
+66,Alytus,4,Lithuania,#B7B079,4,4,True
+67,Kaunas,4,Lithuania,#B7B079,4,4,True
+68,Tauragė,4,Lithuania,#B7B079,4,4,True
+69,Klaipėda,4,Lithuania,#B7B079,4,4,True
+70,Talsi,4,Lithuania,#B7B079,4,4,True
+71,Athlone,22,Ireland,#90613D,22,22,True
+72,Danzig,5,Poland,#7D9081,5,5,True
+73,Bydgoszcz,5,Poland,#7D9081,5,5,True
+74,Poznań,5,Poland,#7D9081,5,5,True
+75,Warsaw,5,Poland,#7D9081,5,5,True
+76,Łódź,5,Poland,#7D9081,5,5,True
+77,Płock,5,Poland,#7D9081,5,5,True
+78,Kraków,5,Poland,#7D9081,5,5,True
+79,Lwów,5,Poland,#7D9081,5,5,True
+80,Tarnów,5,Poland,#7D9081,5,5,True
+81,Lublin,5,Poland,#7D9081,5,5,True
+82,Kielce,5,Poland,#7D9081,5,5,True
+83,Łomża,5,Poland,#7D9081,5,5,True
+84,Wilno,5,Poland,#7D9081,5,5,True
+85,Lida,5,Poland,#7D9081,5,5,True
+86,Stanisławów,5,Poland,#7D9081,5,5,True
+87,Brody,5,Poland,#7D9081,5,5,True
+88,Sarny,5,Poland,#7D9081,5,5,True
+89,Kowel,5,Poland,#7D9081,5,5,True
+90,Edinburgh,21,United Kingdom,#7A8054,21,21,True
+91,Lutsk,6,Ukraine,#F0CE8E,6,6,True
+92,Kiev,6,Ukraine,#F0CE8E,6,6,True
+93,Odessa,6,Ukraine,#F0CE8E,6,6,True
+94,Salisbury,21,United Kingdom,#7A8054,21,21,True
+95,Kharkiv,6,Ukraine,#F0CE8E,6,6,True
+96,Stalino,6,Ukraine,#F0CE8E,6,6,True
+97,Luhansk,6,Ukraine,#F0CE8E,6,6,True
+98,Poltava,6,Ukraine,#F0CE8E,6,6,True
+99,Cherkasy,6,Ukraine,#F0CE8E,6,6,True
+100,Chernihiv,6,Ukraine,#F0CE8E,6,6,True
+101,Zaporizhzhia,6,Ukraine,#F0CE8E,6,6,True
+102,Dnipropetrovsk,6,Ukraine,#F0CE8E,6,6,True
+103,Sevastopol,6,Ukraine,#F0CE8E,6,6,True
+104,Melitopol,6,Ukraine,#F0CE8E,6,6,True
+105,Kirovohrad,6,Ukraine,#F0CE8E,6,6,True
+106,Vinnytsia,6,Ukraine,#F0CE8E,6,6,True
+107,Lviv,6,Ukraine,#F0CE8E,6,6,True
+108,Zhytomyr,6,Ukraine,#F0CE8E,6,6,True
+109,Mykolayiv,6,Ukraine,#F0CE8E,6,6,True
+110,Ternopil,6,Ukraine,#F0CE8E,6,6,True
+111,Uman,6,Ukraine,#F0CE8E,6,6,True
+112,Korosten,6,Ukraine,#F0CE8E,6,6,True
+113,Hamburg,15,Germany,#93412F,15,15,True
+114,Kiel,15,Germany,#93412F,15,15,True
+115,Dresden,15,Germany,#93412F,15,15,True
+116,Berlin,15,Germany,#93412F,15,15,True
+117,Cologne,15,Germany,#93412F,15,15,True
+118,Munich,15,Germany,#93412F,15,15,True
+119,Osnabrück,15,Germany,#93412F,15,15,True
+120,Bremen,15,Germany,#93412F,15,15,True
+121,Hannover,15,Germany,#93412F,15,15,True
+122,Rostock,15,Germany,#93412F,15,15,True
+123,Stettin,15,Germany,#93412F,15,15,True
+124,Kolberg,15,Germany,#93412F,15,15,True
+125,Königsberg,15,Germany,#93412F,15,15,True
+126,Küstrin,15,Germany,#93412F,15,15,True
+127,Magdeburg,15,Germany,#93412F,15,15,True
+128,Oppeln,15,Germany,#93412F,15,15,True
+129,Breslau,15,Germany,#93412F,15,15,True
+130,Leipzig,15,Germany,#93412F,15,15,True
+131,Düsseldorf,15,Germany,#93412F,15,15,True
+132,Frankfurt,15,Germany,#93412F,15,15,True
+133,Stuttgart,15,Germany,#93412F,15,15,True
+134,Saarbrücken,15,Germany,#93412F,15,15,True
+135,Freiburg,15,Germany,#93412F,15,15,True
+136,Augsburg,15,Germany,#93412F,15,15,True
+137,Nuremberg,15,Germany,#93412F,15,15,True
+138,Würzburg,15,Germany,#93412F,15,15,True
+139,Kassel,15,Germany,#93412F,15,15,True
+140,Erfurt,15,Germany,#93412F,15,15,True
+141,Mogilev,3,Belarus,#608367,3,3,True
+142,Gomel,3,Belarus,#608367,3,3,True
+143,Esbjerg,181,Denmark,#BE8C28,181,181,True
+144,Rock Springs,45,Colorado,#6990A4,45,45,True
+145,Frederikshavn,181,Denmark,#BE8C28,181,181,True
+146,Žlobin,3,Belarus,#608367,3,3,True
+147,Babruysk,3,Belarus,#608367,3,3,True
+148,Przemyśl,5,Poland,#7D9081,5,5,True
+149,Zürich,14,Switzerland,#8E6941,14,14,True
+150,Viborg,181,Denmark,#BE8C28,181,181,True
+151,Aarhus,181,Denmark,#BE8C28,181,181,True
+152,Chur,14,Switzerland,#8E6941,14,14,True
+153,Lugano,14,Switzerland,#8E6941,14,14,True
+154,Odense,181,Denmark,#BE8C28,181,181,True
+155,Copenhagen,181,Denmark,#BE8C28,181,181,True
+156,Lausanne,14,Switzerland,#8E6941,14,14,True
+157,Næstved,181,Denmark,#BE8C28,181,181,True
+158,Vienna,13,Austria,#CAA473,13,13,True
+159,Polotsk,3,Belarus,#608367,3,3,True
+160,Minsk,3,Belarus,#608367,3,3,True
+161,Vitsebsk,3,Belarus,#608367,3,3,True
+162,Barysaw,3,Belarus,#608367,3,3,True
+163,Slutsk,3,Belarus,#608367,3,3,True
+164,Lahti,1,Finland,#6E8F93,1,1,True
+165,Sankt Pölten,13,Austria,#CAA473,13,13,True
+166,Graz,13,Austria,#CAA473,13,13,True
+167,Salzburg,13,Austria,#CAA473,13,13,True
+168,Innsbruck,13,Austria,#CAA473,13,13,True
+169,Prague,12,Czechoslovakia,#9B6A28,12,12,True
+170,Liberec,12,Czechoslovakia,#9B6A28,12,12,True
+171,Pilsen,12,Czechoslovakia,#9B6A28,12,12,True
+172,Ostrava,12,Czechoslovakia,#9B6A28,12,12,True
+173,Brno,12,Czechoslovakia,#9B6A28,12,12,True
+174,Žilina,12,Czechoslovakia,#9B6A28,12,12,True
+175,Košice,12,Czechoslovakia,#9B6A28,12,12,True
+176,Mukačevo,12,Czechoslovakia,#9B6A28,12,12,True
+177,Bratislava,12,Czechoslovakia,#9B6A28,12,12,True
+178,Banská Bystrica,12,Czechoslovakia,#9B6A28,12,12,True
+179,Amsterdam,20,Netherlands,#B65D2C,20,20,True
+180,Rotterdam,20,Netherlands,#B65D2C,20,20,True
+181,Den Helder,20,Netherlands,#B65D2C,20,20,True
+182,Groningen,20,Netherlands,#B65D2C,20,20,True
+183,Eindhoven,20,Netherlands,#B65D2C,20,20,True
+184,Brussels,19,Belgium,#E5BB5F,19,19,True
+185,Brugge,19,Belgium,#E5BB5F,19,19,True
+186,Antwerpen,19,Belgium,#E5BB5F,19,19,True
+187,Namur,19,Belgium,#E5BB5F,19,19,True
+188,Bastogne,19,Belgium,#E5BB5F,19,19,True
+189,Luxemburg,200,Luxembourg,#5D758B,200,200,True
+190,Cork,22,Ireland,#90613D,22,22,True
+191,Dublin,22,Ireland,#90613D,22,22,True
+192,Waterford,22,Ireland,#90613D,22,22,True
+193,Galway,22,Ireland,#90613D,22,22,True
+194,Belfast,21,United Kingdom,#7A8054,21,21,True
+195,Lisbon,25,Portugal,#8F7B44,25,25,True
+196,Oporto,25,Portugal,#8F7B44,25,25,True
+197,Coimbra,25,Portugal,#8F7B44,25,25,True
+198,Viseu,25,Portugal,#8F7B44,25,25,True
+199,Beja,25,Portugal,#8F7B44,25,25,True
+200,Faro,25,Portugal,#8F7B44,25,25,True
+201,Reykjavík,23,Iceland,#7DA68E,23,23,True
+202,Akureyri,23,Iceland,#7DA68E,23,23,True
+203,Höfn,23,Iceland,#7DA68E,23,23,True
+204,Tirana,11,Albania,#CCA373,11,11,True
+205,Vlore,11,Albania,#CCA373,11,11,True
+206,Tucson,53,Arizona,#B19249,53,53,True
+207,Phoenix,53,Arizona,#B19249,53,53,True
+208,Flagstaff,53,Arizona,#B19249,53,53,True
+209,Chinle,53,Arizona,#B19249,53,53,True
+210,Kingman,53,Arizona,#B19249,53,53,True
+211,Safford,53,Arizona,#B19249,53,53,True
+212,Prescott,53,Arizona,#B19249,53,53,True
+213,Yuma,53,Arizona,#B19249,53,53,True
+214,Billings,44,Montana,#C15C4C,44,44,True
+215,Great Falls,44,Montana,#C15C4C,44,44,True
+216,Broadus,44,Montana,#C15C4C,44,44,True
+217,Miles City,44,Montana,#C15C4C,44,44,True
+218,Plentywood,44,Montana,#C15C4C,44,44,True
+219,Havre,44,Montana,#C15C4C,44,44,True
+220,Missoula,44,Montana,#C15C4C,44,44,True
+221,Bozeman,44,Montana,#C15C4C,44,44,True
+222,Helena,44,Montana,#C15C4C,44,44,True
+223,Taunton,21,United Kingdom,#7A8054,21,21,True
+224,Bristol,21,United Kingdom,#7A8054,21,21,True
+225,Plymouth,21,United Kingdom,#7A8054,21,21,True
+226,Portsmouth,21,United Kingdom,#7A8054,21,21,True
+227,Ashford,21,United Kingdom,#7A8054,21,21,True
+228,Ipswich,21,United Kingdom,#7A8054,21,21,True
+229,Cambridge,21,United Kingdom,#7A8054,21,21,True
+230,Birmingham,21,United Kingdom,#7A8054,21,21,True
+231,Cardiff,21,United Kingdom,#7A8054,21,21,True
+232,Liverpool,21,United Kingdom,#7A8054,21,21,True
+233,Shrewsbury,21,United Kingdom,#7A8054,21,21,True
+234,Sheffield,21,United Kingdom,#7A8054,21,21,True
+235,Leeds,21,United Kingdom,#7A8054,21,21,True
+236,Carlisle,21,United Kingdom,#7A8054,21,21,True
+237,York,21,United Kingdom,#7A8054,21,21,True
+238,Glasgow,21,United Kingdom,#7A8054,21,21,True
+239,Aberdeen,21,United Kingdom,#7A8054,21,21,True
+240,St. John's,39,New Foundland,#CF7762,39,39,True
+241,Inverness,21,United Kingdom,#7A8054,21,21,True
+242,Thurso,21,United Kingdom,#7A8054,21,21,True
+243,Venice,16,Italy,#90AE77,16,16,True
+244,Turin,16,Italy,#90AE77,16,16,True
+245,Rome,16,Italy,#90AE77,16,16,True
+246,Naples,16,Italy,#90AE77,16,16,True
+247,Verona,16,Italy,#90AE77,16,16,True
+248,Genoa,16,Italy,#90AE77,16,16,True
+249,Bologna,16,Italy,#90AE77,16,16,True
+250,Milan,16,Italy,#90AE77,16,16,True
+251,Cuneo,16,Italy,#90AE77,16,16,True
+252,Parma,16,Italy,#90AE77,16,16,True
+253,Florence,16,Italy,#90AE77,16,16,True
+254,San Marino,16,Italy,#90AE77,16,16,True
+255,Cagliari,16,Italy,#90AE77,16,16,True
+256,Palermo,16,Italy,#90AE77,16,16,True
+257,Civitavecchia,16,Italy,#90AE77,16,16,True
+258,Perugia,16,Italy,#90AE77,16,16,True
+259,Pescara,16,Italy,#90AE77,16,16,True
+260,Latina,16,Italy,#90AE77,16,16,True
+261,Cassino,16,Italy,#90AE77,16,16,True
+262,Bari,16,Italy,#90AE77,16,16,True
+263,Foggia,16,Italy,#90AE77,16,16,True
+264,Salerno,16,Italy,#90AE77,16,16,True
+265,Potenza,16,Italy,#90AE77,16,16,True
+266,Catanzaro,16,Italy,#90AE77,16,16,True
+267,Paris,18,France,#6C9093,18,18,True
+268,Bordeaux,18,France,#6C9093,18,18,True
+269,Marseille,18,France,#6C9093,18,18,True
+270,Lyon,18,France,#6C9093,18,18,True
+271,Brest,18,France,#6C9093,18,18,True
+272,Le Havre,18,France,#6C9093,18,18,True
+273,Ajaccio,18,France,#6C9093,18,18,True
+274,Lille,18,France,#6C9093,18,18,True
+275,Nantes,18,France,#6C9093,18,18,True
+276,La Rochelle,18,France,#6C9093,18,18,True
+277,Toulouse,18,France,#6C9093,18,18,True
+278,Bayonne,18,France,#6C9093,18,18,True
+279,Tarbes,18,France,#6C9093,18,18,True
+280,Orléans,18,France,#6C9093,18,18,True
+281,Bourges,18,France,#6C9093,18,18,True
+282,Mâcon,18,France,#6C9093,18,18,True
+283,Dijon,18,France,#6C9093,18,18,True
+284,Strasbourg,18,France,#6C9093,18,18,True
+285,Nancy,18,France,#6C9093,18,18,True
+286,Reims,18,France,#6C9093,18,18,True
+287,Auxerre,18,France,#6C9093,18,18,True
+288,Le Mans,18,France,#6C9093,18,18,True
+289,Poitiers,18,France,#6C9093,18,18,True
+290,Limoges,18,France,#6C9093,18,18,True
+291,Saint Étienne,18,France,#6C9093,18,18,True
+292,Avignon,18,France,#6C9093,18,18,True
+293,Grenoble,18,France,#6C9093,18,18,True
+294,Madrid,24,Spain,#CCA373,24,24,True
+295,Murcia,24,Spain,#CCA373,24,24,True
+296,Sevilla,24,Spain,#CCA373,24,24,True
+297,Bilbao,24,Spain,#CCA373,24,24,True
+298,Barcelona,24,Spain,#CCA373,24,24,True
+299,Lugo,24,Spain,#CCA373,24,24,True
+300,Vigo,24,Spain,#CCA373,24,24,True
+301,León,24,Spain,#CCA373,24,24,True
+302,Pamplona,24,Spain,#CCA373,24,24,True
+303,Zaragoza,24,Spain,#CCA373,24,24,True
+304,Lleida,24,Spain,#CCA373,24,24,True
+305,Valencia,24,Spain,#CCA373,24,24,True
+306,Cuenca,24,Spain,#CCA373,24,24,True
+307,Malaga,24,Spain,#CCA373,24,24,True
+308,Cádiz,24,Spain,#CCA373,24,24,True
+309,Cáceres,24,Spain,#CCA373,24,24,True
+310,Budapest,7,Romania,#82441D,7,7,True
+311,Córdoba,24,Spain,#CCA373,24,24,True
+312,Huelva,24,Spain,#CCA373,24,24,True
+313,Granada,24,Spain,#CCA373,24,24,True
+314,Toledo,24,Spain,#CCA373,24,24,True
+315,Jaén,24,Spain,#CCA373,24,24,True
+316,Salamanca,24,Spain,#CCA373,24,24,True
+317,Ávila,24,Spain,#CCA373,24,24,True
+318,Valladolid,24,Spain,#CCA373,24,24,True
+319,Zamora,24,Spain,#CCA373,24,24,True
+320,Guymon,51,Oklahoma,#9B6A28,51,51,True
+321,Woodward,51,Oklahoma,#9B6A28,51,51,True
+322,Oklahoma City,51,Oklahoma,#9B6A28,51,51,True
+323,Lawton,51,Oklahoma,#9B6A28,51,51,True
+324,Tulsa,51,Oklahoma,#9B6A28,51,51,True
+325,McAlester,51,Oklahoma,#9B6A28,51,51,True
+326,Norman,51,Oklahoma,#9B6A28,51,51,True
+327,Durant,51,Oklahoma,#9B6A28,51,51,True
+328,Enid,51,Oklahoma,#9B6A28,51,51,True
+329,Ponca City,51,Oklahoma,#9B6A28,51,51,True
+330,Miskolc,7,Romania,#82441D,7,7,True
+331,Vác,7,Romania,#82441D,7,7,True
+332,Györ,7,Romania,#82441D,7,7,True
+333,Pécs,7,Romania,#82441D,7,7,True
+334,Keszthely,7,Romania,#82441D,7,7,True
+335,Debrecen,7,Romania,#82441D,7,7,True
+336,Gyula,7,Romania,#82441D,7,7,True
+337,Timisoara,7,Romania,#82441D,7,7,True
+338,Bucharest,7,Romania,#82441D,7,7,True
+339,Iași,7,Romania,#82441D,7,7,True
+340,Constanța,7,Romania,#82441D,7,7,True
+341,Tulcea,7,Romania,#82441D,7,7,True
+342,Chișinău,7,Romania,#82441D,7,7,True
+343,Botoșani,7,Romania,#82441D,7,7,True
+344,Deva,7,Romania,#82441D,7,7,True
+345,Pitești,7,Romania,#82441D,7,7,True
+346,Reșița,7,Romania,#82441D,7,7,True
+347,Craiova,7,Romania,#82441D,7,7,True
+348,Satu Mare,7,Romania,#82441D,7,7,True
+349,Zalău,7,Romania,#82441D,7,7,True
+350,Ploiești,7,Romania,#82441D,7,7,True
+351,Bacău,7,Romania,#82441D,7,7,True
+352,Suceava,7,Romania,#82441D,7,7,True
+353,Târgu-Mureș,7,Romania,#82441D,7,7,True
+354,Zagreb,17,Yugoslavia,#7A8150,17,17,True
+355,Dubrovnik,17,Yugoslavia,#7A8150,17,17,True
+356,Seattle,31,Northwest USA,#80A37E,31,31,True
+357,Sarajevo,17,Yugoslavia,#7A8150,17,17,True
+358,Belgrad,17,Yugoslavia,#7A8150,17,17,True
+359,Mostar,17,Yugoslavia,#7A8150,17,17,True
+360,Tuzla,17,Yugoslavia,#7A8150,17,17,True
+361,Zenica,17,Yugoslavia,#7A8150,17,17,True
+362,Banja Luka,17,Yugoslavia,#7A8150,17,17,True
+363,Šibenik,17,Yugoslavia,#7A8150,17,17,True
+364,Novi Sad,17,Yugoslavia,#7A8150,17,17,True
+365,Vršac,17,Yugoslavia,#7A8150,17,17,True
+366,Šabac,17,Yugoslavia,#7A8150,17,17,True
+367,Slavonski Brod,17,Yugoslavia,#7A8150,17,17,True
+368,Maribor,17,Yugoslavia,#7A8150,17,17,True
+369,Ljubljana,17,Yugoslavia,#7A8150,17,17,True
+370,Rijeka,17,Yugoslavia,#7A8150,17,17,True
+371,Zadar,17,Yugoslavia,#7A8150,17,17,True
+372,Negotin,17,Yugoslavia,#7A8150,17,17,True
+373,Kragujevac,17,Yugoslavia,#7A8150,17,17,True
+374,Niš,17,Yugoslavia,#7A8150,17,17,True
+375,Skopje,17,Yugoslavia,#7A8150,17,17,True
+376,Pristina,17,Yugoslavia,#7A8150,17,17,True
+377,Podgorica,17,Yugoslavia,#7A8150,17,17,True
+378,Užice,17,Yugoslavia,#7A8150,17,17,True
+379,Sofia,8,Bulgaria,#728476,8,8,True
+380,Vratsa,8,Bulgaria,#728476,8,8,True
+381,Gorna Dzhumaya,8,Bulgaria,#728476,8,8,True
+382,Plovdiv,8,Bulgaria,#728476,8,8,True
+383,Pleven,8,Bulgaria,#728476,8,8,True
+384,Tarnovo,8,Bulgaria,#728476,8,8,True
+385,Varna,8,Bulgaria,#728476,8,8,True
+386,Burgas,8,Bulgaria,#728476,8,8,True
+387,Thessaloniki,10,Greece,#6D8F93,10,10,True
+388,Athens,10,Greece,#6D8F93,10,10,True
+389,Trikala,10,Greece,#6D8F93,10,10,True
+390,Sparti,10,Greece,#6D8F93,10,10,True
+391,Ioannina,10,Greece,#6D8F93,10,10,True
+392,Xanthi,10,Greece,#6D8F93,10,10,True
+393,Kalamaria,10,Greece,#6D8F93,10,10,True
+394,Serres,10,Greece,#6D8F93,10,10,True
+395,Edessa,10,Greece,#6D8F93,10,10,True
+396,Kastoria,10,Greece,#6D8F93,10,10,True
+397,Grevena,10,Greece,#6D8F93,10,10,True
+398,Kalabaka,10,Greece,#6D8F93,10,10,True
+399,Arta,10,Greece,#6D8F93,10,10,True
+400,Corfu,10,Greece,#6D8F93,10,10,True
+401,Larissa,10,Greece,#6D8F93,10,10,True
+402,Volos,10,Greece,#6D8F93,10,10,True
+403,Karditsa,10,Greece,#6D8F93,10,10,True
+404,Lamia,10,Greece,#6D8F93,10,10,True
+405,Patras,10,Greece,#6D8F93,10,10,True
+406,Githio,10,Greece,#6D8F93,10,10,True
+407,Agrinio,10,Greece,#6D8F93,10,10,True
+408,Thiva,10,Greece,#6D8F93,10,10,True
+409,Heraklion,10,Greece,#6D8F93,10,10,True
+410,Rhodes,16,Italy,#90AE77,16,16,True
+411,Ankara,9,Turkey,#8F7B44,9,9,True
+412,Istanbul,9,Turkey,#8F7B44,9,9,True
+413,Adana,9,Turkey,#8F7B44,9,9,True
+414,Izmir,9,Turkey,#8F7B44,9,9,True
+415,Kars,9,Turkey,#8F7B44,9,9,True
+416,Van,9,Turkey,#8F7B44,9,9,True
+417,Siirt,9,Turkey,#8F7B44,9,9,True
+418,Erzurum,9,Turkey,#8F7B44,9,9,True
+419,Ordu,9,Turkey,#8F7B44,9,9,True
+420,Çorum,9,Turkey,#8F7B44,9,9,True
+421,Bafra,9,Turkey,#8F7B44,9,9,True
+422,Bolu,9,Turkey,#8F7B44,9,9,True
+423,Eskişehir,9,Turkey,#8F7B44,9,9,True
+424,Bursa,9,Turkey,#8F7B44,9,9,True
+425,Malatya,9,Turkey,#8F7B44,9,9,True
+426,Balıkesir,9,Turkey,#8F7B44,9,9,True
+427,Aydın,9,Turkey,#8F7B44,9,9,True
+428,Antalya,9,Turkey,#8F7B44,9,9,True
+429,Mardin,9,Turkey,#8F7B44,9,9,True
+430,Konya,9,Turkey,#8F7B44,9,9,True
+431,Kütahya,9,Turkey,#8F7B44,9,9,True
+432,Mersin,9,Turkey,#8F7B44,9,9,True
+433,Karaman,9,Turkey,#8F7B44,9,9,True
+434,Kırşehir,9,Turkey,#8F7B44,9,9,True
+435,Aksaray,9,Turkey,#8F7B44,9,9,True
+436,Gaziantep,9,Turkey,#8F7B44,9,9,True
+437,Çorlu,9,Turkey,#8F7B44,9,9,True
+438,Portland,31,Northwest USA,#80A37E,31,31,True
+439,Spokane,31,Northwest USA,#80A37E,31,31,True
+440,Boise,31,Northwest USA,#80A37E,31,31,True
+441,Nampa,31,Northwest USA,#80A37E,31,31,True
+442,Idaho Falls,31,Northwest USA,#80A37E,31,31,True
+443,Pocatello,31,Northwest USA,#80A37E,31,31,True
+444,Burley,31,Northwest USA,#80A37E,31,31,True
+445,Carey,31,Northwest USA,#80A37E,31,31,True
+446,Stanley,31,Northwest USA,#80A37E,31,31,True
+447,Baker City,31,Northwest USA,#80A37E,31,31,True
+448,Bend,31,Northwest USA,#80A37E,31,31,True
+449,Eugene,31,Northwest USA,#80A37E,31,31,True
+450,Medford,31,Northwest USA,#80A37E,31,31,True
+451,Salem (OR),31,Northwest USA,#80A37E,31,31,True
+452,Tacoma,31,Northwest USA,#80A37E,31,31,True
+453,Burns,31,Northwest USA,#80A37E,31,31,True
+454,Klamath Falls,31,Northwest USA,#80A37E,31,31,True
+455,Yakima,31,Northwest USA,#80A37E,31,31,True
+456,Everett,31,Northwest USA,#80A37E,31,31,True
+457,Lewiston,31,Northwest USA,#80A37E,31,31,True
+458,Kennewick,31,Northwest USA,#80A37E,31,31,True
+459,Coeur d'Alene,31,Northwest USA,#80A37E,31,31,True
+460,Omak,31,Northwest USA,#80A37E,31,31,True
+461,Vancouver,30,British Columbia,#ADA365,30,30,True
+462,Bismarck,43,North USA,#F0CE8E,43,43,True
+463,Sioux Falls,43,North USA,#F0CE8E,43,43,True
+464,Minneapolis,43,North USA,#F0CE8E,43,43,True
+465,Fargo,43,North USA,#F0CE8E,43,43,True
+466,Rochester (MN),43,North USA,#F0CE8E,43,43,True
+467,Mankato,43,North USA,#F0CE8E,43,43,True
+468,St. Cloud,43,North USA,#F0CE8E,43,43,True
+469,Duluth,43,North USA,#F0CE8E,43,43,True
+470,Bemidji,43,North USA,#F0CE8E,43,43,True
+471,Alexandria (MN),43,North USA,#F0CE8E,43,43,True
+472,Grand Forks,43,North USA,#F0CE8E,43,43,True
+473,Rugby,43,North USA,#F0CE8E,43,43,True
+474,Williston,43,North USA,#F0CE8E,43,43,True
+475,Dickinson,43,North USA,#F0CE8E,43,43,True
+476,Jamestown (ND),43,North USA,#F0CE8E,43,43,True
+477,Ipswich (SD),43,North USA,#F0CE8E,43,43,True
+478,Mobridge,43,North USA,#F0CE8E,43,43,True
+479,Mitchell,43,North USA,#F0CE8E,43,43,True
+480,Murdo,43,North USA,#F0CE8E,43,43,True
+481,Redig,43,North USA,#F0CE8E,43,43,True
+482,Rapid City,43,North USA,#F0CE8E,43,43,True
+483,Las Vegas,32,California,#BF794E,32,32,True
+484,Los Angeles,32,California,#BF794E,32,32,True
+485,San Francisco,32,California,#BF794E,32,32,True
+486,Sacramento,32,California,#BF794E,32,32,True
+487,San Diego,32,California,#BF794E,32,32,True
+488,Anaheim,32,California,#BF794E,32,32,True
+489,Bakersfield,32,California,#BF794E,32,32,True
+490,El Centro,32,California,#BF794E,32,32,True
+491,Palm Springs,32,California,#BF794E,32,32,True
+492,Henderson,32,California,#BF794E,32,32,True
+493,Crystal Springs,32,California,#BF794E,32,32,True
+494,Ely,32,California,#BF794E,32,32,True
+495,Elko,32,California,#BF794E,32,32,True
+496,Battle Mountain,32,California,#BF794E,32,32,True
+497,Reno,32,California,#BF794E,32,32,True
+498,Eureka,32,California,#BF794E,32,32,True
+499,Salinas,32,California,#BF794E,32,32,True
+500,Redding,32,California,#BF794E,32,32,True
+501,Santa Rosa (CA),32,California,#BF794E,32,32,True
+502,Chico,32,California,#BF794E,32,32,True
+503,Merced,32,California,#BF794E,32,32,True
+504,Fresno,32,California,#BF794E,32,32,True
+505,Tonopah,32,California,#BF794E,32,32,True
+506,Austin (NV),32,California,#BF794E,32,32,True
+507,Olancha,32,California,#BF794E,32,32,True
+508,Bishop,32,California,#BF794E,32,32,True
+509,Salt Lake City,45,Colorado,#6990A4,45,45,True
+510,Denver,45,Colorado,#6990A4,45,45,True
+511,Cheyenne,45,Colorado,#6990A4,45,45,True
+512,Ogden,45,Colorado,#6990A4,45,45,True
+513,Provo,45,Colorado,#6990A4,45,45,True
+514,Cedar City,45,Colorado,#6990A4,45,45,True
+515,Richfield,45,Colorado,#6990A4,45,45,True
+516,Delta,45,Colorado,#6990A4,45,45,True
+517,Vernal,45,Colorado,#6990A4,45,45,True
+518,Fort Collins,45,Colorado,#6990A4,45,45,True
+519,Casper,45,Colorado,#6990A4,45,45,True
+520,Gilette,45,Colorado,#6990A4,45,45,True
+521,Sheridan,45,Colorado,#6990A4,45,45,True
+522,Jackson (WY),45,Colorado,#6990A4,45,45,True
+523,Afton,45,Colorado,#6990A4,45,45,True
+524,Riverton,45,Colorado,#6990A4,45,45,True
+525,Glenwood Springs,45,Colorado,#6990A4,45,45,True
+526,Sterling,45,Colorado,#6990A4,45,45,True
+527,Colorado Springs,45,Colorado,#6990A4,45,45,True
+528,Pueblo,45,Colorado,#6990A4,45,45,True
+529,Durango (CO),45,Colorado,#6990A4,45,45,True
+530,Blanding,45,Colorado,#6990A4,45,45,True
+531,Grand Junction,45,Colorado,#6990A4,45,45,True
+532,Kingsport,50,Kentucky,#7DA68E,50,50,True
+533,Pritchett,45,Colorado,#6990A4,45,45,True
+534,Aspen,45,Colorado,#6990A4,45,45,True
+535,Scottsbluff,46,Kansas,#CF7762,46,46,True
+536,Chadron,46,Kansas,#CF7762,46,46,True
+537,Valentine,46,Kansas,#CF7762,46,46,True
+538,Omaha,46,Kansas,#CF7762,46,46,True
+539,Lincoln,46,Kansas,#CF7762,46,46,True
+540,Wichita,46,Kansas,#CF7762,46,46,True
+541,Davenport,46,Kansas,#CF7762,46,46,True
+542,Des Moines,46,Kansas,#CF7762,46,46,True
+543,Cedar Rapids,46,Kansas,#CF7762,46,46,True
+544,Mason City,46,Kansas,#CF7762,46,46,True
+545,Fort Dodge,46,Kansas,#CF7762,46,46,True
+546,Red Oak,46,Kansas,#CF7762,46,46,True
+547,Ottumwa,46,Kansas,#CF7762,46,46,True
+548,Fremont,46,Kansas,#CF7762,46,46,True
+549,Avoca,46,Kansas,#CF7762,46,46,True
+550,Kearney,46,Kansas,#CF7762,46,46,True
+551,North Platte,46,Kansas,#CF7762,46,46,True
+552,Colby,46,Kansas,#CF7762,46,46,True
+553,Garden City,46,Kansas,#CF7762,46,46,True
+554,Hugoton,46,Kansas,#CF7762,46,46,True
+555,Hutchinson,46,Kansas,#CF7762,46,46,True
+556,Emporia,46,Kansas,#CF7762,46,46,True
+557,Wellington (KS),46,Kansas,#CF7762,46,46,True
+558,Parsons,46,Kansas,#CF7762,46,46,True
+559,Salina,46,Kansas,#CF7762,46,46,True
+560,Topeka,46,Kansas,#CF7762,46,46,True
+561,Milwaukee,42,Illinois,#A1562A,42,42,True
+562,Chicago,42,Illinois,#A1562A,42,42,True
+563,Indianapolis,42,Illinois,#A1562A,42,42,True
+564,Cleveland,42,Illinois,#A1562A,42,42,True
+565,Detroit,42,Illinois,#A1562A,42,42,True
+566,Traverse City,42,Illinois,#A1562A,42,42,True
+567,Grand Rapids (MI),42,Illinois,#A1562A,42,42,True
+568,Toledo (IL),42,Illinois,#A1562A,42,42,True
+569,South Bend,42,Illinois,#A1562A,42,42,True
+570,Fort Wayne,42,Illinois,#A1562A,42,42,True
+571,Cincinnati,42,Illinois,#A1562A,42,42,True
+572,Columbus (OH),42,Illinois,#A1562A,42,42,True
+573,Nashville,50,Kentucky,#7DA68E,50,50,True
+574,Youngstown,42,Illinois,#A1562A,42,42,True
+575,Zanesville,42,Illinois,#A1562A,42,42,True
+576,Lancaster,42,Illinois,#A1562A,42,42,True
+577,Bloomington,42,Illinois,#A1562A,42,42,True
+578,Madison,42,Illinois,#A1562A,42,42,True
+579,Green Bay,42,Illinois,#A1562A,42,42,True
+580,Eau Claire,42,Illinois,#A1562A,42,42,True
+581,Wausau,42,Illinois,#A1562A,42,42,True
+582,Marquette,42,Illinois,#A1562A,42,42,True
+583,St Louis,50,Kentucky,#7DA68E,50,50,True
+584,Lafayette (IN),42,Illinois,#A1562A,42,42,True
+585,Evansville,42,Illinois,#A1562A,42,42,True
+586,Kansas City,50,Kentucky,#7DA68E,50,50,True
+587,Champaign,42,Illinois,#A1562A,42,42,True
+588,Peoria,42,Illinois,#A1562A,42,42,True
+589,Springfield (IL),42,Illinois,#A1562A,42,42,True
+590,Rockford,42,Illinois,#A1562A,42,42,True
+591,Memphis,50,Kentucky,#7DA68E,50,50,True
+592,Jackson (TN),50,Kentucky,#7DA68E,50,50,True
+593,Knoxville,50,Kentucky,#7DA68E,50,50,True
+594,Chattanooga,50,Kentucky,#7DA68E,50,50,True
+595,Bowling Green,50,Kentucky,#7DA68E,50,50,True
+596,Louisville,50,Kentucky,#7DA68E,50,50,True
+597,El Paso,52,Texas,#CEC074,52,52,True
+598,Prestonsburg,50,Kentucky,#7DA68E,50,50,True
+599,Maryville,50,Kentucky,#7DA68E,50,50,True
+600,Columbia,50,Kentucky,#7DA68E,50,50,True
+601,Jefferson City,50,Kentucky,#7DA68E,50,50,True
+602,Farmington (MO),50,Kentucky,#7DA68E,50,50,True
+603,Springfield (MO),50,Kentucky,#7DA68E,50,50,True
+604,Fayetteville (AR),50,Kentucky,#7DA68E,50,50,True
+605,Conway,50,Kentucky,#7DA68E,50,50,True
+606,Jonesboro,50,Kentucky,#7DA68E,50,50,True
+607,Little Rock,50,Kentucky,#7DA68E,50,50,True
+608,Fort Smith,50,Kentucky,#7DA68E,50,50,True
+609,Crosset,50,Kentucky,#7DA68E,50,50,True
+610,Harrison,50,Kentucky,#7DA68E,50,50,True
+611,Warrensburg,50,Kentucky,#7DA68E,50,50,True
+612,El Dorado,50,Kentucky,#7DA68E,50,50,True
+613,Richmond,47,Virginia,#8A8E74,47,47,True
+614,Charleston (WV),47,Virginia,#8A8E74,47,47,True
+615,Abingdon,47,Virginia,#8A8E74,47,47,True
+616,Norfolk,47,Virginia,#8A8E74,47,47,True
+617,Charlottesville,47,Virginia,#8A8E74,47,47,True
+618,Parkersburg,47,Virginia,#8A8E74,47,47,True
+619,Harrisonburg,47,Virginia,#8A8E74,47,47,True
+620,Lynchburg,47,Virginia,#8A8E74,47,47,True
+621,Blacksburg,47,Virginia,#8A8E74,47,47,True
+622,Lexington (VA),47,Virginia,#8A8E74,47,47,True
+623,Danville,47,Virginia,#8A8E74,47,47,True
+624,Asheville,48,Carolina,#735D2D,48,48,True
+625,Charlotte,48,Carolina,#735D2D,48,48,True
+626,Charleston (SC),48,Carolina,#735D2D,48,48,True
+627,Wilmington,48,Carolina,#735D2D,48,48,True
+628,Durham,48,Carolina,#735D2D,48,48,True
+629,Greensboro,48,Carolina,#735D2D,48,48,True
+630,Hickory,48,Carolina,#735D2D,48,48,True
+631,Greenville (SC),48,Carolina,#735D2D,48,48,True
+632,Fayetteville (NC),48,Carolina,#735D2D,48,48,True
+633,Florence (SC),48,Carolina,#735D2D,48,48,True
+634,Albuquerque,52,Texas,#CEC074,52,52,True
+635,Van Horn,52,Texas,#CEC074,52,52,True
+636,Del Rio,52,Texas,#CEC074,52,52,True
+637,Mc Allen,52,Texas,#CEC074,52,52,True
+638,Houston,52,Texas,#CEC074,52,52,True
+639,Santa Fe,52,Texas,#CEC074,52,52,True
+640,Farmington (NM),52,Texas,#CEC074,52,52,True
+641,Santa Rosa (NM),52,Texas,#CEC074,52,52,True
+642,Amarillo,52,Texas,#CEC074,52,52,True
+643,Hot Springs,52,Texas,#CEC074,52,52,True
+644,Dallas,52,Texas,#CEC074,52,52,True
+645,Jasper,52,Texas,#CEC074,52,52,True
+646,Fort Worth,52,Texas,#CEC074,52,52,True
+647,Lubbock,52,Texas,#CEC074,52,52,True
+648,Midland,52,Texas,#CEC074,52,52,True
+649,Austin,52,Texas,#CEC074,52,52,True
+650,Victoria (TX),52,Texas,#CEC074,52,52,True
+651,Huntsville (TX),52,Texas,#CEC074,52,52,True
+652,Coro,59,Venezuela,#74798B,59,59,True
+653,Tyler,52,Texas,#CEC074,52,52,True
+654,Wichita Falls,52,Texas,#CEC074,52,52,True
+655,Roswell,52,Texas,#CEC074,52,52,True
+656,Dalhart,52,Texas,#CEC074,52,52,True
+657,San Antonio,52,Texas,#CEC074,52,52,True
+658,Corpus Christi,52,Texas,#CEC074,52,52,True
+659,Brownwood,52,Texas,#CEC074,52,52,True
+660,Anchorage,26,Alaska,#5E7F82,26,26,True
+661,Fairbanks,26,Alaska,#5E7F82,26,26,True
+662,McCarthy,26,Alaska,#5E7F82,26,26,True
+663,Prudhoe Bay,26,Alaska,#5E7F82,26,26,True
+664,Barrow,26,Alaska,#5E7F82,26,26,True
+665,Nome,26,Alaska,#5E7F82,26,26,True
+666,Aniak,26,Alaska,#5E7F82,26,26,True
+667,Perryville,26,Alaska,#5E7F82,26,26,True
+668,Fort St. John,30,British Columbia,#ADA365,30,30,True
+669,Prince George,30,British Columbia,#ADA365,30,30,True
+670,Kelowna,30,British Columbia,#ADA365,30,30,True
+671,Skagway,30,British Columbia,#ADA365,30,30,True
+672,Fort Nelson,30,British Columbia,#ADA365,30,30,True
+673,Kamloops,30,British Columbia,#ADA365,30,30,True
+674,Whistler,30,British Columbia,#ADA365,30,30,True
+675,Terrace,30,British Columbia,#ADA365,30,30,True
+676,Smithers,30,British Columbia,#ADA365,30,30,True
+677,Iskut,30,British Columbia,#ADA365,30,30,True
+678,Cassiar,30,British Columbia,#ADA365,30,30,True
+679,Toad River,30,British Columbia,#ADA365,30,30,True
+680,Nanaimo,30,British Columbia,#ADA365,30,30,True
+681,Victoria (BC),30,British Columbia,#ADA365,30,30,True
+682,Prince Rupert,30,British Columbia,#ADA365,30,30,True
+683,Kitimat,30,British Columbia,#ADA365,30,30,True
+684,Hazelton,30,British Columbia,#ADA365,30,30,True
+685,Mackenzie,30,British Columbia,#ADA365,30,30,True
+686,Wonowon,30,British Columbia,#ADA365,30,30,True
+687,Cranbrook,30,British Columbia,#ADA365,30,30,True
+688,Vernon,30,British Columbia,#ADA365,30,30,True
+689,Golden,30,British Columbia,#ADA365,30,30,True
+690,Williams Lake,30,British Columbia,#ADA365,30,30,True
+691,Calgary,34,Alberta,#849493,34,34,True
+692,Edmonton,34,Alberta,#849493,34,34,True
+693,Red Deer,34,Alberta,#849493,34,34,True
+694,Lethbridge,34,Alberta,#849493,34,34,True
+695,Medicine Hat,34,Alberta,#849493,34,34,True
+696,Brooks,34,Alberta,#849493,34,34,True
+697,Hanna,34,Alberta,#849493,34,34,True
+698,Vegreville,34,Alberta,#849493,34,34,True
+699,Vermilion,34,Alberta,#849493,34,34,True
+700,Fort McMurray,34,Alberta,#849493,34,34,True
+701,Lac la Biche,34,Alberta,#849493,34,34,True
+702,Iquitos,62,Peru,#9B6A28,62,62,True
+703,Peerless Lake,34,Alberta,#849493,34,34,True
+704,Peace River,34,Alberta,#849493,34,34,True
+705,Grand Prairie,34,Alberta,#849493,34,34,True
+706,Whitecourt,34,Alberta,#849493,34,34,True
+707,Banff,34,Alberta,#849493,34,34,True
+708,Grand Cache,34,Alberta,#849493,34,34,True
+709,Worsley,34,Alberta,#849493,34,34,True
+710,Boyle,34,Alberta,#849493,34,34,True
+711,Cardston,34,Alberta,#849493,34,34,True
+712,Claresholm,34,Alberta,#849493,34,34,True
+713,Taber,34,Alberta,#849493,34,34,True
+714,Regina,35,Saskatchewan,#5D758B,35,35,True
+715,Saskatoon,35,Saskatchewan,#5D758B,35,35,True
+716,Prince Albert,35,Saskatchewan,#5D758B,35,35,True
+717,N. Battleford,35,Saskatchewan,#5D758B,35,35,True
+718,La Ronge,35,Saskatchewan,#5D758B,35,35,True
+719,Tisdale,35,Saskatchewan,#5D758B,35,35,True
+720,Nipawin,35,Saskatchewan,#5D758B,35,35,True
+721,Estevan,35,Saskatchewan,#5D758B,35,35,True
+722,Yorkton,35,Saskatchewan,#5D758B,35,35,True
+723,Moose Jaw,35,Saskatchewan,#5D758B,35,35,True
+724,Swift Current,35,Saskatchewan,#5D758B,35,35,True
+725,Kindersley,35,Saskatchewan,#5D758B,35,35,True
+726,Rosetown,35,Saskatchewan,#5D758B,35,35,True
+727,Meadow Lake,35,Saskatchewan,#5D758B,35,35,True
+728,Rosthern,35,Saskatchewan,#5D758B,35,35,True
+729,Humboldt,35,Saskatchewan,#5D758B,35,35,True
+730,Archerwill,35,Saskatchewan,#5D758B,35,35,True
+731,Davidson,35,Saskatchewan,#5D758B,35,35,True
+732,Radisson,35,Saskatchewan,#5D758B,35,35,True
+733,Shellbrook,35,Saskatchewan,#5D758B,35,35,True
+734,Shell Lake,35,Saskatchewan,#5D758B,35,35,True
+735,Beauval,35,Saskatchewan,#5D758B,35,35,True
+736,La Loche,35,Saskatchewan,#5D758B,35,35,True
+737,Dawson,182,Yukon,#9CAE8D,182,182,True
+738,Whitehorse,182,Yukon,#9CAE8D,182,182,True
+739,Destruction Bay,182,Yukon,#9CAE8D,182,182,True
+740,Ross River,182,Yukon,#9CAE8D,182,182,True
+741,Nahanni Butte,182,Yukon,#9CAE8D,182,182,True
+742,Yellowknife,182,Yukon,#9CAE8D,182,182,True
+743,Winnipeg,36,Manitoba,#99654E,36,36,True
+744,Brandon,36,Manitoba,#99654E,36,36,True
+745,Dauphin,36,Manitoba,#99654E,36,36,True
+746,Swan River,36,Manitoba,#99654E,36,36,True
+747,Peguis,36,Manitoba,#99654E,36,36,True
+748,Steinbach,36,Manitoba,#99654E,36,36,True
+749,Snow Lake,36,Manitoba,#99654E,36,36,True
+750,Shamattawa,36,Manitoba,#99654E,36,36,True
+751,Thompson,36,Manitoba,#99654E,36,36,True
+752,Grand Rapids,36,Manitoba,#99654E,36,36,True
+753,La Brochet,36,Manitoba,#99654E,36,36,True
+754,Whale Cove,36,Manitoba,#99654E,36,36,True
+755,Baker Lake,36,Manitoba,#99654E,36,36,True
+756,Toronto,37,Ontario,#D29166,37,37,True
+757,Sudbury,37,Ontario,#D29166,37,37,True
+758,Thunder Bay,37,Ontario,#D29166,37,37,True
+759,Moosonee,37,Ontario,#D29166,37,37,True
+760,Timmins,37,Ontario,#D29166,37,37,True
+761,New York,41,New England,#7A8150,41,41,True
+762,Boston,41,New England,#7A8150,41,41,True
+763,Fort Severn,37,Ontario,#D29166,37,37,True
+764,Winisk,37,Ontario,#D29166,37,37,True
+765,Wabitigweyaang,37,Ontario,#D29166,37,37,True
+766,Ignance,37,Ontario,#D29166,37,37,True
+767,Kenora,37,Ontario,#D29166,37,37,True
+768,Nipigon,37,Ontario,#D29166,37,37,True
+769,Sault Ste. Marie,37,Ontario,#D29166,37,37,True
+770,North Bay,37,Ontario,#D29166,37,37,True
+771,Kawartha Lakes,37,Ontario,#D29166,37,37,True
+772,Ottawa,37,Ontario,#D29166,37,37,True
+773,Huntsville,37,Ontario,#D29166,37,37,True
+774,Hamilton (ON),37,Ontario,#D29166,37,37,True
+775,Montréal,38,Quebec,#E5BB5F,38,38,True
+776,Engelhart,37,Ontario,#D29166,37,37,True
+777,Gogama,37,Ontario,#D29166,37,37,True
+778,Cochrane,37,Ontario,#D29166,37,37,True
+779,Wawa,37,Ontario,#D29166,37,37,True
+780,Hearst,37,Ontario,#D29166,37,37,True
+781,Geraldton (ON),37,Ontario,#D29166,37,37,True
+782,Fort Hope,37,Ontario,#D29166,37,37,True
+783,Sioux Lookout,37,Ontario,#D29166,37,37,True
+784,Québec,38,Quebec,#E5BB5F,38,38,True
+785,Saguenay,38,Quebec,#E5BB5F,38,38,True
+786,Sherbrooke,38,Quebec,#E5BB5F,38,38,True
+787,Victoriaville,38,Quebec,#E5BB5F,38,38,True
+788,Shawinigan,38,Quebec,#E5BB5F,38,38,True
+789,Rouyn-Noranda,38,Quebec,#E5BB5F,38,38,True
+790,Saint-Jérôme,38,Quebec,#E5BB5F,38,38,True
+791,La Tuque,38,Quebec,#E5BB5F,38,38,True
+792,Rimouski,38,Quebec,#E5BB5F,38,38,True
+793,Val-d'Or,38,Quebec,#E5BB5F,38,38,True
+794,Kipawa,38,Quebec,#E5BB5F,38,38,True
+795,La Sarre,38,Quebec,#E5BB5F,38,38,True
+796,Kitcisakik,38,Quebec,#E5BB5F,38,38,True
+797,Salluit,38,Quebec,#E5BB5F,38,38,True
+798,Sakami,38,Quebec,#E5BB5F,38,38,True
+799,Happy Valley-Goose Bay,38,Quebec,#E5BB5F,38,38,True
+800,Sept-Îles,38,Quebec,#E5BB5F,38,38,True
+801,Kuujjuaq,38,Quebec,#E5BB5F,38,38,True
+802,Mistissini,38,Quebec,#E5BB5F,38,38,True
+803,Eastmain,38,Quebec,#E5BB5F,38,38,True
+804,Caniapiscau,38,Quebec,#E5BB5F,38,38,True
+805,Aklavik,182,Yukon,#9CAE8D,182,182,True
+806,Old Crow,182,Yukon,#9CAE8D,182,182,True
+807,Fort Reliance,182,Yukon,#9CAE8D,182,182,True
+808,Snowdrift,182,Yukon,#9CAE8D,182,182,True
+809,Bathurst Inlet,182,Yukon,#9CAE8D,182,182,True
+810,Coppermine,182,Yukon,#9CAE8D,182,182,True
+811,Philadelphia,41,New England,#7A8150,41,41,True
+812,Washington,41,New England,#7A8150,41,41,True
+813,Pittsburgh,41,New England,#7A8150,41,41,True
+814,Rochester (NY),41,New England,#7A8150,41,41,True
+815,Baltimore,41,New England,#7A8150,41,41,True
+816,Johnstown,41,New England,#7A8150,41,41,True
+817,Princeton,41,New England,#7A8150,41,41,True
+818,Harrisburg,41,New England,#7A8150,41,41,True
+819,Scranton,41,New England,#7A8150,41,41,True
+820,Syracuse,41,New England,#7A8150,41,41,True
+821,Binghamton,41,New England,#7A8150,41,41,True
+822,Providence,41,New England,#7A8150,41,41,True
+823,Worcester,41,New England,#7A8150,41,41,True
+824,Hartford,41,New England,#7A8150,41,41,True
+825,New Haven,41,New England,#7A8150,41,41,True
+826,Atlantic City,41,New England,#7A8150,41,41,True
+827,Erie,41,New England,#7A8150,41,41,True
+828,Lewisburg,41,New England,#7A8150,41,41,True
+829,State College,41,New England,#7A8150,41,41,True
+830,Bangor,41,New England,#7A8150,41,41,True
+831,Portland (ME),41,New England,#7A8150,41,41,True
+832,Manchester (NH),41,New England,#7A8150,41,41,True
+833,Albany (NY),41,New England,#7A8150,41,41,True
+834,Kingston (NY),41,New England,#7A8150,41,41,True
+835,Burlington,41,New England,#7A8150,41,41,True
+836,Watertown,41,New England,#7A8150,41,41,True
+837,Miami,49,South USA,#6E8F93,49,49,True
+838,Atlanta,49,South USA,#6E8F93,49,49,True
+839,Jacksonville,49,South USA,#6E8F93,49,49,True
+840,New Orleans,49,South USA,#6E8F93,49,49,True
+841,Lafayette (LA),49,South USA,#6E8F93,49,49,True
+842,Shreveport,49,South USA,#6E8F93,49,49,True
+843,Jackson,49,South USA,#6E8F93,49,49,True
+844,Oxford,49,South USA,#6E8F93,49,49,True
+845,Hattiesburg,49,South USA,#6E8F93,49,49,True
+846,Huntsville (AL),49,South USA,#6E8F93,49,49,True
+847,Birmingham (AL),49,South USA,#6E8F93,49,49,True
+848,Montgomery,49,South USA,#6E8F93,49,49,True
+849,Meridian,49,South USA,#6E8F93,49,49,True
+850,Athens (GA),49,South USA,#6E8F93,49,49,True
+851,Marietta,49,South USA,#6E8F93,49,49,True
+852,Macon,49,South USA,#6E8F93,49,49,True
+853,Savannah,49,South USA,#6E8F93,49,49,True
+854,Columbus (GA),49,South USA,#6E8F93,49,49,True
+855,Dothan,49,South USA,#6E8F93,49,49,True
+856,Tallahassee,49,South USA,#6E8F93,49,49,True
+857,Fredericton,40,New Brunswick,#C0574B,40,40,True
+858,Moncton,40,New Brunswick,#C0574B,40,40,True
+859,Yarmouth,40,New Brunswick,#C0574B,40,40,True
+860,New Glasgow,40,New Brunswick,#C0574B,40,40,True
+861,Valdosta,49,South USA,#6E8F93,49,49,True
+862,Albany (GA),49,South USA,#6E8F93,49,49,True
+863,Gainesville,49,South USA,#6E8F93,49,49,True
+864,Orlando,49,South USA,#6E8F93,49,49,True
+865,Tampa,49,South USA,#6E8F93,49,49,True
+866,Fort Myers,49,South USA,#6E8F93,49,49,True
+867,Mobile,49,South USA,#6E8F93,49,49,True
+868,Panama City,49,South USA,#6E8F93,49,49,True
+869,Tijuana,33,Baja California Mexico,#E5BB5F,33,33,True
+870,Ensenada,33,Baja California Mexico,#E5BB5F,33,33,True
+871,La Suerte,33,Baja California Mexico,#E5BB5F,33,33,True
+872,San Ignacio,33,Baja California Mexico,#E5BB5F,33,33,True
+873,Punta Prieta,33,Baja California Mexico,#E5BB5F,33,33,True
+874,La Paz (MX),33,Baja California Mexico,#E5BB5F,33,33,True
+875,Loreto,33,Baja California Mexico,#E5BB5F,33,33,True
+876,Chihuahua,54,North Mexico,#637D52,54,54,True
+877,Hermosillo,54,North Mexico,#637D52,54,54,True
+878,Monterey,54,North Mexico,#637D52,54,54,True
+879,Mazatlan,54,North Mexico,#637D52,54,54,True
+880,Mérida,55,South Mexico,#C15C4C,55,55,True
+881,Veracruz,55,South Mexico,#C15C4C,55,55,True
+882,Mexico City,55,South Mexico,#C15C4C,55,55,True
+883,Acapulco,55,South Mexico,#C15C4C,55,55,True
+884,Tepic,54,North Mexico,#637D52,54,54,True
+885,San Luis Potosi,54,North Mexico,#637D52,54,54,True
+886,Tampico,54,North Mexico,#637D52,54,54,True
+887,Puerto Vallarta,55,South Mexico,#C15C4C,55,55,True
+888,Guadalajara,55,South Mexico,#C15C4C,55,55,True
+889,Irapuato,55,South Mexico,#C15C4C,55,55,True
+890,Poza Rica,55,South Mexico,#C15C4C,55,55,True
+891,Xalapa Enríquez,55,South Mexico,#C15C4C,55,55,True
+892,Escárcega,55,South Mexico,#C15C4C,55,55,True
+893,Chilpancingo,55,South Mexico,#C15C4C,55,55,True
+894,San Juan del Río,55,South Mexico,#C15C4C,55,55,True
+895,Morelia,55,South Mexico,#C15C4C,55,55,True
+896,Colima,55,South Mexico,#C15C4C,55,55,True
+897,Petatlán,55,South Mexico,#C15C4C,55,55,True
+898,San Marcos,55,South Mexico,#C15C4C,55,55,True
+899,Córdoba (MX),55,South Mexico,#C15C4C,55,55,True
+900,Oaxaca,55,South Mexico,#C15C4C,55,55,True
+901,Villahermosa,55,South Mexico,#C15C4C,55,55,True
+902,Coatzacoalcos,55,South Mexico,#C15C4C,55,55,True
+903,Tuxtepec,55,South Mexico,#C15C4C,55,55,True
+904,Tuxtla Gutiérrez,55,South Mexico,#C15C4C,55,55,True
+905,Palenque,55,South Mexico,#C15C4C,55,55,True
+906,Campeche,55,South Mexico,#C15C4C,55,55,True
+907,Cancún,55,South Mexico,#C15C4C,55,55,True
+908,Valladolid (MX),55,South Mexico,#C15C4C,55,55,True
+909,Chetumal,55,South Mexico,#C15C4C,55,55,True
+910,Elfin Cove,30,British Columbia,#ADA365,30,30,True
+911,Benito Juárez,54,North Mexico,#637D52,54,54,True
+912,Caborca,54,North Mexico,#637D52,54,54,True
+913,Navojoa,54,North Mexico,#637D52,54,54,True
+914,Los Mochis,54,North Mexico,#637D52,54,54,True
+915,Culiacán Rosales,54,North Mexico,#637D52,54,54,True
+916,Delicias,54,North Mexico,#637D52,54,54,True
+917,Ures,54,North Mexico,#637D52,54,54,True
+918,Ciudad Cuauhtémoc,54,North Mexico,#637D52,54,54,True
+919,Creel,54,North Mexico,#637D52,54,54,True
+920,Piedras Negras,54,North Mexico,#637D52,54,54,True
+921,Monclova,54,North Mexico,#637D52,54,54,True
+922,Reynosa,54,North Mexico,#637D52,54,54,True
+923,Ciudad Victoria,54,North Mexico,#637D52,54,54,True
+924,Saltillo,54,North Mexico,#637D52,54,54,True
+925,Matehuala,54,North Mexico,#637D52,54,54,True
+926,Fresnillo,54,North Mexico,#637D52,54,54,True
+927,Torreón,54,North Mexico,#637D52,54,54,True
+928,Durango,54,North Mexico,#637D52,54,54,True
+929,Hidalgo del Parral,54,North Mexico,#637D52,54,54,True
+930,El Hundido,54,North Mexico,#637D52,54,54,True
+931,Rodeo,54,North Mexico,#637D52,54,54,True
+932,Belize City,56,Central America,#9CAE8D,56,56,True
+933,Belmopan,56,Central America,#9CAE8D,56,56,True
+934,Guatemala,56,Central America,#9CAE8D,56,56,True
+935,San Pedro Sula,56,Central America,#9CAE8D,56,56,True
+936,San Miguel,56,Central America,#9CAE8D,56,56,True
+937,San Jose,56,Central America,#9CAE8D,56,56,True
+938,Managua,56,Central America,#9CAE8D,56,56,True
+939,Tegucigalpa,56,Central America,#9CAE8D,56,56,True
+940,La Palma,57,Panama,#5C7A87,57,57,True
+941,David,57,Panama,#5C7A87,57,57,True
+942,Havanna,58,Caribbean,#7A8150,58,58,True
+943,Pinar del Río,58,Caribbean,#7A8150,58,58,True
+944,Cienfuegos,58,Caribbean,#7A8150,58,58,True
+945,Camagüey,58,Caribbean,#7A8150,58,58,True
+946,Santa Clara,58,Caribbean,#7A8150,58,58,True
+947,Santiago d. C.,58,Caribbean,#7A8150,58,58,True
+948,Rio Branco,63,West Amazonas,#819254,63,63,True
+949,Guantánamo,58,Caribbean,#7A8150,58,58,True
+950,Bayamo,58,Caribbean,#7A8150,58,58,True
+951,Santo Domingo,58,Caribbean,#7A8150,58,58,True
+952,Higüey,58,Caribbean,#7A8150,58,58,True
+953,Azua,58,Caribbean,#7A8150,58,58,True
+954,Port-au-Prince,58,Caribbean,#7A8150,58,58,True
+955,San Juan,58,Caribbean,#7A8150,58,58,True
+956,Kingston,58,Caribbean,#7A8150,58,58,True
+957,Montego Bay,58,Caribbean,#7A8150,58,58,True
+958,Bogota,60,Colombia,#EECA71,60,60,True
+959,Barranquilla,60,Colombia,#EECA71,60,60,True
+960,Medellín,60,Colombia,#EECA71,60,60,True
+961,Pasto,60,Colombia,#EECA71,60,60,True
+962,La Pedrera,60,Colombia,#EECA71,60,60,True
+963,Pacoa,60,Colombia,#EECA71,60,60,True
+964,Mitú,60,Colombia,#EECA71,60,60,True
+965,Puerto Iñírida,60,Colombia,#EECA71,60,60,True
+966,La Primavera,60,Colombia,#EECA71,60,60,True
+967,Valledupar,60,Colombia,#EECA71,60,60,True
+968,Manizales,60,Colombia,#EECA71,60,60,True
+969,Cali,60,Colombia,#EECA71,60,60,True
+970,Tumaco,60,Colombia,#EECA71,60,60,True
+971,Florencia,60,Colombia,#EECA71,60,60,True
+972,Puerto Leguizamo,60,Colombia,#EECA71,60,60,True
+973,Neiva,60,Colombia,#EECA71,60,60,True
+974,Tunja,60,Colombia,#EECA71,60,60,True
+975,San José del Guaviare,60,Colombia,#EECA71,60,60,True
+976,Montería,60,Colombia,#EECA71,60,60,True
+977,Bucaramanga,60,Colombia,#EECA71,60,60,True
+978,Turbo,60,Colombia,#EECA71,60,60,True
+979,Puerto Berrio,60,Colombia,#EECA71,60,60,True
+980,Yopal,60,Colombia,#EECA71,60,60,True
+981,Espinar,62,Peru,#9B6A28,62,62,True
+982,Cumaribo,60,Colombia,#EECA71,60,60,True
+983,Boavita,60,Colombia,#EECA71,60,60,True
+984,Quito,61,Ecuador,#AF5244,61,61,True
+985,Nueva Loja,61,Ecuador,#AF5244,61,61,True
+986,Guayaquil,61,Ecuador,#AF5244,61,61,True
+987,Manta,61,Ecuador,#AF5244,61,61,True
+988,Ambato,61,Ecuador,#AF5244,61,61,True
+989,Esmeraldas,61,Ecuador,#AF5244,61,61,True
+990,Cuenca (EC),61,Ecuador,#AF5244,61,61,True
+991,Lononaco,61,Ecuador,#AF5244,61,61,True
+992,Puerto Pardo,61,Ecuador,#AF5244,61,61,True
+993,Boca,61,Ecuador,#AF5244,61,61,True
+994,Merritt,30,British Columbia,#ADA365,30,30,True
+995,Carcross,182,Yukon,#9CAE8D,182,182,True
+996,Tarapoto,62,Peru,#9B6A28,62,62,True
+997,Lima,62,Peru,#9B6A28,62,62,True
+998,Piura,62,Peru,#9B6A28,62,62,True
+999,Chiclayo,62,Peru,#9B6A28,62,62,True
+1000,Trujillo,62,Peru,#9B6A28,62,62,True
+1001,Chincha Alta,62,Peru,#9B6A28,62,62,True
+1002,Tacna,62,Peru,#9B6A28,62,62,True
+1003,Arequipa,62,Peru,#9B6A28,62,62,True
+1004,Puno,62,Peru,#9B6A28,62,62,True
+1005,P. Maldonado,62,Peru,#9B6A28,62,62,True
+1006,Cusco,62,Peru,#9B6A28,62,62,True
+1007,Ayacucho,62,Peru,#9B6A28,62,62,True
+1008,Huancayo,62,Peru,#9B6A28,62,62,True
+1009,Alerta,62,Peru,#9B6A28,62,62,True
+1010,Tocache,62,Peru,#9B6A28,62,62,True
+1011,Jaén (PE),62,Peru,#9B6A28,62,62,True
+1012,Lagunas,62,Peru,#9B6A28,62,62,True
+1013,Nauta,62,Peru,#9B6A28,62,62,True
+1014,Pucallpa,62,Peru,#9B6A28,62,62,True
+1015,Pebas,62,Peru,#9B6A28,62,62,True
+1016,Nasca,62,Peru,#9B6A28,62,62,True
+1017,Maracaibo,59,Venezuela,#74798B,59,59,True
+1018,Valera,59,Venezuela,#74798B,59,59,True
+1019,San Cristóbal,59,Venezuela,#74798B,59,59,True
+1020,Barquisimeto,59,Venezuela,#74798B,59,59,True
+1021,Valencia (VE),59,Venezuela,#74798B,59,59,True
+1022,Caracas,59,Venezuela,#74798B,59,59,True
+1023,Cumaná,59,Venezuela,#74798B,59,59,True
+1024,Maturín,59,Venezuela,#74798B,59,59,True
+1025,Ciudad Bolívar,59,Venezuela,#74798B,59,59,True
+1026,Calabozo,59,Venezuela,#74798B,59,59,True
+1027,Canaima,59,Venezuela,#74798B,59,59,True
+1028,Urimán,59,Venezuela,#74798B,59,59,True
+1029,Firiña,59,Venezuela,#74798B,59,59,True
+1030,Zaraza,59,Venezuela,#74798B,59,59,True
+1031,Guarataro,59,Venezuela,#74798B,59,59,True
+1032,San Juan de Manapiare,59,Venezuela,#74798B,59,59,True
+1033,Tamatama,59,Venezuela,#74798B,59,59,True
+1034,La Esmeralda,59,Venezuela,#74798B,59,59,True
+1035,Bruno,59,Venezuela,#74798B,59,59,True
+1036,Machiques,59,Venezuela,#74798B,59,59,True
+1037,Barinas,59,Venezuela,#74798B,59,59,True
+1038,Arismendi,59,Venezuela,#74798B,59,59,True
+1039,Elorza,59,Venezuela,#74798B,59,59,True
+1040,Maripa,59,Venezuela,#74798B,59,59,True
+1041,Parguaza,59,Venezuela,#74798B,59,59,True
+1042,Paramaribo,66,Guyana,#BF794E,66,66,True
+1043,Georgetown,66,Guyana,#BF794E,66,66,True
+1044,Cayenne,66,Guyana,#BF794E,66,66,True
+1045,Bienvenue,66,Guyana,#BF794E,66,66,True
+1046,Lelydorp,66,Guyana,#BF794E,66,66,True
+1047,Apetina,66,Guyana,#BF794E,66,66,True
+1048,Kwakwani,66,Guyana,#BF794E,66,66,True
+1049,Kumaka,66,Guyana,#BF794E,66,66,True
+1050,Baramita,66,Guyana,#BF794E,66,66,True
+1051,Dadanawa,66,Guyana,#BF794E,66,66,True
+1052,Nuuk,183,Greenland,#87A89D,183,183,True
+1053,Nicholls Town,58,Caribbean,#7A8150,58,58,True
+1054,Congo Town,58,Caribbean,#7A8150,58,58,True
+1055,Nueva Gerona,58,Caribbean,#7A8150,58,58,True
+1056,Nassau,58,Caribbean,#7A8150,58,58,True
+1057,Hilo,28,Hawaii,#6990A4,28,28,True
+1058,Lahaina,28,Hawaii,#6990A4,28,28,True
+1059,Honululu,28,Hawaii,#6990A4,28,28,True
+1060,Lihue,28,Hawaii,#6990A4,28,28,True
+1061,Johnston Atoll,29,Johnston Atoll,#BF794E,29,29,True
+1062,Sand Island,27,Midway,#6D9368,27,27,True
+1063,Eastern Island,27,Midway,#6D9368,27,27,True
+1064,La Paz,184,Bolivia,#C25E53,184,184,True
+1065,Coarí,63,West Amazonas,#819254,63,63,True
+1066,Içana,63,West Amazonas,#819254,63,63,True
+1067,Taraquá,63,West Amazonas,#819254,63,63,True
+1068,Benjamin Constant,63,West Amazonas,#819254,63,63,True
+1069,Eirunepé,63,West Amazonas,#819254,63,63,True
+1070,Envira,63,West Amazonas,#819254,63,63,True
+1071,Jutaí,63,West Amazonas,#819254,63,63,True
+1072,Pauini,63,West Amazonas,#819254,63,63,True
+1073,Boca do Acre,63,West Amazonas,#819254,63,63,True
+1074,Concórdia,63,West Amazonas,#819254,63,63,True
+1075,São Paulo de Olivença,63,West Amazonas,#819254,63,63,True
+1076,Manaus,64,East Amazonas,#85ACBE,64,64,True
+1077,Manicoré,64,East Amazonas,#85ACBE,64,64,True
+1078,Itacoatiara,64,East Amazonas,#85ACBE,64,64,True
+1079,Urucará,64,East Amazonas,#85ACBE,64,64,True
+1080,Moura,64,East Amazonas,#85ACBE,64,64,True
+1081,Barcelos,64,East Amazonas,#85ACBE,64,64,True
+1082,Maraã,63,West Amazonas,#819254,63,63,True
+1083,Tefé,64,East Amazonas,#85ACBE,64,64,True
+1084,Coari,64,East Amazonas,#85ACBE,64,64,True
+1085,Borba,64,East Amazonas,#85ACBE,64,64,True
+1086,Novo Aripuanã,64,East Amazonas,#85ACBE,64,64,True
+1087,Humaitá,64,East Amazonas,#85ACBE,64,64,True
+1088,Canutama,64,East Amazonas,#85ACBE,64,64,True
+1089,Sumaúma,64,East Amazonas,#85ACBE,64,64,True
+1090,Prainha,64,East Amazonas,#85ACBE,64,64,True
+1091,Miriti,64,East Amazonas,#85ACBE,64,64,True
+1092,Sucundurí,64,East Amazonas,#85ACBE,64,64,True
+1093,Codajás,64,East Amazonas,#85ACBE,64,64,True
+1094,Boa Vista,65,North Brazil,#96AC80,65,65,True
+1095,Tomar,64,East Amazonas,#85ACBE,64,64,True
+1096,Porto Velho,64,East Amazonas,#85ACBE,64,64,True
+1097,Cujubim,64,East Amazonas,#85ACBE,64,64,True
+1098,Jaru,64,East Amazonas,#85ACBE,64,64,True
+1099,Cacoal,64,East Amazonas,#85ACBE,64,64,True
+1100,São Francisco do Guaporé,64,East Amazonas,#85ACBE,64,64,True
+1101,Abunã,64,East Amazonas,#85ACBE,64,64,True
+1102,Caracaraí,65,North Brazil,#96AC80,65,65,True
+1103,Macapá,65,North Brazil,#96AC80,65,65,True
+1104,Belém,65,North Brazil,#96AC80,65,65,True
+1105,Santarém,65,North Brazil,#96AC80,65,65,True
+1106,Marabá,65,North Brazil,#96AC80,65,65,True
+1107,Parauapebas,65,North Brazil,#96AC80,65,65,True
+1108,Itaituba,65,North Brazil,#96AC80,65,65,True
+1109,Matane,38,Quebec,#E5BB5F,38,38,True
+1110,Rivière-du-Loup,38,Quebec,#E5BB5F,38,38,True
+1111,Cap-Haïtien,58,Caribbean,#7A8150,58,58,True
+1112,Lisboa,61,Ecuador,#AF5244,61,61,True
+1113,Cajamarca,62,Peru,#9B6A28,62,62,True
+1114,Chimbote,62,Peru,#9B6A28,62,62,True
+1115,Shintuya,62,Peru,#9B6A28,62,62,True
+1116,Camaná,62,Peru,#9B6A28,62,62,True
+1117,São Luís,70,Maranhão,#C14858,70,70,True
+1118,Fortaleza,70,Maranhão,#C14858,70,70,True
+1119,Teresina,70,Maranhão,#C14858,70,70,True
+1120,Natal,70,Maranhão,#C14858,70,70,True
+1121,Pinheiro,70,Maranhão,#C14858,70,70,True
+1122,Imperatriz,70,Maranhão,#C14858,70,70,True
+1123,Balsas,70,Maranhão,#C14858,70,70,True
+1124,Corrente,70,Maranhão,#C14858,70,70,True
+1125,Floriano,70,Maranhão,#C14858,70,70,True
+1126,Canto do Buriti,70,Maranhão,#C14858,70,70,True
+1127,Uruçuí,70,Maranhão,#C14858,70,70,True
+1128,São Raimundo Nonato,70,Maranhão,#C14858,70,70,True
+1129,Barra do Corda,70,Maranhão,#C14858,70,70,True
+1130,Bacabal,70,Maranhão,#C14858,70,70,True
+1131,Grajaú,70,Maranhão,#C14858,70,70,True
+1132,Buriticupu,70,Maranhão,#C14858,70,70,True
+1133,Sobral,70,Maranhão,#C14858,70,70,True
+1134,Parnaíba,70,Maranhão,#C14858,70,70,True
+1135,Piripiri,70,Maranhão,#C14858,70,70,True
+1136,Maracanaú,70,Maranhão,#C14858,70,70,True
+1137,Mossoró,70,Maranhão,#C14858,70,70,True
+1138,Caicó,70,Maranhão,#C14858,70,70,True
+1139,Parnamirim,70,Maranhão,#C14858,70,70,True
+1140,Crateús,70,Maranhão,#C14858,70,70,True
+1141,Picos,70,Maranhão,#C14858,70,70,True
+1142,Iguatu,70,Maranhão,#C14858,70,70,True
+1143,Juazeiro d. N.,70,Maranhão,#C14858,70,70,True
+1144,Morros,70,Maranhão,#C14858,70,70,True
+1145,Araguaína,67,North Goiás,#9EB1A3,67,67,True
+1146,Miracema,67,North Goiás,#9EB1A3,67,67,True
+1147,Alvorada,67,North Goiás,#9EB1A3,67,67,True
+1148,Guarai,67,North Goiás,#9EB1A3,67,67,True
+1149,Arraias,67,North Goiás,#9EB1A3,67,67,True
+1150,Pium,67,North Goiás,#9EB1A3,67,67,True
+1151,Estrema,67,North Goiás,#9EB1A3,67,67,True
+1152,Recife,69,Pernambuco,#6C989C,69,69,True
+1153,Campina Grande,70,Maranhão,#C14858,70,70,True
+1154,Maceió,69,Pernambuco,#6C989C,69,69,True
+1155,Ouricuri,69,Pernambuco,#6C989C,69,69,True
+1156,Salta,77,North Argentina,#96A87D,77,77,True
+1157,Córdoba (AR),77,North Argentina,#96A87D,77,77,True
+1158,Buenos Aires,77,North Argentina,#96A87D,77,77,True
+1159,Mendoza,77,North Argentina,#96A87D,77,77,True
+1160,Bahía Blanca,78,South Argentina,#CCB084,78,78,True
+1161,Mar del Plata,77,North Argentina,#96A87D,77,77,True
+1162,Tandil,77,North Argentina,#96A87D,77,77,True
+1163,Calilegua,77,North Argentina,#96A87D,77,77,True
+1164,Cafayate,77,North Argentina,#96A87D,77,77,True
+1165,San Rafael,77,North Argentina,#96A87D,77,77,True
+1166,La Reforma,77,North Argentina,#96A87D,77,77,True
+1167,Santa Rosa,77,North Argentina,#96A87D,77,77,True
+1168,Lusaka,107,Northern Rhodesia,#EAD993,107,107,True
+1169,Urucu,64,East Amazonas,#85ACBE,64,64,True
+1170,Lábrea,64,East Amazonas,#85ACBE,64,64,True
+1171,Meditação,64,East Amazonas,#85ACBE,64,64,True
+1172,Bragança,65,North Brazil,#96AC80,65,65,True
+1173,Boate,65,North Brazil,#96AC80,65,65,True
+1174,Tucuruí,65,North Brazil,#96AC80,65,65,True
+1175,Primavera,65,North Brazil,#96AC80,65,65,True
+1176,Cachimbo,65,North Brazil,#96AC80,65,65,True
+1177,Airi,65,North Brazil,#96AC80,65,65,True
+1178,Vitória (BR),65,North Brazil,#96AC80,65,65,True
+1179,São Félix,65,North Brazil,#96AC80,65,65,True
+1180,Natal (BR),65,North Brazil,#96AC80,65,65,True
+1181,Alenquer,65,North Brazil,#96AC80,65,65,True
+1182,Amapá,65,North Brazil,#96AC80,65,65,True
+1183,Cachorrinho,65,North Brazil,#96AC80,65,65,True
+1184,Tacalé,65,North Brazil,#96AC80,65,65,True
+1185,Estrela,65,North Brazil,#96AC80,65,65,True
+1186,Samaumeira,65,North Brazil,#96AC80,65,65,True
+1187,Santa Maria do Boiaçu,65,North Brazil,#96AC80,65,65,True
+1188,Monte Alegre,65,North Brazil,#96AC80,65,65,True
+1189,São Marcos,65,North Brazil,#96AC80,65,65,True
+1190,Fondlándia,65,North Brazil,#96AC80,65,65,True
+1191,Muaná,65,North Brazil,#96AC80,65,65,True
+1192,Sousel,65,North Brazil,#96AC80,65,65,True
+1193,Akotipa,65,North Brazil,#96AC80,65,65,True
+1194,Mazagão,65,North Brazil,#96AC80,65,65,True
+1195,Amajari,65,North Brazil,#96AC80,65,65,True
+1196,Cochabamba,184,Bolivia,#C25E53,184,184,True
+1197,Santa Cruz S.,184,Bolivia,#C25E53,184,184,True
+1198,Trinidad,184,Bolivia,#C25E53,184,184,True
+1199,Tarija,184,Bolivia,#C25E53,184,184,True
+1200,Oruro,184,Bolivia,#C25E53,184,184,True
+1201,Uyuni,184,Bolivia,#C25E53,184,184,True
+1202,San Pablo,184,Bolivia,#C25E53,184,184,True
+1203,Patacamaya,184,Bolivia,#C25E53,184,184,True
+1204,Caranavi,184,Bolivia,#C25E53,184,184,True
+1205,Rurrenabaque,184,Bolivia,#C25E53,184,184,True
+1206,Sena,184,Bolivia,#C25E53,184,184,True
+1207,Riberalta,184,Bolivia,#C25E53,184,184,True
+1208,San Ramon,184,Bolivia,#C25E53,184,184,True
+1209,Casarabe,184,Bolivia,#C25E53,184,184,True
+1210,El Puente,184,Bolivia,#C25E53,184,184,True
+1211,San José de Chiquitos,184,Bolivia,#C25E53,184,184,True
+1212,Camiri,184,Bolivia,#C25E53,184,184,True
+1213,Curichi,184,Bolivia,#C25E53,184,184,True
+1214,Valle Grande,184,Bolivia,#C25E53,184,184,True
+1215,Sucre,184,Bolivia,#C25E53,184,184,True
+1216,Potosí,184,Bolivia,#C25E53,184,184,True
+1217,Arcopongo,184,Bolivia,#C25E53,184,184,True
+1218,Chimoré,184,Bolivia,#C25E53,184,184,True
+1219,Felicidad,184,Bolivia,#C25E53,184,184,True
+1220,San Juan (BO),184,Bolivia,#C25E53,184,184,True
+1221,Goiânia,71,Goiás,#CEC06C,71,71,True
+1222,Cuiabá,71,Goiás,#CEC06C,71,71,True
+1223,Sinop,71,Goiás,#CEC06C,71,71,True
+1224,Formosa,71,Goiás,#CEC06C,71,71,True
+1225,Rodonópolis,71,Goiás,#CEC06C,71,71,True
+1226,Cáceres (BR),71,Goiás,#CEC06C,71,71,True
+1227,Nova Mutum,71,Goiás,#CEC06C,71,71,True
+1228,Colíder,71,Goiás,#CEC06C,71,71,True
+1229,Aripuanã,71,Goiás,#CEC06C,71,71,True
+1230,Brasnorte,71,Goiás,#CEC06C,71,71,True
+1231,Comodoro,71,Goiás,#CEC06C,71,71,True
+1232,Tangará da Serra,71,Goiás,#CEC06C,71,71,True
+1233,Xingu,71,Goiás,#CEC06C,71,71,True
+1234,Confresa,71,Goiás,#CEC06C,71,71,True
+1235,Sorriso,71,Goiás,#CEC06C,71,71,True
+1236,Primavera do Leste,71,Goiás,#CEC06C,71,71,True
+1237,Barra do Garças,71,Goiás,#CEC06C,71,71,True
+1238,Rio Verde,71,Goiás,#CEC06C,71,71,True
+1239,Catalão,71,Goiás,#CEC06C,71,71,True
+1240,Porangatu,71,Goiás,#CEC06C,71,71,True
+1241,Anápolis,71,Goiás,#CEC06C,71,71,True
+1242,Quirinópolis,71,Goiás,#CEC06C,71,71,True
+1243,Tanguro,71,Goiás,#CEC06C,71,71,True
+1244,Queréncia,71,Goiás,#CEC06C,71,71,True
+1245,Apiacás,71,Goiás,#CEC06C,71,71,True
+1246,Juína,71,Goiás,#CEC06C,71,71,True
+1247,Porto Alegre,75,South Brazil,#8CBF78,75,75,True
+1248,Curitiba,75,South Brazil,#8CBF78,75,75,True
+1249,Londrina,75,South Brazil,#8CBF78,75,75,True
+1250,Cascavel,75,South Brazil,#8CBF78,75,75,True
+1251,Pelotas,75,South Brazil,#8CBF78,75,75,True
+1252,Gramado,75,South Brazil,#8CBF78,75,75,True
+1253,Florianópolis,75,South Brazil,#8CBF78,75,75,True
+1254,Maringá,75,South Brazil,#8CBF78,75,75,True
+1255,Umuarama,75,South Brazil,#8CBF78,75,75,True
+1256,Ponta Grossa,75,South Brazil,#8CBF78,75,75,True
+1257,Guarapuava,75,South Brazil,#8CBF78,75,75,True
+1258,Pato Branco,75,South Brazil,#8CBF78,75,75,True
+1259,Apucarana,75,South Brazil,#8CBF78,75,75,True
+1260,Caçador,75,South Brazil,#8CBF78,75,75,True
+1261,Chapecó,75,South Brazil,#8CBF78,75,75,True
+1262,Santa Cruz do Sul,75,South Brazil,#8CBF78,75,75,True
+1263,Santa Maria,75,South Brazil,#8CBF78,75,75,True
+1264,Alegrete,75,South Brazil,#8CBF78,75,75,True
+1265,Passo Fundo,75,South Brazil,#8CBF78,75,75,True
+1266,Santo Ângelo,75,South Brazil,#8CBF78,75,75,True
+1267,Lages,75,South Brazil,#8CBF78,75,75,True
+1268,Montevideo,76,Uruguay,#6DB3AF,76,76,True
+1269,Melo,76,Uruguay,#6DB3AF,76,76,True
+1270,Rocha,76,Uruguay,#6DB3AF,76,76,True
+1271,Durazno,76,Uruguay,#6DB3AF,76,76,True
+1272,Tacuarembó,76,Uruguay,#6DB3AF,76,76,True
+1273,Campo Grande,72,Mato Grosso,#CAA473,72,72,True
+1274,Dourados,72,Mato Grosso,#CAA473,72,72,True
+1275,Miranda,72,Mato Grosso,#CAA473,72,72,True
+1276,Coxim,72,Mato Grosso,#CAA473,72,72,True
+1277,Água Clara,72,Mato Grosso,#CAA473,72,72,True
+1278,Asunción,74,Paraguay,#619591,74,74,True
+1279,San Ignacio (PY),74,Paraguay,#619591,74,74,True
+1280,Caaguazú,74,Paraguay,#619591,74,74,True
+1281,Concepción,74,Paraguay,#619591,74,74,True
+1282,Loma Plata,74,Paraguay,#619591,74,74,True
+1283,São Paulo,73,São Paulo,#A07F40,73,73,True
+1284,Campinas,73,São Paulo,#A07F40,73,73,True
+1285,Rio de Janeiro,73,São Paulo,#A07F40,73,73,True
+1286,Montes Claros,73,São Paulo,#A07F40,73,73,True
+1287,Vitória,73,São Paulo,#A07F40,73,73,True
+1288,Belo Horizonte,73,São Paulo,#A07F40,73,73,True
+1289,Ipatinga,73,São Paulo,#A07F40,73,73,True
+1290,Bocaiúva,73,São Paulo,#A07F40,73,73,True
+1291,Linhares,73,São Paulo,#A07F40,73,73,True
+1292,Eunápolis,73,São Paulo,#A07F40,73,73,True
+1293,Janaúba,73,São Paulo,#A07F40,73,73,True
+1294,Unaí,73,São Paulo,#A07F40,73,73,True
+1295,Paracatu,73,São Paulo,#A07F40,73,73,True
+1296,Uberlândia,73,São Paulo,#A07F40,73,73,True
+1297,Bauru,73,São Paulo,#A07F40,73,73,True
+1298,Araçatuba,73,São Paulo,#A07F40,73,73,True
+1299,Jales,73,São Paulo,#A07F40,73,73,True
+1300,Uberaba,73,São Paulo,#A07F40,73,73,True
+1301,Ribeirão Preto,73,São Paulo,#A07F40,73,73,True
+1302,Ipateruna,73,São Paulo,#A07F40,73,73,True
+1303,Juiz de fora,73,São Paulo,#A07F40,73,73,True
+1304,Taubaté,73,São Paulo,#A07F40,73,73,True
+1305,Volta Redonda,73,São Paulo,#A07F40,73,73,True
+1306,Lavras,73,São Paulo,#A07F40,73,73,True
+1307,Divinópolis,73,São Paulo,#A07F40,73,73,True
+1308,Itaobim,73,São Paulo,#A07F40,73,73,True
+1309,Arinos,73,São Paulo,#A07F40,73,73,True
+1310,Salvador,68,East Brazil,#6C989C,68,68,True
+1311,Barreiras,68,East Brazil,#6C989C,68,68,True
+1312,Vitória d. C.,68,East Brazil,#6C989C,68,68,True
+1313,Feira de Santana,68,East Brazil,#6C989C,68,68,True
+1314,Jacobina,68,East Brazil,#6C989C,68,68,True
+1315,Irecê,68,East Brazil,#6C989C,68,68,True
+1316,Ibotirama,68,East Brazil,#6C989C,68,68,True
+1317,Formosa do Rio Preto,68,East Brazil,#6C989C,68,68,True
+1318,Correntina,68,East Brazil,#6C989C,68,68,True
+1319,Guanambi,68,East Brazil,#6C989C,68,68,True
+1320,Tremedal,68,East Brazil,#6C989C,68,68,True
+1321,Brumado,68,East Brazil,#6C989C,68,68,True
+1322,Itapetinga,68,East Brazil,#6C989C,68,68,True
+1323,Belmonte,68,East Brazil,#6C989C,68,68,True
+1324,Ilhéus,68,East Brazil,#6C989C,68,68,True
+1325,Valença,68,East Brazil,#6C989C,68,68,True
+1326,Jequié,68,East Brazil,#6C989C,68,68,True
+1327,Remanso,68,East Brazil,#6C989C,68,68,True
+1328,Senhor do Bonfim,68,East Brazil,#6C989C,68,68,True
+1329,Serrinha,68,East Brazil,#6C989C,68,68,True
+1330,Monte Santo,68,East Brazil,#6C989C,68,68,True
+1331,Tilcara,77,North Argentina,#96A87D,77,77,True
+1332,Las Lajitas,77,North Argentina,#96A87D,77,77,True
+1333,San Juan (AR),77,North Argentina,#96A87D,77,77,True
+1334,Oberá,77,North Argentina,#96A87D,77,77,True
+1335,Resistencia,77,North Argentina,#96A87D,77,77,True
+1336,San Luis,77,North Argentina,#96A87D,77,77,True
+1337,Río Cuarto,77,North Argentina,#96A87D,77,77,True
+1338,La Toma,77,North Argentina,#96A87D,77,77,True
+1339,La Rioja,77,North Argentina,#96A87D,77,77,True
+1340,Necochea,78,South Argentina,#CCB084,78,78,True
+1341,Parana,77,North Argentina,#96A87D,77,77,True
+1342,Villaguay,77,North Argentina,#96A87D,77,77,True
+1343,Rosario,77,North Argentina,#96A87D,77,77,True
+1344,Santiago del Estero,77,North Argentina,#96A87D,77,77,True
+1345,Junín,77,North Argentina,#96A87D,77,77,True
+1346,Huinca Renancó,77,North Argentina,#96A87D,77,77,True
+1347,Monte Quemado,77,North Argentina,#96A87D,77,77,True
+1348,Zapala,78,South Argentina,#CCB084,78,78,True
+1349,Neuquén,78,South Argentina,#CCB084,78,78,True
+1350,Lamarque,78,South Argentina,#CCB084,78,78,True
+1351,San Carlos da Bariloche,78,South Argentina,#CCB084,78,78,True
+1352,Río Gallegos,78,South Argentina,#CCB084,78,78,True
+1353,Tres Lagos,78,South Argentina,#CCB084,78,78,True
+1354,Puerto Deseado,78,South Argentina,#CCB084,78,78,True
+1355,Perito Moreno,78,South Argentina,#CCB084,78,78,True
+1356,Comodoro Riva.,78,South Argentina,#CCB084,78,78,True
+1357,Río Mayo,78,South Argentina,#CCB084,78,78,True
+1358,Garayalda,78,South Argentina,#CCB084,78,78,True
+1359,Trelew,78,South Argentina,#CCB084,78,78,True
+1360,Canguel,78,South Argentina,#CCB084,78,78,True
+1361,Las Plumas,78,South Argentina,#CCB084,78,78,True
+1362,San Antonio Oeste,78,South Argentina,#CCB084,78,78,True
+1363,Esquel,78,South Argentina,#CCB084,78,78,True
+1364,Tecka,78,South Argentina,#CCB084,78,78,True
+1365,Cutral-Có,78,South Argentina,#CCB084,78,78,True
+1366,Viedma,78,South Argentina,#CCB084,78,78,True
+1367,Los Menucos,78,South Argentina,#CCB084,78,78,True
+1368,Los Altares,78,South Argentina,#CCB084,78,78,True
+1369,Boliche,78,South Argentina,#CCB084,78,78,True
+1370,Rio Grande,78,South Argentina,#CCB084,78,78,True
+1371,Santiago,79,Chile,#6691B1,79,79,True
+1372,Temuco,79,Chile,#6691B1,79,79,True
+1373,Punta Arenas,79,Chile,#6691B1,79,79,True
+1374,Copiapó,79,Chile,#6691B1,79,79,True
+1375,Iquique,79,Chile,#6691B1,79,79,True
+1376,Puerto Aysen,79,Chile,#6691B1,79,79,True
+1377,Tortel,79,Chile,#6691B1,79,79,True
+1378,West Falkland,80,Falkland,#C08132,80,80,True
+1379,East Falkland,80,Falkland,#C08132,80,80,True
+1380,Isla Isabela,81,Galápagos,#C3B35B,81,81,True
+1381,Santa Cruz,81,Galápagos,#C3B35B,81,81,True
+1382,Fernandina,81,Galápagos,#C3B35B,81,81,True
+1383,Kalomo,107,Northern Rhodesia,#EAD993,107,107,True
+1384,Mongu,107,Northern Rhodesia,#EAD993,107,107,True
+1385,Abercorn,107,Northern Rhodesia,#EAD993,107,107,True
+1386,Broken Hill,107,Northern Rhodesia,#EAD993,107,107,True
+1387,Zomba,107,Northern Rhodesia,#EAD993,107,107,True
+1388,Nairobi,110,Kenya,#B19168,110,110,True
+1389,Mwatate,110,Kenya,#B19168,110,110,True
+1390,Kisumu,110,Kenya,#B19168,110,110,True
+1391,Entebbe,110,Kenya,#B19168,110,110,True
+1392,Wajir,110,Kenya,#B19168,110,110,True
+1393,Marsabit,110,Kenya,#B19168,110,110,True
+1394,Antsirane,108,Madagascar,#B03A47,108,108,True
+1395,Cairo,97,Egypt,#CEC074,97,97,True
+1396,Siwa,97,Egypt,#CEC074,97,97,True
+1397,Sallum,97,Egypt,#CEC074,97,97,True
+1398,Aswan,97,Egypt,#CEC074,97,97,True
+1399,Kharga,97,Egypt,#CEC074,97,97,True
+1400,Arish,97,Egypt,#CEC074,97,97,True
+1401,Asyut,97,Egypt,#CEC074,97,97,True
+1402,Papeete,185,Tahiti,#C15C4C,185,185,True
+1403,Mo'orea,185,Tahiti,#C15C4C,185,185,True
+1404,Cavalcante,71,Goiás,#CEC06C,71,71,True
+1405,Morrinhos,71,Goiás,#CEC06C,71,71,True
+1406,La Victoria,74,Paraguay,#619591,74,74,True
+1407,Puerto Santa Cruz,78,South Argentina,#CCB084,78,78,True
+1408,Capetown,105,South Africa,#9E7C29,105,105,True
+1409,Port Elizabeth,105,South Africa,#9E7C29,105,105,True
+1410,Cradock,105,South Africa,#9E7C29,105,105,True
+1411,Worcester (ZA),105,South Africa,#9E7C29,105,105,True
+1412,Johannesburg,105,South Africa,#9E7C29,105,105,True
+1413,Pretoria,105,South Africa,#9E7C29,105,105,True
+1414,Mafeking,105,South Africa,#9E7C29,105,105,True
+1415,Bethlehem,105,South Africa,#9E7C29,105,105,True
+1416,Ladysmith,105,South Africa,#9E7C29,105,105,True
+1417,East London,105,South Africa,#9E7C29,105,105,True
+1418,Springbok,105,South Africa,#9E7C29,105,105,True
+1419,Calvinia,105,South Africa,#9E7C29,105,105,True
+1420,Mossel Bay,105,South Africa,#9E7C29,105,105,True
+1421,Victoria West,105,South Africa,#9E7C29,105,105,True
+1422,Hopetown,105,South Africa,#9E7C29,105,105,True
+1423,Bloemfontein,105,South Africa,#9E7C29,105,105,True
+1424,Kimberley,105,South Africa,#9E7C29,105,105,True
+1425,De Aar,105,South Africa,#9E7C29,105,105,True
+1426,Mthatha,105,South Africa,#9E7C29,105,105,True
+1427,Queenstown,105,South Africa,#9E7C29,105,105,True
+1428,Durban,105,South Africa,#9E7C29,105,105,True
+1429,Port Shepstone,105,South Africa,#9E7C29,105,105,True
+1430,Windhoek,102,South West Africa,#64A273,102,102,True
+1431,Rehoboth,102,South West Africa,#64A273,102,102,True
+1432,Gobabis,102,South West Africa,#64A273,102,102,True
+1433,Otavi,102,South West Africa,#64A273,102,102,True
+1434,Grootfontein,102,South West Africa,#64A273,102,102,True
+1435,Outjo,102,South West Africa,#64A273,102,102,True
+1436,Kalkfontein,102,South West Africa,#64A273,102,102,True
+1437,Keetmanshoop,102,South West Africa,#64A273,102,102,True
+1438,Bethanie,102,South West Africa,#64A273,102,102,True
+1439,Lüderitz,102,South West Africa,#64A273,102,102,True
+1440,Walvis Bay,102,South West Africa,#64A273,102,102,True
+1441,Solitaire,102,South West Africa,#64A273,102,102,True
+1442,Oshakati,102,South West Africa,#64A273,102,102,True
+1443,Torra Bay,102,South West Africa,#64A273,102,102,True
+1444,Opuwo,102,South West Africa,#64A273,102,102,True
+1445,Kapako,102,South West Africa,#64A273,102,102,True
+1446,Okongo,102,South West Africa,#64A273,102,102,True
+1447,Otjinene,102,South West Africa,#64A273,102,102,True
+1448,Osire,102,South West Africa,#64A273,102,102,True
+1449,Tsumeb,102,South West Africa,#64A273,102,102,True
+1450,Otjimbingwe,102,South West Africa,#64A273,102,102,True
+1451,Swakopmund,102,South West Africa,#64A273,102,102,True
+1452,Luanda,101,Angola,#A9663A,101,101,True
+1453,Lobito,101,Angola,#A9663A,101,101,True
+1454,Cazombo,101,Angola,#A9663A,101,101,True
+1455,Humbe,101,Angola,#A9663A,101,101,True
+1456,Nova Lisboa,101,Angola,#A9663A,101,101,True
+1457,Silva Porto,101,Angola,#A9663A,101,101,True
+1458,Cassinga,101,Angola,#A9663A,101,101,True
+1459,Sá da Bandeira,101,Angola,#A9663A,101,101,True
+1460,Moçâmedes,101,Angola,#A9663A,101,101,True
+1461,Barraca,101,Angola,#A9663A,101,101,True
+1462,Ambriz,101,Angola,#A9663A,101,101,True
+1463,Malanje,101,Angola,#A9663A,101,101,True
+1464,Lourenço Marques,106,Mozambique,#6D7447,106,106,True
+1465,Inhambane,106,Mozambique,#6D7447,106,106,True
+1466,Zambezi,106,Mozambique,#6D7447,106,106,True
+1467,Memba,106,Mozambique,#6D7447,106,106,True
+1468,Sofala,106,Mozambique,#6D7447,106,106,True
+1469,Igarassu,69,Pernambuco,#6C989C,69,69,True
+1470,Serra Talhada,69,Pernambuco,#6C989C,69,69,True
+1471,Nampula,106,Mozambique,#6D7447,106,106,True
+1472,Quelimane,106,Mozambique,#6D7447,106,106,True
+1473,Lichinga,106,Mozambique,#6D7447,106,106,True
+1474,Tete,106,Mozambique,#6D7447,106,106,True
+1475,Léopoldville,100,Belgian Congo,#88BAC4,100,100,True
+1476,Ponta Delgada,25,Portugal,#8F7B44,25,25,True
+1477,Basoko,100,Belgian Congo,#88BAC4,100,100,True
+1478,Likasi,100,Belgian Congo,#88BAC4,100,100,True
+1479,Buta,100,Belgian Congo,#88BAC4,100,100,True
+1480,Niangara,100,Belgian Congo,#88BAC4,100,100,True
+1481,Menonge,101,Angola,#A9663A,101,101,True
+1482,Stanleyville,100,Belgian Congo,#88BAC4,100,100,True
+1483,Gemena,100,Belgian Congo,#88BAC4,100,100,True
+1484,Mbandaka,100,Belgian Congo,#88BAC4,100,100,True
+1485,Lodja,100,Belgian Congo,#88BAC4,100,100,True
+1486,Lusambo,100,Belgian Congo,#88BAC4,100,100,True
+1487,Bukama,100,Belgian Congo,#88BAC4,100,100,True
+1488,Kapanga,100,Belgian Congo,#88BAC4,100,100,True
+1489,Kikwit,100,Belgian Congo,#88BAC4,100,100,True
+1490,Matadi,100,Belgian Congo,#88BAC4,100,100,True
+1491,Luebo,100,Belgian Congo,#88BAC4,100,100,True
+1492,Bandundu,100,Belgian Congo,#88BAC4,100,100,True
+1493,El Minya,97,Egypt,#CEC074,97,97,True
+1494,Port Said,97,Egypt,#CEC074,97,97,True
+1495,Mut,97,Egypt,#CEC074,97,97,True
+1496,Alexandria,97,Egypt,#CEC074,97,97,True
+1497,Damanhur,97,Egypt,#CEC074,97,97,True
+1498,Hurghada,97,Egypt,#CEC074,97,97,True
+1499,Ismailia,97,Egypt,#CEC074,97,97,True
+1500,Farafra,97,Egypt,#CEC074,97,97,True
+1501,Faiyum,97,Egypt,#CEC074,97,97,True
+1502,El Sheb,97,Egypt,#CEC074,97,97,True
+1503,Wadi Halfa,98,North Sudan,#60A26B,98,98,True
+1504,Dongola,98,North Sudan,#60A26B,98,98,True
+1505,Port Sudan,98,North Sudan,#60A26B,98,98,True
+1506,Suakin,98,North Sudan,#60A26B,98,98,True
+1507,El Fasher,98,North Sudan,#60A26B,98,98,True
+1508,En Nahud,98,North Sudan,#60A26B,98,98,True
+1509,El Obeid,98,North Sudan,#60A26B,98,98,True
+1510,El Dueim,98,North Sudan,#60A26B,98,98,True
+1511,Sinjah,98,North Sudan,#60A26B,98,98,True
+1512,Sennar,98,North Sudan,#60A26B,98,98,True
+1513,Khartoum,98,North Sudan,#60A26B,98,98,True
+1514,Merowe,98,North Sudan,#60A26B,98,98,True
+1515,Berber,98,North Sudan,#60A26B,98,98,True
+1516,El Qasr,97,Egypt,#CEC074,97,97,True
+1517,Abu Minqar,97,Egypt,#CEC074,97,97,True
+1518,Aṣ-ṣaḥrā,97,Egypt,#CEC074,97,97,True
+1519,Eastern Sand Sea,97,Egypt,#CEC074,97,97,True
+1520,El Alamein,97,Egypt,#CEC074,97,97,True
+1521,Marsa Matruh,97,Egypt,#CEC074,97,97,True
+1522,Sidi Barrani,97,Egypt,#CEC074,97,97,True
+1523,Cara,97,Egypt,#CEC074,97,97,True
+1524,Bawiti,97,Egypt,#CEC074,97,97,True
+1525,Girga,97,Egypt,#CEC074,97,97,True
+1526,Qena,97,Egypt,#CEC074,97,97,True
+1527,Berenice,97,Egypt,#CEC074,97,97,True
+1528,Safaga,97,Egypt,#CEC074,97,97,True
+1529,Madinaty,97,Egypt,#CEC074,97,97,True
+1530,Luxor,97,Egypt,#CEC074,97,97,True
+1531,Tripoli,93,Libya,#7B9B9D,93,93,True
+1532,Gharyan,93,Libya,#7B9B9D,93,93,True
+1533,Misrata,93,Libya,#7B9B9D,93,93,True
+1534,Sirte,93,Libya,#7B9B9D,93,93,True
+1535,Benghazi,93,Libya,#7B9B9D,93,93,True
+1536,Socna,93,Libya,#7B9B9D,93,93,True
+1537,Qatrun,93,Libya,#7B9B9D,93,93,True
+1538,Wath,93,Libya,#7B9B9D,93,93,True
+1539,Al-Jawf,93,Libya,#7B9B9D,93,93,True
+1540,Buzaymah,93,Libya,#7B9B9D,93,93,True
+1541,Zaltan,93,Libya,#7B9B9D,93,93,True
+1542,Jalu,93,Libya,#7B9B9D,93,93,True
+1543,Giarabub,93,Libya,#7B9B9D,93,93,True
+1544,Tobruk,93,Libya,#7B9B9D,93,93,True
+1545,Derna,93,Libya,#7B9B9D,93,93,True
+1546,Ajdabiya,93,Libya,#7B9B9D,93,93,True
+1547,Marsa al Brega,93,Libya,#7B9B9D,93,93,True
+1548,At Tallab,93,Libya,#7B9B9D,93,93,True
+1549,Timassah,93,Libya,#7B9B9D,93,93,True
+1550,Ghat,93,Libya,#7B9B9D,93,93,True
+1551,Sabha,93,Libya,#7B9B9D,93,93,True
+1552,Ghadames,93,Libya,#7B9B9D,93,93,True
+1553,Nalut,93,Libya,#7B9B9D,93,93,True
+1554,Tabonieh,93,Libya,#7B9B9D,93,93,True
+1555,Zillah,93,Libya,#7B9B9D,93,93,True
+1556,Waddan,93,Libya,#7B9B9D,93,93,True
+1557,Bin Jawad,93,Libya,#7B9B9D,93,93,True
+1558,Kufra,93,Libya,#7B9B9D,93,93,True
+1559,Adiri,93,Libya,#7B9B9D,93,93,True
+1560,Tunis,85,Tunisia,#8F7B44,85,85,True
+1561,Gabes,85,Tunisia,#8F7B44,85,85,True
+1562,Sfax,85,Tunisia,#8F7B44,85,85,True
+1563,Tozeur,85,Tunisia,#8F7B44,85,85,True
+1564,Tataouine,85,Tunisia,#8F7B44,85,85,True
+1565,El Kef,85,Tunisia,#8F7B44,85,85,True
+1566,Oran,84,Algeria,#F0CE8E,84,84,True
+1567,Algiers,84,Algeria,#F0CE8E,84,84,True
+1568,Bedouaram,92,French Niger,#9FA2A0,92,92,True
+1569,Tamanrasset,84,Algeria,#F0CE8E,84,84,True
+1570,In Guezzam,84,Algeria,#F0CE8E,84,84,True
+1571,Idlès,84,Algeria,#F0CE8E,84,84,True
+1572,Tinzouatine,84,Algeria,#F0CE8E,84,84,True
+1573,Silet,84,Algeria,#F0CE8E,84,84,True
+1574,Tazrouk,84,Algeria,#F0CE8E,84,84,True
+1575,Illizi,84,Algeria,#F0CE8E,84,84,True
+1576,El Borma,84,Algeria,#F0CE8E,84,84,True
+1577,El Qued,84,Algeria,#F0CE8E,84,84,True
+1578,Bône,84,Algeria,#F0CE8E,84,84,True
+1579,Setif,84,Algeria,#F0CE8E,84,84,True
+1580,Constantine,84,Algeria,#F0CE8E,84,84,True
+1581,Aougrout,84,Algeria,#F0CE8E,84,84,True
+1582,Benoud,84,Algeria,#F0CE8E,84,84,True
+1583,Tlemcen,84,Algeria,#F0CE8E,84,84,True
+1584,Orléansville,84,Algeria,#F0CE8E,84,84,True
+1585,Djelfa,84,Algeria,#F0CE8E,84,84,True
+1586,Bordj Le Prieur,84,Algeria,#F0CE8E,84,84,True
+1587,Tinduf,84,Algeria,#F0CE8E,84,84,True
+1588,Ouargla,84,Algeria,#F0CE8E,84,84,True
+1589,El Menia,84,Algeria,#F0CE8E,84,84,True
+1590,Béchar,84,Algeria,#F0CE8E,84,84,True
+1591,Reggane,84,Algeria,#F0CE8E,84,84,True
+1592,Ain Salah,84,Algeria,#F0CE8E,84,84,True
+1593,Amquid,84,Algeria,#F0CE8E,84,84,True
+1594,Hassi Messaoud,84,Algeria,#F0CE8E,84,84,True
+1595,Saida,84,Algeria,#F0CE8E,84,84,True
+1596,Laghouat,84,Algeria,#F0CE8E,84,84,True
+1597,Biskra,84,Algeria,#F0CE8E,84,84,True
+1598,Djado,92,French Niger,#9FA2A0,92,92,True
+1599,Zinder,92,French Niger,#9FA2A0,92,92,True
+1600,Niamey,92,French Niger,#9FA2A0,92,92,True
+1601,Tahoua,92,French Niger,#9FA2A0,92,92,True
+1602,Aguella,92,French Niger,#9FA2A0,92,92,True
+1603,Agadez,92,French Niger,#9FA2A0,92,92,True
+1604,Fachi,92,French Niger,#9FA2A0,92,92,True
+1605,Bilma,92,French Niger,#9FA2A0,92,92,True
+1606,Yaoundé,94,Cameroon,#528375,94,94,True
+1607,Douala,94,Cameroon,#528375,94,94,True
+1608,Lomié,94,Cameroon,#528375,94,94,True
+1609,Doumé,94,Cameroon,#528375,94,94,True
+1610,Garoua,94,Cameroon,#528375,94,94,True
+1611,Bamenda,94,Cameroon,#528375,94,94,True
+1612,Nanga Eboko,94,Cameroon,#528375,94,94,True
+1613,Tibati,94,Cameroon,#528375,94,94,True
+1614,Tangier,24,Spain,#CCA373,24,24,True
+1615,Fèz,82,Morocco,#6B8775,82,82,True
+1616,Agadir,82,Morocco,#6B8775,82,82,True
+1617,Marrakech,82,Morocco,#6B8775,82,82,True
+1618,Rabat,82,Morocco,#6B8775,82,82,True
+1619,Oujda,82,Morocco,#6B8775,82,82,True
+1620,Taouz,82,Morocco,#6B8775,82,82,True
+1621,Guelmim,82,Morocco,#6B8775,82,82,True
+1622,Pofadder,105,South Africa,#9E7C29,105,105,True
+1623,Fort Salisbury,104,Bechuanaland,#6A8F93,104,104,True
+1624,Sinoia,104,Bechuanaland,#6A8F93,104,104,True
+1625,Gwelo,104,Bechuanaland,#6A8F93,104,104,True
+1626,Tui,104,Bechuanaland,#6A8F93,104,104,True
+1627,Bulawayo,104,Bechuanaland,#6A8F93,104,104,True
+1628,Mochudi,104,Bechuanaland,#6A8F93,104,104,True
+1629,Pietermaritzburg,105,South Africa,#9E7C29,105,105,True
+1630,Richards Bay,105,South Africa,#9E7C29,105,105,True
+1631,Aliwal North,105,South Africa,#9E7C29,105,105,True
+1632,Carnarvon,105,South Africa,#9E7C29,105,105,True
+1633,Mount Darwin,104,Bechuanaland,#6A8F93,104,104,True
+1634,Umtali,104,Bechuanaland,#6A8F93,104,104,True
+1635,Kadoma,104,Bechuanaland,#6A8F93,104,104,True
+1636,Masvingo,104,Bechuanaland,#6A8F93,104,104,True
+1637,Gokwe,104,Bechuanaland,#6A8F93,104,104,True
+1638,Dete,104,Bechuanaland,#6A8F93,104,104,True
+1639,Gaborone,104,Bechuanaland,#6A8F93,104,104,True
+1640,Tshabong,104,Bechuanaland,#6A8F93,104,104,True
+1641,Two Rivers,104,Bechuanaland,#6A8F93,104,104,True
+1642,Kang,104,Bechuanaland,#6A8F93,104,104,True
+1643,Kanye,104,Bechuanaland,#6A8F93,104,104,True
+1644,Kule,104,Bechuanaland,#6A8F93,104,104,True
+1645,Maun,104,Bechuanaland,#6A8F93,104,104,True
+1646,Dekar,104,Bechuanaland,#6A8F93,104,104,True
+1647,Shakawe,104,Bechuanaland,#6A8F93,104,104,True
+1648,Savuti,104,Bechuanaland,#6A8F93,104,104,True
+1649,Mopipi,104,Bechuanaland,#6A8F93,104,104,True
+1650,Francistown,104,Bechuanaland,#6A8F93,104,104,True
+1651,Molepolole,104,Bechuanaland,#6A8F93,104,104,True
+1652,Takatokwane,104,Bechuanaland,#6A8F93,104,104,True
+1653,Jamba,101,Angola,#A9663A,101,101,True
+1654,Kolwezi,100,Belgian Congo,#88BAC4,100,100,True
+1655,Élisabethville,100,Belgian Congo,#88BAC4,100,100,True
+1656,Kalemie,100,Belgian Congo,#88BAC4,100,100,True
+1657,Malonga,100,Belgian Congo,#88BAC4,100,100,True
+1658,Bukavu,100,Belgian Congo,#88BAC4,100,100,True
+1659,Kasongo,100,Belgian Congo,#88BAC4,100,100,True
+1660,Oshwe,100,Belgian Congo,#88BAC4,100,100,True
+1661,Bunia,100,Belgian Congo,#88BAC4,100,100,True
+1662,Gama,100,Belgian Congo,#88BAC4,100,100,True
+1663,Manono,100,Belgian Congo,#88BAC4,100,100,True
+1664,Lisala,100,Belgian Congo,#88BAC4,100,100,True
+1665,Dundo,101,Angola,#A9663A,101,101,True
+1666,Uíge,101,Angola,#A9663A,101,101,True
+1667,Cacolo,101,Angola,#A9663A,101,101,True
+1668,Novo Redondo,101,Angola,#A9663A,101,101,True
+1669,Benguela,101,Angola,#A9663A,101,101,True
+1670,Lumbala,101,Angola,#A9663A,101,101,True
+1671,Luso,101,Angola,#A9663A,101,101,True
+1672,Lúbia,101,Angola,#A9663A,101,101,True
+1673,Minendunda,101,Angola,#A9663A,101,101,True
+1674,Lumeje,101,Angola,#A9663A,101,101,True
+1675,Dar es Salaam,109,Tanganyika,#9E979A,109,109,True
+1676,Morogoro,109,Tanganyika,#9E979A,109,109,True
+1677,Tanga,109,Tanganyika,#9E979A,109,109,True
+1678,Mikindani,109,Tanganyika,#9E979A,109,109,True
+1679,Molioro,109,Tanganyika,#9E979A,109,109,True
+1680,Dodoma,109,Tanganyika,#9E979A,109,109,True
+1681,Tabora,109,Tanganyika,#9E979A,109,109,True
+1682,Kigoma,109,Tanganyika,#9E979A,109,109,True
+1683,Uvinza,109,Tanganyika,#9E979A,109,109,True
+1684,Kirambo,109,Tanganyika,#9E979A,109,109,True
+1685,Serayombo,109,Tanganyika,#9E979A,109,109,True
+1686,Gitega,109,Tanganyika,#9E979A,109,109,True
+1687,Igonda,109,Tanganyika,#9E979A,109,109,True
+1688,Utengula,109,Tanganyika,#9E979A,109,109,True
+1689,Kia,109,Tanganyika,#9E979A,109,109,True
+1690,Sabruma,109,Tanganyika,#9E979A,109,109,True
+1691,Nasoro,109,Tanganyika,#9E979A,109,109,True
+1692,Kwiringa,109,Tanganyika,#9E979A,109,109,True
+1693,Donde,109,Tanganyika,#9E979A,109,109,True
+1694,Rungwa,109,Tanganyika,#9E979A,109,109,True
+1695,Kitange,109,Tanganyika,#9E979A,109,109,True
+1696,Kondoa,109,Tanganyika,#9E979A,109,109,True
+1697,Kilimatinde,109,Tanganyika,#9E979A,109,109,True
+1698,Mwansa,109,Tanganyika,#9E979A,109,109,True
+1699,Usambara,109,Tanganyika,#9E979A,109,109,True
+1700,Arusha,109,Tanganyika,#9E979A,109,109,True
+1701,Addis Ababa,111,Ethiopia,#C47535,111,111,True
+1702,Nekemte,111,Ethiopia,#C47535,111,111,True
+1703,Gondar,111,Ethiopia,#C47535,111,111,True
+1704,Banana,100,Belgian Congo,#88BAC4,100,100,True
+1705,Harar,111,Ethiopia,#C47535,111,111,True
+1706,Kebri Dehar,111,Ethiopia,#C47535,111,111,True
+1707,Mustahil,111,Ethiopia,#C47535,111,111,True
+1708,Dudub,111,Ethiopia,#C47535,111,111,True
+1709,Afder,111,Ethiopia,#C47535,111,111,True
+1710,Imi,111,Ethiopia,#C47535,111,111,True
+1711,Asosa,111,Ethiopia,#C47535,111,111,True
+1712,Metu,111,Ethiopia,#C47535,111,111,True
+1713,Jimma,111,Ethiopia,#C47535,111,111,True
+1714,Ambo,111,Ethiopia,#C47535,111,111,True
+1715,Bahir Dar,111,Ethiopia,#C47535,111,111,True
+1716,Debre Markos,111,Ethiopia,#C47535,111,111,True
+1717,Shire,111,Ethiopia,#C47535,111,111,True
+1718,Maganan,111,Ethiopia,#C47535,111,111,True
+1719,Mek'ele,111,Ethiopia,#C47535,111,111,True
+1720,Djibouti,111,Ethiopia,#C47535,111,111,True
+1721,AsbeTeferi,111,Ethiopia,#C47535,111,111,True
+1722,Dessie,111,Ethiopia,#C47535,111,111,True
+1723,Gijet,111,Ethiopia,#C47535,111,111,True
+1724,Hudat,111,Ethiopia,#C47535,111,111,True
+1725,Jinka,111,Ethiopia,#C47535,111,111,True
+1726,Arba Minch,111,Ethiopia,#C47535,111,111,True
+1727,Meki,111,Ethiopia,#C47535,111,111,True
+1728,Degeh Bur,111,Ethiopia,#C47535,111,111,True
+1729,Goba,111,Ethiopia,#C47535,111,111,True
+1730,Massawa,113,Eritrea,#6D7447,113,113,True
+1731,Karkabat,113,Eritrea,#6D7447,113,113,True
+1732,Assab,113,Eritrea,#6D7447,113,113,True
+1733,Asmara,113,Eritrea,#6D7447,113,113,True
+1734,Foro,113,Eritrea,#6D7447,113,113,True
+1735,Manila,151,Philippines,#D0C788,151,151,True
+1736,Mogadishu,112,Somalia,#90AE77,112,112,True
+1737,Jamaame,112,Somalia,#90AE77,112,112,True
+1738,Buur Hakaba,112,Somalia,#90AE77,112,112,True
+1739,Bardere,112,Somalia,#90AE77,112,112,True
+1740,Galkayo,112,Somalia,#90AE77,112,112,True
+1741,Hargeisa,112,Somalia,#90AE77,112,112,True
+1742,Burco,112,Somalia,#90AE77,112,112,True
+1743,Bosaso,112,Somalia,#90AE77,112,112,True
+1744,Hordio,112,Somalia,#90AE77,112,112,True
+1745,Eyl,112,Somalia,#90AE77,112,112,True
+1746,Qardho,112,Somalia,#90AE77,112,112,True
+1747,Abu Hamad,98,North Sudan,#60A26B,98,98,True
+1748,Haya,98,North Sudan,#60A26B,98,98,True
+1749,Ad-Damir,98,North Sudan,#60A26B,98,98,True
+1750,Darfur,98,North Sudan,#60A26B,98,98,True
+1751,Abri,98,North Sudan,#60A26B,98,98,True
+1752,Wad Madani,98,North Sudan,#60A26B,98,98,True
+1753,Magrur,98,North Sudan,#60A26B,98,98,True
+1754,Kutum,98,North Sudan,#60A26B,98,98,True
+1755,Nyala,98,North Sudan,#60A26B,98,98,True
+1756,Talodi,98,North Sudan,#60A26B,98,98,True
+1757,Kaduqli,98,North Sudan,#60A26B,98,98,True
+1758,Rabak,98,North Sudan,#60A26B,98,98,True
+1759,Surgi,98,North Sudan,#60A26B,98,98,True
+1760,Lagos,91,Nigeria,#CAB579,91,91,True
+1761,Dikwa,91,Nigeria,#CAB579,91,91,True
+1762,Maiduguri,91,Nigeria,#CAB579,91,91,True
+1763,Kano,91,Nigeria,#CAB579,91,91,True
+1764,Sokoto,91,Nigeria,#CAB579,91,91,True
+1765,Garko,91,Nigeria,#CAB579,91,91,True
+1766,Auyo,91,Nigeria,#CAB579,91,91,True
+1767,Katsina,91,Nigeria,#CAB579,91,91,True
+1768,Kaduna,91,Nigeria,#CAB579,91,91,True
+1769,Minna,91,Nigeria,#CAB579,91,91,True
+1770,Jos,91,Nigeria,#CAB579,91,91,True
+1771,Ibadan,91,Nigeria,#CAB579,91,91,True
+1772,Kukawa,91,Nigeria,#CAB579,91,91,True
+1773,Libreville,95,Equatorial Gabon,#896D36,95,95,True
+1774,Sindara,95,Equatorial Gabon,#896D36,95,95,True
+1775,Loango,95,Equatorial Gabon,#896D36,95,95,True
+1776,Brazzaville,95,Equatorial Gabon,#896D36,95,95,True
+1777,Bonga,95,Equatorial Gabon,#896D36,95,95,True
+1778,Makokou,95,Equatorial Gabon,#896D36,95,95,True
+1779,Mayoumba,95,Equatorial Gabon,#896D36,95,95,True
+1780,Loudima,95,Equatorial Gabon,#896D36,95,95,True
+1781,Tsinguedi,95,Equatorial Gabon,#896D36,95,95,True
+1782,Franceville,95,Equatorial Gabon,#896D36,95,95,True
+1783,Ouesso,95,Equatorial Gabon,#896D36,95,95,True
+1784,Makoua,95,Equatorial Gabon,#896D36,95,95,True
+1785,Gamboma,95,Equatorial Gabon,#896D36,95,95,True
+1786,Nola,95,Equatorial Gabon,#896D36,95,95,True
+1787,Dongou,95,Equatorial Gabon,#896D36,95,95,True
+1788,Bambari,95,Equatorial Gabon,#896D36,95,95,True
+1789,Mobaye,95,Equatorial Gabon,#896D36,95,95,True
+1790,Bangassou,95,Equatorial Gabon,#896D36,95,95,True
+1791,Yalanga,95,Equatorial Gabon,#896D36,95,95,True
+1792,Mouka,95,Equatorial Gabon,#896D36,95,95,True
+1793,Ouanda Djale,95,Equatorial Gabon,#896D36,95,95,True
+1794,Ndélé,95,Equatorial Gabon,#896D36,95,95,True
+1795,Bangui,95,Equatorial Gabon,#896D36,95,95,True
+1796,Ft. Sibut,95,Equatorial Gabon,#896D36,95,95,True
+1797,Carnot,95,Equatorial Gabon,#896D36,95,95,True
+1798,Brussaux,95,Equatorial Gabon,#896D36,95,95,True
+1799,Koundé,95,Equatorial Gabon,#896D36,95,95,True
+1800,Epéna,95,Equatorial Gabon,#896D36,95,95,True
+1801,Archambault,96,Equatorial Chad,#CC8451,96,96,True
+1802,Mao,96,Equatorial Chad,#CC8451,96,96,True
+1803,Laï,96,Equatorial Chad,#CC8451,96,96,True
+1804,Haraze,96,Equatorial Chad,#CC8451,96,96,True
+1805,Faya,96,Equatorial Chad,#CC8451,96,96,True
+1806,Ain Galakka,96,Equatorial Chad,#CC8451,96,96,True
+1807,Bardaï,96,Equatorial Chad,#CC8451,96,96,True
+1808,Fada,96,Equatorial Chad,#CC8451,96,96,True
+1809,Fort-Lamy,96,Equatorial Chad,#CC8451,96,96,True
+1810,Moussoro,96,Equatorial Chad,#CC8451,96,96,True
+1811,Arada,96,Equatorial Chad,#CC8451,96,96,True
+1812,Ziguei,96,Equatorial Chad,#CC8451,96,96,True
+1813,Bossangoa,95,Equatorial Gabon,#896D36,95,95,True
+1814,Ad-Damazin,98,North Sudan,#60A26B,98,98,True
+1815,Mklama,109,Tanganyika,#9E979A,109,109,True
+1816,Lastoursville,95,Equatorial Gabon,#896D36,95,95,True
+1817,Sembé,95,Equatorial Gabon,#896D36,95,95,True
+1818,Kassala,98,North Sudan,#60A26B,98,98,True
+1819,Kafia Kingi,99,South Sudan,#C54149,99,99,True
+1820,Deim Zubeir,99,South Sudan,#C54149,99,99,True
+1821,Malakai,99,South Sudan,#C54149,99,99,True
+1822,Juba,99,South Sudan,#C54149,99,99,True
+1823,Nimule,99,South Sudan,#C54149,99,99,True
+1824,Mongalla,99,South Sudan,#C54149,99,99,True
+1825,Torit,99,South Sudan,#C54149,99,99,True
+1826,Akobo,99,South Sudan,#C54149,99,99,True
+1827,Nasir,99,South Sudan,#C54149,99,99,True
+1828,Shambe,99,South Sudan,#C54149,99,99,True
+1829,Meshra' er Req,99,South Sudan,#C54149,99,99,True
+1830,Wau,99,South Sudan,#C54149,99,99,True
+1831,Tambura,99,South Sudan,#C54149,99,99,True
+1832,Maridi,99,South Sudan,#C54149,99,99,True
+1833,Kodok,99,South Sudan,#C54149,99,99,True
+1834,Lui,99,South Sudan,#C54149,99,99,True
+1835,Abang,99,South Sudan,#C54149,99,99,True
+1836,Turalei,99,South Sudan,#C54149,99,99,True
+1837,Kamil,99,South Sudan,#C54149,99,99,True
+1838,Tonga,99,South Sudan,#C54149,99,99,True
+1839,Wernyol,99,South Sudan,#C54149,99,99,True
+1840,Waat,99,South Sudan,#C54149,99,99,True
+1841,Ayod,99,South Sudan,#C54149,99,99,True
+1842,Beh,99,South Sudan,#C54149,99,99,True
+1843,Leer,99,South Sudan,#C54149,99,99,True
+1844,Raga,99,South Sudan,#C54149,99,99,True
+1845,Biar,99,South Sudan,#C54149,99,99,True
+1846,Yei,99,South Sudan,#C54149,99,99,True
+1847,Yola,91,Nigeria,#CAB579,91,91,True
+1848,Bauchi,91,Nigeria,#CAB579,91,91,True
+1849,Kontagora,91,Nigeria,#CAB579,91,91,True
+1850,Abeoukuta,91,Nigeria,#CAB579,91,91,True
+1851,Calabar,91,Nigeria,#CAB579,91,91,True
+1852,Abakaliki,91,Nigeria,#CAB579,91,91,True
+1853,Port Harcourt,91,Nigeria,#CAB579,91,91,True
+1854,Wukari,91,Nigeria,#CAB579,91,91,True
+1855,Jalingo,91,Nigeria,#CAB579,91,91,True
+1856,Gombe,91,Nigeria,#CAB579,91,91,True
+1857,Damaturu,91,Nigeria,#CAB579,91,91,True
+1858,Gusau,91,Nigeria,#CAB579,91,91,True
+1859,Kaiama,91,Nigeria,#CAB579,91,91,True
+1860,Monrovia,89,Liberia,#CD832C,89,89,True
+1861,Loma,89,Liberia,#CD832C,89,89,True
+1862,Freetown,89,Liberia,#CD832C,89,89,True
+1863,Greenville,89,Liberia,#CD832C,89,89,True
+1864,Buchanan,89,Liberia,#CD832C,89,89,True
+1865,Ouagadougou,90,Upper Volta,#697D55,90,90,True
+1866,Dori,90,Upper Volta,#697D55,90,90,True
+1867,Kumasi,90,Upper Volta,#697D55,90,90,True
+1868,Abidjan,90,Upper Volta,#697D55,90,90,True
+1869,Koudougou,90,Upper Volta,#697D55,90,90,True
+1870,Bobo-Dioulasso,90,Upper Volta,#697D55,90,90,True
+1871,Odienne,90,Upper Volta,#697D55,90,90,True
+1872,Korhogo,90,Upper Volta,#697D55,90,90,True
+1873,Logouale,90,Upper Volta,#697D55,90,90,True
+1874,Mankono,90,Upper Volta,#697D55,90,90,True
+1875,Tabou,90,Upper Volta,#697D55,90,90,True
+1876,Sassandra,90,Upper Volta,#697D55,90,90,True
+1877,Dimbokro,90,Upper Volta,#697D55,90,90,True
+1878,Prestea,90,Upper Volta,#697D55,90,90,True
+1879,Ashanti,90,Upper Volta,#697D55,90,90,True
+1880,Bondoukou,90,Upper Volta,#697D55,90,90,True
+1881,Accra,90,Upper Volta,#697D55,90,90,True
+1882,Lome,90,Upper Volta,#697D55,90,90,True
+1883,Palime,90,Upper Volta,#697D55,90,90,True
+1884,Savé,90,Upper Volta,#697D55,90,90,True
+1885,Tamale,90,Upper Volta,#697D55,90,90,True
+1886,Navrongo,90,Upper Volta,#697D55,90,90,True
+1887,Malanville,90,Upper Volta,#697D55,90,90,True
+1888,Djougou,90,Upper Volta,#697D55,90,90,True
+1889,Fada N' Gourma,90,Upper Volta,#697D55,90,90,True
+1890,Tenkodogo,90,Upper Volta,#697D55,90,90,True
+1891,Wa,90,Upper Volta,#697D55,90,90,True
+1892,Gaoua,90,Upper Volta,#697D55,90,90,True
+1893,Kankan,90,Upper Volta,#697D55,90,90,True
+1894,Davao City,151,Philippines,#D0C788,151,151,True
+1895,Bissau,87,Portuguese Guinea,#6F90A7,87,87,True
+1896,Kedougou,86,Mauritania,#9B6A28,86,86,True
+1897,Haute Casamance,86,Mauritania,#9B6A28,86,86,True
+1898,St. Louis,86,Mauritania,#9B6A28,86,86,True
+1899,Dakar,86,Mauritania,#9B6A28,86,86,True
+1900,Bakel,86,Mauritania,#9B6A28,86,86,True
+1901,Kiffa,86,Mauritania,#9B6A28,86,86,True
+1902,Tichit,86,Mauritania,#9B6A28,86,86,True
+1903,El Merayer,86,Mauritania,#9B6A28,86,86,True
+1904,Tagoujalet,86,Mauritania,#9B6A28,86,86,True
+1905,Merijinat,86,Mauritania,#9B6A28,86,86,True
+1906,Port Etienne,86,Mauritania,#9B6A28,86,86,True
+1907,Tintan,86,Mauritania,#9B6A28,86,86,True
+1908,Atar,86,Mauritania,#9B6A28,86,86,True
+1909,Ouadane,86,Mauritania,#9B6A28,86,86,True
+1910,Nouakchott,86,Mauritania,#9B6A28,86,86,True
+1911,Aleg,86,Mauritania,#9B6A28,86,86,True
+1912,Tamba,86,Mauritania,#9B6A28,86,86,True
+1913,Chinguetti,86,Mauritania,#9B6A28,86,86,True
+1914,Tidjikja,86,Mauritania,#9B6A28,86,86,True
+1915,Moudjeria,86,Mauritania,#9B6A28,86,86,True
+1916,Bourjeimat,86,Mauritania,#9B6A28,86,86,True
+1917,Kaédi,86,Mauritania,#9B6A28,86,86,True
+1918,Tanezroft Tutrimt,86,Mauritania,#9B6A28,86,86,True
+1919,Fort Trinquet,86,Mauritania,#9B6A28,86,86,True
+1920,Taoudeni,88,French Sudan,#E3AF5C,88,88,True
+1921,Aṣ-Ṣaḥrā’ al-Gharbīyah,86,Mauritania,#9B6A28,86,86,True
+1922,Kidai,88,French Sudan,#E3AF5C,88,88,True
+1923,Mabrouk,88,French Sudan,#E3AF5C,88,88,True
+1924,Araouan,88,French Sudan,#E3AF5C,88,88,True
+1925,Néma,88,French Sudan,#E3AF5C,88,88,True
+1926,Timbedra,88,French Sudan,#E3AF5C,88,88,True
+1927,Conakry,88,French Sudan,#E3AF5C,88,88,True
+1928,Mamou,88,French Sudan,#E3AF5C,88,88,True
+1929,Koumbia,88,French Sudan,#E3AF5C,88,88,True
+1930,Dinguiray,88,French Sudan,#E3AF5C,88,88,True
+1931,Bamako,88,French Sudan,#E3AF5C,88,88,True
+1932,Bougouni,88,French Sudan,#E3AF5C,88,88,True
+1933,Djenné,88,French Sudan,#E3AF5C,88,88,True
+1934,San,88,French Sudan,#E3AF5C,88,88,True
+1935,Kayes,88,French Sudan,#E3AF5C,88,88,True
+1936,Kita,88,French Sudan,#E3AF5C,88,88,True
+1937,Banamba,88,French Sudan,#E3AF5C,88,88,True
+1938,Segou,88,French Sudan,#E3AF5C,88,88,True
+1939,Koutiala,88,French Sudan,#E3AF5C,88,88,True
+1940,Homobori,88,French Sudan,#E3AF5C,88,88,True
+1941,Bamba,88,French Sudan,#E3AF5C,88,88,True
+1942,Bandiagara,88,French Sudan,#E3AF5C,88,88,True
+1943,Niafounke,88,French Sudan,#E3AF5C,88,88,True
+1944,Sokolo,88,French Sudan,#E3AF5C,88,88,True
+1945,Mopti,88,French Sudan,#E3AF5C,88,88,True
+1946,El Djouf,88,French Sudan,#E3AF5C,88,88,True
+1947,Tanezrouft,88,French Sudan,#E3AF5C,88,88,True
+1948,Villa Cisneros,83,Río de Oro,#8BAC78,83,83,True
+1949,Auadi,83,Río de Oro,#8BAC78,83,83,True
+1950,Laâyoune,83,Río de Oro,#8BAC78,83,83,True
+1951,Smara,83,Río de Oro,#8BAC78,83,83,True
+1952,Bir Lehlu,83,Río de Oro,#8BAC78,83,83,True
+1953,Mijek,83,Río de Oro,#8BAC78,83,83,True
+1954,Bojador,83,Río de Oro,#8BAC78,83,83,True
+1955,Victoria,186,Malta,#B83338,186,186,True
+1956,Valletta,186,Malta,#B83338,186,186,True
+1957,Majunga,108,Madagascar,#B03A47,108,108,True
+1958,Fianarantsoa,108,Madagascar,#B03A47,108,108,True
+1959,Tuléar,108,Madagascar,#B03A47,108,108,True
+1960,Tamatave,108,Madagascar,#B03A47,108,108,True
+1961,Antalaha,108,Madagascar,#B03A47,108,108,True
+1962,Marovoay,108,Madagascar,#B03A47,108,108,True
+1963,Ananalava,108,Madagascar,#B03A47,108,108,True
+1964,Mananara,108,Madagascar,#B03A47,108,108,True
+1965,Maevatanana,108,Madagascar,#B03A47,108,108,True
+1966,Morafenobe,108,Madagascar,#B03A47,108,108,True
+1967,Soalala,108,Madagascar,#B03A47,108,108,True
+1968,Tananrive,108,Madagascar,#B03A47,108,108,True
+1969,Ihosi,108,Madagascar,#B03A47,108,108,True
+1970,Fort Dauphin,108,Madagascar,#B03A47,108,108,True
+1971,Tsihombe,108,Madagascar,#B03A47,108,108,True
+1972,Morombe,108,Madagascar,#B03A47,108,108,True
+1973,Morondava,108,Madagascar,#B03A47,108,108,True
+1974,Miarinarivo,108,Madagascar,#B03A47,108,108,True
+1975,Ambositra,108,Madagascar,#B03A47,108,108,True
+1976,Chengteh,140,Mukden,#59797C,140,140,True
+1977,Betioky,108,Madagascar,#B03A47,108,108,True
+1978,Farafangana,108,Madagascar,#B03A47,108,108,True
+1979,Vatomandry,108,Madagascar,#B03A47,108,108,True
+1980,Mecca,114,Hejaz,#8EA1B5,114,114,True
+1981,Mendak,114,Hejaz,#8EA1B5,114,114,True
+1982,Ashaira,114,Hejaz,#8EA1B5,114,114,True
+1983,Yenbo,114,Hejaz,#8EA1B5,114,114,True
+1984,Wejh,114,Hejaz,#8EA1B5,114,114,True
+1985,Maqna,114,Hejaz,#8EA1B5,114,114,True
+1986,Tabuk,114,Hejaz,#8EA1B5,114,114,True
+1987,Medain Salih,114,Hejaz,#8EA1B5,114,114,True
+1988,Hadiya,114,Hejaz,#8EA1B5,114,114,True
+1989,Khaibar,117,Saudi Arabia,#A4493E,117,117,True
+1990,Jauf,117,Saudi Arabia,#A4493E,117,117,True
+1991,Sakaka,117,Saudi Arabia,#A4493E,117,117,True
+1992,Kaf,117,Saudi Arabia,#A4493E,117,117,True
+1993,Doha,118,Qatar,#78826B,118,118,True
+1994,Medina,117,Saudi Arabia,#A4493E,117,117,True
+1995,Hajariya,117,Saudi Arabia,#A4493E,117,117,True
+1996,Sabiya,117,Saudi Arabia,#A4493E,117,117,True
+1997,Laila,117,Saudi Arabia,#A4493E,117,117,True
+1998,Riyadh,117,Saudi Arabia,#A4493E,117,117,True
+1999,Mubarraz,117,Saudi Arabia,#A4493E,117,117,True
+2000,Shaqra,117,Saudi Arabia,#A4493E,117,117,True
+2001,Dam,117,Saudi Arabia,#A4493E,117,117,True
+2002,Jubbah,117,Saudi Arabia,#A4493E,117,117,True
+2003,Taima,117,Saudi Arabia,#A4493E,117,117,True
+2004,Qasr al Haiyanya,117,Saudi Arabia,#A4493E,117,117,True
+2005,Buraida,117,Saudi Arabia,#A4493E,117,117,True
+2006,Hail,117,Saudi Arabia,#A4493E,117,117,True
+2007,Jabrin,117,Saudi Arabia,#A4493E,117,117,True
+2008,Rub' al Khali,117,Saudi Arabia,#A4493E,117,117,True
+2009,Raydā,117,Saudi Arabia,#A4493E,117,117,True
+2010,Ash Shalfa,117,Saudi Arabia,#A4493E,117,117,True
+2011,Qunsuliya,117,Saudi Arabia,#A4493E,117,117,True
+2012,Dhamar,117,Saudi Arabia,#A4493E,117,117,True
+2013,Hodeida,117,Saudi Arabia,#A4493E,117,117,True
+2014,Tolunnoerh,140,Mukden,#59797C,140,140,True
+2015,Mocha,117,Saudi Arabia,#A4493E,117,117,True
+2016,Maqlaf,117,Saudi Arabia,#A4493E,117,117,True
+2017,Qadhima,114,Hejaz,#8EA1B5,114,114,True
+2018,Debaba,117,Saudi Arabia,#A4493E,117,117,True
+2019,Al Hofuf,118,Qatar,#78826B,118,118,True
+2020,Kahafa,118,Qatar,#78826B,118,118,True
+2021,Qasr es Sabh,118,Qatar,#78826B,118,118,True
+2022,Muscat,119,Oman,#D7AB4C,119,119,True
+2023,Sharja,119,Oman,#D7AB4C,119,119,True
+2024,Ibri,119,Oman,#D7AB4C,119,119,True
+2025,Aden,119,Oman,#D7AB4C,119,119,True
+2026,Mukalla,119,Oman,#D7AB4C,119,119,True
+2027,Sakwa,119,Oman,#D7AB4C,119,119,True
+2028,Murbat,119,Oman,#D7AB4C,119,119,True
+2029,Saihut,119,Oman,#D7AB4C,119,119,True
+2030,Sharkh,119,Oman,#D7AB4C,119,119,True
+2031,Juwara,119,Oman,#D7AB4C,119,119,True
+2032,Haifa,115,Syria,#CAA473,115,115,True
+2033,Sharamuren,147,Mengjiang,#E7D262,147,147,True
+2034,Jerusalem,115,Syria,#CAA473,115,115,True
+2035,Beirut,115,Syria,#CAA473,115,115,True
+2036,Jaffa,115,Syria,#CAA473,115,115,True
+2037,Damascus,115,Syria,#CAA473,115,115,True
+2038,Hama,115,Syria,#CAA473,115,115,True
+2039,Aleppo,115,Syria,#CAA473,115,115,True
+2040,Al-Raqqah,115,Syria,#CAA473,115,115,True
+2041,Tell Kotchek,115,Syria,#CAA473,115,115,True
+2042,Deir ez Zor,115,Syria,#CAA473,115,115,True
+2043,Ammam,115,Syria,#CAA473,115,115,True
+2044,Bādiyat Ash-shām,115,Syria,#CAA473,115,115,True
+2045,Aqaba,115,Syria,#CAA473,115,115,True
+2046,Ma'an,115,Syria,#CAA473,115,115,True
+2047,Hebron,115,Syria,#CAA473,115,115,True
+2048,Soukhné,115,Syria,#CAA473,115,115,True
+2049,Abu Kemal,115,Syria,#CAA473,115,115,True
+2050,Al Dana,115,Syria,#CAA473,115,115,True
+2051,Palmyra,115,Syria,#CAA473,115,115,True
+2052,Al Suwar,115,Syria,#CAA473,115,115,True
+2053,Manbij,115,Syria,#CAA473,115,115,True
+2054,Meskene,115,Syria,#CAA473,115,115,True
+2055,Al Kuwait,116,Iraq,#4C704E,116,116,True
+2056,Basra,116,Iraq,#4C704E,116,116,True
+2057,Rutba,116,Iraq,#4C704E,116,116,True
+2058,Al-Nukhib,116,Iraq,#4C704E,116,116,True
+2059,Qasr'Uthaimin,116,Iraq,#4C704E,116,116,True
+2060,Mosul,116,Iraq,#4C704E,116,116,True
+2061,Erbil,116,Iraq,#4C704E,116,116,True
+2062,Kirkuk,116,Iraq,#4C704E,116,116,True
+2063,Kalar,116,Iraq,#4C704E,116,116,True
+2064,Baghdad,116,Iraq,#4C704E,116,116,True
+2065,Amara,116,Iraq,#4C704E,116,116,True
+2066,Samawa,116,Iraq,#4C704E,116,116,True
+2067,Qal a Sharqat,116,Iraq,#4C704E,116,116,True
+2068,Anah,116,Iraq,#4C704E,116,116,True
+2069,Tikrit,116,Iraq,#4C704E,116,116,True
+2070,Samarra,116,Iraq,#4C704E,116,116,True
+2071,Ramadi,116,Iraq,#4C704E,116,116,True
+2072,Fallujah,116,Iraq,#4C704E,116,116,True
+2073,An Najaf,116,Iraq,#4C704E,116,116,True
+2074,Duhok,116,Iraq,#4C704E,116,116,True
+2075,Baiji,116,Iraq,#4C704E,116,116,True
+2076,Tuz Khurma,116,Iraq,#4C704E,116,116,True
+2077,Al Jahra,116,Iraq,#4C704E,116,116,True
+2078,Mandali,116,Iraq,#4C704E,116,116,True
+2079,Tehran,120,Persia,#85A1A0,120,120,True
+2080,Amol,120,Persia,#85A1A0,120,120,True
+2081,Gyumri,120,Persia,#85A1A0,120,120,True
+2082,Baku,120,Persia,#85A1A0,120,120,True
+2083,Reshawar,122,Pakistan,#735D2D,122,122,True
+2084,Tabriz,120,Persia,#85A1A0,120,120,True
+2085,Ardabil,120,Persia,#85A1A0,120,120,True
+2086,Urmia,120,Persia,#85A1A0,120,120,True
+2087,Zanjan,120,Persia,#85A1A0,120,120,True
+2088,Karaj,120,Persia,#85A1A0,120,120,True
+2089,Kermanshah,120,Persia,#85A1A0,120,120,True
+2090,Abbottabad,122,Pakistan,#735D2D,122,122,True
+2091,Bandar Busher,120,Persia,#85A1A0,120,120,True
+2092,Bandar Abbas,120,Persia,#85A1A0,120,120,True
+2093,Chabahar,120,Persia,#85A1A0,120,120,True
+2094,Zahedan,120,Persia,#85A1A0,120,120,True
+2095,Kerman,120,Persia,#85A1A0,120,120,True
+2096,Mashhad,120,Persia,#85A1A0,120,120,True
+2097,Gorgan,120,Persia,#85A1A0,120,120,True
+2098,Kashan,120,Persia,#85A1A0,120,120,True
+2099,Isfahan,120,Persia,#85A1A0,120,120,True
+2100,Ahvaz,120,Persia,#85A1A0,120,120,True
+2101,Shiraz,120,Persia,#85A1A0,120,120,True
+2102,Sirjan,120,Persia,#85A1A0,120,120,True
+2103,Gonbaki,120,Persia,#85A1A0,120,120,True
+2104,Khur,120,Persia,#85A1A0,120,120,True
+2105,Tabas,120,Persia,#85A1A0,120,120,True
+2106,Birjand,120,Persia,#85A1A0,120,120,True
+2107,Gonabad,120,Persia,#85A1A0,120,120,True
+2108,Kalgan,147,Mengjiang,#E7D262,147,147,True
+2109,Kweihwa,147,Mengjiang,#E7D262,147,147,True
+2110,Kabul,121,Afghanistan,#759353,121,121,True
+2111,Jelalabad,121,Afghanistan,#759353,121,121,True
+2112,Mazar-i-Sherif,121,Afghanistan,#759353,121,121,True
+2113,Herat,121,Afghanistan,#759353,121,121,True
+2114,Kandahar,121,Afghanistan,#759353,121,121,True
+2115,Farah,121,Afghanistan,#759353,121,121,True
+2116,Ghazni,121,Afghanistan,#759353,121,121,True
+2117,Bamyan,121,Afghanistan,#759353,121,121,True
+2118,Faizabad,121,Afghanistan,#759353,121,121,True
+2119,Chaghcharān,121,Afghanistan,#759353,121,121,True
+2120,Zirni,121,Afghanistan,#759353,121,121,True
+2121,Deshu,121,Afghanistan,#759353,121,121,True
+2122,Kalat,122,Pakistan,#735D2D,122,122,True
+2123,Quetta,122,Pakistan,#735D2D,122,122,True
+2124,Karachi,122,Pakistan,#735D2D,122,122,True
+2125,Gwadar,122,Pakistan,#735D2D,122,122,True
+2126,Srinagar,131,Kashmir,#E8D462,131,131,True
+2127,Jammu,131,Kashmir,#E8D462,131,131,True
+2128,Chamba,131,Kashmir,#E8D462,131,131,True
+2129,Leh,131,Kashmir,#E8D462,131,131,True
+2130,Astor,131,Kashmir,#E8D462,131,131,True
+2131,Gilgit,122,Pakistan,#735D2D,122,122,True
+2132,Rawalpindi,122,Pakistan,#735D2D,122,122,True
+2133,Lahore,122,Pakistan,#735D2D,122,122,True
+2134,Loralai,122,Pakistan,#735D2D,122,122,True
+2135,Badin,122,Pakistan,#735D2D,122,122,True
+2136,Shikarpur,122,Pakistan,#735D2D,122,122,True
+2137,Isai Kalat,122,Pakistan,#735D2D,122,122,True
+2138,Dalbandin,122,Pakistan,#735D2D,122,122,True
+2139,Hyderabad (PK),122,Pakistan,#735D2D,122,122,True
+2140,Jhang Maghiana,122,Pakistan,#735D2D,122,122,True
+2141,Dera Ismail Khan,122,Pakistan,#735D2D,122,122,True
+2142,Bannu,122,Pakistan,#735D2D,122,122,True
+2143,Multan,122,Pakistan,#735D2D,122,122,True
+2144,Bahawalpur,122,Pakistan,#735D2D,122,122,True
+2145,Sukkur,122,Pakistan,#735D2D,122,122,True
+2146,Delhi,123,North India,#A9663A,123,123,True
+2147,Hinglaj,122,Pakistan,#735D2D,122,122,True
+2148,Dera Ghazi Khan,122,Pakistan,#735D2D,122,122,True
+2149,Kasur,122,Pakistan,#735D2D,122,122,True
+2150,Bahawalnagar,122,Pakistan,#735D2D,122,122,True
+2151,Jaipur,123,North India,#A9663A,123,123,True
+2152,Jodhpur,123,North India,#A9663A,123,123,True
+2153,Barmer,123,North India,#A9663A,123,123,True
+2154,Kishangarh,123,North India,#A9663A,123,123,True
+2155,Alwar,123,North India,#A9663A,123,123,True
+2156,Udaipur,123,North India,#A9663A,123,123,True
+2157,Nagaur,123,North India,#A9663A,123,123,True
+2158,Ajmer,123,North India,#A9663A,123,123,True
+2159,Lucknow,123,North India,#A9663A,123,123,True
+2160,Jhansi,123,North India,#A9663A,123,123,True
+2161,Bhopal,123,North India,#A9663A,123,123,True
+2162,Indore,123,North India,#A9663A,123,123,True
+2163,Mhow,123,North India,#A9663A,123,123,True
+2164,Ratlam,123,North India,#A9663A,123,123,True
+2165,Amritsar,123,North India,#A9663A,123,123,True
+2166,Meerut,123,North India,#A9663A,123,123,True
+2167,Bareilly,123,North India,#A9663A,123,123,True
+2168,Gwalior,123,North India,#A9663A,123,123,True
+2169,Kotah,123,North India,#A9663A,123,123,True
+2170,Ujjain,123,North India,#A9663A,123,123,True
+2171,Mandi,123,North India,#A9663A,123,123,True
+2172,Kathgodam,123,North India,#A9663A,123,123,True
+2173,Hissar,123,North India,#A9663A,123,123,True
+2174,Bikaner,123,North India,#A9663A,123,123,True
+2175,Marwar,123,North India,#A9663A,123,123,True
+2176,Khandwa,124,British Odisha,#788E5D,124,124,True
+2177,Allahbad,124,British Odisha,#788E5D,124,124,True
+2178,Patna,124,British Odisha,#788E5D,124,124,True
+2179,Jamshedpur,124,British Odisha,#788E5D,124,124,True
+2180,Cuttack,124,British Odisha,#788E5D,124,124,True
+2181,Berhampur,124,British Odisha,#788E5D,124,124,True
+2182,Raipur,124,British Odisha,#788E5D,124,124,True
+2183,Nagpur,124,British Odisha,#788E5D,124,124,True
+2184,Jagdalpur,124,British Odisha,#788E5D,124,124,True
+2185,Gangtok,124,British Odisha,#788E5D,124,124,True
+2186,Goalpara,124,British Odisha,#788E5D,124,124,True
+2187,Katihar,124,British Odisha,#788E5D,124,124,True
+2188,Monghyr,124,British Odisha,#788E5D,124,124,True
+2189,Gorakhpur,124,British Odisha,#788E5D,124,124,True
+2190,Ghazipur,124,British Odisha,#788E5D,124,124,True
+2191,Rewah,124,British Odisha,#788E5D,124,124,True
+2192,Katni,124,British Odisha,#788E5D,124,124,True
+2193,Sonhat,124,British Odisha,#788E5D,124,124,True
+2194,Baud,124,British Odisha,#788E5D,124,124,True
+2195,Balasore,124,British Odisha,#788E5D,124,124,True
+2196,Daspur,124,British Odisha,#788E5D,124,124,True
+2197,Gaya,124,British Odisha,#788E5D,124,124,True
+2198,Ranchi,124,British Odisha,#788E5D,124,124,True
+2199,Raighar,124,British Odisha,#788E5D,124,124,True
+2200,Seoni,124,British Odisha,#788E5D,124,124,True
+2201,Chanda,124,British Odisha,#788E5D,124,124,True
+2202,Madras,125,South India,#FFD38D,125,125,True
+2203,Bangalore,125,South India,#FFD38D,125,125,True
+2204,Hyderabad,125,South India,#FFD38D,125,125,True
+2205,Bombay,125,South India,#FFD38D,125,125,True
+2206,Jawhar,125,South India,#FFD38D,125,125,True
+2207,Poona,125,South India,#FFD38D,125,125,True
+2208,Nirmal,125,South India,#FFD38D,125,125,True
+2209,Vizagapatam,125,South India,#FFD38D,125,125,True
+2210,Salem,125,South India,#FFD38D,125,125,True
+2211,Madura,125,South India,#FFD38D,125,125,True
+2212,Trivandrum,125,South India,#FFD38D,125,125,True
+2213,Vellore,125,South India,#FFD38D,125,125,True
+2214,Mangalore,125,South India,#FFD38D,125,125,True
+2215,Hassan,125,South India,#FFD38D,125,125,True
+2216,Palghat,125,South India,#FFD38D,125,125,True
+2217,Hindupur,125,South India,#FFD38D,125,125,True
+2218,Nellore,125,South India,#FFD38D,125,125,True
+2219,Masulipatam,125,South India,#FFD38D,125,125,True
+2220,Warangal,125,South India,#FFD38D,125,125,True
+2221,Kolhapur,125,South India,#FFD38D,125,125,True
+2222,Dharwar,125,South India,#FFD38D,125,125,True
+2223,Sholapur,125,South India,#FFD38D,125,125,True
+2224,Pandhapur,125,South India,#FFD38D,125,125,True
+2225,Dhulia,125,South India,#FFD38D,125,125,True
+2226,Raichur,125,South India,#FFD38D,125,125,True
+2227,Gadag,125,South India,#FFD38D,125,125,True
+2228,Aurangabad,125,South India,#FFD38D,125,125,True
+2229,Sil Garhi,127,Nepal,#B58F4A,127,127,True
+2230,Kathmandu,127,Nepal,#B58F4A,127,127,True
+2231,Dhankuta,127,Nepal,#B58F4A,127,127,True
+2232,Hariyon,127,Nepal,#B58F4A,127,127,True
+2233,Bhadgaon,127,Nepal,#B58F4A,127,127,True
+2234,Pokhra,127,Nepal,#B58F4A,127,127,True
+2235,Ahmedabad,126,Kathiawar,#BA9A50,126,126,True
+2236,Rajkot,126,Kathiawar,#BA9A50,126,126,True
+2237,Surat,126,Kathiawar,#BA9A50,126,126,True
+2238,Baroda,126,Kathiawar,#BA9A50,126,126,True
+2239,Nadiad,126,Kathiawar,#BA9A50,126,126,True
+2240,Patan,126,Kathiawar,#BA9A50,126,126,True
+2241,Calcutta,129,Bangladesh,#E19857,129,129,True
+2242,Dacca,129,Bangladesh,#E19857,129,129,True
+2243,Bogra,129,Bangladesh,#E19857,129,129,True
+2244,Chandpur,129,Bangladesh,#E19857,129,129,True
+2245,Punaka,128,Bhutan,#667B7E,128,128,True
+2246,Bumtan,128,Bhutan,#667B7E,128,128,True
+2247,Rangoon,134,Burma,#91896A,134,134,True
+2248,Shillong,134,Burma,#91896A,134,134,True
+2249,Aijal,134,Burma,#91896A,134,134,True
+2250,Imphal,134,Burma,#91896A,134,134,True
+2251,Fort Hertz,134,Burma,#91896A,134,134,True
+2252,Dibrugarh,134,Burma,#91896A,134,134,True
+2253,Mandalay,134,Burma,#91896A,134,134,True
+2254,Kengtung,134,Burma,#91896A,134,134,True
+2255,Maingpan,134,Burma,#91896A,134,134,True
+2256,Moulmein,134,Burma,#91896A,134,134,True
+2257,Mengui,134,Burma,#91896A,134,134,True
+2258,Bassein,134,Burma,#91896A,134,134,True
+2259,Chittagong,134,Burma,#91896A,134,134,True
+2260,Pyinmana,134,Burma,#91896A,134,134,True
+2261,Lungnak,132,Tibet,#BEB88D,132,132,True
+2262,Lashung,132,Tibet,#BEB88D,132,132,True
+2263,Gomo,132,Tibet,#BEB88D,132,132,True
+2264,Rudok,132,Tibet,#BEB88D,132,132,True
+2265,Gartok,132,Tibet,#BEB88D,132,132,True
+2266,Ladse Dzong,132,Tibet,#BEB88D,132,132,True
+2267,Bhamo,134,Burma,#91896A,134,134,True
+2268,Shazia,132,Tibet,#BEB88D,132,132,True
+2269,Daurakpa,132,Tibet,#BEB88D,132,132,True
+2270,Tradum,132,Tibet,#BEB88D,132,132,True
+2271,Lhasa,132,Tibet,#BEB88D,132,132,True
+2272,Chetang,132,Tibet,#BEB88D,132,132,True
+2273,Dhirang Dzong,132,Tibet,#BEB88D,132,132,True
+2274,Tsari,132,Tibet,#BEB88D,132,132,True
+2275,Phondu,132,Tibet,#BEB88D,132,132,True
+2276,Ed Dzong,132,Tibet,#BEB88D,132,132,True
+2277,Darchoi,132,Tibet,#BEB88D,132,132,True
+2278,Govo,132,Tibet,#BEB88D,132,132,True
+2279,Shigatse,132,Tibet,#BEB88D,132,132,True
+2280,Gyangtse,132,Tibet,#BEB88D,132,132,True
+2281,Lhari,132,Tibet,#BEB88D,132,132,True
+2282,Chamchu,132,Tibet,#BEB88D,132,132,True
+2283,Parka,132,Tibet,#BEB88D,132,132,True
+2284,Nagron,132,Tibet,#BEB88D,132,132,True
+2285,Selipuk,132,Tibet,#BEB88D,132,132,True
+2286,Soping,138,Communist China,#CEC8A5,138,138,True
+2287,Demchok,132,Tibet,#BEB88D,132,132,True
+2288,Djiacham,132,Tibet,#BEB88D,132,132,True
+2289,Namling,132,Tibet,#BEB88D,132,132,True
+2290,Sibi,122,Pakistan,#735D2D,122,122,True
+2291,Yunnanfu,136,Yunnan,#96746B,136,136,True
+2292,Yuangchang,136,Yunnan,#96746B,136,136,True
+2293,Chengkiang,136,Yunnan,#96746B,136,136,True
+2294,Tungchwan,136,Yunnan,#96746B,136,136,True
+2295,Pu'er,136,Yunnan,#96746B,136,136,True
+2296,Sinhing,136,Yunnan,#96746B,136,136,True
+2297,Lungling,136,Yunnan,#96746B,136,136,True
+2298,Kweiyang,139,South China,#D3B374,139,139,True
+2299,Puanting,139,South China,#D3B374,139,139,True
+2300,Nanning,139,South China,#D3B374,139,139,True
+2301,Canton,139,South China,#D3B374,139,139,True
+2302,Guilin,139,South China,#D3B374,139,139,True
+2303,Ziyuan,139,South China,#D3B374,139,139,True
+2304,Tsunyi,139,South China,#D3B374,139,139,True
+2305,Tuyun,139,South China,#D3B374,139,139,True
+2306,Szenan,139,South China,#D3B374,139,139,True
+2307,Liping,139,South China,#D3B374,139,139,True
+2308,Shiuchow,139,South China,#D3B374,139,139,True
+2309,Chaochow,139,South China,#D3B374,139,139,True
+2310,Linping,139,South China,#D3B374,139,139,True
+2311,Bayard,139,South China,#D3B374,139,139,True
+2312,Tunghing,139,South China,#D3B374,139,139,True
+2313,Taiping,139,South China,#D3B374,139,139,True
+2314,Chenan,139,South China,#D3B374,139,139,True
+2315,Szecheng,139,South China,#D3B374,139,139,True
+2316,Pinglo,139,South China,#D3B374,139,139,True
+2317,Chaoking,139,South China,#D3B374,139,139,True
+2318,Sunyi,139,South China,#D3B374,139,139,True
+2319,Liuzhou,139,South China,#D3B374,139,139,True
+2320,Guixian,139,South China,#D3B374,139,139,True
+2321,Shanghai,137,Nationalist China,#8F9D78,137,137,True
+2322,Wuchow,139,South China,#D3B374,139,139,True
+2323,Nanking,137,Nationalist China,#8F9D78,137,137,True
+2324,Teian,137,Nationalist China,#8F9D78,137,137,True
+2325,Ichang,137,Nationalist China,#8F9D78,137,137,True
+2326,Tungjen,137,Nationalist China,#8F9D78,137,137,True
+2327,Tsingchow,137,Nationalist China,#8F9D78,137,137,True
+2328,Wuhan,137,Nationalist China,#8F9D78,137,137,True
+2329,Changsha,137,Nationalist China,#8F9D78,137,137,True
+2330,Nanchang,137,Nationalist China,#8F9D78,137,137,True
+2331,Kanchow,137,Nationalist China,#8F9D78,137,137,True
+2332,Foochow,137,Nationalist China,#8F9D78,137,137,True
+2333,Hangchow,137,Nationalist China,#8F9D78,137,137,True
+2334,Wenchow,137,Nationalist China,#8F9D78,137,137,True
+2335,Linchwan,137,Nationalist China,#8F9D78,137,137,True
+2336,Anqing,137,Nationalist China,#8F9D78,137,137,True
+2337,Kingchow,137,Nationalist China,#8F9D78,137,137,True
+2338,Supu,137,Nationalist China,#8F9D78,137,137,True
+2339,Yuanchow,137,Nationalist China,#8F9D78,137,137,True
+2340,Hanyang,137,Nationalist China,#8F9D78,137,137,True
+2341,Tingchow,137,Nationalist China,#8F9D78,137,137,True
+2342,Yungchow,137,Nationalist China,#8F9D78,137,137,True
+2343,Wukang,137,Nationalist China,#8F9D78,137,137,True
+2344,Siangtan,137,Nationalist China,#8F9D78,137,137,True
+2345,Hengchow,137,Nationalist China,#8F9D78,137,137,True
+2346,Kian,137,Nationalist China,#8F9D78,137,137,True
+2347,Kienning,137,Nationalist China,#8F9D78,137,137,True
+2348,Chuanchow,137,Nationalist China,#8F9D78,137,137,True
+2349,Kyaukse,134,Burma,#91896A,134,134,True
+2350,Yeu,134,Burma,#91896A,134,134,True
+2351,Kohima,134,Burma,#91896A,134,134,True
+2352,Katha,134,Burma,#91896A,134,134,True
+2353,Myitkyina,134,Burma,#91896A,134,134,True
+2354,Mogaung,134,Burma,#91896A,134,134,True
+2355,Paletwa,134,Burma,#91896A,134,134,True
+2356,Sandoway,134,Burma,#91896A,134,134,True
+2357,Pegu,134,Burma,#91896A,134,134,True
+2358,Yamethin,134,Burma,#91896A,134,134,True
+2359,Pakokku,134,Burma,#91896A,134,134,True
+2360,Mong Kung,134,Burma,#91896A,134,134,True
+2361,Bangkok,133,Siam,#D5AD46,133,133,True
+2362,Kiang Mai,133,Siam,#D5AD46,133,133,True
+2363,Sa Kaeo,133,Siam,#D5AD46,133,133,True
+2364,Kalasin,133,Siam,#D5AD46,133,133,True
+2365,Surin,133,Siam,#D5AD46,133,133,True
+2366,Sukhothai,133,Siam,#D5AD46,133,133,True
+2367,Phang Nga,133,Siam,#D5AD46,133,133,True
+2368,Singora,133,Siam,#D5AD46,133,133,True
+2369,Ranong,133,Siam,#D5AD46,133,133,True
+2370,Kanburi,133,Siam,#D5AD46,133,133,True
+2371,Pnom Penh,135,Indochina,#90AE77,135,135,True
+2372,Saigon,135,Indochina,#90AE77,135,135,True
+2373,Luang Prabang,135,Indochina,#90AE77,135,135,True
+2374,Hanoi,135,Indochina,#90AE77,135,135,True
+2375,Hue,135,Indochina,#90AE77,135,135,True
+2376,Kampot,135,Indochina,#90AE77,135,135,True
+2377,Odong,135,Indochina,#90AE77,135,135,True
+2378,Battambang,135,Indochina,#90AE77,135,135,True
+2379,Bak Lieu,135,Indochina,#90AE77,135,135,True
+2380,Binh Thuan,135,Indochina,#90AE77,135,135,True
+2381,Phu-yen,135,Indochina,#90AE77,135,135,True
+2382,Prey Veng,135,Indochina,#90AE77,135,135,True
+2383,Pak-Lai,135,Indochina,#90AE77,135,135,True
+2384,Kao Bang,135,Indochina,#90AE77,135,135,True
+2385,Lao-Kai,135,Indochina,#90AE77,135,135,True
+2386,Muang Xay,135,Indochina,#90AE77,135,135,True
+2387,Yen-bai,135,Indochina,#90AE77,135,135,True
+2388,Haiphong,135,Indochina,#90AE77,135,135,True
+2389,Vinh,135,Indochina,#90AE77,135,135,True
+2390,Banlao,135,Indochina,#90AE77,135,135,True
+2391,Đong Hoi,135,Indochina,#90AE77,135,135,True
+2392,Tourane,135,Indochina,#90AE77,135,135,True
+2393,Meluprey,135,Indochina,#90AE77,135,135,True
+2394,Nong Hoi,135,Indochina,#90AE77,135,135,True
+2395,Kratié,135,Indochina,#90AE77,135,135,True
+2396,Beijing,138,Communist China,#CEC8A5,138,138,True
+2397,Tianjin,138,Communist China,#CEC8A5,138,138,True
+2398,Jinan,138,Communist China,#CEC8A5,138,138,True
+2399,Rizhao,138,Communist China,#CEC8A5,138,138,True
+2400,Tsingtao,138,Communist China,#CEC8A5,138,138,True
+2401,Weifang,138,Communist China,#CEC8A5,138,138,True
+2402,Mangan,147,Mengjiang,#E7D262,147,147,True
+2403,Kolan,138,Communist China,#CEC8A5,138,138,True
+2404,Fuping,138,Communist China,#CEC8A5,138,138,True
+2405,Qingyang,138,Communist China,#CEC8A5,138,138,True
+2406,Taiyuan,138,Communist China,#CEC8A5,138,138,True
+2407,Shijiazhuang,138,Communist China,#CEC8A5,138,138,True
+2408,Yangquan,138,Communist China,#CEC8A5,138,138,True
+2409,Boading,138,Communist China,#CEC8A5,138,138,True
+2410,Zhengzhou,138,Communist China,#CEC8A5,138,138,True
+2411,Jining,138,Communist China,#CEC8A5,138,138,True
+2412,Yancheng,138,Communist China,#CEC8A5,138,138,True
+2413,Xuzhou,138,Communist China,#CEC8A5,138,138,True
+2414,Linyi,138,Communist China,#CEC8A5,138,138,True
+2415,Bengbu,138,Communist China,#CEC8A5,138,138,True
+2416,Nanyang,138,Communist China,#CEC8A5,138,138,True
+2417,Zhumadian,138,Communist China,#CEC8A5,138,138,True
+2418,Yungcheng,138,Communist China,#CEC8A5,138,138,True
+2419,Lüliang,138,Communist China,#CEC8A5,138,138,True
+2420,Ulaanbaatar,130,Mongolia,#9C8850,130,130,True
+2421,Altai,130,Mongolia,#9C8850,130,130,True
+2422,Bor-Undur,130,Mongolia,#9C8850,130,130,True
+2423,Choir,130,Mongolia,#9C8850,130,130,True
+2424,Sainshand,130,Mongolia,#9C8850,130,130,True
+2425,Matad,130,Mongolia,#9C8850,130,130,True
+2426,Baruun-Urt,130,Mongolia,#9C8850,130,130,True
+2427,Baganuur,130,Mongolia,#9C8850,130,130,True
+2428,Choibalsan,130,Mongolia,#9C8850,130,130,True
+2429,Uniket,147,Mengjiang,#E7D262,147,147,True
+2430,Sharga,130,Mongolia,#9C8850,130,130,True
+2431,Delger,130,Mongolia,#9C8850,130,130,True
+2432,Erdene,130,Mongolia,#9C8850,130,130,True
+2433,Khatansuudal,130,Mongolia,#9C8850,130,130,True
+2434,Murun,130,Mongolia,#9C8850,130,130,True
+2435,Turuun,130,Mongolia,#9C8850,130,130,True
+2436,Ulaangom,130,Mongolia,#9C8850,130,130,True
+2437,Ulgii,130,Mongolia,#9C8850,130,130,True
+2438,Terper Tugrug,130,Mongolia,#9C8850,130,130,True
+2439,Bayankhongor,130,Mongolia,#9C8850,130,130,True
+2440,Bulgan,130,Mongolia,#9C8850,130,130,True
+2441,Gurvansaikhan,130,Mongolia,#9C8850,130,130,True
+2442,Bulan,130,Mongolia,#9C8850,130,130,True
+2443,Bayan-Ovoo,130,Mongolia,#9C8850,130,130,True
+2444,Mandal-Ovoo,130,Mongolia,#9C8850,130,130,True
+2445,Lun,130,Mongolia,#9C8850,130,130,True
+2446,Bugat,130,Mongolia,#9C8850,130,130,True
+2447,Durvuljin,130,Mongolia,#9C8850,130,130,True
+2448,Kingpeng,140,Mukden,#59797C,140,140,True
+2449,Urumchi,150,Xinjiang,#BB5444,150,150,True
+2450,Bulun Tokhoi,150,Xinjiang,#BB5444,150,150,True
+2451,Ningyuan,150,Xinjiang,#BB5444,150,150,True
+2452,Aqsu,150,Xinjiang,#BB5444,150,150,True
+2453,Kashgar,150,Xinjiang,#BB5444,150,150,True
+2454,Niya,150,Xinjiang,#BB5444,150,150,True
+2455,Kushui,150,Xinjiang,#BB5444,150,150,True
+2456,Chochiang,150,Xinjiang,#BB5444,150,150,True
+2457,Hotien,150,Xinjiang,#BB5444,150,150,True
+2458,Yutien,150,Xinjiang,#BB5444,150,150,True
+2459,Kucha,150,Xinjiang,#BB5444,150,150,True
+2460,Qara Shahr,150,Xinjiang,#BB5444,150,150,True
+2461,Turfan,150,Xinjiang,#BB5444,150,150,True
+2462,Hami,150,Xinjiang,#BB5444,150,150,True
+2463,Chensi,150,Xinjiang,#BB5444,150,150,True
+2464,Charchan,150,Xinjiang,#BB5444,150,150,True
+2465,Suilai,150,Xinjiang,#BB5444,150,150,True
+2466,Wusu,150,Xinjiang,#BB5444,150,150,True
+2467,Tsingho,150,Xinjiang,#BB5444,150,150,True
+2468,Shawan,150,Xinjiang,#BB5444,150,150,True
+2469,Yulghunbulak,150,Xinjiang,#BB5444,150,150,True
+2470,Kitai,150,Xinjiang,#BB5444,150,150,True
+2471,Guntamga,150,Xinjiang,#BB5444,150,150,True
+2472,Kargilik,150,Xinjiang,#BB5444,150,150,True
+2473,Bashi,150,Xinjiang,#BB5444,150,150,True
+2474,Vash Shahri,150,Xinjiang,#BB5444,150,150,True
+2475,Sinping,150,Xinjiang,#BB5444,150,150,True
+2476,Cagayan de Oro,151,Philippines,#D0C788,151,151,True
+2477,Tuguegarao,151,Philippines,#D0C788,151,151,True
+2478,Naujan,151,Philippines,#D0C788,151,151,True
+2479,Batangas City,151,Philippines,#D0C788,151,151,True
+2480,Boac,151,Philippines,#D0C788,151,151,True
+2481,Hǎikou,146,Hainan,#807E97,146,146,True
+2482,Angeles,151,Philippines,#D0C788,151,151,True
+2483,Luzhou,149,Sichuan,#6DB3AF,149,149,True
+2484,Hangkin,147,Mengjiang,#E7D262,147,147,True
+2485,Ashan,147,Mengjiang,#E7D262,147,147,True
+2486,Chihfeng,140,Mukden,#59797C,140,140,True
+2487,Qinhuangdao,140,Mukden,#59797C,140,140,True
+2488,Yingkow,140,Mukden,#59797C,140,140,True
+2489,Tokyo,143,Japan,#CD555E,143,143,True
+2490,Osaka,143,Japan,#CD555E,143,143,True
+2491,Nagasaki,143,Japan,#CD555E,143,143,True
+2492,Sapporo,143,Japan,#CD555E,143,143,True
+2493,Urakawa,143,Japan,#CD555E,143,143,True
+2494,Kushiro,143,Japan,#CD555E,143,143,True
+2495,Nayoro,143,Japan,#CD555E,143,143,True
+2496,Iwamizawa,143,Japan,#CD555E,143,143,True
+2497,Fukuyama,143,Japan,#CD555E,143,143,True
+2498,Sendai,143,Japan,#CD555E,143,143,True
+2499,Kagoshima,143,Japan,#CD555E,143,143,True
+2500,Kumamoto,143,Japan,#CD555E,143,143,True
+2501,Fukuoka,143,Japan,#CD555E,143,143,True
+2502,Kochi,143,Japan,#CD555E,143,143,True
+2503,Miyako,143,Japan,#CD555E,143,143,True
+2504,Takamatsu,143,Japan,#CD555E,143,143,True
+2505,Wakayama,143,Japan,#CD555E,143,143,True
+2506,Kyoto,143,Japan,#CD555E,143,143,True
+2507,Kobe,143,Japan,#CD555E,143,143,True
+2508,Hiroshima,143,Japan,#CD555E,143,143,True
+2509,Hirosaki,143,Japan,#CD555E,143,143,True
+2510,Yokohama,143,Japan,#CD555E,143,143,True
+2511,Nagoya,143,Japan,#CD555E,143,143,True
+2512,Kanazawa,143,Japan,#CD555E,143,143,True
+2513,Ishioka,143,Japan,#CD555E,143,143,True
+2514,Kiryu,143,Japan,#CD555E,143,143,True
+2515,Nagano,143,Japan,#CD555E,143,143,True
+2516,Keijo,142,Korea,#667F6C,142,142,True
+2517,Heijo,142,Korea,#667F6C,142,142,True
+2518,Fusan,142,Korea,#667F6C,142,142,True
+2519,Kojo,142,Korea,#667F6C,142,142,True
+2520,Seishin,142,Korea,#667F6C,142,142,True
+2521,Onjo,142,Korea,#667F6C,142,142,True
+2522,Joshin,142,Korea,#667F6C,142,142,True
+2523,Choshin,142,Korea,#667F6C,142,142,True
+2524,Shingishu,142,Korea,#667F6C,142,142,True
+2525,Shinnampo,142,Korea,#667F6C,142,142,True
+2526,Kaishu,142,Korea,#667F6C,142,142,True
+2527,Shunsen,142,Korea,#667F6C,142,142,True
+2528,Gangneung,142,Korea,#667F6C,142,142,True
+2529,Taikyu,142,Korea,#667F6C,142,142,True
+2530,Koshu,142,Korea,#667F6C,142,142,True
+2531,Kunsan,142,Korea,#667F6C,142,142,True
+2532,Uruchin,142,Korea,#667F6C,142,142,True
+2533,Seikwan,142,Korea,#667F6C,142,142,True
+2534,Gensan,142,Korea,#667F6C,142,142,True
+2535,Anshu,142,Korea,#667F6C,142,142,True
+2536,Jipyeong-ri,142,Korea,#667F6C,142,142,True
+2537,Huanren,140,Mukden,#59797C,140,140,True
+2538,Mukden,140,Mukden,#59797C,140,140,True
+2539,Solun,140,Mukden,#59797C,140,140,True
+2540,Suanhwa,138,Communist China,#CEC8A5,138,138,True
+2541,Qamdo,149,Sichuan,#6DB3AF,149,149,True
+2542,Liangshan,149,Sichuan,#6DB3AF,149,149,True
+2543,Chongqing,149,Sichuan,#6DB3AF,149,149,True
+2544,Chengdu,149,Sichuan,#6DB3AF,149,149,True
+2545,Ya'an,149,Sichuan,#6DB3AF,149,149,True
+2546,Aba,149,Sichuan,#6DB3AF,149,149,True
+2547,Garze,149,Sichuan,#6DB3AF,149,149,True
+2548,Nanchong,149,Sichuan,#6DB3AF,149,149,True
+2549,Xi'an,149,Sichuan,#6DB3AF,149,149,True
+2550,Tianshui,149,Sichuan,#6DB3AF,149,149,True
+2551,Lanzhou,149,Sichuan,#6DB3AF,149,149,True
+2552,Weinan,149,Sichuan,#6DB3AF,149,149,True
+2553,Ziyang,149,Sichuan,#6DB3AF,149,149,True
+2554,Gannan,149,Sichuan,#6DB3AF,149,149,True
+2555,Daocheng,149,Sichuan,#6DB3AF,149,149,True
+2556,Zunyi,149,Sichuan,#6DB3AF,149,149,True
+2557,Zhaotong,149,Sichuan,#6DB3AF,149,149,True
+2558,Longnan,149,Sichuan,#6DB3AF,149,149,True
+2559,Lintao,149,Sichuan,#6DB3AF,149,149,True
+2560,Baiyin,149,Sichuan,#6DB3AF,149,149,True
+2561,Dagupan,151,Philippines,#D0C788,151,151,True
+2562,Hezhou,149,Sichuan,#6DB3AF,149,149,True
+2563,Hongyuan,149,Sichuan,#6DB3AF,149,149,True
+2564,Zogang,149,Sichuan,#6DB3AF,149,149,True
+2565,Laoag,151,Philippines,#D0C788,151,151,True
+2566,Derge,149,Sichuan,#6DB3AF,149,149,True
+2567,Yaxian,146,Hainan,#807E97,146,146,True
+2568,Toyohara,144,Sakhalin,#AEC399,144,144,True
+2569,Alexandrovsk,144,Sakhalin,#AEC399,144,144,True
+2570,Okha,144,Sakhalin,#AEC399,144,144,True
+2571,Keton,144,Sakhalin,#AEC399,144,144,True
+2572,Palevo,144,Sakhalin,#AEC399,144,144,True
+2573,Taipei,145,Taiwan,#759353,145,145,True
+2574,Taoyuan,145,Taiwan,#759353,145,145,True
+2575,Taichū,145,Taiwan,#759353,145,145,True
+2576,Takow,145,Taiwan,#759353,145,145,True
+2577,Cauayan,151,Philippines,#D0C788,151,151,True
+2578,Naga,151,Philippines,#D0C788,151,151,True
+2579,Misamis,151,Philippines,#D0C788,151,151,True
+2580,Zamboanga,151,Philippines,#D0C788,151,151,True
+2581,Malaybalay,151,Philippines,#D0C788,151,151,True
+2582,Bislig,151,Philippines,#D0C788,151,151,True
+2583,Glan,151,Philippines,#D0C788,151,151,True
+2584,Butuan,151,Philippines,#D0C788,151,151,True
+2585,Iloilo City,151,Philippines,#D0C788,151,151,True
+2586,Calbayog,151,Philippines,#D0C788,151,151,True
+2587,Ormoc,151,Philippines,#D0C788,151,151,True
+2588,Bacolod,151,Philippines,#D0C788,151,151,True
+2589,Cebu,151,Philippines,#D0C788,151,151,True
+2590,Catanauan,151,Philippines,#D0C788,151,151,True
+2591,Jiuquan,148,Ma-Clique,#E0A972,148,148,True
+2592,Zhangye,148,Ma-Clique,#E0A972,148,148,True
+2593,Jinchang,148,Ma-Clique,#E0A972,148,148,True
+2594,Wuwei,148,Ma-Clique,#E0A972,148,148,True
+2595,Delhi (CN),148,Ma-Clique,#E0A972,148,148,True
+2596,Kandagan,153,Borneo,#718E90,153,153,True
+2597,Bandjermasin,153,Borneo,#718E90,153,153,True
+2598,Pontianak,153,Borneo,#718E90,153,153,True
+2599,Sambas,153,Borneo,#718E90,153,153,True
+2600,Kendawangan,153,Borneo,#718E90,153,153,True
+2601,Muara Teweh,153,Borneo,#718E90,153,153,True
+2602,Singtang,153,Borneo,#718E90,153,153,True
+2603,Sanggau,153,Borneo,#718E90,153,153,True
+2604,Sampit,153,Borneo,#718E90,153,153,True
+2605,Palangkaraya,153,Borneo,#718E90,153,153,True
+2606,Kalolokan,153,Borneo,#718E90,153,153,True
+2607,Tarakan,153,Borneo,#718E90,153,153,True
+2608,Samarinda,153,Borneo,#718E90,153,153,True
+2609,Yushu,148,Ma-Clique,#E0A972,148,148,True
+2610,Zadoi,148,Ma-Clique,#E0A972,148,148,True
+2611,Long Poera,153,Borneo,#718E90,153,153,True
+2612,Makassar,153,Borneo,#718E90,153,153,True
+2613,Lelewaoe,153,Borneo,#718E90,153,153,True
+2614,Poleang,153,Borneo,#718E90,153,153,True
+2615,Singaradja,155,Nusa Tenggara,#6DB3AF,155,155,True
+2616,Palu,153,Borneo,#718E90,153,153,True
+2617,Maros,153,Borneo,#718E90,153,153,True
+2618,Wono,153,Borneo,#718E90,153,153,True
+2619,Deking,153,Borneo,#718E90,153,153,True
+2620,Singkang,153,Borneo,#718E90,153,153,True
+2621,Masamba,153,Borneo,#718E90,153,153,True
+2622,Ampana,153,Borneo,#718E90,153,153,True
+2623,Menado,153,Borneo,#718E90,153,153,True
+2624,Tanggulazhen,148,Ma-Clique,#E0A972,148,148,True
+2625,Wutumeirenxiang,148,Ma-Clique,#E0A972,148,148,True
+2626,Lenghuzhen,148,Ma-Clique,#E0A972,148,148,True
+2627,Xihuxiang,148,Ma-Clique,#E0A972,148,148,True
+2628,Yumen,148,Ma-Clique,#E0A972,148,148,True
+2629,Yanglongxiang,148,Ma-Clique,#E0A972,148,148,True
+2630,Golog,148,Ma-Clique,#E0A972,148,148,True
+2631,Huangnan,148,Ma-Clique,#E0A972,148,148,True
+2632,Chakazhen,148,Ma-Clique,#E0A972,148,148,True
+2633,Youyunxiang,148,Ma-Clique,#E0A972,148,148,True
+2634,Madoi,148,Ma-Clique,#E0A972,148,148,True
+2635,Golmud,148,Ma-Clique,#E0A972,148,148,True
+2636,Qumahexiang,148,Ma-Clique,#E0A972,148,148,True
+2637,Hainan,148,Ma-Clique,#E0A972,148,148,True
+2638,Niandixiang,148,Ma-Clique,#E0A972,148,148,True
+2639,Kuching,188,Brunei,#CB5843,188,188,True
+2640,Sibu,188,Brunei,#CB5843,188,188,True
+2641,Bintulu,188,Brunei,#CB5843,188,188,True
+2642,Brunei,188,Brunei,#CB5843,188,188,True
+2643,Kudat,188,Brunei,#CB5843,188,188,True
+2644,Singapore,187,Malaysia,#60A495,187,187,True
+2645,Sungai Petani,187,Malaysia,#60A495,187,187,True
+2646,Kuala Lumpur,187,Malaysia,#60A495,187,187,True
+2647,Khota Bharn,187,Malaysia,#60A495,187,187,True
+2648,Taliwang,155,Nusa Tenggara,#6DB3AF,155,155,True
+2649,Ampenan,155,Nusa Tenggara,#6DB3AF,155,155,True
+2650,Ende,155,Nusa Tenggara,#6DB3AF,155,155,True
+2651,Palenbang,154,Sumatra,#D48B48,154,154,True
+2652,Waingapu,155,Nusa Tenggara,#6DB3AF,155,155,True
+2653,Kupang,155,Nusa Tenggara,#6DB3AF,155,155,True
+2654,Dili,155,Nusa Tenggara,#6DB3AF,155,155,True
+2655,Batavia,154,Sumatra,#D48B48,154,154,True
+2656,Soerabaja,154,Sumatra,#D48B48,154,154,True
+2657,Medan,154,Sumatra,#D48B48,154,154,True
+2658,Banda Aceh,154,Sumatra,#D48B48,154,154,True
+2659,Bandung,154,Sumatra,#D48B48,154,154,True
+2660,Cheribon,154,Sumatra,#D48B48,154,154,True
+2661,Solo,154,Sumatra,#D48B48,154,154,True
+2662,Banyuwangi,154,Sumatra,#D48B48,154,154,True
+2663,Semarang,154,Sumatra,#D48B48,154,154,True
+2664,Pandeglang,154,Sumatra,#D48B48,154,154,True
+2665,Malang,154,Sumatra,#D48B48,154,154,True
+2666,Pekanbaru,154,Sumatra,#D48B48,154,154,True
+2667,Djambi,154,Sumatra,#D48B48,154,154,True
+2668,Telukbetung,154,Sumatra,#D48B48,154,154,True
+2669,Padang,154,Sumatra,#D48B48,154,154,True
+2670,Bengkulu,154,Sumatra,#D48B48,154,154,True
+2671,Rengat,154,Sumatra,#D48B48,154,154,True
+2672,Tapaktuan,154,Sumatra,#D48B48,154,154,True
+2673,Tanjungbalai,154,Sumatra,#D48B48,154,154,True
+2674,Langsa,154,Sumatra,#D48B48,154,154,True
+2675,Darwin,176,Central Australia,#A9662D,176,176,True
+2676,Adelaide,176,Central Australia,#A9662D,176,176,True
+2677,Alice Springs,176,Central Australia,#A9662D,176,176,True
+2678,Marla,176,Central Australia,#A9662D,176,176,True
+2679,Maralinga,176,Central Australia,#A9662D,176,176,True
+2680,The Sill,176,Central Australia,#A9662D,176,176,True
+2681,Kintore,176,Central Australia,#A9662D,176,176,True
+2682,Urluru,176,Central Australia,#A9662D,176,176,True
+2683,Katherine,176,Central Australia,#A9662D,176,176,True
+2684,Lajamanu,176,Central Australia,#A9662D,176,176,True
+2685,Three Ways,176,Central Australia,#A9662D,176,176,True
+2686,Borroloola,176,Central Australia,#A9662D,176,176,True
+2687,Port Augusta,176,Central Australia,#A9662D,176,176,True
+2688,Renmark,176,Central Australia,#A9662D,176,176,True
+2689,Perth,175,Western Australia,#90AE77,175,175,True
+2690,Roebourne,175,Western Australia,#90AE77,175,175,True
+2691,Kalgoorlie,175,Western Australia,#90AE77,175,175,True
+2692,Geraldton,175,Western Australia,#90AE77,175,175,True
+2693,Esperance,175,Western Australia,#90AE77,175,175,True
+2694,Loongana,175,Western Australia,#90AE77,175,175,True
+2695,Southern Cross,175,Western Australia,#90AE77,175,175,True
+2696,Northam,175,Western Australia,#90AE77,175,175,True
+2697,Albany,175,Western Australia,#90AE77,175,175,True
+2698,Dongara,175,Western Australia,#90AE77,175,175,True
+2699,Wyndham,175,Western Australia,#90AE77,175,175,True
+2700,Derby,175,Western Australia,#90AE77,175,175,True
+2701,Halls Creek,175,Western Australia,#90AE77,175,175,True
+2702,Port Hedland,175,Western Australia,#90AE77,175,175,True
+2703,Newman,175,Western Australia,#90AE77,175,175,True
+2704,Carnavon,175,Western Australia,#90AE77,175,175,True
+2705,Wiluna,175,Western Australia,#90AE77,175,175,True
+2706,Warburton,175,Western Australia,#90AE77,175,175,True
+2707,Tanami,175,Western Australia,#90AE77,175,175,True
+2708,Yalgoo,175,Western Australia,#90AE77,175,175,True
+2709,Abbots,175,Western Australia,#90AE77,175,175,True
+2710,Telfer,175,Western Australia,#90AE77,175,175,True
+2711,Rawanna,175,Western Australia,#90AE77,175,175,True
+2712,Higginsville,175,Western Australia,#90AE77,175,175,True
+2713,Onslow,175,Western Australia,#90AE77,175,175,True
+2714,Kumarina,175,Western Australia,#90AE77,175,175,True
+2715,Merauke,152,Papua New Guinea,#D5AD46,152,152,True
+2716,Melbourne,178,New South Wales,#E8D462,178,178,True
+2717,Sydney,178,New South Wales,#E8D462,178,178,True
+2718,Newcastle,178,New South Wales,#E8D462,178,178,True
+2719,Mildura,178,New South Wales,#E8D462,178,178,True
+2720,Ballarat,178,New South Wales,#E8D462,178,178,True
+2721,Bendigo,178,New South Wales,#E8D462,178,178,True
+2722,Canberra,178,New South Wales,#E8D462,178,178,True
+2723,Bairnsdale,178,New South Wales,#E8D462,178,178,True
+2724,Wagga Wagga,178,New South Wales,#E8D462,178,178,True
+2725,Yaapeet,178,New South Wales,#E8D462,178,178,True
+2726,Silverton,178,New South Wales,#E8D462,178,178,True
+2727,Tibooburra,178,New South Wales,#E8D462,178,178,True
+2728,Hay,178,New South Wales,#E8D462,178,178,True
+2729,Gosford,178,New South Wales,#E8D462,178,178,True
+2730,Lismore,178,New South Wales,#E8D462,178,178,True
+2731,Dubbo,178,New South Wales,#E8D462,178,178,True
+2732,Byrock,178,New South Wales,#E8D462,178,178,True
+2733,Ivanhoe,178,New South Wales,#E8D462,178,178,True
+2734,Bathurst,178,New South Wales,#E8D462,178,178,True
+2735,Nymagee,178,New South Wales,#E8D462,178,178,True
+2736,Walgett,178,New South Wales,#E8D462,178,178,True
+2737,Wanaaring,178,New South Wales,#E8D462,178,178,True
+2738,Brisbane,177,Queensland,#718E90,177,177,True
+2739,Warwick,177,Queensland,#718E90,177,177,True
+2740,Townsville,177,Queensland,#718E90,177,177,True
+2741,Cloncurry,177,Queensland,#718E90,177,177,True
+2742,Rockhampton,177,Queensland,#718E90,177,177,True
+2743,Longreach,177,Queensland,#718E90,177,177,True
+2744,Cairns,177,Queensland,#718E90,177,177,True
+2745,Floraville,177,Queensland,#718E90,177,177,True
+2746,Dutches,177,Queensland,#718E90,177,177,True
+2747,Richmond (QLD),177,Queensland,#718E90,177,177,True
+2748,MCDonnell,177,Queensland,#718E90,177,177,True
+2749,Emerald,177,Queensland,#718E90,177,177,True
+2750,Mackay,177,Queensland,#718E90,177,177,True
+2751,Charters Towers,177,Queensland,#718E90,177,177,True
+2752,Palmerville,177,Queensland,#718E90,177,177,True
+2753,Birdsville,177,Queensland,#718E90,177,177,True
+2754,Boulia,177,Queensland,#718E90,177,177,True
+2755,Windorah,177,Queensland,#718E90,177,177,True
+2756,Eromanga,177,Queensland,#718E90,177,177,True
+2757,Eulo,177,Queensland,#718E90,177,177,True
+2758,Maryborough,177,Queensland,#718E90,177,177,True
+2759,Rannes,177,Queensland,#718E90,177,177,True
+2760,Sandgate,177,Queensland,#718E90,177,177,True
+2761,Dirranbandi,177,Queensland,#718E90,177,177,True
+2762,Roma,177,Queensland,#718E90,177,177,True
+2763,Charleville,177,Queensland,#718E90,177,177,True
+2764,Port Moresby,152,Papua New Guinea,#D5AD46,152,152,True
+2765,Alotau,152,Papua New Guinea,#D5AD46,152,152,True
+2766,Daru,152,Papua New Guinea,#D5AD46,152,152,True
+2767,Aitape,152,Papua New Guinea,#D5AD46,152,152,True
+2768,Sarmi,152,Papua New Guinea,#D5AD46,152,152,True
+2769,Sorong,152,Papua New Guinea,#D5AD46,152,152,True
+2770,Kaimana,152,Papua New Guinea,#D5AD46,152,152,True
+2771,Madang,152,Papua New Guinea,#D5AD46,152,152,True
+2772,Lae,152,Papua New Guinea,#D5AD46,152,152,True
+2773,Morobe,152,Papua New Guinea,#D5AD46,152,152,True
+2774,Timika,152,Papua New Guinea,#D5AD46,152,152,True
+2775,Agats,152,Papua New Guinea,#D5AD46,152,152,True
+2776,Mendi,152,Papua New Guinea,#D5AD46,152,152,True
+2777,Wewak,152,Papua New Guinea,#D5AD46,152,152,True
+2778,Tiom,152,Papua New Guinea,#D5AD46,152,152,True
+2779,Aiambak,152,Papua New Guinea,#D5AD46,152,152,True
+2780,Tabubil,152,Papua New Guinea,#D5AD46,152,152,True
+2781,Wabag,152,Papua New Guinea,#D5AD46,152,152,True
+2782,Manokwari,152,Papua New Guinea,#D5AD46,152,152,True
+2783,Kimbe,152,Papua New Guinea,#D5AD46,152,152,True
+2784,Kavieng,152,Papua New Guinea,#D5AD46,152,152,True
+2785,Jayapura,152,Papua New Guinea,#D5AD46,152,152,True
+2786,Kumbe,152,Papua New Guinea,#D5AD46,152,152,True
+2787,Botawa,152,Papua New Guinea,#D5AD46,152,152,True
+2788,Tembagapura,152,Papua New Guinea,#D5AD46,152,152,True
+2789,Hobart,179,Tasmania,#8F7B44,179,179,True
+2790,Devonport,179,Tasmania,#8F7B44,179,179,True
+2791,Strahan,179,Tasmania,#8F7B44,179,179,True
+2792,Auckland,174,New Zealand,#4C704E,174,174,True
+2793,Wellington,174,New Zealand,#4C704E,174,174,True
+2794,Otira,174,New Zealand,#4C704E,174,174,True
+2795,Dunedin,174,New Zealand,#4C704E,174,174,True
+2796,Invercargill,174,New Zealand,#4C704E,174,174,True
+2797,Cromwell,174,New Zealand,#4C704E,174,174,True
+2798,Nelson,174,New Zealand,#4C704E,174,174,True
+2799,Greymouth,174,New Zealand,#4C704E,174,174,True
+2800,Timaru,174,New Zealand,#4C704E,174,174,True
+2801,Oamaru,174,New Zealand,#4C704E,174,174,True
+2802,Westport,174,New Zealand,#4C704E,174,174,True
+2803,Ohakune,174,New Zealand,#4C704E,174,174,True
+2804,Gisborne,174,New Zealand,#4C704E,174,174,True
+2805,Mokai,174,New Zealand,#4C704E,174,174,True
+2806,Ohura,174,New Zealand,#4C704E,174,174,True
+2807,Napier,174,New Zealand,#4C704E,174,174,True
+2808,Masterton,174,New Zealand,#4C704E,174,174,True
+2809,Hamilton,174,New Zealand,#4C704E,174,174,True
+2810,Blenheim,174,New Zealand,#4C704E,174,174,True
+2811,Kaikoura,174,New Zealand,#4C704E,174,174,True
+2812,Te Anau,174,New Zealand,#4C704E,174,174,True
+2813,Hokitika,174,New Zealand,#4C704E,174,174,True
+2814,Wanaka,174,New Zealand,#4C704E,174,174,True
+2815,Christchurch,174,New Zealand,#4C704E,174,174,True
+2816,Leningrad,157,Arkhangelsk,#D1B04D,157,157,True
+2817,Vologda,157,Arkhangelsk,#D1B04D,157,157,True
+2818,Arkhangelsk,157,Arkhangelsk,#D1B04D,157,157,True
+2819,Naryan-Mar,157,Arkhangelsk,#D1B04D,157,157,True
+2820,Pskov,157,Arkhangelsk,#D1B04D,157,157,True
+2821,Veliky Novgorod,157,Arkhangelsk,#D1B04D,157,157,True
+2822,Gdov,157,Arkhangelsk,#D1B04D,157,157,True
+2823,Nevel,157,Arkhangelsk,#D1B04D,157,157,True
+2824,Amderma,157,Arkhangelsk,#D1B04D,157,157,True
+2825,Shoyna,157,Arkhangelsk,#D1B04D,157,157,True
+2826,Knyazhpogost,158,Komi Republic,#7A8054,158,158,True
+2827,Dutovo,158,Komi Republic,#7A8054,158,158,True
+2828,Pechora,158,Komi Republic,#7A8054,158,158,True
+2829,Ukhta,158,Komi Republic,#7A8054,158,158,True
+2830,Izhma,158,Komi Republic,#7A8054,158,158,True
+2831,Ust-Tsilma,158,Komi Republic,#7A8054,158,158,True
+2832,Inta,158,Komi Republic,#7A8054,158,158,True
+2833,Syktyvkar,158,Komi Republic,#7A8054,158,158,True
+2834,Troitsko-Pechorsk,158,Komi Republic,#7A8054,158,158,True
+2835,Kuratovo,158,Komi Republic,#7A8054,158,158,True
+2836,Vazhgort,158,Komi Republic,#7A8054,158,158,True
+2837,Khorey-Ver,157,Arkhangelsk,#D1B04D,157,157,True
+2838,Kargopol,157,Arkhangelsk,#D1B04D,157,157,True
+2839,Kotlas,157,Arkhangelsk,#D1B04D,157,157,True
+2840,Mezen,157,Arkhangelsk,#D1B04D,157,157,True
+2841,Onega,157,Arkhangelsk,#D1B04D,157,157,True
+2842,Shenkursk,157,Arkhangelsk,#D1B04D,157,157,True
+2843,Bereznik,157,Arkhangelsk,#D1B04D,157,157,True
+2844,Karpogory,157,Arkhangelsk,#D1B04D,157,157,True
+2845,Leshukonskoye,157,Arkhangelsk,#D1B04D,157,157,True
+2846,Pinega,157,Arkhangelsk,#D1B04D,157,157,True
+2847,Kotkino,157,Arkhangelsk,#D1B04D,157,157,True
+2848,Cherepovets,157,Arkhangelsk,#D1B04D,157,157,True
+2849,Volkhov,157,Arkhangelsk,#D1B04D,157,157,True
+2850,Khvoynaya,157,Arkhangelsk,#D1B04D,157,157,True
+2851,Sokol,157,Arkhangelsk,#D1B04D,157,157,True
+2852,Gryazovets,157,Arkhangelsk,#D1B04D,157,157,True
+2853,Nikolsk,157,Arkhangelsk,#D1B04D,157,157,True
+2854,Kizema,157,Arkhangelsk,#D1B04D,157,157,True
+2855,Salekhard,161,North Ural,#729093,161,161,True
+2856,Tarko-Sale,161,North Ural,#729093,161,161,True
+2857,Nadym,161,North Ural,#729093,161,161,True
+2858,Urengoy,161,North Ural,#729093,161,161,True
+2859,Khanty-Mansiysk,161,North Ural,#729093,161,161,True
+2860,Surgut,161,North Ural,#729093,161,161,True
+2861,Beloyarsky,161,North Ural,#729093,161,161,True
+2862,Nizhnevartovsk,161,North Ural,#729093,161,161,True
+2863,Leushi,161,North Ural,#729093,161,161,True
+2864,Beryozovo,161,North Ural,#729093,161,161,True
+2865,Igrim,161,North Ural,#729093,161,161,True
+2866,Kasymsk,161,North Ural,#729093,161,161,True
+2867,Pokatshena,161,North Ural,#729093,161,161,True
+2868,Yugansk,161,North Ural,#729093,161,161,True
+2869,Taran,161,North Ural,#729093,161,161,True
+2870,Ovgort,161,North Ural,#729093,161,161,True
+2871,Korliki,161,North Ural,#729093,161,161,True
+2872,Kikkiakki,161,North Ural,#729093,161,161,True
+2873,Khalmer-Sede,161,North Ural,#729093,161,161,True
+2874,Muşkino,161,North Ural,#729093,161,161,True
+2875,Andra,161,North Ural,#729093,161,161,True
+2876,Verkhnekazymskiy,161,North Ural,#729093,161,161,True
+2877,Tolka,161,North Ural,#729093,161,161,True
+2878,Ratta,161,North Ural,#729093,161,161,True
+2879,Krasnoselkup,161,North Ural,#729093,161,161,True
+2880,Nowoagansk,161,North Ural,#729093,161,161,True
+2881,Krasnoyarsk,163,Siberia,#6B8775,163,163,True
+2882,Dudinka,163,Siberia,#6B8775,163,163,True
+2883,Igarka,163,Siberia,#6B8775,163,163,True
+2884,Irkutsk,164,East Siberia,#9B6A28,164,164,True
+2885,Norilsk,163,Siberia,#6B8775,163,163,True
+2886,Nazarovo,163,Siberia,#6B8775,163,163,True
+2887,Ilansky,163,Siberia,#6B8775,163,163,True
+2888,Syndassko,163,Siberia,#6B8775,163,163,True
+2889,Baykit,163,Siberia,#6B8775,163,163,True
+2890,Bor,163,Siberia,#6B8775,163,163,True
+2891,Khatanga,163,Siberia,#6B8775,163,163,True
+2892,Ekonda,163,Siberia,#6B8775,163,163,True
+2893,Poligus,163,Siberia,#6B8775,163,163,True
+2894,Tura,163,Siberia,#6B8775,163,163,True
+2895,Vanavara,163,Siberia,#6B8775,163,163,True
+2896,Volochanka,163,Siberia,#6B8775,163,163,True
+2897,Uchami,163,Siberia,#6B8775,163,163,True
+2898,Yessey,163,Siberia,#6B8775,163,163,True
+2899,Tomsk,163,Siberia,#6B8775,163,163,True
+2900,Kolpashevo,163,Siberia,#6B8775,163,163,True
+2901,Alexandrovskoye,163,Siberia,#6B8775,163,163,True
+2902,Maklakovo,163,Siberia,#6B8775,163,163,True
+2903,Abakan,163,Siberia,#6B8775,163,163,True
+2904,Novosibirsk,163,Siberia,#6B8775,163,163,True
+2905,Barnaul,163,Siberia,#6B8775,163,163,True
+2906,Kyzyl,165,Tannu Tuva,#A64A4C,165,165,True
+2907,Onguday,163,Siberia,#6B8775,163,163,True
+2908,Omsk,163,Siberia,#6B8775,163,163,True
+2909,Tatarsk,163,Siberia,#6B8775,163,163,True
+2910,Kyshtovka,163,Siberia,#6B8775,163,163,True
+2911,Karasuk,163,Siberia,#6B8775,163,163,True
+2912,Sheregesh,163,Siberia,#6B8775,163,163,True
+2913,Bolotnoye,163,Siberia,#6B8775,163,163,True
+2914,Kirensk,164,East Siberia,#9B6A28,164,164,True
+2915,Nizhneudinsk,164,East Siberia,#9B6A28,164,164,True
+2916,Bratsk,164,East Siberia,#9B6A28,164,164,True
+2917,Kyren,164,East Siberia,#9B6A28,164,164,True
+2918,Ulan-Ude,164,East Siberia,#9B6A28,164,164,True
+2919,Bodaybo,164,East Siberia,#9B6A28,164,164,True
+2920,Kyakhta,164,East Siberia,#9B6A28,164,164,True
+2921,Yerbogachen,164,East Siberia,#9B6A28,164,164,True
+2922,Tokma,164,East Siberia,#9B6A28,164,164,True
+2923,Zhigalovo,164,East Siberia,#9B6A28,164,164,True
+2924,Chara,164,East Siberia,#9B6A28,164,164,True
+2925,Mogocha,164,East Siberia,#9B6A28,164,164,True
+2926,Otpor,164,East Siberia,#9B6A28,164,164,True
+2927,Chita,164,East Siberia,#9B6A28,164,164,True
+2928,Bagdarin,164,East Siberia,#9B6A28,164,164,True
+2929,Chadan,165,Tannu Tuva,#A64A4C,165,165,True
+2930,Shagonar,165,Tannu Tuva,#A64A4C,165,165,True
+2931,Saryg-Sep,165,Tannu Tuva,#A64A4C,165,165,True
+2932,Toora-Chem,165,Tannu Tuva,#A64A4C,165,165,True
+2933,Siktyah,167,West Yakutia,#F0CE8E,167,167,True
+2934,Nyurba,167,West Yakutia,#F0CE8E,167,167,True
+2935,Aykhal,167,West Yakutia,#F0CE8E,167,167,True
+2936,Olenyok,167,West Yakutia,#F0CE8E,167,167,True
+2937,Zhigansk,167,West Yakutia,#F0CE8E,167,167,True
+2938,Nyuya,167,West Yakutia,#F0CE8E,167,167,True
+2939,Olyokminsk,167,West Yakutia,#F0CE8E,167,167,True
+2940,Vilyuysk,167,West Yakutia,#F0CE8E,167,167,True
+2941,Tiksi,167,West Yakutia,#F0CE8E,167,167,True
+2942,Peleduy,167,West Yakutia,#F0CE8E,167,167,True
+2943,Sangar,167,West Yakutia,#F0CE8E,167,167,True
+2944,Nayba,167,West Yakutia,#F0CE8E,167,167,True
+2945,Kryusyur,167,West Yakutia,#F0CE8E,167,167,True
+2946,Ust-Olenek,167,West Yakutia,#F0CE8E,167,167,True
+2947,Yuryung-Khaya,167,West Yakutia,#F0CE8E,167,167,True
+2948,Saskylakh,167,West Yakutia,#F0CE8E,167,167,True
+2949,Bolotistoy-Derevne,167,West Yakutia,#F0CE8E,167,167,True
+2950,Zyryanka,166,East Yakutia,#577779,166,166,True
+2951,Yugoryonok,166,East Yakutia,#577779,166,166,True
+2952,Yakutsk,166,East Yakutia,#577779,166,166,True
+2953,Zhataystroy,166,East Yakutia,#577779,166,166,True
+2954,Ust-Maya,166,East Yakutia,#577779,166,166,True
+2955,Nizhny Kuranakh,166,East Yakutia,#577779,166,166,True
+2956,Nizhneyansk,166,East Yakutia,#577779,166,166,True
+2957,Nagorny,166,East Yakutia,#577779,166,166,True
+2958,Nizhne-Stalinsk,166,East Yakutia,#577779,166,166,True
+2959,Khandyga,166,East Yakutia,#577779,166,166,True
+2960,Ese-Khayya,166,East Yakutia,#577779,166,166,True
+2961,Chokurdakh,166,East Yakutia,#577779,166,166,True
+2962,Nizhniye Kresty,166,East Yakutia,#577779,166,166,True
+2963,Batagay,166,East Yakutia,#577779,166,166,True
+2964,Pokrovsk,166,East Yakutia,#577779,166,166,True
+2965,Aldan,166,East Yakutia,#577779,166,166,True
+2966,Srednekolymsk,166,East Yakutia,#577779,166,166,True
+2967,Verkhoyansk,166,East Yakutia,#577779,166,166,True
+2968,Eldikan,166,East Yakutia,#577779,166,166,True
+2969,Tyanya,166,East Yakutia,#577779,166,166,True
+2970,Ust-Nera,166,East Yakutia,#577779,166,166,True
+2971,Allakh-Yun,166,East Yakutia,#577779,166,166,True
+2972,Yunkyur,166,East Yakutia,#577779,166,166,True
+2973,Khonuu,166,East Yakutia,#577779,166,166,True
+2974,Tynda,166,East Yakutia,#577779,166,166,True
+2975,Bomnak,166,East Yakutia,#577779,166,166,True
+2976,Chagda,166,East Yakutia,#577779,166,166,True
+2977,Tugur,169,Khabarovsk,#CEB779,169,169,True
+2978,Chumikan,169,Khabarovsk,#CEB779,169,169,True
+2979,Ayan,169,Khabarovsk,#CEB779,169,169,True
+2980,Oktyabrskiy,169,Khabarovsk,#CEB779,169,169,True
+2981,Blagoveshchensk,169,Khabarovsk,#CEB779,169,169,True
+2982,Khabarovsk,169,Khabarovsk,#CEB779,169,169,True
+2983,Bikinskaya,169,Khabarovsk,#CEB779,169,169,True
+2984,Komsomolsk,169,Khabarovsk,#CEB779,169,169,True
+2985,Nikolayevsk-on-Amur,169,Khabarovsk,#CEB779,169,169,True
+2986,Sovetskaya Gavan,169,Khabarovsk,#CEB779,169,169,True
+2987,Vyazemsky,169,Khabarovsk,#CEB779,169,169,True
+2988,De-Kastri,169,Khabarovsk,#CEB779,169,169,True
+2989,Vanino,169,Khabarovsk,#CEB779,169,169,True
+2990,Chegdomyn,169,Khabarovsk,#CEB779,169,169,True
+2991,Imeni Poliny Osipenko,169,Khabarovsk,#CEB779,169,169,True
+2992,Vyatskoye,169,Khabarovsk,#CEB779,169,169,True
+2993,Ekimchan,169,Khabarovsk,#CEB779,169,169,True
+2994,Aim,169,Khabarovsk,#CEB779,169,169,True
+2995,Nelkan,169,Khabarovsk,#CEB779,169,169,True
+2996,Ogoron,169,Khabarovsk,#CEB779,169,169,True
+2997,Nakhodka,169,Khabarovsk,#CEB779,169,169,True
+2998,Vladivostok,169,Khabarovsk,#CEB779,169,169,True
+2999,Semyonovka,169,Khabarovsk,#CEB779,169,169,True
+3000,Tetyukhe,169,Khabarovsk,#CEB779,169,169,True
+3001,Iman,169,Khabarovsk,#CEB779,169,169,True
+3002,Voroshilov,169,Khabarovsk,#CEB779,169,169,True
+3003,Vostok,169,Khabarovsk,#CEB779,169,169,True
+3004,Ternistryy,169,Khabarovsk,#CEB779,169,169,True
+3005,Zlatoustovsk,169,Khabarovsk,#CEB779,169,169,True
+3006,Okhotsk,168,Kamchatka,#7DA68E,168,168,True
+3007,Pevek,168,Kamchatka,#7DA68E,168,168,True
+3008,Petropavlovsk-Kamchatsky,168,Kamchatka,#7DA68E,168,168,True
+3009,Slautnoye,168,Kamchatka,#7DA68E,168,168,True
+3010,Markovo,168,Kamchatka,#7DA68E,168,168,True
+3011,Uelen,168,Kamchatka,#7DA68E,168,168,True
+3012,Keperveyem,168,Kamchatka,#7DA68E,168,168,True
+3013,Palana,168,Kamchatka,#7DA68E,168,168,True
+3014,Ilirney,168,Kamchatka,#7DA68E,168,168,True
+3015,Gizhiga,168,Kamchatka,#7DA68E,168,168,True
+3016,Magadan,168,Kamchatka,#7DA68E,168,168,True
+3017,Talon,168,Kamchatka,#7DA68E,168,168,True
+3018,Atka,168,Kamchatka,#7DA68E,168,168,True
+3019,Sasyr,168,Kamchatka,#7DA68E,168,168,True
+3020,Oymyakon,168,Kamchatka,#7DA68E,168,168,True
+3021,Kholodny,168,Kamchatka,#7DA68E,168,168,True
+3022,Khaty,167,West Yakutia,#F0CE8E,167,167,True
+3023,Mukhtuya,167,West Yakutia,#F0CE8E,167,167,True
+3024,Sayylyk,167,West Yakutia,#F0CE8E,167,167,True
+3025,Sheya,167,West Yakutia,#F0CE8E,167,167,True
+3026,Usun,167,West Yakutia,#F0CE8E,167,167,True
+3027,Lybalakh,167,West Yakutia,#F0CE8E,167,167,True
+3028,Baytakh,167,West Yakutia,#F0CE8E,167,167,True
+3029,Bykovsky,167,West Yakutia,#F0CE8E,167,167,True
+3030,Taymylyr,167,West Yakutia,#F0CE8E,167,167,True
+3031,Kyusyur,167,West Yakutia,#F0CE8E,167,167,True
+3032,Eryukkyune,167,West Yakutia,#F0CE8E,167,167,True
+3033,Ulakhan-Kyuel,167,West Yakutia,#F0CE8E,167,167,True
+3034,Eyik,167,West Yakutia,#F0CE8E,167,167,True
+3035,Beizi Temple,140,Mukden,#59797C,140,140,True
+3036,Zhèngxiāngbái,140,Mukden,#59797C,140,140,True
+3037,Old Barag,141,Manchukuo,#A44937,141,141,True
+3038,Hulunbuir,141,Manchukuo,#A44937,141,141,True
+3039,Harbin,141,Manchukuo,#A44937,141,141,True
+3040,Kiamusze,141,Manchukuo,#A44937,141,141,True
+3041,Hsinking,141,Manchukuo,#A44937,141,141,True
+3042,Yimin Sumu,141,Manchukuo,#A44937,141,141,True
+3043,Mohe,141,Manchukuo,#A44937,141,141,True
+3044,Tahe,141,Manchukuo,#A44937,141,141,True
+3045,Sunwu,141,Manchukuo,#A44937,141,141,True
+3046,Nenjiang,141,Manchukuo,#A44937,141,141,True
+3047,Xuguit Qi,141,Manchukuo,#A44937,141,141,True
+3048,Yichun,141,Manchukuo,#A44937,141,141,True
+3049,Shuangyashan,141,Manchukuo,#A44937,141,141,True
+3050,Qitaihe,141,Manchukuo,#A44937,141,141,True
+3051,Yilan,141,Manchukuo,#A44937,141,141,True
+3052,Tonghe,141,Manchukuo,#A44937,141,141,True
+3053,Dehui,141,Manchukuo,#A44937,141,141,True
+3054,Liaoyang,141,Manchukuo,#A44937,141,141,True
+3055,Tonghua,141,Manchukuo,#A44937,141,141,True
+3056,Botankou,141,Manchukuo,#A44937,141,141,True
+3057,Yanbian,141,Manchukuo,#A44937,141,141,True
+3058,Tongliao,141,Manchukuo,#A44937,141,141,True
+3059,Huolin Gol,141,Manchukuo,#A44937,141,141,True
+3060,Arxan,141,Manchukuo,#A44937,141,141,True
+3061,Chaihezhen,141,Manchukuo,#A44937,141,141,True
+3062,Guyuanzhen,141,Manchukuo,#A44937,141,141,True
+3063,Beijiangxiang,141,Manchukuo,#A44937,141,141,True
+3064,Sartu,141,Manchukuo,#A44937,141,141,True
+3065,Qigihar,141,Manchukuo,#A44937,141,141,True
+3066,Sverdlovsk,162,South Ural,#C15C4C,162,162,True
+3067,Tyumen,162,South Ural,#C15C4C,162,162,True
+3068,Krasnoturyinsk,162,South Ural,#C15C4C,162,162,True
+3069,Verkhnyaya Salda,162,South Ural,#C15C4C,162,162,True
+3070,Pervouralsk,162,South Ural,#C15C4C,162,162,True
+3071,Tobolsk,162,South Ural,#C15C4C,162,162,True
+3072,Berezovka,162,South Ural,#C15C4C,162,162,True
+3073,Aromashevo,162,South Ural,#C15C4C,162,162,True
+3074,Ishim,162,South Ural,#C15C4C,162,162,True
+3075,Kurgan,162,South Ural,#C15C4C,162,162,True
+3076,Chelyabinsk,162,South Ural,#C15C4C,162,162,True
+3077,Magnitogorsk,162,South Ural,#C15C4C,162,162,True
+3078,Kartaly,162,South Ural,#C15C4C,162,162,True
+3079,Zykova,162,South Ural,#C15C4C,162,162,True
+3080,Astana,173,Kazakhstan,#E5BB5F,173,173,True
+3081,Guryev,173,Kazakhstan,#E5BB5F,173,173,True
+3082,Taras,173,Kazakhstan,#E5BB5F,173,173,True
+3083,Turkistan,173,Kazakhstan,#E5BB5F,173,173,True
+3084,Shymkent,173,Kazakhstan,#E5BB5F,173,173,True
+3085,Uralsk,173,Kazakhstan,#E5BB5F,173,173,True
+3086,Ufa,160,Volga Perm,#9CAE8D,160,160,True
+3087,Orenburg,160,Volga Perm,#9CAE8D,160,160,True
+3088,Semipalatinsk,173,Kazakhstan,#E5BB5F,173,173,True
+3089,Petropavl,173,Kazakhstan,#E5BB5F,173,173,True
+3090,Pavlodar,173,Kazakhstan,#E5BB5F,173,173,True
+3091,Kokshetau,173,Kazakhstan,#E5BB5F,173,173,True
+3092,Almaty,173,Kazakhstan,#E5BB5F,173,173,True
+3093,Kzyl-Orda,173,Kazakhstan,#E5BB5F,173,173,True
+3094,Oskemen,173,Kazakhstan,#E5BB5F,173,173,True
+3095,Aktobe,173,Kazakhstan,#E5BB5F,173,173,True
+3096,Kostanay,173,Kazakhstan,#E5BB5F,173,173,True
+3097,Karaganda,173,Kazakhstan,#E5BB5F,173,173,True
+3098,Balkhash,173,Kazakhstan,#E5BB5F,173,173,True
+3099,Arshaly,173,Kazakhstan,#E5BB5F,173,173,True
+3100,Dzhezkazgan,173,Kazakhstan,#E5BB5F,173,173,True
+3101,Atasu,173,Kazakhstan,#E5BB5F,173,173,True
+3102,Tole Bi,173,Kazakhstan,#E5BB5F,173,173,True
+3103,Birlik,173,Kazakhstan,#E5BB5F,173,173,True
+3104,Talgar,173,Kazakhstan,#E5BB5F,173,173,True
+3105,Taldy-Kurgan,173,Kazakhstan,#E5BB5F,173,173,True
+3106,Fort Shevchenko,173,Kazakhstan,#E5BB5F,173,173,True
+3107,Usturt,173,Kazakhstan,#E5BB5F,173,173,True
+3108,Nizhniy Embensk,173,Kazakhstan,#E5BB5F,173,173,True
+3109,Aralsk,173,Kazakhstan,#E5BB5F,173,173,True
+3110,Ashkhabad,172,Turkestan,#78826B,172,172,True
+3111,Anau,172,Turkestan,#78826B,172,172,True
+3112,Nebit Dag,172,Turkestan,#78826B,172,172,True
+3113,Mary,172,Turkestan,#78826B,172,172,True
+3114,Tashauz,172,Turkestan,#78826B,172,172,True
+3115,Chardzhou,172,Turkestan,#78826B,172,172,True
+3116,Derweze,172,Turkestan,#78826B,172,172,True
+3117,Kyzyl-Arvat,172,Turkestan,#78826B,172,172,True
+3118,Bäherden,172,Turkestan,#78826B,172,172,True
+3119,Yerbent,172,Turkestan,#78826B,172,172,True
+3120,Samarqand,172,Turkestan,#78826B,172,172,True
+3121,Qarshi,172,Turkestan,#78826B,172,172,True
+3122,Termiz,172,Turkestan,#78826B,172,172,True
+3123,Bukhara,172,Turkestan,#78826B,172,172,True
+3124,Fergana,172,Turkestan,#78826B,172,172,True
+3125,Marat,172,Turkestan,#78826B,172,172,True
+3126,Chelkar,172,Turkestan,#78826B,172,172,True
+3127,Nukus,172,Turkestan,#78826B,172,172,True
+3128,Krasnowodsk,172,Turkestan,#78826B,172,172,True
+3129,Oboy,172,Turkestan,#78826B,172,172,True
+3130,Gyzylgaya,172,Turkestan,#78826B,172,172,True
+3131,Stalinabad,172,Turkestan,#78826B,172,172,True
+3132,Murghab,172,Turkestan,#78826B,172,172,True
+3133,Panjakent,172,Turkestan,#78826B,172,172,True
+3134,Jizzakh,172,Turkestan,#78826B,172,172,True
+3135,Oktyabrsky (TK),172,Turkestan,#78826B,172,172,True
+3136,Frunze,172,Turkestan,#78826B,172,172,True
+3137,Przhevalsk,172,Turkestan,#78826B,172,172,True
+3138,At-Bashy,172,Turkestan,#78826B,172,172,True
+3139,Orsk,160,Volga Perm,#9CAE8D,160,160,True
+3140,Sterlitamak,160,Volga Perm,#9CAE8D,160,160,True
+3141,Perm,160,Volga Perm,#9CAE8D,160,160,True
+3142,Talovo,160,Volga Perm,#9CAE8D,160,160,True
+3143,Gayny,160,Volga Perm,#9CAE8D,160,160,True
+3144,Cherdyn,160,Volga Perm,#9CAE8D,160,160,True
+3145,Dobryanka,160,Volga Perm,#9CAE8D,160,160,True
+3146,Berezniki,160,Volga Perm,#9CAE8D,160,160,True
+3147,Kudymkar,160,Volga Perm,#9CAE8D,160,160,True
+3148,Nytva,160,Volga Perm,#9CAE8D,160,160,True
+3149,Oktyabrsky,160,Volga Perm,#9CAE8D,160,160,True
+3150,Mishkinsky,160,Volga Perm,#9CAE8D,160,160,True
+3151,Birsk,160,Volga Perm,#9CAE8D,160,160,True
+3152,Davlekanovo,160,Volga Perm,#9CAE8D,160,160,True
+3153,Beloretsk,160,Volga Perm,#9CAE8D,160,160,True
+3154,Sibay,160,Volga Perm,#9CAE8D,160,160,True
+3155,Ishimbay,160,Volga Perm,#9CAE8D,160,160,True
+3156,Sorochinsk,160,Volga Perm,#9CAE8D,160,160,True
+3157,Lysva,160,Volga Perm,#9CAE8D,160,160,True
+3158,Sol-Iletsk,160,Volga Perm,#9CAE8D,160,160,True
+3159,Igra,160,Volga Perm,#9CAE8D,160,160,True
+3160,Debyosy,160,Volga Perm,#9CAE8D,160,160,True
+3161,Glazov,160,Volga Perm,#9CAE8D,160,160,True
+3162,Izhevsk,160,Volga Perm,#9CAE8D,160,160,True
+3163,Buzuluk,160,Volga Perm,#9CAE8D,160,160,True
+3164,Abdulino,160,Volga Perm,#9CAE8D,160,160,True
+3165,Buguruslan,160,Volga Perm,#9CAE8D,160,160,True
+3166,Kirov,159,Volga Nzhny,#CCA373,159,159,True
+3167,Murashi,159,Volga Nzhny,#CCA373,159,159,True
+3168,Batumi,171,Georgia,#D2C363,171,171,True
+3169,Tiflis,171,Georgia,#D2C363,171,171,True
+3170,Kirs,159,Volga Nzhny,#CCA373,159,159,True
+3171,Kuybyshev,159,Volga Nzhny,#CCA373,159,159,True
+3172,Gori,171,Georgia,#D2C363,171,171,True
+3173,Kumyony,159,Volga Nzhny,#CCA373,159,159,True
+3174,Urzhum,159,Volga Nzhny,#CCA373,159,159,True
+3175,Naberezhnye Chelny,159,Volga Nzhny,#CCA373,159,159,True
+3176,Tolyatti,159,Volga Nzhny,#CCA373,159,159,True
+3177,Pokhvistnevo,159,Volga Nzhny,#CCA373,159,159,True
+3178,Yaransk,159,Volga Nzhny,#CCA373,159,159,True
+3179,Kutaisi,171,Georgia,#D2C363,171,171,True
+3180,Gorky,159,Volga Nzhny,#CCA373,159,159,True
+3181,Ilori,171,Georgia,#D2C363,171,171,True
+3182,Kazan,159,Volga Nzhny,#CCA373,159,159,True
+3183,Khelvachauri,171,Georgia,#D2C363,171,171,True
+3184,Saratov,159,Volga Nzhny,#CCA373,159,159,True
+3185,Buinsk,159,Volga Nzhny,#CCA373,159,159,True
+3186,Pestretsy,159,Volga Nzhny,#CCA373,159,159,True
+3187,Bugulma,159,Volga Nzhny,#CCA373,159,159,True
+3188,Signalki,171,Georgia,#D2C363,171,171,True
+3189,Neftegorsk,159,Volga Nzhny,#CCA373,159,159,True
+3190,Rostov,170,Caucasus,#556769,170,170,True
+3191,Ulyanovsk,159,Volga Nzhny,#CCA373,159,159,True
+3192,Petrovsk,170,Caucasus,#556769,170,170,True
+3193,Aleksandryia,159,Volga Nzhny,#CCA373,159,159,True
+3194,Novospasskoye,159,Volga Nzhny,#CCA373,159,159,True
+3195,Penza,159,Volga Nzhny,#CCA373,159,159,True
+3196,Saransk,159,Volga Nzhny,#CCA373,159,159,True
+3197,Balakovo,159,Volga Nzhny,#CCA373,159,159,True
+3198,Pugachyov,159,Volga Nzhny,#CCA373,159,159,True
+3199,Baltser,159,Volga Nzhny,#CCA373,159,159,True
+3200,Novouzensk,159,Volga Nzhny,#CCA373,159,159,True
+3201,Atarsk,159,Volga Nzhny,#CCA373,159,159,True
+3202,Uren,159,Volga Nzhny,#CCA373,159,159,True
+3203,Ordzhonikidze,170,Caucasus,#556769,170,170,True
+3204,Stavropol,170,Caucasus,#556769,170,170,True
+3205,Krasnodar,170,Caucasus,#556769,170,170,True
+3206,Stalingrad,170,Caucasus,#556769,170,170,True
+3207,Astrakhan,170,Caucasus,#556769,170,170,True
+3208,Yashkul,170,Caucasus,#556769,170,170,True
+3209,Maykop,170,Caucasus,#556769,170,170,True
+3210,Dubovka,170,Caucasus,#556769,170,170,True
+3211,Elista,170,Caucasus,#556769,170,170,True
+3212,Salsk,170,Caucasus,#556769,170,170,True
+3213,Millerovo,170,Caucasus,#556769,170,170,True
+3214,Moscow,156,Central Russia,#735D2D,156,156,True
+3215,Bryansk,156,Central Russia,#735D2D,156,156,True
+3216,Voronezh,156,Central Russia,#735D2D,156,156,True
+3217,Ryazan,156,Central Russia,#735D2D,156,156,True
+3218,Yaroslavl,156,Central Russia,#735D2D,156,156,True
+3219,Vladimir,156,Central Russia,#735D2D,156,156,True
+3220,Kovrov,156,Central Russia,#735D2D,156,156,True
+3221,Kologriv,156,Central Russia,#735D2D,156,156,True
+3222,Kostroma,156,Central Russia,#735D2D,156,156,True
+3223,Vokhma,156,Central Russia,#735D2D,156,156,True
+3224,Kalinin,156,Central Russia,#735D2D,156,156,True
+3225,Tula,156,Central Russia,#735D2D,156,156,True
+3226,Belgorod,156,Central Russia,#735D2D,156,156,True
+3227,Kursk,156,Central Russia,#735D2D,156,156,True
+3228,Ivanovo,156,Central Russia,#735D2D,156,156,True
+3229,Kineshma,156,Central Russia,#735D2D,156,156,True
+3230,Kaluga,156,Central Russia,#735D2D,156,156,True
+3231,Lipetsk,156,Central Russia,#735D2D,156,156,True
+3232,Oryol,156,Central Russia,#735D2D,156,156,True
+3233,Smolensk,156,Central Russia,#735D2D,156,156,True
+3234,Tambov,156,Central Russia,#735D2D,156,156,True
+3235,Borisolglebsk,156,Central Russia,#735D2D,156,156,True
+3236,Morshansk,156,Central Russia,#735D2D,156,156,True
+3237,Murom,156,Central Russia,#735D2D,156,156,True
+3238,Sasovo,156,Central Russia,#735D2D,156,156,True
+3239,Yefremov,156,Central Russia,#735D2D,156,156,True
+3240,Shivolo,156,Central Russia,#735D2D,156,156,True
+3241,Palau,189,Palau,#7FAC55,189,189,True
+3242,Guam,190,Mariana,#9B7E39,190,190,True
+3243,Songsong,190,Mariana,#9B7E39,190,190,True
+3244,Tinian,190,Mariana,#9B7E39,190,190,True
+3245,Saipan,190,Mariana,#9B7E39,190,190,True
+3246,Aguigan,190,Mariana,#9B7E39,190,190,True
+3247,Weno,191,Micronesia,#608367,191,191,True
+3248,Tol,191,Micronesia,#608367,191,191,True
+3249,Palikir,191,Micronesia,#608367,191,191,True
+3250,Nouméa,192,New Caledonia,#CAA473,192,192,True
+3251,Wé,192,New Caledonia,#CAA473,192,192,True
+3252,La Roche,192,New Caledonia,#CAA473,192,192,True
+3253,Port Vila,193,Vanuatu,#78826B,193,193,True
+3254,Luganville,193,Vanuatu,#78826B,193,193,True
+3255,Lakatoro,193,Vanuatu,#78826B,193,193,True
+3256,Suva,194,Fiji,#80A37E,194,194,True
+3257,Labasa,194,Fiji,#80A37E,194,194,True
+3258,Apia,195,Samoa,#537548,195,195,True
+3259,Salelologa,195,Samoa,#537548,195,195,True
+3260,Jamestown,103,Saint Helena,#735D2D,103,103,True
+3261,Pago Pago,195,Samoa,#537548,195,195,True
+3262,Arawa,196,Solomon,#AC962F,196,196,True
+3263,Polo,196,Solomon,#AC962F,196,196,True
+3264,Honiara,196,Solomon,#AC962F,196,196,True
+3265,Namuga,196,Solomon,#AC962F,196,196,True
+3266,Auki,196,Solomon,#AC962F,196,196,True
+3267,Buala,196,Solomon,#AC962F,196,196,True
+3268,Munda,196,Solomon,#AC962F,196,196,True
+3269,Kwajalein,191,Micronesia,#608367,191,191,True
+3270,Majuro,191,Micronesia,#608367,191,191,True
+3271,Enewetak,191,Micronesia,#608367,191,191,True
+3272,Wake Island,191,Micronesia,#608367,191,191,True
+3273,Naha,197,Okinawa,#FFF000,197,197,True
+3274,Amami,197,Okinawa,#FFF000,197,197,True
+3275,Miyakojima,197,Okinawa,#FFF000,197,197,True
+3276,Ishigaki,197,Okinawa,#FFF000,197,197,True
+3277,Kunashiri,198,Kuril,#E5BB5F,198,198,True
+3278,Etorofu,198,Kuril,#E5BB5F,198,198,True
+3279,Przasnysz,5,Poland,#7D9081,5,5,True
+3280,Katowice,5,Poland,#7D9081,5,5,True
+3281,Białystok,5,Poland,#7D9081,5,5,True
+3282,Baranovichi,5,Poland,#7D9081,5,5,True
+3283,Lexington,46,Kansas,#CF7762,46,46,True
+3284,Barraute,38,Quebec,#E5BB5F,38,38,True
+3285,Kerrville,52,Texas,#CEC074,52,52,True
+3286,Itabuna,68,East Brazil,#6C989C,68,68,True
+3287,Mankoya,107,Northern Rhodesia,#EAD993,107,107,True
+3288,Vavuniya,199,Ceylon,#4C704E,199,199,True
+3289,Colombo,199,Ceylon,#4C704E,199,199,True
+3290,Galle,199,Ceylon,#4C704E,199,199,True
+3291,Sveg,180,Sweden,#5D758B,180,180,True
+3292,Hammerdal,180,Sweden,#5D758B,180,180,True
+3293,Jönköping,180,Sweden,#5D758B,180,180,True
+3294,Jokkmokk,180,Sweden,#5D758B,180,180,True
+3295,Jeju,142,Korea,#667F6C,142,142,True
+3296,Nicosia,115,Syria,#CAA473,115,115,True
+3297,São Tomé,94,Cameroon,#528375,94,94,True
+3298,College Station,52,Texas,#CEC074,52,52,True
+3299,Whangarei,174,New Zealand,#4C704E,174,174,True
+3300,Santa Cruz de Tenerife,24,Spain,#CCA373,24,24,True
+3301,Panamá,57,Panama,#5C7A87,57,57,True
+3302,Obock,111,Ethiopia,#C47535,111,111,True
+3332,Trieste,16,Italy,#90AE77,16,16,True

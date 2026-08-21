@@ -1,0 +1,12 @@
+﻿region_id,name,is_random_region,province_count
+0,Europe,False,376
+1,North America,False,475
+2,Central America,False,93
+3,South America,False,417
+4,North Africa,False,336
+5,South Africa,False,251
+6,Russia,False,386
+7,Middle East,False,125
+8,Asia,False,520
+9,South East Asia,False,174
+10,Oceania,False,150

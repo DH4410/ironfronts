@@ -1,0 +1,201 @@
+﻿country_id,nation_name,nation_adjective,nation_title,capital_province_id,nationality_id,faction_id,primary_color_rgba,primary_color_hex,secondary_color_rgba,secondary_color_hex
+1,Finland,Finnish,Prime Minister,14,1,1,"rgba(110,143,147,255)",#6E8F93,"rgba(255,255,255,255)",#FFFFFF
+2,Norway,Norwegian,Prime Minister,46,2,2,"rgba(103,140,109,255)",#678C6D,"rgba(255,255,255,255)",#FFFFFF
+3,Belarus,Belorussian,Prime Minister,160,3,3,"rgba(96,131,103,255)",#608367,"rgba(255,255,255,255)",#FFFFFF
+4,Lithuania,Lithuanian,Prime Minister,62,4,1,"rgba(183,176,121,255)",#B7B079,"rgba(255,255,255,255)",#FFFFFF
+5,Poland,Polish,Prime Minister,75,5,2,"rgba(125,144,129,255)",#7D9081,"rgba(255,255,255,255)",#FFFFFF
+6,Ukraine,Ukrainian,President,92,6,3,"rgba(240,206,142,255)",#F0CE8E,"rgba(255,255,255,255)",#FFFFFF
+7,Romania,Romanian,Prime Minister,338,7,1,"rgba(130,68,29,255)",#82441D,"rgba(255,255,255,255)",#FFFFFF
+8,Bulgaria,Bulgarian,Prime Minister,379,8,1,"rgba(114,132,118,255)",#728476,"rgba(255,255,255,255)",#FFFFFF
+9,Turkey,Turkish,President,411,9,3,"rgba(143,123,68,255)",#8F7B44,"rgba(255,255,255,255)",#FFFFFF
+10,Greece,Greek,Prime Minister,388,10,2,"rgba(109,143,147,255)",#6D8F93,"rgba(255,255,255,255)",#FFFFFF
+11,Albania,Albanian,Prime Minister,204,11,3,"rgba(204,163,115,255)",#CCA373,"rgba(255,255,255,255)",#FFFFFF
+12,Czechoslovakia,Czech,Prime Minister,169,12,3,"rgba(155,106,40,255)",#9B6A28,"rgba(255,255,255,255)",#FFFFFF
+13,Austria,Austrian,Chancellor,158,13,1,"rgba(202,164,115,255)",#CAA473,"rgba(255,255,255,255)",#FFFFFF
+14,Switzerland,Swiss,Federal Chancellor,149,14,1,"rgba(142,105,65,255)",#8E6941,"rgba(255,255,255,255)",#FFFFFF
+15,Germany,German,Chancellor,116,15,1,"rgba(147,65,47,255)",#93412F,"rgba(255,255,255,255)",#FFFFFF
+16,Italy,Italian,Prime Minister,245,16,1,"rgba(144,174,119,255)",#90AE77,"rgba(255,255,255,255)",#FFFFFF
+17,Yugoslavia,Yugoslavian,King,358,17,3,"rgba(122,129,80,255)",#7A8150,"rgba(255,255,255,255)",#FFFFFF
+18,France,French,President,267,18,2,"rgba(108,144,147,255)",#6C9093,"rgba(255,255,255,255)",#FFFFFF
+19,Belgium,Belgian,Prime Minister,184,19,2,"rgba(229,187,95,255)",#E5BB5F,"rgba(255,255,255,255)",#FFFFFF
+20,Netherlands,Dutch,Prime Minister,179,20,2,"rgba(182,93,44,255)",#B65D2C,"rgba(255,255,255,255)",#FFFFFF
+21,United Kingdom,British,Prime Minister,60,21,2,"rgba(122,128,84,255)",#7A8054,"rgba(255,255,255,255)",#FFFFFF
+22,Ireland,Irish,Taoiseach,191,22,2,"rgba(144,97,61,255)",#90613D,"rgba(255,255,255,255)",#FFFFFF
+23,Iceland,Icelandic,Prime Minister,201,23,2,"rgba(125,166,142,255)",#7DA68E,"rgba(255,255,255,255)",#FFFFFF
+24,Spain,Spanish,Prime Minister,294,24,1,"rgba(204,163,115,255)",#CCA373,"rgba(255,255,255,255)",#FFFFFF
+25,Portugal,Portuguese,Prime Minister,195,25,1,"rgba(143,123,68,255)",#8F7B44,"rgba(255,255,255,255)",#FFFFFF
+26,Alaska,Alaskan,Governor,660,26,3,"rgba(94,127,130,255)",#5E7F82,"rgba(255,255,255,255)",#FFFFFF
+27,Midway,Midwayan,Commander,1062,27,1,"rgba(109,147,104,255)",#6D9368,"rgba(255,255,255,255)",#FFFFFF
+28,Hawaii,Hawaiian,Governor,1059,28,2,"rgba(105,144,164,255)",#6990A4,"rgba(255,255,255,255)",#FFFFFF
+29,Johnston Atoll,Johnston Atollian,Commander,1061,29,2,"rgba(191,121,78,255)",#BF794E,"rgba(255,255,255,255)",#FFFFFF
+30,British Columbia,British Columbian,Lieutenant Governor,461,30,2,"rgba(173,163,101,255)",#ADA365,"rgba(255,255,255,255)",#FFFFFF
+31,Northwest USA,Northwest American,Governor,356,31,2,"rgba(128,163,126,255)",#80A37E,"rgba(255,255,255,255)",#FFFFFF
+32,California,Californian,Governor,484,32,2,"rgba(191,121,78,255)",#BF794E,"rgba(255,255,255,255)",#FFFFFF
+33,Baja California Mexico,Baja California Mexican,Governor,869,33,2,"rgba(229,187,95,255)",#E5BB5F,"rgba(255,255,255,255)",#FFFFFF
+34,Alberta,Albertan,Lieutenant Governor,692,34,3,"rgba(132,148,147,255)",#849493,"rgba(255,255,255,255)",#FFFFFF
+35,Saskatchewan,Saskatchewan,Lieutenant Governor,714,35,2,"rgba(93,117,139,255)",#5D758B,"rgba(255,255,255,255)",#FFFFFF
+36,Manitoba,Manitoban,Lieutenant Governor,743,36,2,"rgba(153,101,78,255)",#99654E,"rgba(255,255,255,255)",#FFFFFF
+37,Ontario,Ontarian,Lieutenant Governor,756,37,2,"rgba(210,145,102,255)",#D29166,"rgba(255,255,255,255)",#FFFFFF
+38,Quebec,Quebecer,Lieutenant Governor,784,38,2,"rgba(229,187,95,255)",#E5BB5F,"rgba(255,255,255,255)",#FFFFFF
+39,New Foundland,Newfoundlandian,Prime Minister,240,39,2,"rgba(207,119,98,255)",#CF7762,"rgba(255,255,255,255)",#FFFFFF
+40,New Brunswick,New Brunswicker,Lieutenant Governor,860,40,2,"rgba(192,87,75,255)",#C0574B,"rgba(255,255,255,255)",#FFFFFF
+41,New England,New English,Governor,761,41,2,"rgba(122,129,80,255)",#7A8150,"rgba(255,255,255,255)",#FFFFFF
+42,Illinois,Illinoisan,Governor,563,42,2,"rgba(161,86,42,255)",#A1562A,"rgba(255,255,255,255)",#FFFFFF
+43,North USA,North American,Governor,464,43,2,"rgba(240,206,142,255)",#F0CE8E,"rgba(255,255,255,255)",#FFFFFF
+44,Montana,Montanan,Governor,214,44,2,"rgba(193,92,76,255)",#C15C4C,"rgba(255,255,255,255)",#FFFFFF
+45,Colorado,Coloradan,Governor,510,45,2,"rgba(105,144,164,255)",#6990A4,"rgba(255,255,255,255)",#FFFFFF
+46,Kansas,Kansan,Governor,538,46,2,"rgba(207,119,98,255)",#CF7762,"rgba(255,255,255,255)",#FFFFFF
+47,Virginia,Virginian,Governor,613,47,2,"rgba(138,142,116,255)",#8A8E74,"rgba(255,255,255,255)",#FFFFFF
+48,Carolina,Carolanian,Governor,625,48,2,"rgba(115,93,45,255)",#735D2D,"rgba(255,255,255,255)",#FFFFFF
+49,South USA,South American,Governor,840,49,2,"rgba(110,143,147,255)",#6E8F93,"rgba(255,255,255,255)",#FFFFFF
+50,Kentucky,Kentuckian,Governor,573,50,2,"rgba(125,166,142,255)",#7DA68E,"rgba(255,255,255,255)",#FFFFFF
+51,Oklahoma,Oklahoman,Governor,322,51,2,"rgba(155,106,40,255)",#9B6A28,"rgba(255,255,255,255)",#FFFFFF
+52,Texas,Texan,Governor,649,52,2,"rgba(206,192,116,255)",#CEC074,"rgba(255,255,255,255)",#FFFFFF
+53,Arizona,Arizonan,Governor,207,53,2,"rgba(177,146,73,255)",#B19249,"rgba(255,255,255,255)",#FFFFFF
+54,North Mexico,North Mexican,Governor,879,54,1,"rgba(99,125,82,255)",#637D52,"rgba(255,255,255,255)",#FFFFFF
+55,South Mexico,South Mexican,President,882,55,1,"rgba(193,92,76,255)",#C15C4C,"rgba(255,255,255,255)",#FFFFFF
+56,Central America,Central American,President,932,56,3,"rgba(156,174,141,255)",#9CAE8D,"rgba(255,255,255,255)",#FFFFFF
+57,Panama,Panamanian,President,3301,57,2,"rgba(92,122,135,255)",#5C7A87,"rgba(255,255,255,255)",#FFFFFF
+58,Caribbean,Caribbean,President,942,58,3,"rgba(122,129,80,255)",#7A8150,"rgba(255,255,255,255)",#FFFFFF
+59,Venezuela,Venezuelan,President,1022,59,3,"rgba(116,121,139,255)",#74798B,"rgba(255,255,255,255)",#FFFFFF
+60,Colombia,Colombian,President,958,60,3,"rgba(238,202,113,255)",#EECA71,"rgba(255,255,255,255)",#FFFFFF
+61,Ecuador,Ecuadorian,President,984,61,3,"rgba(175,82,68,255)",#AF5244,"rgba(255,255,255,255)",#FFFFFF
+62,Peru,Peruvian,President,997,62,1,"rgba(155,106,40,255)",#9B6A28,"rgba(255,255,255,255)",#FFFFFF
+63,West Amazonas,West Amazonense,Governor,1067,63,1,"rgba(129,146,84,255)",#819254,"rgba(255,255,255,255)",#FFFFFF
+64,East Amazonas,East Amazonense,Governor,1076,64,1,"rgba(133,172,190,255)",#85ACBE,"rgba(255,255,255,255)",#FFFFFF
+65,North Brazil,North Brazilian,Governor,1103,65,1,"rgba(150,172,128,255)",#96AC80,"rgba(255,255,255,255)",#FFFFFF
+66,Guyana,Guyanese,Governor,1042,66,2,"rgba(191,121,78,255)",#BF794E,"rgba(255,255,255,255)",#FFFFFF
+67,North Goiás,North Goián,Governor,1146,67,1,"rgba(158,177,163,255)",#9EB1A3,"rgba(255,255,255,255)",#FFFFFF
+68,East Brazil,East Brazilian,Governor,1310,68,1,"rgba(108,152,156,255)",#6C989C,"rgba(255,255,255,255)",#FFFFFF
+69,Pernambuco,Pernambucano,Governor,1152,69,1,"rgba(108,152,156,255)",#6C989C,"rgba(255,255,255,255)",#FFFFFF
+70,Maranhão,Maranhense,Governor,1119,70,1,"rgba(193,72,88,255)",#C14858,"rgba(255,255,255,255)",#FFFFFF
+71,Goiás,Goiano,Governor,1222,71,1,"rgba(206,192,108,255)",#CEC06C,"rgba(255,255,255,255)",#FFFFFF
+72,Mato Grosso,Mato-grossense,Governor,1273,72,1,"rgba(202,164,115,255)",#CAA473,"rgba(255,255,255,255)",#FFFFFF
+73,São Paulo,Paulistano,Governor,1285,73,1,"rgba(160,127,64,255)",#A07F40,"rgba(255,255,255,255)",#FFFFFF
+74,Paraguay,Paraguayan,President,1278,74,3,"rgba(97,149,145,255)",#619591,"rgba(255,255,255,255)",#FFFFFF
+75,South Brazil,Brazilian,President,1247,75,1,"rgba(140,191,120,255)",#8CBF78,"rgba(255,255,255,255)",#FFFFFF
+76,Uruguay,Uruguayan,President,1268,76,1,"rgba(109,179,175,255)",#6DB3AF,"rgba(255,255,255,255)",#FFFFFF
+77,North Argentina,North Argentine,President,1158,77,1,"rgba(150,168,125,255)",#96A87D,"rgba(255,255,255,255)",#FFFFFF
+78,South Argentina,South Argentine,Governor,1359,78,1,"rgba(204,176,132,255)",#CCB084,"rgba(255,255,255,255)",#FFFFFF
+79,Chile,Chilean,President,1371,79,1,"rgba(102,145,177,255)",#6691B1,"rgba(255,255,255,255)",#FFFFFF
+80,Falkland,Falklandish,Governor,1378,80,2,"rgba(192,129,50,255)",#C08132,"rgba(255,255,255,255)",#FFFFFF
+81,Galápagos,Galapageño,Lady,1381,81,2,"rgba(195,179,91,255)",#C3B35B,"rgba(255,255,255,255)",#FFFFFF
+82,Morocco,Moroccan,Sultân,1617,82,2,"rgba(107,135,117,255)",#6B8775,"rgba(255,255,255,255)",#FFFFFF
+83,Río de Oro,Río de Oran,Governor,1950,83,2,"rgba(139,172,120,255)",#8BAC78,"rgba(255,255,255,255)",#FFFFFF
+84,Algeria,Algerian,President,1567,84,1,"rgba(240,206,142,255)",#F0CE8E,"rgba(255,255,255,255)",#FFFFFF
+85,Tunisia,Tunisian,King,1560,85,1,"rgba(143,123,68,255)",#8F7B44,"rgba(255,255,255,255)",#FFFFFF
+86,Mauritania,Mauritanian,Lieutenant Governor,1911,86,1,"rgba(155,106,40,255)",#9B6A28,"rgba(255,255,255,255)",#FFFFFF
+87,Portuguese Guinea,Portuguese Guinean,Governor,1895,87,1,"rgba(111,144,167,255)",#6F90A7,"rgba(255,255,255,255)",#FFFFFF
+88,French Sudan,French Sudanese,Governor,1931,88,2,"rgba(227,175,92,255)",#E3AF5C,"rgba(255,255,255,255)",#FFFFFF
+89,Liberia,Liberian,President,1860,89,2,"rgba(205,131,44,255)",#CD832C,"rgba(255,255,255,255)",#FFFFFF
+90,Upper Volta,Upper Voltan,Lieutenant Governor,1867,90,2,"rgba(105,125,85,255)",#697D55,"rgba(255,255,255,255)",#FFFFFF
+91,Nigeria,Nigerian,Governor,1760,91,3,"rgba(202,181,121,255)",#CAB579,"rgba(255,255,255,255)",#FFFFFF
+92,French Niger,French Nigerien,Lieutenant Governor,1603,92,2,"rgba(159,162,160,255)",#9FA2A0,"rgba(255,255,255,255)",#FFFFFF
+93,Libya,Libyan,King,1531,93,1,"rgba(123,155,157,255)",#7B9B9D,"rgba(255,255,255,255)",#FFFFFF
+94,Cameroon,Cameroonian,Commissioner,1606,94,1,"rgba(82,131,117,255)",#528375,"rgba(255,255,255,255)",#FFFFFF
+95,Equatorial Gabon,Gabonese,Governor-General,1773,95,2,"rgba(137,109,54,255)",#896D36,"rgba(255,255,255,255)",#FFFFFF
+96,Equatorial Chad,Chadian,Governor-Delegate,1809,96,2,"rgba(204,132,81,255)",#CC8451,"rgba(255,255,255,255)",#FFFFFF
+97,Egypt,Egyptian,King,1395,97,1,"rgba(206,192,116,255)",#CEC074,"rgba(255,255,255,255)",#FFFFFF
+98,North Sudan,North Sudanese,Governor-General,1513,98,2,"rgba(96,162,107,255)",#60A26B,"rgba(255,255,255,255)",#FFFFFF
+99,South Sudan,South Sudanese,Major-General,1839,99,2,"rgba(197,65,73,255)",#C54149,"rgba(255,255,255,255)",#FFFFFF
+100,Belgian Congo,Belgian Congolese,Governor-General,1475,100,1,"rgba(136,186,196,255)",#88BAC4,"rgba(255,255,255,255)",#FFFFFF
+101,Angola,Angolan,Governor-General,1452,101,3,"rgba(169,102,58,255)",#A9663A,"rgba(255,255,255,255)",#FFFFFF
+102,South West Africa,South West African,Administrator,1430,102,1,"rgba(100,162,115,255)",#64A273,"rgba(255,255,255,255)",#FFFFFF
+103,Saint Helena,Saint Helenan,Governor,3260,103,2,"rgba(115,93,45,255)",#735D2D,"rgba(255,255,255,255)",#FFFFFF
+104,Bechuanaland,Beachuanian,Resident Commissioner,1623,104,3,"rgba(106,143,147,255)",#6A8F93,"rgba(255,255,255,255)",#FFFFFF
+105,South Africa,South African,Governor-General,1412,105,2,"rgba(158,124,41,255)",#9E7C29,"rgba(255,255,255,255)",#FFFFFF
+106,Mozambique,Mozambican,Governor-General,1471,106,1,"rgba(109,116,71,255)",#6D7447,"rgba(255,255,255,255)",#FFFFFF
+107,Northern Rhodesia,Northern Rhodesian,Governor,1168,107,3,"rgba(234,217,147,255)",#EAD993,"rgba(255,255,255,255)",#FFFFFF
+108,Madagascar,Madagascan,Governor-General,1960,108,1,"rgba(176,58,71,255)",#B03A47,"rgba(255,255,255,255)",#FFFFFF
+109,Tanganyika,Tangyniykan,Governor,1680,109,2,"rgba(158,151,154,255)",#9E979A,"rgba(255,255,255,255)",#FFFFFF
+110,Kenya,Kenyan,Governor,1388,110,2,"rgba(177,145,104,255)",#B19168,"rgba(255,255,255,255)",#FFFFFF
+111,Ethiopia,Ehtiopian,Emperor,1701,111,1,"rgba(196,117,53,255)",#C47535,"rgba(255,255,255,255)",#FFFFFF
+112,Somalia,Somalian,Governor,1736,112,1,"rgba(144,174,119,255)",#90AE77,"rgba(255,255,255,255)",#FFFFFF
+113,Eritrea,Eritrean,Governor,1730,113,1,"rgba(109,116,71,255)",#6D7447,"rgba(255,255,255,255)",#FFFFFF
+114,Hejaz,Hejazi,King,1980,114,3,"rgba(142,161,181,255)",#8EA1B5,"rgba(255,255,255,255)",#FFFFFF
+115,Syria,Syrian,President,2035,115,2,"rgba(202,164,115,255)",#CAA473,"rgba(255,255,255,255)",#FFFFFF
+116,Iraq,Iraqi,Prime Minister,2064,116,1,"rgba(76,112,78,255)",#4C704E,"rgba(255,255,255,255)",#FFFFFF
+117,Saudi Arabia,Saudi,King,1994,117,1,"rgba(164,73,62,255)",#A4493E,"rgba(255,255,255,255)",#FFFFFF
+118,Qatar,Qatari,Emir,1993,118,3,"rgba(120,130,107,255)",#78826B,"rgba(255,255,255,255)",#FFFFFF
+119,Oman,Omani,Sultan,2022,119,2,"rgba(215,171,76,255)",#D7AB4C,"rgba(255,255,255,255)",#FFFFFF
+120,Persia,Persian,Shah,2079,120,1,"rgba(133,161,160,255)",#85A1A0,"rgba(255,255,255,255)",#FFFFFF
+121,Afghanistan,Afghan,King,2110,121,1,"rgba(117,147,83,255)",#759353,"rgba(255,255,255,255)",#FFFFFF
+122,Pakistan,Pakistani,Governor-General,2124,122,3,"rgba(115,93,45,255)",#735D2D,"rgba(255,255,255,255)",#FFFFFF
+123,North India,North Indian,Maharaja,2146,123,2,"rgba(169,102,58,255)",#A9663A,"rgba(255,255,255,255)",#FFFFFF
+124,British Odisha,British Odishan,Secretary,2195,124,2,"rgba(120,142,93,255)",#788E5D,"rgba(255,255,255,255)",#FFFFFF
+125,South India,South Indian,Nizam,2203,125,2,"rgba(255,211,141,255)",#FFD38D,"rgba(255,255,255,255)",#FFFFFF
+126,Kathiawar,Kathiawari,Governor-General,2235,126,3,"rgba(186,154,80,255)",#BA9A50,"rgba(255,255,255,255)",#FFFFFF
+127,Nepal,Nepalese,King,2230,127,1,"rgba(181,143,74,255)",#B58F4A,"rgba(255,255,255,255)",#FFFFFF
+128,Bhutan,Bhutanese,King,2245,128,2,"rgba(102,123,126,255)",#667B7E,"rgba(255,255,255,255)",#FFFFFF
+129,Bangladesh,Bangladeshi,Nawab,2242,129,3,"rgba(225,152,87,255)",#E19857,"rgba(255,255,255,255)",#FFFFFF
+130,Mongolia,Mongolian,Prime Minister,2420,130,3,"rgba(156,136,80,255)",#9C8850,"rgba(255,255,255,255)",#FFFFFF
+131,Kashmir,Kashmiri,Prime Minister,2126,131,3,"rgba(232,212,98,255)",#E8D462,"rgba(255,255,255,255)",#FFFFFF
+132,Tibet,Tibetan,Dalai Lama,2271,132,4,"rgba(190,184,141,255)",#BEB88D,"rgba(255,255,255,255)",#FFFFFF
+133,Siam,Siamese,King,2361,133,4,"rgba(213,173,70,255)",#D5AD46,"rgba(255,255,255,255)",#FFFFFF
+134,Burma,Burmese,Governor,2247,134,4,"rgba(145,137,106,255)",#91896A,"rgba(255,255,255,255)",#FFFFFF
+135,Indochina,Indochinese,Governor-General,2371,135,4,"rgba(144,174,119,255)",#90AE77,"rgba(255,255,255,255)",#FFFFFF
+136,Yunnan,Yunnan,Governor,2291,136,4,"rgba(150,116,107,255)",#96746B,"rgba(255,255,255,255)",#FFFFFF
+137,Nationalist China,Nationalist Chinese,Chairman,2321,137,4,"rgba(143,157,120,255)",#8F9D78,"rgba(255,255,255,255)",#FFFFFF
+138,Communist China,Communist Chinese,General,2396,138,3,"rgba(206,200,165,255)",#CEC8A5,"rgba(255,255,255,255)",#FFFFFF
+139,South China,South Chinese,Chairman,2301,139,4,"rgba(211,179,116,255)",#D3B374,"rgba(255,255,255,255)",#FFFFFF
+140,Mukden,Mukden,Prime Minister,2488,140,4,"rgba(89,121,124,255)",#59797C,"rgba(255,255,255,255)",#FFFFFF
+141,Manchukuo,Manchu,Emperor,3039,141,4,"rgba(164,73,55,255)",#A44937,"rgba(255,255,255,255)",#FFFFFF
+142,Korea,Korean,Governor-General,2516,142,4,"rgba(102,127,108,255)",#667F6C,"rgba(255,255,255,255)",#FFFFFF
+143,Japan,Japanese,Prime Minister,2489,143,4,"rgba(205,85,94,255)",#CD555E,"rgba(255,255,255,255)",#FFFFFF
+144,Sakhalin,Sakhalin,Director,2569,144,4,"rgba(174,195,153,255)",#AEC399,"rgba(255,255,255,255)",#FFFFFF
+145,Taiwan,Taiwanese,Governor–General,2573,145,4,"rgba(117,147,83,255)",#759353,"rgba(255,255,255,255)",#FFFFFF
+146,Hainan,Hainan,Commander,2481,146,4,"rgba(128,126,151,255)",#807E97,"rgba(255,255,255,255)",#FFFFFF
+147,Mengjiang,Mengjiang,Chairman,2033,147,4,"rgba(231,210,98,255)",#E7D262,"rgba(255,255,255,255)",#FFFFFF
+148,Ma-Clique,Ma-Clique,General,2637,148,4,"rgba(224,169,114,255)",#E0A972,"rgba(255,255,255,255)",#FFFFFF
+149,Sichuan,Sichuanese,Warlord,2544,149,4,"rgba(109,179,175,255)",#6DB3AF,"rgba(255,255,255,255)",#FFFFFF
+150,Xinjiang,Xinjiang,Military Commander,2449,150,4,"rgba(187,84,68,255)",#BB5444,"rgba(255,255,255,255)",#FFFFFF
+151,Philippines,Phillippine,President,1735,151,4,"rgba(208,199,136,255)",#D0C788,"rgba(255,255,255,255)",#FFFFFF
+152,Papua New Guinea,Papua New Guinean,Lieutenant-Governor,2715,152,4,"rgba(213,173,70,255)",#D5AD46,"rgba(255,255,255,255)",#FFFFFF
+153,Borneo,Bornean,Governor,2597,153,4,"rgba(113,142,144,255)",#718E90,"rgba(255,255,255,255)",#FFFFFF
+154,Sumatra,Sumatran,Governor-General,2655,154,4,"rgba(212,139,72,255)",#D48B48,"rgba(255,255,255,255)",#FFFFFF
+155,Nusa Tenggara,Nusa Tenggaran,Commander,2649,155,4,"rgba(109,179,175,255)",#6DB3AF,"rgba(255,255,255,255)",#FFFFFF
+156,Central Russia,Central Russian,First Secretary,3214,156,3,"rgba(115,93,45,255)",#735D2D,"rgba(255,255,255,255)",#FFFFFF
+157,Arkhangelsk,Arkhangelsky,First Secretary,2816,157,3,"rgba(209,176,77,255)",#D1B04D,"rgba(255,255,255,255)",#FFFFFF
+158,Komi Republic,Komi Republican,First Secretary,2830,158,3,"rgba(122,128,84,255)",#7A8054,"rgba(255,255,255,255)",#FFFFFF
+159,Volga Nzhny,Volga Nzhny,First Secretary,3191,159,3,"rgba(204,163,115,255)",#CCA373,"rgba(255,255,255,255)",#FFFFFF
+160,Volga Perm,Volga Permy,First Secretary,3086,160,3,"rgba(156,174,141,255)",#9CAE8D,"rgba(255,255,255,255)",#FFFFFF
+161,North Ural,North Uralian,First Secretary,2859,161,3,"rgba(114,144,147,255)",#729093,"rgba(255,255,255,255)",#FFFFFF
+162,South Ural,South Uralian,First Secretary,3066,162,3,"rgba(193,92,76,255)",#C15C4C,"rgba(255,255,255,255)",#FFFFFF
+163,Siberia,Siberian,First Secretary,2899,163,3,"rgba(107,135,117,255)",#6B8775,"rgba(255,255,255,255)",#FFFFFF
+164,East Siberia,East Siberian,First Secretary,2884,164,3,"rgba(155,106,40,255)",#9B6A28,"rgba(255,255,255,255)",#FFFFFF
+165,Tannu Tuva,Tannu Tuvan,Prime Minister,2906,165,3,"rgba(166,74,76,255)",#A64A4C,"rgba(255,255,255,255)",#FFFFFF
+166,East Yakutia,East Yakutian,First Secretary,2952,166,3,"rgba(87,119,121,255)",#577779,"rgba(255,255,255,255)",#FFFFFF
+167,West Yakutia,West Yakutian,First Secretary,2934,167,3,"rgba(240,206,142,255)",#F0CE8E,"rgba(255,255,255,255)",#FFFFFF
+168,Kamchatka,Kamchatkan,First Secretary,3016,168,3,"rgba(125,166,142,255)",#7DA68E,"rgba(255,255,255,255)",#FFFFFF
+169,Khabarovsk,Khabarovsky,First Secretary,2982,169,3,"rgba(206,183,121,255)",#CEB779,"rgba(255,255,255,255)",#FFFFFF
+170,Caucasus,Caucasian,General Secretary,3206,170,1,"rgba(85,103,105,255)",#556769,"rgba(255,255,255,255)",#FFFFFF
+171,Georgia,Georgian,Prime Minister,3168,171,3,"rgba(210,195,99,255)",#D2C363,"rgba(255,255,255,255)",#FFFFFF
+172,Turkestan,Turkestan,First Secretary,3131,172,3,"rgba(120,130,107,255)",#78826B,"rgba(255,255,255,255)",#FFFFFF
+173,Kazakhstan,Kazakhstani,First Secretary,3080,173,3,"rgba(229,187,95,255)",#E5BB5F,"rgba(255,255,255,255)",#FFFFFF
+174,New Zealand,New Zealander,Prime Minister,2793,174,2,"rgba(76,112,78,255)",#4C704E,"rgba(255,255,255,255)",#FFFFFF
+175,Western Australia,Western Australian,Governor,2689,175,2,"rgba(144,174,119,255)",#90AE77,"rgba(255,255,255,255)",#FFFFFF
+176,Central Australia,Central Australian,Governor,2676,176,2,"rgba(169,102,45,255)",#A9662D,"rgba(255,255,255,255)",#FFFFFF
+177,Queensland,Queenslander,Governor,2738,177,2,"rgba(113,142,144,255)",#718E90,"rgba(255,255,255,255)",#FFFFFF
+178,New South Wales,New South Welsh,Governor,2717,178,2,"rgba(232,212,98,255)",#E8D462,"rgba(255,255,255,255)",#FFFFFF
+179,Tasmania,Tasmanian,Governor,2790,179,1,"rgba(143,123,68,255)",#8F7B44,"rgba(255,255,255,255)",#FFFFFF
+180,Sweden,Swedish,Prime Minister,28,180,1,"rgba(93,117,139,255)",#5D758B,"rgba(255,255,255,255)",#FFFFFF
+181,Denmark,Danish,Prime Minister,155,181,2,"rgba(190,140,40,255)",#BE8C28,"rgba(255,255,255,255)",#FFFFFF
+182,Yukon,Yukoner,Commissioner,738,182,2,"rgba(156,174,141,255)",#9CAE8D,"rgba(255,255,255,255)",#FFFFFF
+183,Greenland,Greenlandic,Governor,1052,183,1,"rgba(135,168,157,255)",#87A89D,"rgba(255,255,255,255)",#FFFFFF
+184,Bolivia,Bolivian,President,1064,184,3,"rgba(194,94,83,255)",#C25E53,"rgba(255,255,255,255)",#FFFFFF
+185,Tahiti,Tahitian,Governor,1402,185,3,"rgba(193,92,76,255)",#C15C4C,"rgba(255,255,255,255)",#FFFFFF
+186,Malta,Maltese,Governor,1956,186,2,"rgba(184,51,56,255)",#B83338,"rgba(255,255,255,255)",#FFFFFF
+187,Malaysia,Malaysian,Federal Secretary,2646,187,4,"rgba(96,164,149,255)",#60A495,"rgba(255,255,255,255)",#FFFFFF
+188,Brunei,Bruneian,Sultan,2642,188,4,"rgba(203,88,67,255)",#CB5843,"rgba(255,255,255,255)",#FFFFFF
+189,Palau,Palauan,Governor,3241,189,4,"rgba(127,172,85,255)",#7FAC55,"rgba(255,255,255,255)",#FFFFFF
+190,Mariana,Marianan,Governor,3243,190,4,"rgba(155,126,57,255)",#9B7E39,"rgba(255,255,255,255)",#FFFFFF
+191,Micronesia,Micronesian,Governor,3249,191,4,"rgba(96,131,103,255)",#608367,"rgba(255,255,255,255)",#FFFFFF
+192,New Caledonia,New Caledonian,Governor,3250,192,1,"rgba(202,164,115,255)",#CAA473,"rgba(255,255,255,255)",#FFFFFF
+193,Vanuatu,Vanuatuan,Commissioner,3254,193,1,"rgba(120,130,107,255)",#78826B,"rgba(255,255,255,255)",#FFFFFF
+194,Fiji,Fijian,Governor,3256,194,1,"rgba(128,163,126,255)",#80A37E,"rgba(255,255,255,255)",#FFFFFF
+195,Samoa,Samoan,Administrator,3259,195,2,"rgba(83,117,72,255)",#537548,"rgba(255,255,255,255)",#FFFFFF
+196,Solomon,Solomonan,Commissioner,3267,196,2,"rgba(172,150,47,255)",#AC962F,"rgba(255,255,255,255)",#FFFFFF
+197,Okinawa,Okinawan,Governor,3273,197,4,"rgba(255,240,0,255)",#FFF000,"rgba(255,255,255,255)",#FFFFFF
+198,Kuril,Kurilian,Commander,3278,198,4,"rgba(229,187,95,255)",#E5BB5F,"rgba(255,255,255,255)",#FFFFFF
+199,Ceylon,Ceylonian,Governor,3289,199,2,"rgba(76,112,78,255)",#4C704E,"rgba(255,255,255,255)",#FFFFFF
+200,Luxembourg,Luxembourger,Prime Minister,189,200,2,"rgba(93,117,139,255)",#5D758B,"rgba(255,255,255,255)",#FFFFFF

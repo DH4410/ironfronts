@@ -1,0 +1,68 @@
+﻿province_a_id,province_a_name,province_b_id,province_b_name
+57,Bern,135,Freiburg
+101,Zaporizhzhia,105,Kirovohrad
+121,Hannover,122,Rostock
+132,Frankfurt,139,Kassel
+134,Saarbrücken,135,Freiburg
+135,Freiburg,152,Chur
+137,Nuremberg,138,Würzburg
+158,Vienna,173,Brno
+166,Graz,177,Bratislava
+282,Mâcon,291,Saint Étienne
+340,Constanța,347,Craiova
+364,Novi Sad,366,Šabac
+459,Coeur d'Alene,460,Omak
+466,Rochester (MN),580,Eau Claire
+468,St. Cloud,469,Duluth
+468,St. Cloud,470,Bemidji
+543,Cedar Rapids,588,Peoria
+547,Ottumwa,588,Peoria
+589,Springfield (IL),601,Jefferson City
+592,Jackson (TN),606,Jonesboro
+639,Santa Fe,640,Farmington (NM)
+641,Santa Rosa (NM),643,Hot Springs
+672,Fort Nelson,686,Wonowon
+687,Cranbrook,712,Claresholm
+721,Estevan,731,Davidson
+723,Moose Jaw,731,Davidson
+724,Swift Current,725,Kindersley
+744,Brandon,747,Peguis
+747,Peguis,748,Steinbach
+981,Espinar,1115,Shintuya
+1007,Ayacucho,1115,Shintuya
+1035,Bruno,1065,Coarí
+1076,Manaus,1085,Borba
+1092,Sucundurí,1177,Airi
+1097,Cujubim,1170,Lábrea
+1098,Jaru,1101,Abunã
+1166,La Reforma,1365,Cutral-Có
+1208,San Ramon,1209,Casarabe
+1209,Casarabe,1218,Chimoré
+1241,Anápolis,1294,Unaí
+1274,Dourados,1298,Araçatuba
+1294,Unaí,1404,Cavalcante
+1398,Aswan,1526,Qena
+1399,Kharga,1526,Qena
+1493,El Minya,1529,Madinaty
+1515,Berber,1753,Magrur
+1599,Zinder,1766,Auyo
+1752,Wad Madani,1753,Magrur
+2090,Abbottabad,2133,Lahore
+2133,Lahore,2142,Bannu
+2140,Jhang Maghiana,2148,Dera Ghazi Khan
+2171,Mandi,2172,Kathgodam
+2189,Gorakhpur,2197,Gaya
+2223,Sholapur,2226,Raichur
+2379,Bak Lieu,2382,Prey Veng
+2425,Matad,3060,Arxan
+2595,Delhi (CN),2629,Yanglongxiang
+2633,Youyunxiang,2634,Madoi
+2634,Madoi,2638,Niandixiang
+2822,Gdov,2849,Volkhov
+2875,Andra,2876,Verkhnekazymskiy
+3174,Urzhum,3182,Kazan
+3176,Tolyatti,3185,Buinsk
+3193,Aleksandryia,3194,Novospasskoye
+3197,Balakovo,3201,Atarsk
+3199,Baltser,3201,Atarsk
+3200,Novouzensk,3210,Dubovka

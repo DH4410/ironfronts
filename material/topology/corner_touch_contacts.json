@@ -1,0 +1,407 @@
+{
+  "count": 67,
+  "contacts": [
+    {
+      "province_a_id": 57,
+      "province_a_name": "Bern",
+      "province_b_id": 135,
+      "province_b_name": "Freiburg"
+    },
+    {
+      "province_a_id": 101,
+      "province_a_name": "Zaporizhzhia",
+      "province_b_id": 105,
+      "province_b_name": "Kirovohrad"
+    },
+    {
+      "province_a_id": 121,
+      "province_a_name": "Hannover",
+      "province_b_id": 122,
+      "province_b_name": "Rostock"
+    },
+    {
+      "province_a_id": 132,
+      "province_a_name": "Frankfurt",
+      "province_b_id": 139,
+      "province_b_name": "Kassel"
+    },
+    {
+      "province_a_id": 134,
+      "province_a_name": "Saarbrücken",
+      "province_b_id": 135,
+      "province_b_name": "Freiburg"
+    },
+    {
+      "province_a_id": 135,
+      "province_a_name": "Freiburg",
+      "province_b_id": 152,
+      "province_b_name": "Chur"
+    },
+    {
+      "province_a_id": 137,
+      "province_a_name": "Nuremberg",
+      "province_b_id": 138,
+      "province_b_name": "Würzburg"
+    },
+    {
+      "province_a_id": 158,
+      "province_a_name": "Vienna",
+      "province_b_id": 173,
+      "province_b_name": "Brno"
+    },
+    {
+      "province_a_id": 166,
+      "province_a_name": "Graz",
+      "province_b_id": 177,
+      "province_b_name": "Bratislava"
+    },
+    {
+      "province_a_id": 282,
+      "province_a_name": "Mâcon",
+      "province_b_id": 291,
+      "province_b_name": "Saint Étienne"
+    },
+    {
+      "province_a_id": 340,
+      "province_a_name": "Constanța",
+      "province_b_id": 347,
+      "province_b_name": "Craiova"
+    },
+    {
+      "province_a_id": 364,
+      "province_a_name": "Novi Sad",
+      "province_b_id": 366,
+      "province_b_name": "Šabac"
+    },
+    {
+      "province_a_id": 459,
+      "province_a_name": "Coeur d'Alene",
+      "province_b_id": 460,
+      "province_b_name": "Omak"
+    },
+    {
+      "province_a_id": 466,
+      "province_a_name": "Rochester (MN)",
+      "province_b_id": 580,
+      "province_b_name": "Eau Claire"
+    },
+    {
+      "province_a_id": 468,
+      "province_a_name": "St. Cloud",
+      "province_b_id": 469,
+      "province_b_name": "Duluth"
+    },
+    {
+      "province_a_id": 468,
+      "province_a_name": "St. Cloud",
+      "province_b_id": 470,
+      "province_b_name": "Bemidji"
+    },
+    {
+      "province_a_id": 543,
+      "province_a_name": "Cedar Rapids",
+      "province_b_id": 588,
+      "province_b_name": "Peoria"
+    },
+    {
+      "province_a_id": 547,
+      "province_a_name": "Ottumwa",
+      "province_b_id": 588,
+      "province_b_name": "Peoria"
+    },
+    {
+      "province_a_id": 589,
+      "province_a_name": "Springfield (IL)",
+      "province_b_id": 601,
+      "province_b_name": "Jefferson City"
+    },
+    {
+      "province_a_id": 592,
+      "province_a_name": "Jackson (TN)",
+      "province_b_id": 606,
+      "province_b_name": "Jonesboro"
+    },
+    {
+      "province_a_id": 639,
+      "province_a_name": "Santa Fe",
+      "province_b_id": 640,
+      "province_b_name": "Farmington (NM)"
+    },
+    {
+      "province_a_id": 641,
+      "province_a_name": "Santa Rosa (NM)",
+      "province_b_id": 643,
+      "province_b_name": "Hot Springs"
+    },
+    {
+      "province_a_id": 672,
+      "province_a_name": "Fort Nelson",
+      "province_b_id": 686,
+      "province_b_name": "Wonowon"
+    },
+    {
+      "province_a_id": 687,
+      "province_a_name": "Cranbrook",
+      "province_b_id": 712,
+      "province_b_name": "Claresholm"
+    },
+    {
+      "province_a_id": 721,
+      "province_a_name": "Estevan",
+      "province_b_id": 731,
+      "province_b_name": "Davidson"
+    },
+    {
+      "province_a_id": 723,
+      "province_a_name": "Moose Jaw",
+      "province_b_id": 731,
+      "province_b_name": "Davidson"
+    },
+    {
+      "province_a_id": 724,
+      "province_a_name": "Swift Current",
+      "province_b_id": 725,
+      "province_b_name": "Kindersley"
+    },
+    {
+      "province_a_id": 744,
+      "province_a_name": "Brandon",
+      "province_b_id": 747,
+      "province_b_name": "Peguis"
+    },
+    {
+      "province_a_id": 747,
+      "province_a_name": "Peguis",
+      "province_b_id": 748,
+      "province_b_name": "Steinbach"
+    },
+    {
+      "province_a_id": 981,
+      "province_a_name": "Espinar",
+      "province_b_id": 1115,
+      "province_b_name": "Shintuya"
+    },
+    {
+      "province_a_id": 1007,
+      "province_a_name": "Ayacucho",
+      "province_b_id": 1115,
+      "province_b_name": "Shintuya"
+    },
+    {
+      "province_a_id": 1035,
+      "province_a_name": "Bruno",
+      "province_b_id": 1065,
+      "province_b_name": "Coarí"
+    },
+    {
+      "province_a_id": 1076,
+      "province_a_name": "Manaus",
+      "province_b_id": 1085,
+      "province_b_name": "Borba"
+    },
+    {
+      "province_a_id": 1092,
+      "province_a_name": "Sucundurí",
+      "province_b_id": 1177,
+      "province_b_name": "Airi"
+    },
+    {
+      "province_a_id": 1097,
+      "province_a_name": "Cujubim",
+      "province_b_id": 1170,
+      "province_b_name": "Lábrea"
+    },
+    {
+      "province_a_id": 1098,
+      "province_a_name": "Jaru",
+      "province_b_id": 1101,
+      "province_b_name": "Abunã"
+    },
+    {
+      "province_a_id": 1166,
+      "province_a_name": "La Reforma",
+      "province_b_id": 1365,
+      "province_b_name": "Cutral-Có"
+    },
+    {
+      "province_a_id": 1208,
+      "province_a_name": "San Ramon",
+      "province_b_id": 1209,
+      "province_b_name": "Casarabe"
+    },
+    {
+      "province_a_id": 1209,
+      "province_a_name": "Casarabe",
+      "province_b_id": 1218,
+      "province_b_name": "Chimoré"
+    },
+    {
+      "province_a_id": 1241,
+      "province_a_name": "Anápolis",
+      "province_b_id": 1294,
+      "province_b_name": "Unaí"
+    },
+    {
+      "province_a_id": 1274,
+      "province_a_name": "Dourados",
+      "province_b_id": 1298,
+      "province_b_name": "Araçatuba"
+    },
+    {
+      "province_a_id": 1294,
+      "province_a_name": "Unaí",
+      "province_b_id": 1404,
+      "province_b_name": "Cavalcante"
+    },
+    {
+      "province_a_id": 1398,
+      "province_a_name": "Aswan",
+      "province_b_id": 1526,
+      "province_b_name": "Qena"
+    },
+    {
+      "province_a_id": 1399,
+      "province_a_name": "Kharga",
+      "province_b_id": 1526,
+      "province_b_name": "Qena"
+    },
+    {
+      "province_a_id": 1493,
+      "province_a_name": "El Minya",
+      "province_b_id": 1529,
+      "province_b_name": "Madinaty"
+    },
+    {
+      "province_a_id": 1515,
+      "province_a_name": "Berber",
+      "province_b_id": 1753,
+      "province_b_name": "Magrur"
+    },
+    {
+      "province_a_id": 1599,
+      "province_a_name": "Zinder",
+      "province_b_id": 1766,
+      "province_b_name": "Auyo"
+    },
+    {
+      "province_a_id": 1752,
+      "province_a_name": "Wad Madani",
+      "province_b_id": 1753,
+      "province_b_name": "Magrur"
+    },
+    {
+      "province_a_id": 2090,
+      "province_a_name": "Abbottabad",
+      "province_b_id": 2133,
+      "province_b_name": "Lahore"
+    },
+    {
+      "province_a_id": 2133,
+      "province_a_name": "Lahore",
+      "province_b_id": 2142,
+      "province_b_name": "Bannu"
+    },
+    {
+      "province_a_id": 2140,
+      "province_a_name": "Jhang Maghiana",
+      "province_b_id": 2148,
+      "province_b_name": "Dera Ghazi Khan"
+    },
+    {
+      "province_a_id": 2171,
+      "province_a_name": "Mandi",
+      "province_b_id": 2172,
+      "province_b_name": "Kathgodam"
+    },
+    {
+      "province_a_id": 2189,
+      "province_a_name": "Gorakhpur",
+      "province_b_id": 2197,
+      "province_b_name": "Gaya"
+    },
+    {
+      "province_a_id": 2223,
+      "province_a_name": "Sholapur",
+      "province_b_id": 2226,
+      "province_b_name": "Raichur"
+    },
+    {
+      "province_a_id": 2379,
+      "province_a_name": "Bak Lieu",
+      "province_b_id": 2382,
+      "province_b_name": "Prey Veng"
+    },
+    {
+      "province_a_id": 2425,
+      "province_a_name": "Matad",
+      "province_b_id": 3060,
+      "province_b_name": "Arxan"
+    },
+    {
+      "province_a_id": 2595,
+      "province_a_name": "Delhi (CN)",
+      "province_b_id": 2629,
+      "province_b_name": "Yanglongxiang"
+    },
+    {
+      "province_a_id": 2633,
+      "province_a_name": "Youyunxiang",
+      "province_b_id": 2634,
+      "province_b_name": "Madoi"
+    },
+    {
+      "province_a_id": 2634,
+      "province_a_name": "Madoi",
+      "province_b_id": 2638,
+      "province_b_name": "Niandixiang"
+    },
+    {
+      "province_a_id": 2822,
+      "province_a_name": "Gdov",
+      "province_b_id": 2849,
+      "province_b_name": "Volkhov"
+    },
+    {
+      "province_a_id": 2875,
+      "province_a_name": "Andra",
+      "province_b_id": 2876,
+      "province_b_name": "Verkhnekazymskiy"
+    },
+    {
+      "province_a_id": 3174,
+      "province_a_name": "Urzhum",
+      "province_b_id": 3182,
+      "province_b_name": "Kazan"
+    },
+    {
+      "province_a_id": 3176,
+      "province_a_name": "Tolyatti",
+      "province_b_id": 3185,
+      "province_b_name": "Buinsk"
+    },
+    {
+      "province_a_id": 3193,
+      "province_a_name": "Aleksandryia",
+      "province_b_id": 3194,
+      "province_b_name": "Novospasskoye"
+    },
+    {
+      "province_a_id": 3197,
+      "province_a_name": "Balakovo",
+      "province_b_id": 3201,
+      "province_b_name": "Atarsk"
+    },
+    {
+      "province_a_id": 3199,
+      "province_a_name": "Baltser",
+      "province_b_id": 3201,
+      "province_b_name": "Atarsk"
+    },
+    {
+      "province_a_id": 3200,
+      "province_a_name": "Novouzensk",
+      "province_b_id": 3210,
+      "province_b_name": "Dubovka"
+    }
+  ]
+}

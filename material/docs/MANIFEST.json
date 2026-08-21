@@ -1,0 +1,285 @@
+{
+  "package": "material",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 2108,
+      "sha256": "63cfca5f1c1f292601eb25a44675ab64f52b41953da01244a2b29ca4dbb50275"
+    },
+    {
+      "path": "docs/FIELD_DICTIONARY.md",
+      "bytes": 3430,
+      "sha256": "a19c42b8b3ab2d3f0e061627be65dd01ec89d854c310c84eae031e4dace1d9ae"
+    },
+    {
+      "path": "docs/MESH_NOTES.md",
+      "bytes": 1034,
+      "sha256": "e6820941e570ac2db2dd74b121433ae635fd097ba3a67a11171cc2b979c442e4"
+    },
+    {
+      "path": "docs/PROVENANCE.md",
+      "bytes": 670,
+      "sha256": "c8a0008b54ba6ae8264e3bf0f7777bf1fe1794d4f85125479ede0428d92bb288"
+    },
+    {
+      "path": "docs/TOPOLOGY_NOTES.md",
+      "bytes": 1009,
+      "sha256": "0a6886d81bab6f411851647e3782f9c6ef6825cd5634d6b765d8d8067e5f85a3"
+    },
+    {
+      "path": "geometry/province_centers.csv",
+      "bytes": 94909,
+      "sha256": "0308909354fe588ae1522ad24fceacd2cba474fe9e02be674c4bd52bb37f7b89"
+    },
+    {
+      "path": "geometry/province_centers.geojson",
+      "bytes": 468166,
+      "sha256": "46f8ea423b3398d8ce0b07b52eb58ed2ec2b5f90d6111b8dc5a402c73931652b"
+    },
+    {
+      "path": "geometry/province_centers.json",
+      "bytes": 339344,
+      "sha256": "786519dfee0a4ba524eaa02259f6eb991a45d0b884cd3d95cbc0bf29724d07ac"
+    },
+    {
+      "path": "geometry/province_polygons.geojson",
+      "bytes": 2726909,
+      "sha256": "574be46f30386f6603c4a032e985c76f1fd3ccdb7c0d6942fd5f3bb4257cbbce"
+    },
+    {
+      "path": "geometry/province_polygons_decoded.json",
+      "bytes": 8498668,
+      "sha256": "7059f888a4d389683a1c77bfa973ef162be10507821e2be8916208c05da1c3f3"
+    },
+    {
+      "path": "geometry/sea_points.csv",
+      "bytes": 179896,
+      "sha256": "b57a8c373fdc9f4af696afac076c6caa75560eff612badc14d3925eb9cbc8f19"
+    },
+    {
+      "path": "geometry/sea_points.geojson",
+      "bytes": 857242,
+      "sha256": "bc788516964fbe68d80256dc93d06d52edfa6e9776fae0a71e9eb702e8f428bd"
+    },
+    {
+      "path": "geometry/sea_points.json",
+      "bytes": 761774,
+      "sha256": "9946757cf3d86793810eeaa935bc8421974c6d2e75728244739fd1446345793a"
+    },
+    {
+      "path": "geometry/terrain_marker_positions.csv",
+      "bytes": 107397,
+      "sha256": "ba3f2767ce047b8e235e6007b0d3a375a098a15323664cbae0211aeb0952509c"
+    },
+    {
+      "path": "geometry/terrain_marker_positions.geojson",
+      "bytes": 538999,
+      "sha256": "280a1f08c9617f3370e421f8fb4fce4cbc26a59a7a0c51705fdf16cc6060ad47"
+    },
+    {
+      "path": "geometry/terrain_marker_positions.json",
+      "bytes": 485414,
+      "sha256": "a839ee8294d813b63d6ea415c626a1aeb3af2cad1125c6a0b955344eca9e5d00"
+    },
+    {
+      "path": "mesh/province_mesh_index.csv",
+      "bytes": 240265,
+      "sha256": "c7df840d2cd999afb7289205d9de4bb5a7afdd838d4e5d2e5692879f4336122f"
+    },
+    {
+      "path": "mesh/province_mesh_index.json",
+      "bytes": 997052,
+      "sha256": "7a23bcc361c6e08022b3de0f52c0e5b0b2a6708dea99962056103c775f5e7e21"
+    },
+    {
+      "path": "mesh/triangulations_decoded.json",
+      "bytes": 8152975,
+      "sha256": "26e7be88446eb4c526bf034db1170b5f14c6fd615cb9a089bf5c3e1b163d7554"
+    },
+    {
+      "path": "metadata/countries.csv",
+      "bytes": 22334,
+      "sha256": "bf80cb17a3dfae586720d40741ce0a3a95e71bc956e4aa6716b1e3e66d1ee18f"
+    },
+    {
+      "path": "metadata/countries.json",
+      "bytes": 83792,
+      "sha256": "ac318ae99ed7f6d5bb58f055ff9c12528b0e24a210cae5ae944f5b9fd017e367"
+    },
+    {
+      "path": "metadata/initial_ownership.csv",
+      "bytes": 159507,
+      "sha256": "5363493703f5b8b78554aeb47664b4bb606f68a9d72f17a35175c85771c3bb46"
+    },
+    {
+      "path": "metadata/initial_ownership.json",
+      "bytes": 972041,
+      "sha256": "cac2281376b25e1bc9a93b571f0f03295d9d5f08457546012410190c5b262479"
+    },
+    {
+      "path": "metadata/map_metadata.json",
+      "bytes": 829,
+      "sha256": "8b5ebdd86377e7ba842fd48483ae861bc978a00876348da79b70ace351a81438"
+    },
+    {
+      "path": "metadata/province_region_membership.csv",
+      "bytes": 89903,
+      "sha256": "27aa446270bdf59a2bf3c88dbcbd959873911ee7fbe416a7c9e60fc0776b1073"
+    },
+    {
+      "path": "metadata/province_region_membership.json",
+      "bytes": 430102,
+      "sha256": "10101bc9b2ea9f29595d4f7b54da81f1971485f8a3660849e7be3692a5cb1ffc"
+    },
+    {
+      "path": "metadata/province_resource_production.csv",
+      "bytes": 115276,
+      "sha256": "c27ed9d5777a54ee32d95cfdfee8e117dd6abf69ed515f4f5516a23ef2dc4c13"
+    },
+    {
+      "path": "metadata/province_resource_production.json",
+      "bytes": 729776,
+      "sha256": "cbebbeb41ce21364eabf3dc7c2c4183726de465bec95981830c83746fb4a8a92"
+    },
+    {
+      "path": "metadata/provinces.csv",
+      "bytes": 344890,
+      "sha256": "fbb2d6f17e807b8ed8d5ad9f04b5af3d95a1f9b5a981c8c800bf608a3fe60814"
+    },
+    {
+      "path": "metadata/provinces.json",
+      "bytes": 2727130,
+      "sha256": "1e1fb8c30d970fee957c37088ea8567de1693b14cfaa25fbefe0e6bbed617c95"
+    },
+    {
+      "path": "metadata/regions.csv",
+      "bytes": 319,
+      "sha256": "93200c672f502f4cb9220a8b2ed12788b2e3fa750b645066f66afa1909365049"
+    },
+    {
+      "path": "metadata/regions.json",
+      "bytes": 1404,
+      "sha256": "4ab727297633b3a99a68b7fd5b59c479e2f494bc0499ca97c2befd9b4338a30b"
+    },
+    {
+      "path": "metadata/resource_types.json",
+      "bytes": 168,
+      "sha256": "c878ce1954629766694194563824a410ec049fc0b8476513124971c8f83a7563"
+    },
+    {
+      "path": "metadata/terrain_types.json",
+      "bytes": 127,
+      "sha256": "e4a5291a95f0e410c96862151e52caa06371cd2a2eee623653dfa9eec9359bc4"
+    },
+    {
+      "path": "movement/connection_segments.csv",
+      "bytes": 2226755,
+      "sha256": "9718b47dc3987e1b2a2107cea17b2a942d832e93a67e3d67d37c8a6ae29be78c"
+    },
+    {
+      "path": "movement/connection_segments.json",
+      "bytes": 5544267,
+      "sha256": "4ebbb162406562f6d5400c03a70673be28a1578a42cf3d90e98c2d1388e0c779"
+    },
+    {
+      "path": "movement/connections.geojson",
+      "bytes": 7505727,
+      "sha256": "43ddbc44754d578b78a112b6cc559506ba1a04d9d8483ee012bb36b521b35f02"
+    },
+    {
+      "path": "movement/network_nodes.csv",
+      "bytes": 798856,
+      "sha256": "3073a7f3a6cdae307c417264028a7c25f95ad66ae97bcac1a62c41049d62a980"
+    },
+    {
+      "path": "movement/network_nodes.json",
+      "bytes": 2277498,
+      "sha256": "c024c01f4e4b3a12b869e846bce4b713026d69895d1fd1c73df35a961652161a"
+    },
+    {
+      "path": "source/50512_3@high.original.json",
+      "bytes": 6917712,
+      "sha256": "880013029d11085fbe7f86b58a95be99c3886dc2862467480f7e82448664a079"
+    },
+    {
+      "path": "source/connections_v2.bin",
+      "bytes": 692328,
+      "sha256": "4a03c3544fe20a83b0676f3e8214c05c02599a405a57275efe36c96c7ede5061"
+    },
+    {
+      "path": "source/triangulations.original.json",
+      "bytes": 12064120,
+      "sha256": "0800c722e614f2efa57050101e5bcf817f3361a2aac33069efa8d853c942797f"
+    },
+    {
+      "path": "tools/decode_connections.py",
+      "bytes": 377,
+      "sha256": "d2a89eebc8440b83cfaf88d9cabd76e881eb7e1937279c66ee2780f3f0b20a86"
+    },
+    {
+      "path": "tools/decode_province_boundary.py",
+      "bytes": 246,
+      "sha256": "ad49babe96881e29d144e16ff9e1ce39a18f4ce69497f8b9a1dcb6af04896aee"
+    },
+    {
+      "path": "topology/border_edge_pieces.csv",
+      "bytes": 11963121,
+      "sha256": "951549706beeb4fe3a273b9ae63875c1c1d0dd9acada99d30a53c92e4c3df831"
+    },
+    {
+      "path": "topology/border_edge_pieces.geojson",
+      "bytes": 44744440,
+      "sha256": "1477d862de746b37b819f46fa9638846dceb33d1438c1361d090aaa3cba9d973"
+    },
+    {
+      "path": "topology/border_edge_pieces.json",
+      "bytes": 36457684,
+      "sha256": "9e70f5f9bd648b49d70aa9d51050820a90b587c76d2308eb930b9015893d05c2"
+    },
+    {
+      "path": "topology/border_topology_vertices.csv",
+      "bytes": 6691737,
+      "sha256": "a0fea15b03af3e3459e06416bcf68517b8e59e0165406f91905a551b5255360c"
+    },
+    {
+      "path": "topology/border_topology_vertices.json",
+      "bytes": 28383430,
+      "sha256": "a146ccb29a1cab36550b37d548d673b4c16ba6c5150e202a2bba1cf488bfa096"
+    },
+    {
+      "path": "topology/corner_touch_contacts.csv",
+      "bytes": 1957,
+      "sha256": "5e4db1fe9c671959841278548ad1b61e2a30152dd9aa7723f9e33ac5a7c84ef8"
+    },
+    {
+      "path": "topology/corner_touch_contacts.json",
+      "bytes": 9635,
+      "sha256": "c06500fd9f5075b5eb9c075f460f24bcdff7cc715a079f46636b518c0a48c34b"
+    },
+    {
+      "path": "topology/logical_border_segments.csv",
+      "bytes": 1344728,
+      "sha256": "eca3493817c4f7f6b99b85f9ce3e2423f691178796004ae56b996a70f465d84f"
+    },
+    {
+      "path": "topology/logical_border_segments.geojson",
+      "bytes": 8172224,
+      "sha256": "179d3bc62dcb4161c629d493364dcba52ea354056dfb467c60aa551a0617d8e2"
+    },
+    {
+      "path": "topology/logical_border_segments.json",
+      "bytes": 6906005,
+      "sha256": "75683b612cb443c5601cae82e1f998ac3b33bbec84ad876f698d0e6ecad018d1"
+    },
+    {
+      "path": "topology/province_adjacency.csv",
+      "bytes": 475879,
+      "sha256": "e46a5090da1d99b40eecc794a5370cb6526af82e41823a6e9556980dc0771139"
+    },
+    {
+      "path": "topology/province_adjacency.json",
+      "bytes": 2668961,
+      "sha256": "3109383ba2ad1c46ecc37ded03d8adba992cd42960a62d76cc71326cebe14baf"
+    }
+  ]
+}

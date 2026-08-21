@@ -1,0 +1,71 @@
+{
+  "count": 11,
+  "regions": [
+    {
+      "region_id": 0,
+      "name": "Europe",
+      "is_random_region": false,
+      "province_count": 376
+    },
+    {
+      "region_id": 1,
+      "name": "North America",
+      "is_random_region": false,
+      "province_count": 475
+    },
+    {
+      "region_id": 2,
+      "name": "Central America",
+      "is_random_region": false,
+      "province_count": 93
+    },
+    {
+      "region_id": 3,
+      "name": "South America",
+      "is_random_region": false,
+      "province_count": 417
+    },
+    {
+      "region_id": 4,
+      "name": "North Africa",
+      "is_random_region": false,
+      "province_count": 336
+    },
+    {
+      "region_id": 5,
+      "name": "South Africa",
+      "is_random_region": false,
+      "province_count": 251
+    },
+    {
+      "region_id": 6,
+      "name": "Russia",
+      "is_random_region": false,
+      "province_count": 386
+    },
+    {
+      "region_id": 7,
+      "name": "Middle East",
+      "is_random_region": false,
+      "province_count": 125
+    },
+    {
+      "region_id": 8,
+      "name": "Asia",
+      "is_random_region": false,
+      "province_count": 520
+    },
+    {
+      "region_id": 9,
+      "name": "South East Asia",
+      "is_random_region": false,
+      "province_count": 174
+    },
+    {
+      "region_id": 10,
+      "name": "Oceania",
+      "is_random_region": false,
+      "province_count": 150
+    }
+  ]
+}

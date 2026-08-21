@@ -1,0 +1,2555 @@
+﻿province_id,name,marker_index,x,y,terrain_type_id,terrain_type
+24,Arjeborg,0,6888.0,881.0,12,Mountain
+24,Arjeborg,1,6915.0,848.0,12,Mountain
+24,Arjeborg,2,6916.0,872.0,12,Mountain
+24,Arjeborg,3,6917.0,889.0,12,Mountain
+24,Arjeborg,4,6929.0,832.0,12,Mountain
+24,Arjeborg,5,6934.0,874.0,12,Mountain
+24,Arjeborg,6,6935.0,853.0,12,Mountain
+24,Arjeborg,7,6941.0,813.0,12,Mountain
+24,Arjeborg,8,6949.0,841.0,12,Mountain
+24,Arjeborg,9,6960.0,798.0,12,Mountain
+24,Arjeborg,10,6967.0,833.0,12,Mountain
+24,Arjeborg,11,6969.0,823.0,12,Mountain
+24,Arjeborg,12,6976.0,797.0,12,Mountain
+24,Arjeborg,13,6983.0,832.0,12,Mountain
+40,Narvik,0,6870.0,805.0,12,Mountain
+40,Narvik,1,6887.0,793.0,12,Mountain
+40,Narvik,2,6889.0,815.0,12,Mountain
+40,Narvik,3,6905.0,803.0,12,Mountain
+40,Narvik,4,6907.0,790.0,12,Mountain
+40,Narvik,5,6921.0,786.0,12,Mountain
+40,Narvik,6,6922.0,772.0,12,Mountain
+40,Narvik,7,6923.0,748.0,12,Mountain
+40,Narvik,8,6933.0,732.0,12,Mountain
+40,Narvik,9,6935.0,757.0,12,Mountain
+40,Narvik,10,6948.0,734.0,12,Mountain
+40,Narvik,11,6948.0,760.0,12,Mountain
+40,Narvik,12,6949.0,716.0,12,Mountain
+40,Narvik,13,6966.0,720.0,12,Mountain
+40,Narvik,14,6966.0,731.0,12,Mountain
+40,Narvik,15,6986.0,724.0,12,Mountain
+40,Narvik,16,7004.0,711.0,12,Mountain
+42,Alta,0,7031.0,677.0,12,Mountain
+42,Alta,1,7036.0,693.0,12,Mountain
+42,Alta,2,7055.0,673.0,12,Mountain
+42,Alta,3,7075.0,663.0,12,Mountain
+42,Alta,4,7106.0,671.0,12,Mountain
+42,Alta,5,7117.0,654.0,12,Mountain
+42,Alta,6,7123.0,686.0,12,Mountain
+42,Alta,7,7137.0,640.0,12,Mountain
+42,Alta,8,7140.0,662.0,12,Mountain
+42,Alta,9,7155.0,707.0,12,Mountain
+42,Alta,10,7166.0,670.0,12,Mountain
+42,Alta,11,7194.0,673.0,12,Mountain
+42,Alta,12,7209.0,652.0,12,Mountain
+42,Alta,13,7228.0,650.0,12,Mountain
+42,Alta,14,7289.0,623.0,12,Mountain
+42,Alta,15,7296.0,625.0,12,Mountain
+44,Steinkjer,0,6697.0,1016.0,12,Mountain
+44,Steinkjer,1,6718.0,1006.0,12,Mountain
+44,Steinkjer,2,6734.0,1043.0,12,Mountain
+44,Steinkjer,3,6735.0,1008.0,12,Mountain
+44,Steinkjer,4,6746.0,1033.0,12,Mountain
+44,Steinkjer,5,6751.0,979.0,12,Mountain
+44,Steinkjer,6,6756.0,1016.0,12,Mountain
+44,Steinkjer,7,6760.0,955.0,12,Mountain
+44,Steinkjer,8,6769.0,930.0,12,Mountain
+44,Steinkjer,9,6771.0,978.0,12,Mountain
+44,Steinkjer,10,6772.0,999.0,12,Mountain
+44,Steinkjer,11,6782.0,945.0,12,Mountain
+44,Steinkjer,12,6786.0,977.0,12,Mountain
+44,Steinkjer,13,6793.0,921.0,12,Mountain
+44,Steinkjer,14,6806.0,953.0,12,Mountain
+44,Steinkjer,15,6810.0,939.0,12,Mountain
+44,Steinkjer,16,6812.0,965.0,12,Mountain
+44,Steinkjer,17,6816.0,924.0,12,Mountain
+44,Steinkjer,18,6819.0,945.0,12,Mountain
+44,Steinkjer,19,6836.0,934.0,12,Mountain
+50,Bergen,0,6517.0,1228.0,12,Mountain
+50,Bergen,1,6531.0,1223.0,12,Mountain
+50,Bergen,2,6535.0,1259.0,12,Mountain
+50,Bergen,3,6544.0,1238.0,12,Mountain
+50,Bergen,4,6555.0,1227.0,12,Mountain
+50,Bergen,5,6567.0,1218.0,12,Mountain
+50,Bergen,6,6569.0,1233.0,12,Mountain
+50,Bergen,7,6570.0,1248.0,12,Mountain
+50,Bergen,8,6586.0,1244.0,12,Mountain
+50,Bergen,9,6591.0,1216.0,12,Mountain
+50,Bergen,10,6591.0,1233.0,12,Mountain
+50,Bergen,11,6603.0,1220.0,12,Mountain
+50,Bergen,12,6610.0,1206.0,12,Mountain
+50,Bergen,13,6613.0,1239.0,12,Mountain
+50,Bergen,14,6622.0,1212.0,12,Mountain
+50,Bergen,15,6631.0,1201.0,12,Mountain
+51,Stryn,0,6497.0,1181.0,12,Mountain
+51,Stryn,1,6511.0,1173.0,12,Mountain
+51,Stryn,2,6533.0,1176.0,12,Mountain
+51,Stryn,3,6545.0,1130.0,12,Mountain
+51,Stryn,4,6553.0,1161.0,12,Mountain
+51,Stryn,5,6562.0,1180.0,12,Mountain
+51,Stryn,6,6568.0,1126.0,12,Mountain
+51,Stryn,7,6570.0,1143.0,12,Mountain
+51,Stryn,8,6571.0,1155.0,12,Mountain
+51,Stryn,9,6574.0,1175.0,12,Mountain
+51,Stryn,10,6583.0,1138.0,12,Mountain
+51,Stryn,11,6590.0,1123.0,12,Mountain
+51,Stryn,12,6591.0,1163.0,12,Mountain
+51,Stryn,13,6601.0,1139.0,12,Mountain
+51,Stryn,14,6606.0,1117.0,12,Mountain
+51,Stryn,15,6608.0,1176.0,12,Mountain
+51,Stryn,16,6611.0,1157.0,12,Mountain
+51,Stryn,17,6629.0,1138.0,12,Mountain
+51,Stryn,18,6630.0,1127.0,12,Mountain
+51,Stryn,19,6631.0,1177.0,12,Mountain
+51,Stryn,20,6639.0,1162.0,12,Mountain
+57,Bern,0,6398.0,2165.0,12,Mountain
+57,Bern,1,6415.0,2142.0,12,Mountain
+57,Bern,2,6428.0,2151.0,12,Mountain
+57,Bern,3,6435.0,2133.0,12,Mountain
+57,Bern,4,6441.0,2156.0,12,Mountain
+57,Bern,5,6445.0,2131.0,12,Mountain
+57,Bern,6,6450.0,2158.0,12,Mountain
+57,Bern,7,6452.0,2140.0,12,Mountain
+57,Bern,8,6460.0,2134.0,12,Mountain
+57,Bern,9,6473.0,2140.0,12,Mountain
+80,Tarnów,0,7059.0,1946.0,12,Mountain
+80,Tarnów,1,7069.0,1958.0,12,Mountain
+80,Tarnów,2,7072.0,1948.0,12,Mountain
+80,Tarnów,3,7090.0,1943.0,12,Mountain
+80,Tarnów,4,7090.0,1962.0,12,Mountain
+80,Tarnów,5,7104.0,1938.0,12,Mountain
+80,Tarnów,6,7111.0,1958.0,12,Mountain
+80,Tarnów,7,7116.0,1947.0,12,Mountain
+152,Chur,0,6497.0,2149.0,12,Mountain
+152,Chur,1,6503.0,2172.0,12,Mountain
+152,Chur,2,6507.0,2156.0,12,Mountain
+152,Chur,3,6520.0,2177.0,12,Mountain
+152,Chur,4,6525.0,2161.0,12,Mountain
+152,Chur,5,6529.0,2142.0,12,Mountain
+152,Chur,6,6535.0,2163.0,12,Mountain
+152,Chur,7,6537.0,2179.0,12,Mountain
+152,Chur,8,6552.0,2187.0,12,Mountain
+152,Chur,9,6562.0,2179.0,12,Mountain
+153,Lugano,0,6475.0,2193.0,12,Mountain
+153,Lugano,1,6487.0,2201.0,12,Mountain
+153,Lugano,2,6494.0,2191.0,12,Mountain
+153,Lugano,3,6500.0,2206.0,12,Mountain
+153,Lugano,4,6504.0,2217.0,12,Mountain
+153,Lugano,5,6511.0,2197.0,12,Mountain
+153,Lugano,6,6514.0,2207.0,12,Mountain
+153,Lugano,7,6533.0,2208.0,12,Mountain
+156,Lausanne,0,6386.0,2184.0,12,Mountain
+156,Lausanne,1,6407.0,2181.0,12,Mountain
+156,Lausanne,2,6417.0,2222.0,12,Mountain
+156,Lausanne,3,6419.0,2208.0,12,Mountain
+156,Lausanne,4,6427.0,2193.0,12,Mountain
+156,Lausanne,5,6431.0,2206.0,12,Mountain
+156,Lausanne,6,6439.0,2204.0,12,Mountain
+156,Lausanne,7,6439.0,2222.0,12,Mountain
+156,Lausanne,8,6445.0,2194.0,12,Mountain
+156,Lausanne,9,6454.0,2183.0,12,Mountain
+166,Graz,0,6817.0,2152.0,12,Mountain
+166,Graz,1,6820.0,2169.0,12,Mountain
+166,Graz,2,6822.0,2135.0,12,Mountain
+166,Graz,3,6831.0,2146.0,12,Mountain
+166,Graz,4,6832.0,2158.0,12,Mountain
+166,Graz,5,6839.0,2131.0,12,Mountain
+166,Graz,6,6843.0,2163.0,12,Mountain
+166,Graz,7,6852.0,2155.0,12,Mountain
+166,Graz,8,6853.0,2142.0,12,Mountain
+166,Graz,9,6863.0,2139.0,12,Mountain
+166,Graz,10,6866.0,2121.0,12,Mountain
+166,Graz,11,6872.0,2158.0,12,Mountain
+166,Graz,12,6875.0,2120.0,12,Mountain
+166,Graz,13,6877.0,2150.0,12,Mountain
+166,Graz,14,6883.0,2128.0,12,Mountain
+166,Graz,15,6886.0,2114.0,12,Mountain
+167,Salzburg,0,6726.0,2147.0,12,Mountain
+167,Salzburg,1,6749.0,2152.0,12,Mountain
+167,Salzburg,2,6752.0,2140.0,12,Mountain
+167,Salzburg,3,6756.0,2128.0,12,Mountain
+167,Salzburg,4,6763.0,2154.0,12,Mountain
+167,Salzburg,5,6767.0,2133.0,12,Mountain
+167,Salzburg,6,6770.0,2116.0,12,Mountain
+167,Salzburg,7,6774.0,2083.0,12,Mountain
+167,Salzburg,8,6775.0,2160.0,12,Mountain
+167,Salzburg,9,6778.0,2131.0,12,Mountain
+167,Salzburg,10,6781.0,2101.0,12,Mountain
+167,Salzburg,11,6788.0,2150.0,12,Mountain
+167,Salzburg,12,6790.0,2130.0,12,Mountain
+168,Innsbruck,0,6564.0,2150.0,12,Mountain
+168,Innsbruck,1,6583.0,2153.0,12,Mountain
+168,Innsbruck,2,6598.0,2165.0,12,Mountain
+168,Innsbruck,3,6612.0,2150.0,12,Mountain
+168,Innsbruck,4,6616.0,2174.0,12,Mountain
+168,Innsbruck,5,6623.0,2161.0,12,Mountain
+168,Innsbruck,6,6628.0,2150.0,12,Mountain
+168,Innsbruck,7,6633.0,2174.0,12,Mountain
+168,Innsbruck,8,6640.0,2150.0,12,Mountain
+168,Innsbruck,9,6648.0,2170.0,12,Mountain
+168,Innsbruck,10,6661.0,2170.0,12,Mountain
+168,Innsbruck,11,6666.0,2158.0,12,Mountain
+168,Innsbruck,12,6674.0,2147.0,12,Mountain
+168,Innsbruck,13,6682.0,2165.0,12,Mountain
+168,Innsbruck,14,6682.0,2181.0,12,Mountain
+168,Innsbruck,15,6692.0,2148.0,12,Mountain
+168,Innsbruck,16,6693.0,2182.0,12,Mountain
+168,Innsbruck,17,6698.0,2160.0,12,Mountain
+168,Innsbruck,18,6713.0,2172.0,12,Mountain
+168,Innsbruck,19,6732.0,2175.0,12,Mountain
+168,Innsbruck,20,6792.0,2184.0,12,Mountain
+174,Žilina,0,7002.0,1989.0,12,Mountain
+174,Žilina,1,7014.0,1999.0,12,Mountain
+174,Žilina,2,7025.0,1990.0,12,Mountain
+174,Žilina,3,7030.0,2001.0,12,Mountain
+174,Žilina,4,7042.0,2001.0,12,Mountain
+174,Žilina,5,7059.0,1998.0,12,Mountain
+174,Žilina,6,7083.0,1996.0,12,Mountain
+175,Košice,0,7120.0,2009.0,12,Mountain
+175,Košice,1,7124.0,1991.0,12,Mountain
+175,Košice,2,7138.0,1983.0,12,Mountain
+175,Košice,3,7142.0,2010.0,12,Mountain
+175,Košice,4,7146.0,1995.0,12,Mountain
+175,Košice,5,7161.0,2000.0,12,Mountain
+175,Košice,6,7180.0,2005.0,12,Mountain
+175,Košice,7,7191.0,2000.0,12,Mountain
+176,Mukačevo,0,7221.0,2014.0,12,Mountain
+176,Mukačevo,1,7224.0,2024.0,12,Mountain
+176,Mukačevo,2,7238.0,2018.0,12,Mountain
+176,Mukačevo,3,7251.0,2024.0,12,Mountain
+176,Mukačevo,4,7256.0,2015.0,12,Mountain
+176,Mukačevo,5,7271.0,2027.0,12,Mountain
+176,Mukačevo,6,7285.0,2021.0,12,Mountain
+201,Reykjavík,0,5324.0,997.0,14,Urban
+201,Reykjavík,1,5345.0,1002.0,14,Urban
+201,Reykjavík,2,5356.0,1017.0,14,Urban
+202,Akureyri,0,5267.0,947.0,12,Mountain
+202,Akureyri,1,5278.0,950.0,12,Mountain
+202,Akureyri,2,5290.0,954.0,12,Mountain
+202,Akureyri,3,5310.0,942.0,12,Mountain
+202,Akureyri,4,5330.0,983.0,12,Mountain
+202,Akureyri,5,5340.0,988.0,12,Mountain
+202,Akureyri,6,5349.0,980.0,12,Mountain
+202,Akureyri,7,5361.0,992.0,12,Mountain
+202,Akureyri,8,5370.0,982.0,12,Mountain
+202,Akureyri,9,5375.0,999.0,12,Mountain
+202,Akureyri,10,5377.0,964.0,12,Mountain
+202,Akureyri,11,5386.0,982.0,12,Mountain
+202,Akureyri,12,5386.0,1010.0,12,Mountain
+202,Akureyri,13,5392.0,1019.0,12,Mountain
+202,Akureyri,14,5401.0,1007.0,12,Mountain
+202,Akureyri,15,5407.0,974.0,12,Mountain
+202,Akureyri,16,5413.0,1014.0,12,Mountain
+202,Akureyri,17,5416.0,984.0,12,Mountain
+202,Akureyri,18,5434.0,965.0,12,Mountain
+202,Akureyri,19,5434.0,977.0,12,Mountain
+202,Akureyri,20,5446.0,970.0,12,Mountain
+202,Akureyri,21,5446.0,1019.0,12,Mountain
+202,Akureyri,22,5446.0,1029.0,12,Mountain
+202,Akureyri,23,5449.0,954.0,12,Mountain
+202,Akureyri,24,5451.0,1006.0,12,Mountain
+202,Akureyri,25,5457.0,1032.0,12,Mountain
+202,Akureyri,26,5459.0,1005.0,12,Mountain
+202,Akureyri,27,5464.0,961.0,12,Mountain
+202,Akureyri,28,5464.0,1021.0,12,Mountain
+202,Akureyri,29,5468.0,1012.0,12,Mountain
+202,Akureyri,30,5472.0,1027.0,12,Mountain
+202,Akureyri,31,5476.0,1007.0,12,Mountain
+202,Akureyri,32,5477.0,1014.0,12,Mountain
+202,Akureyri,33,5480.0,963.0,12,Mountain
+202,Akureyri,34,5496.0,968.0,12,Mountain
+202,Akureyri,35,5498.0,951.0,12,Mountain
+202,Akureyri,36,5501.0,938.0,12,Mountain
+202,Akureyri,37,5507.0,954.0,12,Mountain
+202,Akureyri,38,5511.0,937.0,12,Mountain
+211,Safford,0,1860.0,2481.0,12,Mountain
+211,Safford,1,1883.0,2486.0,12,Mountain
+211,Safford,2,1909.0,2490.0,12,Mountain
+211,Safford,3,1914.0,2506.0,12,Mountain
+211,Safford,4,1936.0,2506.0,12,Mountain
+211,Safford,5,1941.0,2521.0,12,Mountain
+212,Prescott,0,1711.0,2390.0,12,Mountain
+212,Prescott,1,1736.0,2390.0,12,Mountain
+212,Prescott,2,1762.0,2408.0,12,Mountain
+212,Prescott,3,1771.0,2377.0,12,Mountain
+212,Prescott,4,1781.0,2424.0,12,Mountain
+212,Prescott,5,1788.0,2397.0,12,Mountain
+212,Prescott,6,1809.0,2391.0,12,Mountain
+212,Prescott,7,1809.0,2422.0,12,Mountain
+220,Missoula,0,1652.0,1482.0,12,Mountain
+220,Missoula,1,1653.0,1512.0,12,Mountain
+220,Missoula,2,1676.0,1544.0,12,Mountain
+220,Missoula,3,1683.0,1487.0,12,Mountain
+220,Missoula,4,1691.0,1530.0,12,Mountain
+220,Missoula,5,1698.0,1496.0,12,Mountain
+220,Missoula,6,1705.0,1585.0,12,Mountain
+220,Missoula,7,1722.0,1470.0,12,Mountain
+220,Missoula,8,1737.0,1515.0,12,Mountain
+220,Missoula,9,1738.0,1577.0,12,Mountain
+220,Missoula,10,1740.0,1482.0,12,Mountain
+220,Missoula,11,1752.0,1548.0,12,Mountain
+220,Missoula,12,1760.0,1526.0,12,Mountain
+221,Bozeman,0,1863.0,1667.0,12,Mountain
+221,Bozeman,1,1874.0,1640.0,12,Mountain
+221,Bozeman,2,1879.0,1711.0,12,Mountain
+221,Bozeman,3,1888.0,1672.0,12,Mountain
+221,Bozeman,4,1926.0,1694.0,12,Mountain
+221,Bozeman,5,1928.0,1644.0,12,Mountain
+221,Bozeman,6,1930.0,1716.0,12,Mountain
+221,Bozeman,7,1998.0,1713.0,12,Mountain
+222,Helena,0,1728.0,1658.0,12,Mountain
+222,Helena,1,1746.0,1622.0,12,Mountain
+222,Helena,2,1752.0,1676.0,12,Mountain
+222,Helena,3,1761.0,1651.0,12,Mountain
+222,Helena,4,1764.0,1714.0,12,Mountain
+222,Helena,5,1771.0,1729.0,12,Mountain
+222,Helena,6,1778.0,1584.0,12,Mountain
+222,Helena,7,1780.0,1703.0,12,Mountain
+222,Helena,8,1786.0,1668.0,12,Mountain
+222,Helena,9,1797.0,1617.0,12,Mountain
+222,Helena,10,1811.0,1697.0,12,Mountain
+222,Helena,11,1819.0,1640.0,12,Mountain
+241,Inverness,0,5742.0,1233.0,12,Mountain
+241,Inverness,1,5789.0,1295.0,12,Mountain
+241,Inverness,2,5812.0,1310.0,12,Mountain
+241,Inverness,3,5814.0,1289.0,12,Mountain
+241,Inverness,4,5820.0,1346.0,12,Mountain
+241,Inverness,5,5832.0,1319.0,12,Mountain
+241,Inverness,6,5836.0,1360.0,12,Mountain
+241,Inverness,7,5839.0,1298.0,12,Mountain
+241,Inverness,8,5839.0,1337.0,12,Mountain
+241,Inverness,9,5853.0,1305.0,12,Mountain
+241,Inverness,10,5862.0,1275.0,12,Mountain
+241,Inverness,11,5873.0,1305.0,12,Mountain
+241,Inverness,12,5890.0,1285.0,12,Mountain
+241,Inverness,13,5908.0,1285.0,12,Mountain
+242,Thurso,0,5790.0,1211.0,12,Mountain
+242,Thurso,1,5813.0,1258.0,12,Mountain
+242,Thurso,2,5814.0,1216.0,12,Mountain
+242,Thurso,3,5815.0,1242.0,12,Mountain
+242,Thurso,4,5819.0,1182.0,12,Mountain
+242,Thurso,5,5821.0,1200.0,12,Mountain
+242,Thurso,6,5823.0,1159.0,12,Mountain
+242,Thurso,7,5824.0,1138.0,12,Mountain
+242,Thurso,8,5824.0,1223.0,12,Mountain
+242,Thurso,9,5835.0,1169.0,12,Mountain
+242,Thurso,10,5836.0,1188.0,12,Mountain
+242,Thurso,11,5838.0,1152.0,12,Mountain
+242,Thurso,12,5838.0,1223.0,12,Mountain
+242,Thurso,13,5844.0,1200.0,12,Mountain
+242,Thurso,14,5854.0,1157.0,12,Mountain
+242,Thurso,15,5862.0,1170.0,12,Mountain
+242,Thurso,16,5874.0,1155.0,12,Mountain
+242,Thurso,17,5885.0,1148.0,12,Mountain
+244,Turin,0,6409.0,2288.0,12,Mountain
+244,Turin,1,6413.0,2267.0,12,Mountain
+244,Turin,2,6415.0,2321.0,12,Mountain
+244,Turin,3,6423.0,2306.0,12,Mountain
+244,Turin,4,6430.0,2278.0,12,Mountain
+244,Turin,5,6433.0,2255.0,12,Mountain
+244,Turin,6,6439.0,2328.0,12,Mountain
+244,Turin,7,6443.0,2295.0,12,Mountain
+244,Turin,8,6446.0,2272.0,12,Mountain
+244,Turin,9,6459.0,2265.0,12,Mountain
+244,Turin,10,6459.0,2282.0,12,Mountain
+244,Turin,11,6461.0,2313.0,12,Mountain
+244,Turin,12,6472.0,2240.0,12,Mountain
+273,Ajaccio,0,6509.0,2512.0,12,Mountain
+273,Ajaccio,1,6512.0,2487.0,12,Mountain
+291,Saint Étienne,0,6237.0,2220.0,12,Mountain
+291,Saint Étienne,1,6249.0,2239.0,12,Mountain
+291,Saint Étienne,2,6252.0,2224.0,12,Mountain
+291,Saint Étienne,3,6266.0,2264.0,12,Mountain
+291,Saint Étienne,4,6274.0,2277.0,12,Mountain
+291,Saint Étienne,5,6278.0,2254.0,12,Mountain
+291,Saint Étienne,6,6296.0,2283.0,12,Mountain
+291,Saint Étienne,7,6297.0,2265.0,12,Mountain
+291,Saint Étienne,8,6307.0,2275.0,12,Mountain
+291,Saint Étienne,9,6328.0,2256.0,12,Mountain
+291,Saint Étienne,10,6338.0,2270.0,12,Mountain
+291,Saint Étienne,11,6350.0,2251.0,12,Mountain
+291,Saint Étienne,12,6356.0,2267.0,12,Mountain
+291,Saint Étienne,13,6361.0,2253.0,12,Mountain
+291,Saint Étienne,14,6365.0,2281.0,12,Mountain
+291,Saint Étienne,15,6374.0,2270.0,12,Mountain
+291,Saint Étienne,16,6377.0,2243.0,12,Mountain
+291,Saint Étienne,17,6381.0,2229.0,12,Mountain
+291,Saint Étienne,18,6382.0,2258.0,12,Mountain
+293,Grenoble,0,6336.0,2304.0,12,Mountain
+293,Grenoble,1,6336.0,2329.0,12,Mountain
+293,Grenoble,2,6343.0,2350.0,12,Mountain
+293,Grenoble,3,6350.0,2374.0,12,Mountain
+293,Grenoble,4,6357.0,2336.0,12,Mountain
+293,Grenoble,5,6369.0,2409.0,12,Mountain
+293,Grenoble,6,6371.0,2380.0,12,Mountain
+293,Grenoble,7,6376.0,2320.0,12,Mountain
+293,Grenoble,8,6378.0,2348.0,12,Mountain
+299,Lugo,0,5625.0,2299.0,12,Mountain
+299,Lugo,1,5666.0,2312.0,12,Mountain
+299,Lugo,2,5701.0,2328.0,12,Mountain
+299,Lugo,3,5725.0,2321.0,12,Mountain
+302,Pamplona,0,5904.0,2385.0,12,Mountain
+302,Pamplona,1,5915.0,2432.0,12,Mountain
+302,Pamplona,2,5930.0,2374.0,12,Mountain
+302,Pamplona,3,5944.0,2460.0,12,Mountain
+302,Pamplona,4,5951.0,2389.0,12,Mountain
+302,Pamplona,5,5956.0,2434.0,12,Mountain
+302,Pamplona,6,5957.0,2401.0,12,Mountain
+302,Pamplona,7,5973.0,2398.0,12,Mountain
+302,Pamplona,8,5980.0,2415.0,12,Mountain
+304,Lleida,0,6026.0,2428.0,12,Mountain
+304,Lleida,1,6037.0,2468.0,12,Mountain
+304,Lleida,2,6054.0,2491.0,12,Mountain
+304,Lleida,3,6057.0,2443.0,12,Mountain
+304,Lleida,4,6075.0,2444.0,12,Mountain
+304,Lleida,5,6086.0,2492.0,12,Mountain
+304,Lleida,6,6115.0,2459.0,12,Mountain
+304,Lleida,7,6121.0,2492.0,12,Mountain
+304,Lleida,8,6138.0,2478.0,12,Mountain
+304,Lleida,9,6167.0,2488.0,12,Mountain
+313,Granada,0,5776.0,2791.0,12,Mountain
+313,Granada,1,5800.0,2785.0,12,Mountain
+313,Granada,2,5823.0,2800.0,12,Mountain
+344,Deva,0,7204.0,2177.0,12,Mountain
+344,Deva,1,7218.0,2174.0,12,Mountain
+344,Deva,2,7219.0,2190.0,12,Mountain
+344,Deva,3,7232.0,2188.0,12,Mountain
+344,Deva,4,7241.0,2204.0,12,Mountain
+344,Deva,5,7248.0,2175.0,12,Mountain
+344,Deva,6,7255.0,2213.0,12,Mountain
+344,Deva,7,7261.0,2191.0,12,Mountain
+344,Deva,8,7267.0,2181.0,12,Mountain
+344,Deva,9,7270.0,2204.0,12,Mountain
+344,Deva,10,7274.0,2223.0,12,Mountain
+344,Deva,11,7284.0,2190.0,12,Mountain
+346,Reșița,0,7181.0,2221.0,12,Mountain
+346,Reșița,1,7192.0,2237.0,12,Mountain
+346,Reșița,2,7199.0,2216.0,12,Mountain
+346,Reșița,3,7211.0,2262.0,12,Mountain
+346,Reșița,4,7212.0,2240.0,12,Mountain
+346,Reșița,5,7219.0,2216.0,12,Mountain
+346,Reșița,6,7222.0,2228.0,12,Mountain
+348,Satu Mare,0,7226.0,2064.0,12,Mountain
+348,Satu Mare,1,7242.0,2074.0,12,Mountain
+348,Satu Mare,2,7246.0,2084.0,12,Mountain
+348,Satu Mare,3,7261.0,2076.0,12,Mountain
+348,Satu Mare,4,7276.0,2066.0,12,Mountain
+348,Satu Mare,5,7297.0,2068.0,12,Mountain
+348,Satu Mare,6,7304.0,2084.0,12,Mountain
+348,Satu Mare,7,7313.0,2070.0,12,Mountain
+349,Zalău,0,7248.0,2122.0,12,Mountain
+349,Zalău,1,7263.0,2123.0,12,Mountain
+349,Zalău,2,7264.0,2144.0,12,Mountain
+349,Zalău,3,7269.0,2131.0,12,Mountain
+349,Zalău,4,7280.0,2114.0,12,Mountain
+349,Zalău,5,7285.0,2137.0,12,Mountain
+349,Zalău,6,7285.0,2149.0,12,Mountain
+349,Zalău,7,7290.0,2123.0,12,Mountain
+349,Zalău,8,7303.0,2151.0,12,Mountain
+349,Zalău,9,7305.0,2128.0,12,Mountain
+349,Zalău,10,7316.0,2150.0,12,Mountain
+353,Târgu-Mureș,0,7325.0,2108.0,12,Mountain
+353,Târgu-Mureș,1,7339.0,2112.0,12,Mountain
+353,Târgu-Mureș,2,7343.0,2129.0,12,Mountain
+353,Târgu-Mureș,3,7353.0,2136.0,12,Mountain
+353,Târgu-Mureș,4,7366.0,2100.0,12,Mountain
+353,Târgu-Mureș,5,7366.0,2115.0,12,Mountain
+353,Târgu-Mureș,6,7381.0,2112.0,12,Mountain
+359,Mostar,0,6982.0,2428.0,12,Mountain
+359,Mostar,1,6994.0,2430.0,12,Mountain
+359,Mostar,2,6995.0,2414.0,12,Mountain
+359,Mostar,3,7012.0,2432.0,12,Mountain
+359,Mostar,4,7023.0,2447.0,12,Mountain
+359,Mostar,5,7032.0,2439.0,12,Mountain
+369,Ljubljana,0,6789.0,2225.0,12,Mountain
+369,Ljubljana,1,6794.0,2209.0,12,Mountain
+369,Ljubljana,2,6794.0,2244.0,12,Mountain
+369,Ljubljana,3,6803.0,2217.0,12,Mountain
+369,Ljubljana,4,6810.0,2252.0,12,Mountain
+369,Ljubljana,5,6811.0,2231.0,12,Mountain
+369,Ljubljana,6,6822.0,2232.0,12,Mountain
+369,Ljubljana,7,6824.0,2215.0,12,Mountain
+369,Ljubljana,8,6836.0,2229.0,12,Mountain
+369,Ljubljana,9,6836.0,2249.0,12,Mountain
+372,Negotin,0,7210.0,2298.0,12,Mountain
+372,Negotin,1,7210.0,2319.0,12,Mountain
+372,Negotin,2,7218.0,2349.0,12,Mountain
+372,Negotin,3,7221.0,2304.0,12,Mountain
+372,Negotin,4,7222.0,2332.0,12,Mountain
+372,Negotin,5,7234.0,2295.0,12,Mountain
+372,Negotin,6,7236.0,2312.0,12,Mountain
+372,Negotin,7,7236.0,2344.0,12,Mountain
+372,Negotin,8,7242.0,2359.0,12,Mountain
+372,Negotin,9,7252.0,2316.0,12,Mountain
+377,Podgorica,0,7059.0,2473.0,12,Mountain
+377,Podgorica,1,7064.0,2451.0,12,Mountain
+377,Podgorica,2,7072.0,2484.0,12,Mountain
+377,Podgorica,3,7073.0,2462.0,12,Mountain
+377,Podgorica,4,7081.0,2469.0,12,Mountain
+380,Vratsa,0,7272.0,2375.0,12,Mountain
+380,Vratsa,1,7278.0,2355.0,12,Mountain
+380,Vratsa,2,7281.0,2326.0,12,Mountain
+380,Vratsa,3,7289.0,2370.0,12,Mountain
+380,Vratsa,4,7295.0,2336.0,12,Mountain
+380,Vratsa,5,7299.0,2360.0,12,Mountain
+380,Vratsa,6,7304.0,2317.0,12,Mountain
+380,Vratsa,7,7305.0,2377.0,12,Mountain
+380,Vratsa,8,7310.0,2333.0,12,Mountain
+380,Vratsa,9,7315.0,2357.0,12,Mountain
+380,Vratsa,10,7321.0,2324.0,12,Mountain
+383,Pleven,0,7348.0,2353.0,12,Mountain
+383,Pleven,1,7355.0,2339.0,12,Mountain
+383,Pleven,2,7362.0,2315.0,12,Mountain
+383,Pleven,3,7369.0,2341.0,12,Mountain
+383,Pleven,4,7371.0,2320.0,12,Mountain
+383,Pleven,5,7385.0,2326.0,12,Mountain
+383,Pleven,6,7393.0,2315.0,12,Mountain
+391,Ioannina,0,7149.0,2646.0,12,Mountain
+391,Ioannina,1,7151.0,2633.0,12,Mountain
+391,Ioannina,2,7162.0,2624.0,12,Mountain
+391,Ioannina,3,7164.0,2635.0,12,Mountain
+392,Xanthi,0,7323.0,2531.0,12,Mountain
+392,Xanthi,1,7324.0,2517.0,12,Mountain
+392,Xanthi,2,7335.0,2519.0,12,Mountain
+392,Xanthi,3,7348.0,2510.0,12,Mountain
+392,Xanthi,4,7348.0,2521.0,12,Mountain
+392,Xanthi,5,7360.0,2522.0,12,Mountain
+392,Xanthi,6,7368.0,2504.0,12,Mountain
+394,Serres,0,7266.0,2556.0,12,Mountain
+394,Serres,1,7281.0,2548.0,12,Mountain
+394,Serres,2,7282.0,2525.0,12,Mountain
+394,Serres,3,7286.0,2534.0,12,Mountain
+394,Serres,4,7292.0,2525.0,12,Mountain
+415,Kars,0,7968.0,2363.0,12,Mountain
+415,Kars,1,7988.0,2368.0,12,Mountain
+415,Kars,2,8002.0,2347.0,12,Mountain
+415,Kars,3,8015.0,2374.0,12,Mountain
+415,Kars,4,8035.0,2357.0,12,Mountain
+415,Kars,5,8049.0,2391.0,12,Mountain
+415,Kars,6,8060.0,2348.0,12,Mountain
+415,Kars,7,8063.0,2379.0,12,Mountain
+415,Kars,8,8074.0,2405.0,12,Mountain
+415,Kars,9,8088.0,2370.0,12,Mountain
+415,Kars,10,8095.0,2392.0,12,Mountain
+415,Kars,11,8111.0,2388.0,12,Mountain
+415,Kars,12,8112.0,2356.0,12,Mountain
+415,Kars,13,8117.0,2371.0,12,Mountain
+415,Kars,14,8129.0,2393.0,12,Mountain
+418,Erzurum,0,7905.0,2383.0,12,Mountain
+418,Erzurum,1,7916.0,2400.0,12,Mountain
+418,Erzurum,2,7938.0,2413.0,12,Mountain
+418,Erzurum,3,7962.0,2405.0,12,Mountain
+418,Erzurum,4,7987.0,2408.0,12,Mountain
+418,Erzurum,5,7987.0,2427.0,12,Mountain
+418,Erzurum,6,8006.0,2451.0,12,Mountain
+418,Erzurum,7,8013.0,2437.0,12,Mountain
+418,Erzurum,8,8032.0,2447.0,12,Mountain
+425,Malatya,0,7839.0,2479.0,12,Mountain
+425,Malatya,1,7864.0,2502.0,12,Mountain
+425,Malatya,2,7877.0,2468.0,12,Mountain
+425,Malatya,3,7897.0,2497.0,12,Mountain
+425,Malatya,4,7925.0,2483.0,12,Mountain
+425,Malatya,5,7930.0,2450.0,12,Mountain
+425,Malatya,6,7946.0,2489.0,12,Mountain
+442,Idaho Falls,0,1820.0,1804.0,12,Mountain
+442,Idaho Falls,1,1841.0,1822.0,12,Mountain
+442,Idaho Falls,2,1845.0,1845.0,12,Mountain
+443,Pocatello,0,1813.0,1911.0,12,Mountain
+443,Pocatello,1,1817.0,1881.0,12,Mountain
+443,Pocatello,2,1837.0,1906.0,12,Mountain
+443,Pocatello,3,1843.0,1919.0,12,Mountain
+448,Bend,0,1312.0,1896.0,12,Mountain
+448,Bend,1,1335.0,1872.0,12,Mountain
+448,Bend,2,1410.0,1758.0,12,Mountain
+448,Bend,3,1427.0,1800.0,12,Mountain
+448,Bend,4,1432.0,1819.0,12,Mountain
+448,Bend,5,1436.0,1726.0,12,Mountain
+448,Bend,6,1444.0,1767.0,12,Mountain
+448,Bend,7,1453.0,1746.0,12,Mountain
+449,Eugene,0,1237.0,1895.0,13,Forest
+449,Eugene,1,1247.0,1869.0,13,Forest
+449,Eugene,2,1249.0,1917.0,13,Forest
+449,Eugene,3,1278.0,1889.0,13,Forest
+454,Klamath Falls,0,1328.0,1916.0,10,Plains
+454,Klamath Falls,1,1344.0,1900.0,10,Plains
+455,Yakima,0,1401.0,1579.0,12,Mountain
+455,Yakima,1,1420.0,1617.0,12,Mountain
+455,Yakima,2,1428.0,1656.0,12,Mountain
+455,Yakima,3,1436.0,1591.0,12,Mountain
+455,Yakima,4,1442.0,1571.0,12,Mountain
+456,Everett,0,1349.0,1484.0,12,Mountain
+456,Everett,1,1379.0,1524.0,12,Mountain
+456,Everett,2,1380.0,1484.0,12,Mountain
+456,Everett,3,1404.0,1480.0,12,Mountain
+456,Everett,4,1421.0,1515.0,12,Mountain
+489,Bakersfield,0,1414.0,2380.0,12,Mountain
+489,Bakersfield,1,1422.0,2391.0,12,Mountain
+489,Bakersfield,2,1438.0,2368.0,12,Mountain
+489,Bakersfield,3,1449.0,2387.0,12,Mountain
+489,Bakersfield,4,1458.0,2363.0,12,Mountain
+489,Bakersfield,5,1468.0,2384.0,12,Mountain
+489,Bakersfield,6,1477.0,2367.0,12,Mountain
+489,Bakersfield,7,1484.0,2381.0,12,Mountain
+497,Reno,0,1458.0,2119.0,14,Urban
+497,Reno,1,1461.0,2096.0,14,Urban
+497,Reno,2,1465.0,2105.0,14,Urban
+497,Reno,3,1466.0,2134.0,14,Urban
+497,Reno,4,1470.0,2112.0,14,Urban
+497,Reno,5,1476.0,2125.0,14,Urban
+497,Reno,6,1484.0,2131.0,14,Urban
+498,Eureka,0,1234.0,1965.0,12,Mountain
+498,Eureka,1,1237.0,1989.0,12,Mountain
+498,Eureka,2,1237.0,2015.0,12,Mountain
+498,Eureka,3,1238.0,2043.0,12,Mountain
+498,Eureka,4,1246.0,2068.0,12,Mountain
+498,Eureka,5,1268.0,2075.0,12,Mountain
+498,Eureka,6,1270.0,1974.0,12,Mountain
+498,Eureka,7,1273.0,2010.0,12,Mountain
+498,Eureka,8,1276.0,1993.0,12,Mountain
+498,Eureka,9,1278.0,2038.0,12,Mountain
+498,Eureka,10,1293.0,2029.0,12,Mountain
+499,Salinas,0,1342.0,2287.0,12,Mountain
+499,Salinas,1,1354.0,2293.0,12,Mountain
+499,Salinas,2,1364.0,2272.0,12,Mountain
+499,Salinas,3,1371.0,2301.0,12,Mountain
+499,Salinas,4,1385.0,2292.0,12,Mountain
+500,Redding,0,1323.0,1969.0,12,Mountain
+500,Redding,1,1330.0,2014.0,12,Mountain
+500,Redding,2,1331.0,2041.0,12,Mountain
+500,Redding,3,1334.0,1983.0,12,Mountain
+500,Redding,4,1352.0,2027.0,12,Mountain
+500,Redding,5,1354.0,1996.0,12,Mountain
+500,Redding,6,1366.0,2054.0,12,Mountain
+500,Redding,7,1369.0,2018.0,12,Mountain
+500,Redding,8,1378.0,2070.0,12,Mountain
+500,Redding,9,1389.0,2038.0,12,Mountain
+500,Redding,10,1414.0,2042.0,12,Mountain
+500,Redding,11,1421.0,2050.0,12,Mountain
+501,Santa Rosa (CA),0,1259.0,2100.0,12,Mountain
+501,Santa Rosa (CA),1,1260.0,2117.0,12,Mountain
+501,Santa Rosa (CA),2,1267.0,2152.0,12,Mountain
+501,Santa Rosa (CA),3,1272.0,2110.0,12,Mountain
+501,Santa Rosa (CA),4,1277.0,2128.0,12,Mountain
+501,Santa Rosa (CA),5,1288.0,2103.0,12,Mountain
+501,Santa Rosa (CA),6,1294.0,2148.0,12,Mountain
+501,Santa Rosa (CA),7,1295.0,2130.0,12,Mountain
+501,Santa Rosa (CA),8,1300.0,2161.0,12,Mountain
+504,Fresno,0,1388.0,2330.0,12,Mountain
+504,Fresno,1,1400.0,2326.0,12,Mountain
+504,Fresno,2,1406.0,2347.0,12,Mountain
+504,Fresno,3,1420.0,2336.0,12,Mountain
+504,Fresno,4,1436.0,2324.0,12,Mountain
+504,Fresno,5,1448.0,2329.0,12,Mountain
+504,Fresno,6,1474.0,2329.0,12,Mountain
+505,Tonopah,0,1541.0,2262.0,12,Mountain
+505,Tonopah,1,1546.0,2226.0,12,Mountain
+505,Tonopah,2,1547.0,2248.0,12,Mountain
+505,Tonopah,3,1553.0,2266.0,12,Mountain
+505,Tonopah,4,1564.0,2236.0,12,Mountain
+505,Tonopah,5,1566.0,2261.0,12,Mountain
+505,Tonopah,6,1568.0,2275.0,12,Mountain
+506,Austin (NV),0,1490.0,2104.0,11,Hills
+506,Austin (NV),1,1496.0,2134.0,11,Hills
+507,Olancha,0,1507.0,2342.0,12,Mountain
+507,Olancha,1,1510.0,2322.0,12,Mountain
+507,Olancha,2,1524.0,2331.0,12,Mountain
+507,Olancha,3,1526.0,2310.0,12,Mountain
+507,Olancha,4,1539.0,2304.0,12,Mountain
+507,Olancha,5,1548.0,2313.0,12,Mountain
+507,Olancha,6,1553.0,2300.0,12,Mountain
+508,Bishop,0,1481.0,2147.0,10,Plains
+508,Bishop,1,1500.0,2144.0,10,Plains
+512,Ogden,0,1747.0,1993.0,12,Mountain
+512,Ogden,1,1751.0,2032.0,12,Mountain
+512,Ogden,2,1761.0,1969.0,12,Mountain
+512,Ogden,3,1796.0,1996.0,12,Mountain
+512,Ogden,4,1811.0,1971.0,12,Mountain
+512,Ogden,5,1844.0,1965.0,12,Mountain
+517,Vernal,0,1887.0,2046.0,12,Mountain
+517,Vernal,1,1904.0,2007.0,12,Mountain
+517,Vernal,2,1920.0,2059.0,12,Mountain
+517,Vernal,3,1933.0,2026.0,12,Mountain
+517,Vernal,4,1959.0,2030.0,12,Mountain
+517,Vernal,5,1964.0,2060.0,12,Mountain
+517,Vernal,6,1997.0,1997.0,12,Mountain
+522,Jackson (WY),0,1895.0,1804.0,12,Mountain
+522,Jackson (WY),1,1895.0,1822.0,12,Mountain
+522,Jackson (WY),2,1896.0,1772.0,12,Mountain
+522,Jackson (WY),3,1920.0,1843.0,12,Mountain
+522,Jackson (WY),4,1925.0,1799.0,12,Mountain
+522,Jackson (WY),5,1939.0,1773.0,12,Mountain
+522,Jackson (WY),6,1955.0,1819.0,12,Mountain
+527,Colorado Springs,0,2161.0,2166.0,12,Mountain
+527,Colorado Springs,1,2182.0,2159.0,12,Mountain
+527,Colorado Springs,2,2184.0,2141.0,12,Mountain
+527,Colorado Springs,3,2201.0,2175.0,12,Mountain
+527,Colorado Springs,4,2202.0,2153.0,12,Mountain
+528,Pueblo,0,2152.0,2253.0,12,Mountain
+528,Pueblo,1,2153.0,2220.0,12,Mountain
+528,Pueblo,2,2178.0,2237.0,12,Mountain
+528,Pueblo,3,2194.0,2215.0,12,Mountain
+528,Pueblo,4,2198.0,2250.0,12,Mountain
+528,Pueblo,5,2203.0,2226.0,12,Mountain
+534,Aspen,0,2048.0,2138.0,12,Mountain
+534,Aspen,1,2050.0,2152.0,12,Mountain
+534,Aspen,2,2054.0,2122.0,12,Mountain
+534,Aspen,3,2072.0,2142.0,12,Mountain
+534,Aspen,4,2089.0,2138.0,12,Mountain
+534,Aspen,5,2092.0,2168.0,12,Mountain
+534,Aspen,6,2105.0,2156.0,12,Mountain
+534,Aspen,7,2108.0,2179.0,12,Mountain
+534,Aspen,8,2122.0,2122.0,12,Mountain
+597,El Paso,0,1991.0,2559.0,12,Mountain
+597,El Paso,1,2000.0,2537.0,12,Mountain
+597,El Paso,2,2021.0,2553.0,12,Mountain
+597,El Paso,3,2039.0,2551.0,12,Mountain
+597,El Paso,4,2059.0,2552.0,12,Mountain
+597,El Paso,5,2084.0,2556.0,12,Mountain
+621,Blacksburg,0,3406.0,2227.0,12,Mountain
+621,Blacksburg,1,3412.0,2198.0,12,Mountain
+621,Blacksburg,2,3419.0,2216.0,12,Mountain
+621,Blacksburg,3,3420.0,2176.0,12,Mountain
+624,Asheville,0,3261.0,2374.0,12,Mountain
+624,Asheville,1,3273.0,2373.0,12,Mountain
+624,Asheville,2,3285.0,2366.0,12,Mountain
+630,Hickory,0,3331.0,2354.0,12,Mountain
+630,Hickory,1,3347.0,2352.0,12,Mountain
+630,Hickory,2,3356.0,2341.0,12,Mountain
+630,Hickory,3,3372.0,2323.0,12,Mountain
+635,Van Horn,0,2107.0,2566.0,12,Mountain
+635,Van Horn,1,2146.0,2621.0,12,Mountain
+635,Van Horn,2,2148.0,2596.0,12,Mountain
+635,Van Horn,3,2157.0,2639.0,12,Mountain
+635,Van Horn,4,2169.0,2602.0,12,Mountain
+635,Van Horn,5,2174.0,2623.0,12,Mountain
+635,Van Horn,6,2184.0,2643.0,12,Mountain
+639,Santa Fe,0,2113.0,2342.0,12,Mountain
+639,Santa Fe,1,2124.0,2326.0,12,Mountain
+639,Santa Fe,2,2130.0,2385.0,12,Mountain
+639,Santa Fe,3,2133.0,2303.0,12,Mountain
+639,Santa Fe,4,2143.0,2369.0,12,Mountain
+639,Santa Fe,5,2155.0,2344.0,12,Mountain
+639,Santa Fe,6,2158.0,2295.0,12,Mountain
+639,Santa Fe,7,2158.0,2323.0,12,Mountain
+639,Santa Fe,8,2180.0,2300.0,12,Mountain
+640,Farmington (NM),0,2096.0,2318.0,11,Hills
+640,Farmington (NM),1,2102.0,2303.0,11,Hills
+662,McCarthy,0,799.0,824.0,12,Mountain
+662,McCarthy,1,846.0,819.0,12,Mountain
+662,McCarthy,2,848.0,956.0,12,Mountain
+662,McCarthy,3,883.0,937.0,12,Mountain
+662,McCarthy,4,901.0,802.0,12,Mountain
+662,McCarthy,5,929.0,778.0,12,Mountain
+662,McCarthy,6,938.0,732.0,12,Mountain
+662,McCarthy,7,942.0,953.0,12,Mountain
+663,Prudhoe Bay,0,689.0,547.0,12,Mountain
+663,Prudhoe Bay,1,698.0,426.0,12,Mountain
+663,Prudhoe Bay,2,719.0,550.0,12,Mountain
+663,Prudhoe Bay,3,726.0,464.0,12,Mountain
+663,Prudhoe Bay,4,742.0,522.0,12,Mountain
+663,Prudhoe Bay,5,770.0,547.0,12,Mountain
+663,Prudhoe Bay,6,804.0,517.0,12,Mountain
+663,Prudhoe Bay,7,818.0,453.0,12,Mountain
+663,Prudhoe Bay,8,846.0,474.0,12,Mountain
+663,Prudhoe Bay,9,851.0,528.0,12,Mountain
+663,Prudhoe Bay,10,888.0,535.0,12,Mountain
+663,Prudhoe Bay,11,894.0,441.0,12,Mountain
+663,Prudhoe Bay,12,903.0,482.0,12,Mountain
+663,Prudhoe Bay,13,930.0,431.0,12,Mountain
+663,Prudhoe Bay,14,936.0,475.0,12,Mountain
+663,Prudhoe Bay,15,950.0,497.0,12,Mountain
+664,Barrow,0,327.0,467.0,12,Mountain
+664,Barrow,1,389.0,418.0,12,Mountain
+664,Barrow,2,416.0,518.0,12,Mountain
+664,Barrow,3,449.0,547.0,12,Mountain
+664,Barrow,4,469.0,599.0,12,Mountain
+664,Barrow,5,501.0,539.0,12,Mountain
+664,Barrow,6,503.0,464.0,12,Mountain
+664,Barrow,7,513.0,580.0,12,Mountain
+664,Barrow,8,550.0,396.0,12,Mountain
+664,Barrow,9,559.0,547.0,12,Mountain
+664,Barrow,10,581.0,465.0,12,Mountain
+664,Barrow,11,594.0,555.0,12,Mountain
+664,Barrow,12,607.0,584.0,12,Mountain
+666,Aniak,0,285.0,945.0,12,Mountain
+666,Aniak,1,321.0,897.0,12,Mountain
+666,Aniak,2,386.0,918.0,12,Mountain
+666,Aniak,3,416.0,884.0,12,Mountain
+666,Aniak,4,492.0,884.0,12,Mountain
+666,Aniak,5,498.0,930.0,12,Mountain
+666,Aniak,6,601.0,896.0,12,Mountain
+666,Aniak,7,694.0,894.0,12,Mountain
+666,Aniak,8,705.0,844.0,12,Mountain
+666,Aniak,9,733.0,845.0,12,Mountain
+667,Perryville,0,307.0,1161.0,12,Mountain
+667,Perryville,1,380.0,1132.0,12,Mountain
+667,Perryville,2,470.0,1084.0,12,Mountain
+667,Perryville,3,525.0,1064.0,12,Mountain
+667,Perryville,4,560.0,1038.0,12,Mountain
+667,Perryville,5,586.0,984.0,12,Mountain
+667,Perryville,6,590.0,1018.0,12,Mountain
+667,Perryville,7,636.0,977.0,12,Mountain
+667,Perryville,8,637.0,1008.0,12,Mountain
+667,Perryville,9,663.0,987.0,12,Mountain
+667,Perryville,10,706.0,979.0,12,Mountain
+668,Fort St. John,0,1401.0,1020.0,12,Mountain
+668,Fort St. John,1,1421.0,1014.0,12,Mountain
+668,Fort St. John,2,1424.0,1039.0,12,Mountain
+668,Fort St. John,3,1430.0,1076.0,12,Mountain
+672,Fort Nelson,0,1330.0,957.0,12,Mountain
+672,Fort Nelson,1,1338.0,973.0,12,Mountain
+672,Fort Nelson,2,1374.0,963.0,12,Mountain
+672,Fort Nelson,3,1397.0,974.0,12,Mountain
+672,Fort Nelson,4,1402.0,955.0,12,Mountain
+672,Fort Nelson,5,1413.0,979.0,12,Mountain
+674,Whistler,0,1210.0,1357.0,12,Mountain
+674,Whistler,1,1231.0,1364.0,12,Mountain
+674,Whistler,2,1244.0,1390.0,12,Mountain
+674,Whistler,3,1250.0,1347.0,12,Mountain
+674,Whistler,4,1258.0,1378.0,12,Mountain
+675,Terrace,0,1174.0,1148.0,12,Mountain
+675,Terrace,1,1180.0,1172.0,12,Mountain
+675,Terrace,2,1187.0,1192.0,12,Mountain
+675,Terrace,3,1202.0,1231.0,12,Mountain
+675,Terrace,4,1204.0,1204.0,12,Mountain
+675,Terrace,5,1213.0,1162.0,12,Mountain
+675,Terrace,6,1226.0,1176.0,12,Mountain
+677,Iskut,0,1106.0,1129.0,12,Mountain
+677,Iskut,1,1121.0,1103.0,12,Mountain
+677,Iskut,2,1139.0,1094.0,12,Mountain
+677,Iskut,3,1168.0,1085.0,12,Mountain
+677,Iskut,4,1190.0,1079.0,12,Mountain
+677,Iskut,5,1198.0,1099.0,12,Mountain
+678,Cassiar,0,1097.0,961.0,12,Mountain
+678,Cassiar,1,1137.0,961.0,12,Mountain
+678,Cassiar,2,1139.0,985.0,12,Mountain
+678,Cassiar,3,1154.0,1006.0,12,Mountain
+678,Cassiar,4,1164.0,972.0,12,Mountain
+678,Cassiar,5,1177.0,999.0,12,Mountain
+679,Toad River,0,1216.0,953.0,12,Mountain
+679,Toad River,1,1224.0,978.0,12,Mountain
+679,Toad River,2,1226.0,1006.0,12,Mountain
+679,Toad River,3,1264.0,988.0,12,Mountain
+679,Toad River,4,1274.0,956.0,12,Mountain
+679,Toad River,5,1287.0,1007.0,12,Mountain
+679,Toad River,6,1293.0,964.0,12,Mountain
+683,Kitimat,0,1207.0,1280.0,12,Mountain
+683,Kitimat,1,1212.0,1300.0,12,Mountain
+683,Kitimat,2,1225.0,1282.0,12,Mountain
+683,Kitimat,3,1227.0,1272.0,12,Mountain
+683,Kitimat,4,1228.0,1297.0,12,Mountain
+687,Cranbrook,0,1548.0,1399.0,12,Mountain
+687,Cranbrook,1,1551.0,1424.0,12,Mountain
+687,Cranbrook,2,1584.0,1384.0,12,Mountain
+687,Cranbrook,3,1596.0,1382.0,12,Mountain
+687,Cranbrook,4,1597.0,1415.0,12,Mountain
+687,Cranbrook,5,1625.0,1412.0,12,Mountain
+687,Cranbrook,6,1627.0,1380.0,12,Mountain
+687,Cranbrook,7,1644.0,1400.0,12,Mountain
+689,Golden,0,1507.0,1333.0,12,Mountain
+689,Golden,1,1521.0,1293.0,12,Mountain
+689,Golden,2,1547.0,1329.0,12,Mountain
+689,Golden,3,1549.0,1309.0,12,Mountain
+689,Golden,4,1572.0,1332.0,12,Mountain
+689,Golden,5,1589.0,1340.0,12,Mountain
+707,Banff,0,1546.0,1252.0,12,Mountain
+707,Banff,1,1568.0,1266.0,12,Mountain
+707,Banff,2,1575.0,1231.0,12,Mountain
+707,Banff,3,1577.0,1201.0,12,Mountain
+707,Banff,4,1590.0,1214.0,12,Mountain
+707,Banff,5,1591.0,1249.0,12,Mountain
+707,Banff,6,1608.0,1284.0,12,Mountain
+707,Banff,7,1626.0,1265.0,12,Mountain
+707,Banff,8,1628.0,1250.0,12,Mountain
+708,Grand Cache,0,1462.0,1199.0,12,Mountain
+708,Grand Cache,1,1465.0,1174.0,12,Mountain
+708,Grand Cache,2,1490.0,1156.0,12,Mountain
+708,Grand Cache,3,1490.0,1222.0,12,Mountain
+708,Grand Cache,4,1495.0,1190.0,12,Mountain
+708,Grand Cache,5,1511.0,1170.0,12,Mountain
+708,Grand Cache,6,1511.0,1206.0,12,Mountain
+708,Grand Cache,7,1536.0,1170.0,12,Mountain
+737,Dawson,0,1003.0,635.0,12,Mountain
+737,Dawson,1,1013.0,742.0,12,Mountain
+737,Dawson,2,1014.0,721.0,12,Mountain
+737,Dawson,3,1020.0,692.0,12,Mountain
+737,Dawson,4,1027.0,655.0,12,Mountain
+737,Dawson,5,1034.0,608.0,12,Mountain
+737,Dawson,6,1042.0,721.0,12,Mountain
+737,Dawson,7,1047.0,675.0,12,Mountain
+737,Dawson,8,1070.0,725.0,12,Mountain
+737,Dawson,9,1075.0,680.0,12,Mountain
+737,Dawson,10,1097.0,668.0,12,Mountain
+737,Dawson,11,1118.0,723.0,12,Mountain
+737,Dawson,12,1123.0,690.0,12,Mountain
+737,Dawson,13,1153.0,728.0,12,Mountain
+737,Dawson,14,1162.0,748.0,12,Mountain
+737,Dawson,15,1198.0,727.0,12,Mountain
+740,Ross River,0,1185.0,836.0,12,Mountain
+740,Ross River,1,1212.0,797.0,12,Mountain
+740,Ross River,2,1225.0,846.0,12,Mountain
+740,Ross River,3,1245.0,790.0,12,Mountain
+740,Ross River,4,1245.0,810.0,12,Mountain
+740,Ross River,5,1245.0,843.0,12,Mountain
+740,Ross River,6,1256.0,760.0,12,Mountain
+740,Ross River,7,1272.0,808.0,12,Mountain
+740,Ross River,8,1283.0,834.0,12,Mountain
+874,La Paz (MX),0,1857.0,2999.0,12,Mountain
+874,La Paz (MX),1,1917.0,3051.0,12,Mountain
+886,Tampico,0,2322.0,3092.0,12,Mountain
+886,Tampico,1,2323.0,3075.0,12,Mountain
+886,Tampico,2,2327.0,3108.0,12,Mountain
+886,Tampico,3,2344.0,3057.0,12,Mountain
+886,Tampico,4,2346.0,3102.0,12,Mountain
+886,Tampico,5,2357.0,3084.0,12,Mountain
+886,Tampico,6,2381.0,3096.0,12,Mountain
+886,Tampico,7,2385.0,3066.0,12,Mountain
+889,Irapuato,0,2261.0,3200.0,12,Mountain
+889,Irapuato,1,2269.0,3175.0,12,Mountain
+889,Irapuato,2,2280.0,3220.0,12,Mountain
+889,Irapuato,3,2284.0,3162.0,12,Mountain
+889,Irapuato,4,2292.0,3216.0,12,Mountain
+889,Irapuato,5,2296.0,3184.0,12,Mountain
+889,Irapuato,6,2307.0,3170.0,12,Mountain
+894,San Juan del Río,0,2336.0,3203.0,12,Mountain
+894,San Juan del Río,1,2337.0,3163.0,12,Mountain
+894,San Juan del Río,2,2345.0,3235.0,12,Mountain
+894,San Juan del Río,3,2346.0,3189.0,12,Mountain
+894,San Juan del Río,4,2351.0,3168.0,12,Mountain
+894,San Juan del Río,5,2360.0,3199.0,12,Mountain
+894,San Juan del Río,6,2370.0,3221.0,12,Mountain
+894,San Juan del Río,7,2379.0,3239.0,12,Mountain
+899,Córdoba (MX),0,2406.0,3318.0,12,Mountain
+899,Córdoba (MX),1,2423.0,3331.0,12,Mountain
+899,Córdoba (MX),2,2438.0,3312.0,12,Mountain
+899,Córdoba (MX),3,2461.0,3351.0,12,Mountain
+899,Córdoba (MX),4,2464.0,3327.0,12,Mountain
+903,Tuxtepec,0,2502.0,3383.0,12,Mountain
+903,Tuxtepec,1,2521.0,3398.0,12,Mountain
+903,Tuxtepec,2,2539.0,3415.0,12,Mountain
+903,Tuxtepec,3,2549.0,3410.0,12,Mountain
+904,Tuxtla Gutiérrez,0,2582.0,3457.0,12,Mountain
+904,Tuxtla Gutiérrez,1,2596.0,3465.0,12,Mountain
+904,Tuxtla Gutiérrez,2,2621.0,3472.0,12,Mountain
+904,Tuxtla Gutiérrez,3,2623.0,3489.0,12,Mountain
+904,Tuxtla Gutiérrez,4,2627.0,3505.0,12,Mountain
+904,Tuxtla Gutiérrez,5,2644.0,3533.0,12,Mountain
+910,Elfin Cove,0,1017.0,995.0,12,Mountain
+910,Elfin Cove,1,1047.0,1021.0,12,Mountain
+910,Elfin Cove,2,1061.0,1050.0,12,Mountain
+910,Elfin Cove,3,1065.0,1011.0,12,Mountain
+910,Elfin Cove,4,1103.0,1054.0,12,Mountain
+910,Elfin Cove,5,1109.0,1038.0,12,Mountain
+911,Benito Juárez,0,2031.0,2619.0,12,Mountain
+911,Benito Juárez,1,2043.0,2647.0,12,Mountain
+911,Benito Juárez,2,2059.0,2616.0,12,Mountain
+911,Benito Juárez,3,2074.0,2655.0,12,Mountain
+911,Benito Juárez,4,2082.0,2612.0,12,Mountain
+911,Benito Juárez,5,2089.0,2639.0,12,Mountain
+911,Benito Juárez,6,2104.0,2660.0,12,Mountain
+916,Delicias,0,2143.0,2707.0,12,Mountain
+916,Delicias,1,2155.0,2761.0,12,Mountain
+916,Delicias,2,2161.0,2736.0,12,Mountain
+916,Delicias,3,2166.0,2716.0,12,Mountain
+916,Delicias,4,2175.0,2750.0,12,Mountain
+917,Ures,0,1908.0,2624.0,12,Mountain
+917,Ures,1,1915.0,2649.0,12,Mountain
+917,Ures,2,1945.0,2648.0,12,Mountain
+917,Ures,3,1966.0,2616.0,12,Mountain
+917,Ures,4,1970.0,2670.0,12,Mountain
+917,Ures,5,1981.0,2633.0,12,Mountain
+917,Ures,6,1995.0,2654.0,12,Mountain
+924,Saltillo,0,2264.0,2898.0,12,Mountain
+924,Saltillo,1,2275.0,2927.0,12,Mountain
+924,Saltillo,2,2289.0,2895.0,12,Mountain
+924,Saltillo,3,2313.0,2922.0,12,Mountain
+925,Matehuala,0,2289.0,2999.0,12,Mountain
+925,Matehuala,1,2298.0,2972.0,12,Mountain
+925,Matehuala,2,2302.0,3018.0,12,Mountain
+925,Matehuala,3,2312.0,2998.0,12,Mountain
+930,El Hundido,0,2181.0,2840.0,12,Mountain
+930,El Hundido,1,2187.0,2813.0,12,Mountain
+930,El Hundido,2,2211.0,2801.0,12,Mountain
+930,El Hundido,3,2212.0,2823.0,12,Mountain
+930,El Hundido,4,2224.0,2857.0,12,Mountain
+930,El Hundido,5,2247.0,2837.0,12,Mountain
+934,Guatemala,0,2679.0,3571.0,12,Mountain
+934,Guatemala,1,2693.0,3555.0,12,Mountain
+934,Guatemala,2,2705.0,3575.0,12,Mountain
+934,Guatemala,3,2722.0,3580.0,12,Mountain
+934,Guatemala,4,2748.0,3593.0,12,Mountain
+950,Bayamo,0,3578.0,3201.0,12,Mountain
+950,Bayamo,1,3591.0,3191.0,12,Mountain
+953,Azua,0,3814.0,3281.0,12,Mountain
+953,Azua,1,3828.0,3284.0,12,Mountain
+968,Manizales,0,3164.0,3931.0,12,Mountain
+968,Manizales,1,3167.0,3947.0,12,Mountain
+968,Manizales,2,3181.0,3943.0,12,Mountain
+968,Manizales,3,3189.0,3927.0,12,Mountain
+968,Manizales,4,3203.0,3926.0,12,Mountain
+968,Manizales,5,3203.0,3956.0,12,Mountain
+968,Manizales,6,3214.0,3918.0,12,Mountain
+969,Cali,0,3150.0,4037.0,12,Mountain
+969,Cali,1,3153.0,4049.0,12,Mountain
+969,Cali,2,3164.0,4019.0,12,Mountain
+969,Cali,3,3172.0,3985.0,12,Mountain
+969,Cali,4,3172.0,4013.0,12,Mountain
+969,Cali,5,3176.0,3997.0,12,Mountain
+971,Florencia,0,3158.0,4112.0,12,Mountain
+971,Florencia,1,3170.0,4099.0,12,Mountain
+971,Florencia,2,3173.0,4066.0,12,Mountain
+971,Florencia,3,3181.0,4084.0,12,Mountain
+974,Tunja,0,3248.0,3907.0,12,Mountain
+974,Tunja,1,3256.0,3925.0,12,Mountain
+974,Tunja,2,3265.0,3900.0,12,Mountain
+974,Tunja,3,3273.0,3885.0,12,Mountain
+977,Bucaramanga,0,3297.0,3821.0,12,Mountain
+977,Bucaramanga,1,3298.0,3787.0,12,Mountain
+977,Bucaramanga,2,3307.0,3805.0,12,Mountain
+977,Bucaramanga,3,3324.0,3817.0,12,Mountain
+977,Bucaramanga,4,3331.0,3780.0,12,Mountain
+977,Bucaramanga,5,3351.0,3827.0,12,Mountain
+985,Nueva Loja,0,3125.0,4151.0,12,Mountain
+985,Nueva Loja,1,3128.0,4138.0,12,Mountain
+985,Nueva Loja,2,3131.0,4160.0,12,Mountain
+985,Nueva Loja,3,3137.0,4144.0,12,Mountain
+985,Nueva Loja,4,3158.0,4148.0,12,Mountain
+988,Ambato,0,3109.0,4184.0,12,Mountain
+988,Ambato,1,3116.0,4221.0,12,Mountain
+988,Ambato,2,3117.0,4190.0,12,Mountain
+988,Ambato,3,3120.0,4212.0,12,Mountain
+988,Ambato,4,3128.0,4203.0,12,Mountain
+990,Cuenca (EC),0,3028.0,4318.0,12,Mountain
+990,Cuenca (EC),1,3048.0,4322.0,12,Mountain
+990,Cuenca (EC),2,3060.0,4336.0,12,Mountain
+990,Cuenca (EC),3,3067.0,4316.0,12,Mountain
+990,Cuenca (EC),4,3084.0,4305.0,12,Mountain
+990,Cuenca (EC),5,3095.0,4289.0,12,Mountain
+992,Puerto Pardo,0,3121.0,4280.0,12,Mountain
+992,Puerto Pardo,1,3135.0,4244.0,12,Mountain
+992,Puerto Pardo,2,3136.0,4274.0,12,Mountain
+992,Puerto Pardo,3,3140.0,4258.0,12,Mountain
+995,Carcross,0,1164.0,909.0,12,Mountain
+995,Carcross,1,1201.0,906.0,12,Mountain
+995,Carcross,2,1204.0,893.0,12,Mountain
+998,Piura,0,2992.0,4377.0,12,Mountain
+998,Piura,1,2993.0,4355.0,12,Mountain
+998,Piura,2,3005.0,4393.0,12,Mountain
+998,Piura,3,3019.0,4387.0,12,Mountain
+998,Piura,4,3023.0,4412.0,12,Mountain
+998,Piura,5,3024.0,4366.0,12,Mountain
+999,Chiclayo,0,3045.0,4440.0,12,Mountain
+999,Chiclayo,1,3062.0,4423.0,12,Mountain
+999,Chiclayo,2,3062.0,4462.0,12,Mountain
+999,Chiclayo,3,3067.0,4449.0,12,Mountain
+999,Chiclayo,4,3080.0,4482.0,12,Mountain
+999,Chiclayo,5,3082.0,4463.0,12,Mountain
+999,Chiclayo,6,3088.0,4498.0,12,Mountain
+1001,Chincha Alta,0,3185.0,4663.0,12,Mountain
+1001,Chincha Alta,1,3198.0,4684.0,12,Mountain
+1001,Chincha Alta,2,3216.0,4705.0,12,Mountain
+1001,Chincha Alta,3,3218.0,4673.0,12,Mountain
+1001,Chincha Alta,4,3219.0,4689.0,12,Mountain
+1001,Chincha Alta,5,3238.0,4706.0,12,Mountain
+1002,Tacna,0,3375.0,4823.0,12,Mountain
+1002,Tacna,1,3388.0,4808.0,12,Mountain
+1002,Tacna,2,3405.0,4806.0,12,Mountain
+1002,Tacna,3,3412.0,4826.0,12,Mountain
+1002,Tacna,4,3429.0,4848.0,12,Mountain
+1002,Tacna,5,3446.0,4840.0,12,Mountain
+1002,Tacna,6,3463.0,4844.0,12,Mountain
+1002,Tacna,7,3480.0,4841.0,12,Mountain
+1002,Tacna,8,3494.0,4831.0,12,Mountain
+1002,Tacna,9,3513.0,4842.0,12,Mountain
+1004,Puno,0,3435.0,4781.0,12,Mountain
+1004,Puno,1,3445.0,4768.0,12,Mountain
+1004,Puno,2,3458.0,4776.0,12,Mountain
+1004,Puno,3,3463.0,4800.0,12,Mountain
+1004,Puno,4,3472.0,4790.0,12,Mountain
+1004,Puno,5,3482.0,4762.0,12,Mountain
+1004,Puno,6,3500.0,4771.0,12,Mountain
+1016,Nasca,0,3237.0,4744.0,12,Mountain
+1016,Nasca,1,3254.0,4767.0,12,Mountain
+1016,Nasca,2,3263.0,4738.0,12,Mountain
+1016,Nasca,3,3267.0,4763.0,12,Mountain
+1016,Nasca,4,3272.0,4726.0,12,Mountain
+1016,Nasca,5,3291.0,4739.0,12,Mountain
+1018,Valera,0,3446.0,3722.0,12,Mountain
+1018,Valera,1,3459.0,3733.0,12,Mountain
+1018,Valera,2,3462.0,3716.0,12,Mountain
+1018,Valera,3,3491.0,3721.0,12,Mountain
+1019,San Cristóbal,0,3383.0,3783.0,14,Urban
+1028,Urimán,0,3808.0,3931.0,12,Mountain
+1028,Urimán,1,3833.0,3916.0,12,Mountain
+1028,Urimán,2,3851.0,3924.0,12,Mountain
+1028,Urimán,3,3877.0,3912.0,12,Mountain
+1036,Machiques,0,3391.0,3799.0,13,Forest
+1037,Barinas,0,3407.0,3784.0,13,Forest
+1037,Barinas,1,3413.0,3771.0,13,Forest
+1052,Nuuk,0,4678.0,543.0,11,Hills
+1052,Nuuk,1,4739.0,519.0,11,Hills
+1052,Nuuk,2,4743.0,883.0,11,Hills
+1052,Nuuk,3,4750.0,948.0,11,Hills
+1052,Nuuk,4,4754.0,825.0,11,Hills
+1052,Nuuk,5,4792.0,586.0,11,Hills
+1052,Nuuk,6,4793.0,747.0,11,Hills
+1052,Nuuk,7,4802.0,663.0,11,Hills
+1052,Nuuk,8,4811.0,802.0,11,Hills
+1052,Nuuk,9,4822.0,865.0,11,Hills
+1052,Nuuk,10,4839.0,702.0,11,Hills
+1052,Nuuk,11,4859.0,757.0,11,Hills
+1052,Nuuk,12,4913.0,712.0,11,Hills
+1052,Nuuk,13,4926.0,567.0,11,Hills
+1052,Nuuk,14,4957.0,710.0,11,Hills
+1052,Nuuk,15,4969.0,587.0,11,Hills
+1052,Nuuk,16,4972.0,522.0,11,Hills
+1052,Nuuk,17,4984.0,674.0,11,Hills
+1052,Nuuk,18,4998.0,742.0,11,Hills
+1052,Nuuk,19,5030.0,632.0,11,Hills
+1052,Nuuk,20,5042.0,668.0,11,Hills
+1052,Nuuk,21,5057.0,502.0,11,Hills
+1052,Nuuk,22,5063.0,703.0,11,Hills
+1052,Nuuk,23,5085.0,593.0,11,Hills
+1052,Nuuk,24,5098.0,632.0,11,Hills
+1052,Nuuk,25,5102.0,497.0,11,Hills
+1052,Nuuk,26,5126.0,561.0,11,Hills
+1052,Nuuk,27,5150.0,595.0,11,Hills
+1052,Nuuk,28,5159.0,496.0,11,Hills
+1114,Chimbote,0,3118.0,4550.0,12,Mountain
+1114,Chimbote,1,3133.0,4560.0,12,Mountain
+1114,Chimbote,2,3138.0,4574.0,12,Mountain
+1114,Chimbote,3,3141.0,4594.0,12,Mountain
+1114,Chimbote,4,3149.0,4602.0,12,Mountain
+1114,Chimbote,5,3151.0,4572.0,12,Mountain
+1116,Camaná,0,3297.0,4786.0,12,Mountain
+1116,Camaná,1,3303.0,4777.0,12,Mountain
+1116,Camaná,2,3319.0,4784.0,12,Mountain
+1116,Camaná,3,3332.0,4795.0,12,Mountain
+1116,Camaná,4,3341.0,4783.0,12,Mountain
+1116,Camaná,5,3342.0,4809.0,12,Mountain
+1164,Cafayate,0,3581.0,5317.0,12,Mountain
+1164,Cafayate,1,3602.0,5286.0,12,Mountain
+1164,Cafayate,2,3611.0,5310.0,12,Mountain
+1164,Cafayate,3,3616.0,5219.0,12,Mountain
+1164,Cafayate,4,3617.0,5279.0,12,Mountain
+1164,Cafayate,5,3621.0,5255.0,12,Mountain
+1164,Cafayate,6,3637.0,5225.0,12,Mountain
+1183,Cachorrinho,0,4248.0,4127.0,13,Forest
+1183,Cachorrinho,1,4251.0,4093.0,13,Forest
+1189,São Marcos,0,3853.0,3977.0,12,Mountain
+1189,São Marcos,1,3884.0,3972.0,12,Mountain
+1189,São Marcos,2,3896.0,3955.0,12,Mountain
+1200,Oruro,0,3562.0,4917.0,12,Mountain
+1200,Oruro,1,3572.0,4930.0,12,Mountain
+1200,Oruro,2,3582.0,4954.0,12,Mountain
+1200,Oruro,3,3585.0,4907.0,12,Mountain
+1200,Oruro,4,3596.0,4938.0,12,Mountain
+1200,Oruro,5,3601.0,4879.0,12,Mountain
+1200,Oruro,6,3603.0,4916.0,12,Mountain
+1200,Oruro,7,3616.0,4921.0,12,Mountain
+1200,Oruro,8,3621.0,4894.0,12,Mountain
+1200,Oruro,9,3621.0,4911.0,12,Mountain
+1201,Uyuni,0,3585.0,4990.0,12,Mountain
+1201,Uyuni,1,3591.0,5015.0,12,Mountain
+1201,Uyuni,2,3602.0,5031.0,12,Mountain
+1201,Uyuni,3,3610.0,5010.0,12,Mountain
+1201,Uyuni,4,3614.0,4976.0,12,Mountain
+1201,Uyuni,5,3632.0,4968.0,12,Mountain
+1201,Uyuni,6,3632.0,4994.0,12,Mountain
+1201,Uyuni,7,3648.0,4984.0,12,Mountain
+1202,San Pablo,0,3614.0,5069.0,12,Mountain
+1202,San Pablo,1,3627.0,5065.0,12,Mountain
+1202,San Pablo,2,3635.0,5043.0,12,Mountain
+1202,San Pablo,3,3654.0,5034.0,12,Mountain
+1203,Patacamaya,0,3548.0,4833.0,12,Mountain
+1203,Patacamaya,1,3556.0,4848.0,12,Mountain
+1203,Patacamaya,2,3556.0,4861.0,12,Mountain
+1203,Patacamaya,3,3558.0,4885.0,12,Mountain
+1204,Caranavi,0,3548.0,4768.0,12,Mountain
+1204,Caranavi,1,3578.0,4770.0,12,Mountain
+1204,Caranavi,2,3589.0,4778.0,12,Mountain
+1204,Caranavi,3,3591.0,4766.0,12,Mountain
+1331,Tilcara,0,3604.0,5189.0,12,Mountain
+1331,Tilcara,1,3629.0,5173.0,12,Mountain
+1331,Tilcara,2,3649.0,5180.0,12,Mountain
+1331,Tilcara,3,3654.0,5140.0,12,Mountain
+1331,Tilcara,4,3655.0,5085.0,12,Mountain
+1331,Tilcara,5,3656.0,5103.0,12,Mountain
+1331,Tilcara,6,3666.0,5113.0,12,Mountain
+1333,San Juan (AR),0,3548.0,5462.0,12,Mountain
+1333,San Juan (AR),1,3556.0,5428.0,12,Mountain
+1333,San Juan (AR),2,3563.0,5385.0,12,Mountain
+1333,San Juan (AR),3,3568.0,5366.0,12,Mountain
+1333,San Juan (AR),4,3568.0,5405.0,12,Mountain
+1333,San Juan (AR),5,3568.0,5433.0,12,Mountain
+1333,San Juan (AR),6,3583.0,5367.0,12,Mountain
+1372,Temuco,0,3483.0,5736.0,12,Mountain
+1372,Temuco,1,3484.0,5696.0,12,Mountain
+1372,Temuco,2,3484.0,5762.0,12,Mountain
+1372,Temuco,3,3486.0,5797.0,12,Mountain
+1372,Temuco,4,3488.0,5676.0,12,Mountain
+1372,Temuco,5,3492.0,5648.0,12,Mountain
+1372,Temuco,6,3495.0,5564.0,12,Mountain
+1372,Temuco,7,3495.0,5594.0,12,Mountain
+1372,Temuco,8,3496.0,5628.0,12,Mountain
+1372,Temuco,9,3504.0,5609.0,12,Mountain
+1372,Temuco,10,3523.0,5577.0,12,Mountain
+1373,Punta Arenas,0,3503.0,6263.0,12,Mountain
+1373,Punta Arenas,1,3534.0,6328.0,12,Mountain
+1373,Punta Arenas,2,3547.0,6353.0,12,Mountain
+1373,Punta Arenas,3,3563.0,6373.0,12,Mountain
+1373,Punta Arenas,4,3576.0,6396.0,12,Mountain
+1373,Punta Arenas,5,3646.0,6374.0,12,Mountain
+1373,Punta Arenas,6,3660.0,6389.0,12,Mountain
+1373,Punta Arenas,7,3661.0,6427.0,12,Mountain
+1374,Copiapó,0,3493.0,5359.0,12,Mountain
+1374,Copiapó,1,3494.0,5381.0,12,Mountain
+1374,Copiapó,2,3496.0,5492.0,12,Mountain
+1374,Copiapó,3,3497.0,5417.0,12,Mountain
+1374,Copiapó,4,3501.0,5448.0,12,Mountain
+1374,Copiapó,5,3504.0,5322.0,12,Mountain
+1374,Copiapó,6,3508.0,5297.0,12,Mountain
+1374,Copiapó,7,3522.0,5348.0,12,Mountain
+1374,Copiapó,8,3538.0,5312.0,12,Mountain
+1375,Iquique,0,3488.0,4920.0,12,Mountain
+1375,Iquique,1,3494.0,4940.0,12,Mountain
+1375,Iquique,2,3503.0,4905.0,12,Mountain
+1375,Iquique,3,3506.0,4886.0,12,Mountain
+1375,Iquique,4,3513.0,5050.0,12,Mountain
+1375,Iquique,5,3515.0,4986.0,12,Mountain
+1375,Iquique,6,3517.0,5230.0,12,Mountain
+1375,Iquique,7,3520.0,4949.0,12,Mountain
+1375,Iquique,8,3527.0,5262.0,12,Mountain
+1375,Iquique,9,3528.0,5092.0,12,Mountain
+1375,Iquique,10,3532.0,5016.0,12,Mountain
+1375,Iquique,11,3533.0,4996.0,12,Mountain
+1375,Iquique,12,3536.0,4963.0,12,Mountain
+1375,Iquique,13,3537.0,5052.0,12,Mountain
+1375,Iquique,14,3537.0,5165.0,12,Mountain
+1375,Iquique,15,3543.0,5225.0,12,Mountain
+1375,Iquique,16,3549.0,5252.0,12,Mountain
+1375,Iquique,17,3555.0,5061.0,12,Mountain
+1375,Iquique,18,3557.0,5202.0,12,Mountain
+1375,Iquique,19,3559.0,5172.0,12,Mountain
+1375,Iquique,20,3564.0,5080.0,12,Mountain
+1375,Iquique,21,3571.0,5133.0,12,Mountain
+1375,Iquique,22,3578.0,5104.0,12,Mountain
+1376,Puerto Aysen,0,3480.0,5880.0,12,Mountain
+1376,Puerto Aysen,1,3490.0,5845.0,12,Mountain
+1376,Puerto Aysen,2,3491.0,5903.0,12,Mountain
+1376,Puerto Aysen,3,3497.0,5976.0,12,Mountain
+1376,Puerto Aysen,4,3507.0,6009.0,12,Mountain
+1376,Puerto Aysen,5,3515.0,6048.0,12,Mountain
+1377,Tortel,0,3496.0,6106.0,12,Mountain
+1377,Tortel,1,3502.0,6221.0,12,Mountain
+1377,Tortel,2,3507.0,6198.0,12,Mountain
+1377,Tortel,3,3514.0,6171.0,12,Mountain
+1377,Tortel,4,3518.0,6092.0,12,Mountain
+1400,Arish,0,7738.0,3134.0,12,Mountain
+1400,Arish,1,7743.0,3142.0,12,Mountain
+1400,Arish,2,7749.0,3149.0,12,Mountain
+1400,Arish,3,7750.0,3130.0,12,Mountain
+1400,Arish,4,7750.0,3139.0,12,Mountain
+1400,Arish,5,7755.0,3143.0,12,Mountain
+1411,Worcester (ZA),0,6977.0,5824.0,12,Mountain
+1411,Worcester (ZA),1,6991.0,5817.0,12,Mountain
+1411,Worcester (ZA),2,6999.0,5813.0,12,Mountain
+1423,Bloemfontein,0,7296.0,5597.0,14,Urban
+1423,Bloemfontein,1,7311.0,5585.0,14,Urban
+1563,Tozeur,0,6408.0,3036.0,12,Mountain
+1563,Tozeur,1,6413.0,3006.0,12,Mountain
+1563,Tozeur,2,6434.0,3054.0,12,Mountain
+1563,Tozeur,3,6436.0,3030.0,12,Mountain
+1563,Tozeur,4,6441.0,3004.0,12,Mountain
+1571,Idlès,0,6354.0,3388.0,12,Mountain
+1571,Idlès,1,6379.0,3390.0,12,Mountain
+1571,Idlès,2,6382.0,3340.0,12,Mountain
+1571,Idlès,3,6396.0,3371.0,12,Mountain
+1574,Tazrouk,0,6407.0,3480.0,12,Mountain
+1574,Tazrouk,1,6426.0,3471.0,12,Mountain
+1574,Tazrouk,2,6437.0,3490.0,12,Mountain
+1574,Tazrouk,3,6446.0,3446.0,12,Mountain
+1574,Tazrouk,4,6469.0,3451.0,12,Mountain
+1582,Benoud,0,5955.0,3074.0,12,Mountain
+1582,Benoud,1,5980.0,3051.0,12,Mountain
+1582,Benoud,2,5990.0,3087.0,12,Mountain
+1582,Benoud,3,6019.0,3065.0,12,Mountain
+1582,Benoud,4,6023.0,3086.0,12,Mountain
+1582,Benoud,5,6044.0,3086.0,12,Mountain
+1582,Benoud,6,6060.0,3066.0,12,Mountain
+1585,Djelfa,0,6132.0,2975.0,12,Mountain
+1585,Djelfa,1,6159.0,2962.0,12,Mountain
+1585,Djelfa,2,6174.0,2980.0,12,Mountain
+1585,Djelfa,3,6191.0,2959.0,12,Mountain
+1585,Djelfa,4,6202.0,2975.0,12,Mountain
+1596,Laghouat,0,6114.0,3057.0,12,Mountain
+1596,Laghouat,1,6118.0,3038.0,12,Mountain
+1596,Laghouat,2,6133.0,3053.0,12,Mountain
+1596,Laghouat,3,6152.0,3049.0,12,Mountain
+1596,Laghouat,4,6155.0,3022.0,12,Mountain
+1596,Laghouat,5,6181.0,3040.0,12,Mountain
+1596,Laghouat,6,6190.0,3027.0,12,Mountain
+1596,Laghouat,7,6202.0,3035.0,12,Mountain
+1597,Biskra,0,6247.0,2989.0,12,Mountain
+1597,Biskra,1,6256.0,2974.0,12,Mountain
+1597,Biskra,2,6258.0,3002.0,12,Mountain
+1597,Biskra,3,6270.0,2991.0,12,Mountain
+1597,Biskra,4,6290.0,2982.0,12,Mountain
+1597,Biskra,5,6315.0,2978.0,12,Mountain
+1597,Biskra,6,6325.0,2963.0,12,Mountain
+1597,Biskra,7,6343.0,2978.0,12,Mountain
+1611,Bamenda,0,6596.0,4167.0,12,Mountain
+1611,Bamenda,1,6611.0,4206.0,12,Mountain
+1611,Bamenda,2,6616.0,4151.0,12,Mountain
+1611,Bamenda,3,6627.0,4175.0,12,Mountain
+1620,Taouz,0,5728.0,3110.0,12,Mountain
+1620,Taouz,1,5741.0,3131.0,12,Mountain
+1620,Taouz,2,5760.0,3099.0,12,Mountain
+1620,Taouz,3,5776.0,3117.0,12,Mountain
+1620,Taouz,4,5779.0,3085.0,12,Mountain
+1620,Taouz,5,5800.0,3112.0,12,Mountain
+1620,Taouz,6,5819.0,3076.0,12,Mountain
+1621,Guelmim,0,5564.0,3164.0,12,Mountain
+1621,Guelmim,1,5595.0,3170.0,12,Mountain
+1621,Guelmim,2,5623.0,3168.0,12,Mountain
+1621,Guelmim,3,5665.0,3156.0,12,Mountain
+1629,Pietermaritzburg,0,7336.0,5572.0,10,Plains
+1629,Pietermaritzburg,1,7347.0,5589.0,10,Plains
+1629,Pietermaritzburg,2,7361.0,5578.0,10,Plains
+1629,Pietermaritzburg,3,7363.0,5600.0,10,Plains
+1631,Aliwal North,0,7325.0,5601.0,10,Plains
+1700,Arusha,0,7783.0,4561.0,12,Mountain
+1700,Arusha,1,7796.0,4547.0,12,Mountain
+1700,Arusha,2,7797.0,4580.0,12,Mountain
+1700,Arusha,3,7813.0,4564.0,12,Mountain
+1700,Arusha,4,7819.0,4578.0,12,Mountain
+1700,Arusha,5,7821.0,4595.0,12,Mountain
+1701,Addis Ababa,0,7917.0,4070.0,14,Urban
+1714,Ambo,0,7856.0,4055.0,12,Mountain
+1714,Ambo,1,7878.0,4041.0,12,Mountain
+1714,Ambo,2,7879.0,4063.0,12,Mountain
+1714,Ambo,3,7896.0,4077.0,12,Mountain
+1714,Ambo,4,7902.0,4044.0,12,Mountain
+1715,Bahir Dar,0,7789.0,4036.0,12,Mountain
+1715,Bahir Dar,1,7806.0,4047.0,12,Mountain
+1715,Bahir Dar,2,7810.0,4014.0,12,Mountain
+1715,Bahir Dar,3,7813.0,4035.0,12,Mountain
+1715,Bahir Dar,4,7815.0,3987.0,12,Mountain
+1715,Bahir Dar,5,7831.0,4010.0,12,Mountain
+1715,Bahir Dar,6,7839.0,3974.0,12,Mountain
+1715,Bahir Dar,7,7845.0,3994.0,12,Mountain
+1716,Debre Markos,0,7881.0,3986.0,12,Mountain
+1716,Debre Markos,1,7883.0,4010.0,12,Mountain
+1716,Debre Markos,2,7899.0,4009.0,12,Mountain
+1716,Debre Markos,3,7906.0,3979.0,12,Mountain
+1716,Debre Markos,4,7920.0,3975.0,12,Mountain
+1716,Debre Markos,5,7923.0,4001.0,12,Mountain
+1719,Mek'ele,0,7929.0,3872.0,12,Mountain
+1719,Mek'ele,1,7956.0,3873.0,12,Mountain
+1719,Mek'ele,2,7967.0,3893.0,12,Mountain
+1719,Mek'ele,3,7978.0,3875.0,12,Mountain
+1719,Mek'ele,4,7989.0,3895.0,12,Mountain
+1719,Mek'ele,5,7996.0,3874.0,12,Mountain
+1719,Mek'ele,6,8013.0,3887.0,12,Mountain
+1723,Gijet,0,7880.0,3939.0,12,Mountain
+1723,Gijet,1,7909.0,3931.0,12,Mountain
+1723,Gijet,2,7914.0,3914.0,12,Mountain
+1727,Meki,0,7904.0,4123.0,12,Mountain
+1727,Meki,1,7915.0,4143.0,12,Mountain
+1727,Meki,2,7937.0,4125.0,12,Mountain
+1727,Meki,3,7937.0,4168.0,12,Mountain
+1727,Meki,4,7942.0,4141.0,12,Mountain
+1733,Asmara,0,7857.0,3815.0,12,Mountain
+1733,Asmara,1,7887.0,3817.0,12,Mountain
+1806,Ain Galakka,0,6845.0,3574.0,12,Mountain
+1806,Ain Galakka,1,6860.0,3605.0,12,Mountain
+1806,Ain Galakka,2,6876.0,3604.0,12,Mountain
+1806,Ain Galakka,3,6881.0,3578.0,12,Mountain
+1806,Ain Galakka,4,6903.0,3570.0,12,Mountain
+1806,Ain Galakka,5,6915.0,3553.0,12,Mountain
+1806,Ain Galakka,6,6924.0,3583.0,12,Mountain
+1806,Ain Galakka,7,6934.0,3541.0,12,Mountain
+1806,Ain Galakka,8,6946.0,3518.0,12,Mountain
+1806,Ain Galakka,9,6950.0,3563.0,12,Mountain
+1806,Ain Galakka,10,6965.0,3541.0,12,Mountain
+1806,Ain Galakka,11,6979.0,3536.0,12,Mountain
+1807,Bardaï,0,6800.0,3566.0,12,Mountain
+1807,Bardaï,1,6808.0,3485.0,12,Mountain
+1807,Bardaï,2,6810.0,3537.0,12,Mountain
+1807,Bardaï,3,6817.0,3518.0,12,Mountain
+1807,Bardaï,4,6843.0,3498.0,12,Mountain
+1807,Bardaï,5,6857.0,3470.0,12,Mountain
+1807,Bardaï,6,6879.0,3479.0,12,Mountain
+1807,Bardaï,7,6903.0,3486.0,12,Mountain
+1963,Ananalava,0,8246.0,4966.0,12,Mountain
+1963,Ananalava,1,8261.0,4954.0,12,Mountain
+1963,Ananalava,2,8263.0,4969.0,12,Mountain
+1963,Ananalava,3,8274.0,4950.0,12,Mountain
+1975,Ambositra,0,8137.0,5179.0,12,Mountain
+1975,Ambositra,1,8152.0,5172.0,12,Mountain
+1975,Ambositra,2,8159.0,5196.0,12,Mountain
+1975,Ambositra,3,8167.0,5181.0,12,Mountain
+1975,Ambositra,4,8178.0,5192.0,12,Mountain
+1975,Ambositra,5,8181.0,5177.0,12,Mountain
+1981,Mendak,0,8065.0,3533.0,12,Mountain
+1981,Mendak,1,8099.0,3552.0,12,Mountain
+1981,Mendak,2,8110.0,3578.0,12,Mountain
+1981,Mendak,3,8115.0,3605.0,12,Mountain
+1982,Ashaira,0,8048.0,3483.0,12,Mountain
+1982,Ashaira,1,8061.0,3501.0,12,Mountain
+1988,Hadiya,0,7985.0,3320.0,12,Mountain
+1988,Hadiya,1,8001.0,3327.0,12,Mountain
+1988,Hadiya,2,8015.0,3343.0,12,Mountain
+1989,Khaibar,0,8061.0,3331.0,12,Mountain
+1989,Khaibar,1,8063.0,3300.0,12,Mountain
+1989,Khaibar,2,8076.0,3348.0,12,Mountain
+1989,Khaibar,3,8079.0,3296.0,12,Mountain
+1989,Khaibar,4,8097.0,3326.0,12,Mountain
+1989,Khaibar,5,8106.0,3370.0,12,Mountain
+1995,Hajariya,0,8080.0,3438.0,12,Mountain
+1995,Hajariya,1,8101.0,3427.0,12,Mountain
+1995,Hajariya,2,8115.0,3472.0,12,Mountain
+1995,Hajariya,3,8123.0,3438.0,12,Mountain
+1995,Hajariya,4,8130.0,3484.0,12,Mountain
+1996,Sabiya,0,8155.0,3639.0,12,Mountain
+1996,Sabiya,1,8168.0,3649.0,12,Mountain
+1996,Sabiya,2,8177.0,3672.0,12,Mountain
+1996,Sabiya,3,8190.0,3664.0,12,Mountain
+1996,Sabiya,4,8192.0,3728.0,12,Mountain
+1996,Sabiya,5,8196.0,3700.0,12,Mountain
+2012,Dhamar,0,8240.0,3761.0,12,Mountain
+2012,Dhamar,1,8265.0,3754.0,12,Mountain
+2012,Dhamar,2,8275.0,3771.0,12,Mountain
+2012,Dhamar,3,8302.0,3766.0,12,Mountain
+2015,Mocha,0,8222.0,3816.0,12,Mountain
+2015,Mocha,1,8231.0,3836.0,12,Mountain
+2017,Qadhima,0,7999.0,3413.0,12,Mountain
+2017,Qadhima,1,8011.0,3420.0,12,Mountain
+2017,Qadhima,2,8024.0,3419.0,12,Mountain
+2025,Aden,0,8269.0,3872.0,12,Mountain
+2025,Aden,1,8289.0,3850.0,12,Mountain
+2025,Aden,2,8316.0,3839.0,12,Mountain
+2025,Aden,3,8346.0,3835.0,12,Mountain
+2027,Sakwa,0,8348.0,3798.0,12,Mountain
+2027,Sakwa,1,8359.0,3785.0,12,Mountain
+2027,Sakwa,2,8385.0,3779.0,12,Mountain
+2027,Sakwa,3,8399.0,3758.0,12,Mountain
+2037,Damascus,0,7886.0,2832.0,12,Mountain
+2037,Damascus,1,7894.0,2850.0,12,Mountain
+2080,Amol,0,8491.0,2646.0,12,Mountain
+2080,Amol,1,8508.0,2651.0,12,Mountain
+2080,Amol,2,8526.0,2660.0,12,Mountain
+2080,Amol,3,8544.0,2669.0,12,Mountain
+2080,Amol,4,8559.0,2658.0,12,Mountain
+2080,Amol,5,8559.0,2697.0,12,Mountain
+2080,Amol,6,8562.0,2678.0,12,Mountain
+2081,Gyumri,0,8161.0,2349.0,12,Mountain
+2081,Gyumri,1,8167.0,2373.0,12,Mountain
+2081,Gyumri,2,8178.0,2358.0,12,Mountain
+2081,Gyumri,3,8180.0,2377.0,12,Mountain
+2081,Gyumri,4,8190.0,2404.0,12,Mountain
+2081,Gyumri,5,8198.0,2378.0,12,Mountain
+2081,Gyumri,6,8204.0,2404.0,12,Mountain
+2081,Gyumri,7,8213.0,2412.0,12,Mountain
+2081,Gyumri,8,8214.0,2387.0,12,Mountain
+2081,Gyumri,9,8216.0,2401.0,12,Mountain
+2081,Gyumri,10,8238.0,2428.0,12,Mountain
+2086,Urmia,0,8206.0,2524.0,12,Mountain
+2086,Urmia,1,8214.0,2499.0,12,Mountain
+2086,Urmia,2,8217.0,2448.0,12,Mountain
+2086,Urmia,3,8220.0,2470.0,12,Mountain
+2086,Urmia,4,8222.0,2515.0,12,Mountain
+2086,Urmia,5,8222.0,2540.0,12,Mountain
+2086,Urmia,6,8228.0,2491.0,12,Mountain
+2086,Urmia,7,8235.0,2481.0,12,Mountain
+2086,Urmia,8,8243.0,2502.0,12,Mountain
+2096,Mashhad,0,8704.0,2574.0,12,Mountain
+2096,Mashhad,1,8706.0,2605.0,12,Mountain
+2096,Mashhad,2,8714.0,2661.0,12,Mountain
+2096,Mashhad,3,8720.0,2591.0,12,Mountain
+2096,Mashhad,4,8730.0,2638.0,12,Mountain
+2096,Mashhad,5,8740.0,2607.0,12,Mountain
+2096,Mashhad,6,8745.0,2642.0,12,Mountain
+2096,Mashhad,7,8769.0,2611.0,12,Mountain
+2096,Mashhad,8,8771.0,2644.0,12,Mountain
+2096,Mashhad,9,8784.0,2630.0,12,Mountain
+2097,Gorgan,0,8604.0,2620.0,12,Mountain
+2097,Gorgan,1,8606.0,2646.0,12,Mountain
+2097,Gorgan,2,8616.0,2710.0,12,Mountain
+2097,Gorgan,3,8620.0,2636.0,12,Mountain
+2097,Gorgan,4,8620.0,2694.0,12,Mountain
+2097,Gorgan,5,8624.0,2608.0,12,Mountain
+2097,Gorgan,6,8636.0,2667.0,12,Mountain
+2097,Gorgan,7,8638.0,2595.0,12,Mountain
+2097,Gorgan,8,8641.0,2685.0,12,Mountain
+2097,Gorgan,9,8643.0,2633.0,12,Mountain
+2097,Gorgan,10,8656.0,2646.0,12,Mountain
+2097,Gorgan,11,8658.0,2599.0,12,Mountain
+2097,Gorgan,12,8661.0,2623.0,12,Mountain
+2111,Jelalabad,0,9140.0,2690.0,12,Mountain
+2111,Jelalabad,1,9142.0,2715.0,12,Mountain
+2111,Jelalabad,2,9149.0,2728.0,12,Mountain
+2111,Jelalabad,3,9159.0,2688.0,12,Mountain
+2111,Jelalabad,4,9162.0,2667.0,12,Mountain
+2111,Jelalabad,5,9162.0,2741.0,12,Mountain
+2111,Jelalabad,6,9166.0,2704.0,12,Mountain
+2111,Jelalabad,7,9173.0,2662.0,12,Mountain
+2111,Jelalabad,8,9177.0,2644.0,12,Mountain
+2111,Jelalabad,9,9178.0,2622.0,12,Mountain
+2111,Jelalabad,10,9180.0,2724.0,12,Mountain
+2111,Jelalabad,11,9182.0,2738.0,12,Mountain
+2111,Jelalabad,12,9186.0,2688.0,12,Mountain
+2111,Jelalabad,13,9191.0,2667.0,12,Mountain
+2111,Jelalabad,14,9191.0,2708.0,12,Mountain
+2118,Faizabad,0,9109.0,2589.0,12,Mountain
+2118,Faizabad,1,9112.0,2619.0,12,Mountain
+2118,Faizabad,2,9112.0,2634.0,12,Mountain
+2118,Faizabad,3,9127.0,2637.0,12,Mountain
+2118,Faizabad,4,9128.0,2581.0,12,Mountain
+2118,Faizabad,5,9128.0,2598.0,12,Mountain
+2118,Faizabad,6,9131.0,2536.0,12,Mountain
+2118,Faizabad,7,9132.0,2615.0,12,Mountain
+2118,Faizabad,8,9138.0,2564.0,12,Mountain
+2118,Faizabad,9,9143.0,2598.0,12,Mountain
+2118,Faizabad,10,9145.0,2623.0,12,Mountain
+2118,Faizabad,11,9151.0,2609.0,12,Mountain
+2118,Faizabad,12,9153.0,2585.0,12,Mountain
+2129,Leh,0,9466.0,2740.0,12,Mountain
+2129,Leh,1,9477.0,2705.0,12,Mountain
+2129,Leh,2,9480.0,2667.0,12,Mountain
+2129,Leh,3,9488.0,2688.0,12,Mountain
+2129,Leh,4,9495.0,2669.0,12,Mountain
+2129,Leh,5,9510.0,2722.0,12,Mountain
+2129,Leh,6,9511.0,2681.0,12,Mountain
+2129,Leh,7,9521.0,2700.0,12,Mountain
+2129,Leh,8,9525.0,2674.0,12,Mountain
+2129,Leh,9,9540.0,2665.0,12,Mountain
+2129,Leh,10,9542.0,2688.0,12,Mountain
+2129,Leh,11,9554.0,2670.0,12,Mountain
+2129,Leh,12,9562.0,2691.0,12,Mountain
+2131,Gilgit,0,9217.0,2624.0,12,Mountain
+2131,Gilgit,1,9228.0,2631.0,12,Mountain
+2131,Gilgit,2,9236.0,2644.0,12,Mountain
+2131,Gilgit,3,9239.0,2659.0,12,Mountain
+2131,Gilgit,4,9241.0,2623.0,12,Mountain
+2131,Gilgit,5,9245.0,2642.0,12,Mountain
+2131,Gilgit,6,9258.0,2659.0,12,Mountain
+2131,Gilgit,7,9263.0,2638.0,12,Mountain
+2131,Gilgit,8,9280.0,2620.0,12,Mountain
+2131,Gilgit,9,9290.0,2637.0,12,Mountain
+2131,Gilgit,10,9294.0,2659.0,12,Mountain
+2131,Gilgit,11,9302.0,2618.0,12,Mountain
+2131,Gilgit,12,9302.0,2638.0,12,Mountain
+2131,Gilgit,13,9316.0,2644.0,12,Mountain
+2131,Gilgit,14,9320.0,2622.0,12,Mountain
+2131,Gilgit,15,9323.0,2657.0,12,Mountain
+2131,Gilgit,16,9333.0,2614.0,12,Mountain
+2131,Gilgit,17,9333.0,2635.0,12,Mountain
+2229,Sil Garhi,0,9732.0,2993.0,12,Mountain
+2229,Sil Garhi,1,9740.0,2969.0,12,Mountain
+2229,Sil Garhi,2,9742.0,2956.0,12,Mountain
+2229,Sil Garhi,3,9761.0,2966.0,12,Mountain
+2229,Sil Garhi,4,9761.0,2979.0,12,Mountain
+2229,Sil Garhi,5,9774.0,2990.0,12,Mountain
+2229,Sil Garhi,6,9775.0,3022.0,12,Mountain
+2229,Sil Garhi,7,9794.0,2980.0,12,Mountain
+2229,Sil Garhi,8,9801.0,2995.0,12,Mountain
+2231,Dhankuta,0,9971.0,3095.0,12,Mountain
+2231,Dhankuta,1,9973.0,3056.0,12,Mountain
+2231,Dhankuta,2,9975.0,3102.0,12,Mountain
+2231,Dhankuta,3,9980.0,3061.0,12,Mountain
+2231,Dhankuta,4,9989.0,3074.0,12,Mountain
+2231,Dhankuta,5,9995.0,3061.0,12,Mountain
+2231,Dhankuta,6,9999.0,3083.0,12,Mountain
+2231,Dhankuta,7,10008.0,3075.0,12,Mountain
+2231,Dhankuta,8,10013.0,3065.0,12,Mountain
+2231,Dhankuta,9,10032.0,3076.0,12,Mountain
+2233,Bhadgaon,0,9911.0,3043.0,12,Mountain
+2233,Bhadgaon,1,9919.0,3039.0,12,Mountain
+2233,Bhadgaon,2,9926.0,3058.0,12,Mountain
+2233,Bhadgaon,3,9944.0,3048.0,12,Mountain
+2245,Punaka,0,10082.0,3058.0,14,Urban
+2245,Punaka,1,10085.0,3066.0,14,Urban
+2245,Punaka,2,10091.0,3076.0,14,Urban
+2245,Punaka,3,10100.0,3061.0,14,Urban
+2246,Bumtan,0,10120.0,3083.0,12,Mountain
+2246,Bumtan,1,10131.0,3078.0,12,Mountain
+2246,Bumtan,2,10131.0,3087.0,12,Mountain
+2246,Bumtan,3,10141.0,3081.0,12,Mountain
+2261,Lungnak,0,9593.0,2541.0,12,Mountain
+2261,Lungnak,1,9601.0,2546.0,12,Mountain
+2261,Lungnak,2,9612.0,2514.0,12,Mountain
+2261,Lungnak,3,9617.0,2529.0,12,Mountain
+2261,Lungnak,4,9620.0,2543.0,12,Mountain
+2261,Lungnak,5,9626.0,2574.0,12,Mountain
+2261,Lungnak,6,9636.0,2525.0,12,Mountain
+2261,Lungnak,7,9667.0,2577.0,12,Mountain
+2261,Lungnak,8,9690.0,2569.0,12,Mountain
+2261,Lungnak,9,9691.0,2590.0,12,Mountain
+2261,Lungnak,10,9697.0,2540.0,12,Mountain
+2262,Lashung,0,9703.0,2632.0,12,Mountain
+2262,Lashung,1,9725.0,2662.0,12,Mountain
+2262,Lashung,2,9731.0,2614.0,12,Mountain
+2262,Lashung,3,9750.0,2638.0,12,Mountain
+2262,Lashung,4,9770.0,2563.0,12,Mountain
+2262,Lashung,5,9780.0,2610.0,12,Mountain
+2262,Lashung,6,9800.0,2608.0,12,Mountain
+2262,Lashung,7,9804.0,2583.0,12,Mountain
+2262,Lashung,8,9815.0,2564.0,12,Mountain
+2262,Lashung,9,9819.0,2626.0,12,Mountain
+2262,Lashung,10,9841.0,2559.0,12,Mountain
+2264,Rudok,0,9565.0,2570.0,12,Mountain
+2264,Rudok,1,9572.0,2581.0,12,Mountain
+2264,Rudok,2,9576.0,2558.0,12,Mountain
+2264,Rudok,3,9576.0,2610.0,12,Mountain
+2264,Rudok,4,9586.0,2648.0,12,Mountain
+2264,Rudok,5,9605.0,2607.0,12,Mountain
+2264,Rudok,6,9622.0,2634.0,12,Mountain
+2264,Rudok,7,9626.0,2682.0,12,Mountain
+2264,Rudok,8,9636.0,2698.0,12,Mountain
+2264,Rudok,9,9651.0,2635.0,12,Mountain
+2264,Rudok,10,9676.0,2662.0,12,Mountain
+2266,Ladse Dzong,0,9891.0,3004.0,12,Mountain
+2266,Ladse Dzong,1,9898.0,2996.0,12,Mountain
+2266,Ladse Dzong,2,9898.0,3011.0,12,Mountain
+2266,Ladse Dzong,3,9910.0,2992.0,12,Mountain
+2266,Ladse Dzong,4,9919.0,3007.0,12,Mountain
+2266,Ladse Dzong,5,9923.0,2990.0,12,Mountain
+2266,Ladse Dzong,6,9928.0,2981.0,12,Mountain
+2266,Ladse Dzong,7,9933.0,3003.0,12,Mountain
+2266,Ladse Dzong,8,9946.0,2996.0,12,Mountain
+2266,Ladse Dzong,9,9953.0,3018.0,12,Mountain
+2266,Ladse Dzong,10,9956.0,2994.0,12,Mountain
+2266,Ladse Dzong,11,9959.0,2967.0,12,Mountain
+2266,Ladse Dzong,12,9963.0,3010.0,12,Mountain
+2266,Ladse Dzong,13,9972.0,3005.0,12,Mountain
+2266,Ladse Dzong,14,9978.0,3023.0,12,Mountain
+2266,Ladse Dzong,15,9993.0,2990.0,12,Mountain
+2266,Ladse Dzong,16,10000.0,3025.0,12,Mountain
+2266,Ladse Dzong,17,10004.0,3013.0,12,Mountain
+2270,Tradum,0,9776.0,2939.0,12,Mountain
+2270,Tradum,1,9796.0,2946.0,12,Mountain
+2270,Tradum,2,9798.0,2926.0,12,Mountain
+2270,Tradum,3,9807.0,2931.0,12,Mountain
+2270,Tradum,4,9813.0,2907.0,12,Mountain
+2270,Tradum,5,9819.0,2875.0,12,Mountain
+2270,Tradum,6,9819.0,2894.0,12,Mountain
+2270,Tradum,7,9820.0,2957.0,12,Mountain
+2270,Tradum,8,9824.0,2921.0,12,Mountain
+2270,Tradum,9,9831.0,2941.0,12,Mountain
+2270,Tradum,10,9836.0,2929.0,12,Mountain
+2270,Tradum,11,9842.0,2958.0,12,Mountain
+2270,Tradum,12,9847.0,2940.0,12,Mountain
+2270,Tradum,13,9850.0,2973.0,12,Mountain
+2270,Tradum,14,9860.0,2944.0,12,Mountain
+2270,Tradum,15,9860.0,2961.0,12,Mountain
+2270,Tradum,16,9869.0,2973.0,12,Mountain
+2270,Tradum,17,9872.0,2936.0,12,Mountain
+2270,Tradum,18,9875.0,2959.0,12,Mountain
+2272,Chetang,0,10143.0,2977.0,12,Mountain
+2272,Chetang,1,10149.0,2953.0,12,Mountain
+2272,Chetang,2,10152.0,2991.0,12,Mountain
+2272,Chetang,3,10156.0,3015.0,12,Mountain
+2272,Chetang,4,10164.0,2960.0,12,Mountain
+2272,Chetang,5,10167.0,2976.0,12,Mountain
+2272,Chetang,6,10171.0,2931.0,12,Mountain
+2272,Chetang,7,10171.0,2947.0,12,Mountain
+2272,Chetang,8,10177.0,2957.0,12,Mountain
+2272,Chetang,9,10178.0,2984.0,12,Mountain
+2272,Chetang,10,10184.0,2965.0,12,Mountain
+2272,Chetang,11,10188.0,2931.0,12,Mountain
+2272,Chetang,12,10194.0,2946.0,12,Mountain
+2272,Chetang,13,10195.0,2961.0,12,Mountain
+2272,Chetang,14,10212.0,2957.0,12,Mountain
+2273,Dhirang Dzong,0,10149.0,3044.0,14,Urban
+2273,Dhirang Dzong,1,10158.0,3030.0,14,Urban
+2273,Dhirang Dzong,2,10158.0,3055.0,14,Urban
+2273,Dhirang Dzong,3,10171.0,3045.0,14,Urban
+2274,Tsari,0,10173.0,3028.0,12,Mountain
+2274,Tsari,1,10189.0,3043.0,12,Mountain
+2274,Tsari,2,10198.0,3025.0,12,Mountain
+2274,Tsari,3,10200.0,2996.0,12,Mountain
+2274,Tsari,4,10201.0,3034.0,12,Mountain
+2274,Tsari,5,10210.0,3043.0,12,Mountain
+2274,Tsari,6,10211.0,3009.0,12,Mountain
+2274,Tsari,7,10212.0,2986.0,12,Mountain
+2274,Tsari,8,10220.0,2992.0,12,Mountain
+2274,Tsari,9,10225.0,2982.0,12,Mountain
+2274,Tsari,10,10226.0,3024.0,12,Mountain
+2274,Tsari,11,10232.0,3009.0,12,Mountain
+2274,Tsari,12,10237.0,2961.0,12,Mountain
+2274,Tsari,13,10240.0,2951.0,12,Mountain
+2274,Tsari,14,10242.0,2989.0,12,Mountain
+2274,Tsari,15,10249.0,2979.0,12,Mountain
+2274,Tsari,16,10252.0,2965.0,12,Mountain
+2274,Tsari,17,10260.0,2950.0,12,Mountain
+2274,Tsari,18,10262.0,2998.0,12,Mountain
+2274,Tsari,19,10273.0,2986.0,12,Mountain
+2274,Tsari,20,10275.0,2967.0,12,Mountain
+2274,Tsari,21,10292.0,2958.0,12,Mountain
+2275,Phondu,0,10087.0,2892.0,12,Mountain
+2275,Phondu,1,10088.0,2914.0,12,Mountain
+2275,Phondu,2,10130.0,2900.0,12,Mountain
+2275,Phondu,3,10139.0,2909.0,12,Mountain
+2275,Phondu,4,10153.0,2876.0,12,Mountain
+2275,Phondu,5,10177.0,2901.0,12,Mountain
+2276,Ed Dzong,0,10040.0,2803.0,12,Mountain
+2276,Ed Dzong,1,10059.0,2807.0,12,Mountain
+2276,Ed Dzong,2,10079.0,2787.0,12,Mountain
+2276,Ed Dzong,3,10084.0,2848.0,12,Mountain
+2276,Ed Dzong,4,10120.0,2864.0,12,Mountain
+2276,Ed Dzong,5,10122.0,2815.0,12,Mountain
+2276,Ed Dzong,6,10150.0,2848.0,12,Mountain
+2280,Gyangtse,0,10022.0,3034.0,12,Mountain
+2280,Gyangtse,1,10030.0,3034.0,12,Mountain
+2280,Gyangtse,2,10038.0,3026.0,12,Mountain
+2280,Gyangtse,3,10062.0,2978.0,12,Mountain
+2280,Gyangtse,4,10068.0,3035.0,12,Mountain
+2280,Gyangtse,5,10075.0,3023.0,12,Mountain
+2280,Gyangtse,6,10076.0,3032.0,12,Mountain
+2280,Gyangtse,7,10085.0,3019.0,12,Mountain
+2280,Gyangtse,8,10087.0,3002.0,12,Mountain
+2280,Gyangtse,9,10094.0,3024.0,12,Mountain
+2280,Gyangtse,10,10117.0,3032.0,12,Mountain
+2280,Gyangtse,11,10127.0,3023.0,12,Mountain
+2280,Gyangtse,12,10131.0,3046.0,12,Mountain
+2280,Gyangtse,13,10144.0,3028.0,12,Mountain
+2281,Lhari,0,10192.0,2863.0,12,Mountain
+2281,Lhari,1,10198.0,2904.0,12,Mountain
+2281,Lhari,2,10208.0,2883.0,12,Mountain
+2281,Lhari,3,10211.0,2917.0,12,Mountain
+2281,Lhari,4,10215.0,2852.0,12,Mountain
+2281,Lhari,5,10220.0,2931.0,12,Mountain
+2281,Lhari,6,10222.0,2902.0,12,Mountain
+2281,Lhari,7,10225.0,2883.0,12,Mountain
+2281,Lhari,8,10233.0,2911.0,12,Mountain
+2281,Lhari,9,10234.0,2888.0,12,Mountain
+2281,Lhari,10,10238.0,2862.0,12,Mountain
+2281,Lhari,11,10238.0,2926.0,12,Mountain
+2281,Lhari,12,10243.0,2873.0,12,Mountain
+2281,Lhari,13,10248.0,2894.0,12,Mountain
+2281,Lhari,14,10256.0,2924.0,12,Mountain
+2281,Lhari,15,10258.0,2870.0,12,Mountain
+2281,Lhari,16,10262.0,2841.0,12,Mountain
+2281,Lhari,17,10267.0,2910.0,12,Mountain
+2281,Lhari,18,10272.0,2882.0,12,Mountain
+2281,Lhari,19,10272.0,2900.0,12,Mountain
+2281,Lhari,20,10274.0,2831.0,12,Mountain
+2281,Lhari,21,10283.0,2853.0,12,Mountain
+2281,Lhari,22,10285.0,2871.0,12,Mountain
+2281,Lhari,23,10290.0,2899.0,12,Mountain
+2282,Chamchu,0,9667.0,2734.0,12,Mountain
+2282,Chamchu,1,9676.0,2709.0,12,Mountain
+2282,Chamchu,2,9683.0,2750.0,12,Mountain
+2282,Chamchu,3,9713.0,2702.0,12,Mountain
+2283,Parka,0,9700.0,2878.0,12,Mountain
+2283,Parka,1,9713.0,2868.0,12,Mountain
+2283,Parka,2,9720.0,2836.0,12,Mountain
+2283,Parka,3,9723.0,2819.0,12,Mountain
+2283,Parka,4,9725.0,2854.0,12,Mountain
+2283,Parka,5,9726.0,2874.0,12,Mountain
+2283,Parka,6,9727.0,2846.0,12,Mountain
+2283,Parka,7,9732.0,2835.0,12,Mountain
+2283,Parka,8,9735.0,2860.0,12,Mountain
+2283,Parka,9,9735.0,2876.0,12,Mountain
+2283,Parka,10,9746.0,2882.0,12,Mountain
+2283,Parka,11,9749.0,2865.0,12,Mountain
+2283,Parka,12,9750.0,2821.0,12,Mountain
+2283,Parka,13,9751.0,2845.0,12,Mountain
+2283,Parka,14,9752.0,2907.0,12,Mountain
+2283,Parka,15,9753.0,2856.0,12,Mountain
+2283,Parka,16,9754.0,2877.0,12,Mountain
+2283,Parka,17,9759.0,2913.0,12,Mountain
+2283,Parka,18,9760.0,2888.0,12,Mountain
+2283,Parka,19,9770.0,2880.0,12,Mountain
+2283,Parka,20,9772.0,2900.0,12,Mountain
+2283,Parka,21,9773.0,2865.0,12,Mountain
+2284,Nagron,0,9765.0,2671.0,12,Mountain
+2284,Nagron,1,9791.0,2747.0,12,Mountain
+2284,Nagron,2,9801.0,2663.0,12,Mountain
+2284,Nagron,3,9810.0,2703.0,12,Mountain
+2284,Nagron,4,9836.0,2731.0,12,Mountain
+2284,Nagron,5,9851.0,2697.0,12,Mountain
+2285,Selipuk,0,9740.0,2732.0,12,Mountain
+2285,Selipuk,1,9759.0,2784.0,12,Mountain
+2287,Demchok,0,9549.0,2750.0,12,Mountain
+2287,Demchok,1,9560.0,2724.0,12,Mountain
+2287,Demchok,2,9560.0,2734.0,12,Mountain
+2287,Demchok,3,9560.0,2751.0,12,Mountain
+2287,Demchok,4,9571.0,2762.0,12,Mountain
+2287,Demchok,5,9572.0,2752.0,12,Mountain
+2287,Demchok,6,9578.0,2730.0,12,Mountain
+2287,Demchok,7,9582.0,2745.0,12,Mountain
+2287,Demchok,8,9591.0,2777.0,12,Mountain
+2287,Demchok,9,9597.0,2744.0,12,Mountain
+2287,Demchok,10,9600.0,2762.0,12,Mountain
+2287,Demchok,11,9608.0,2773.0,12,Mountain
+2287,Demchok,12,9611.0,2719.0,12,Mountain
+2288,Djiacham,0,9636.0,2791.0,12,Mountain
+2288,Djiacham,1,9647.0,2797.0,12,Mountain
+2288,Djiacham,2,9650.0,2810.0,12,Mountain
+2288,Djiacham,3,9667.0,2791.0,12,Mountain
+2288,Djiacham,4,9669.0,2816.0,12,Mountain
+2288,Djiacham,5,9677.0,2809.0,12,Mountain
+2288,Djiacham,6,9686.0,2788.0,12,Mountain
+2288,Djiacham,7,9687.0,2801.0,12,Mountain
+2288,Djiacham,8,9687.0,2831.0,12,Mountain
+2288,Djiacham,9,9689.0,2820.0,12,Mountain
+2289,Namling,0,10003.0,2956.0,12,Mountain
+2289,Namling,1,10012.0,2895.0,12,Mountain
+2289,Namling,2,10026.0,2848.0,12,Mountain
+2289,Namling,3,10046.0,2941.0,12,Mountain
+2289,Namling,4,10052.0,2892.0,12,Mountain
+2292,Yuangchang,0,10505.0,3107.0,12,Mountain
+2292,Yuangchang,1,10507.0,3130.0,12,Mountain
+2292,Yuangchang,2,10518.0,3020.0,12,Mountain
+2292,Yuangchang,3,10521.0,3071.0,12,Mountain
+2292,Yuangchang,4,10522.0,3044.0,12,Mountain
+2292,Yuangchang,5,10524.0,3138.0,12,Mountain
+2292,Yuangchang,6,10526.0,3086.0,12,Mountain
+2292,Yuangchang,7,10527.0,3118.0,12,Mountain
+2292,Yuangchang,8,10531.0,3050.0,12,Mountain
+2292,Yuangchang,9,10539.0,3066.0,12,Mountain
+2292,Yuangchang,10,10544.0,3099.0,12,Mountain
+2292,Yuangchang,11,10547.0,3109.0,12,Mountain
+2292,Yuangchang,12,10548.0,3139.0,12,Mountain
+2292,Yuangchang,13,10549.0,3081.0,12,Mountain
+2294,Tungchwan,0,10635.0,3112.0,12,Mountain
+2294,Tungchwan,1,10646.0,3082.0,12,Mountain
+2294,Tungchwan,2,10653.0,3115.0,12,Mountain
+2294,Tungchwan,3,10655.0,3101.0,12,Mountain
+2294,Tungchwan,4,10656.0,3018.0,12,Mountain
+2294,Tungchwan,5,10656.0,3072.0,12,Mountain
+2294,Tungchwan,6,10659.0,3057.0,12,Mountain
+2294,Tungchwan,7,10660.0,3081.0,12,Mountain
+2294,Tungchwan,8,10664.0,3042.0,12,Mountain
+2294,Tungchwan,9,10677.0,3124.0,12,Mountain
+2294,Tungchwan,10,10682.0,3101.0,12,Mountain
+2294,Tungchwan,11,10683.0,3032.0,12,Mountain
+2296,Sinhing,0,10570.0,3102.0,12,Mountain
+2296,Sinhing,1,10574.0,3127.0,12,Mountain
+2296,Sinhing,2,10580.0,3149.0,12,Mountain
+2296,Sinhing,3,10580.0,3174.0,12,Mountain
+2296,Sinhing,4,10582.0,3162.0,12,Mountain
+2296,Sinhing,5,10584.0,3131.0,12,Mountain
+2296,Sinhing,6,10593.0,3114.0,12,Mountain
+2296,Sinhing,7,10602.0,3129.0,12,Mountain
+2296,Sinhing,8,10602.0,3172.0,12,Mountain
+2296,Sinhing,9,10614.0,3123.0,12,Mountain
+2297,Lungling,0,10478.0,3184.0,12,Mountain
+2297,Lungling,1,10479.0,3164.0,12,Mountain
+2297,Lungling,2,10522.0,3198.0,12,Mountain
+2297,Lungling,3,10528.0,3167.0,12,Mountain
+2297,Lungling,4,10535.0,3192.0,12,Mountain
+2297,Lungling,5,10536.0,3204.0,12,Mountain
+2297,Lungling,6,10540.0,3151.0,12,Mountain
+2297,Lungling,7,10545.0,3183.0,12,Mountain
+2297,Lungling,8,10553.0,3166.0,12,Mountain
+2308,Shiuchow,0,11208.0,3186.0,10,Plains
+2309,Chaochow,0,11249.0,3185.0,14,Urban
+2309,Chaochow,1,11250.0,3206.0,14,Urban
+2310,Linping,0,11199.0,3210.0,11,Hills
+2319,Liuzhou,0,10874.0,3173.0,12,Mountain
+2319,Liuzhou,1,10900.0,3199.0,12,Mountain
+2319,Liuzhou,2,10911.0,3177.0,12,Mountain
+2319,Liuzhou,3,10928.0,3185.0,12,Mountain
+2334,Wenchow,0,11367.0,2922.0,12,Mountain
+2334,Wenchow,1,11373.0,2935.0,12,Mountain
+2334,Wenchow,2,11374.0,2952.0,12,Mountain
+2334,Wenchow,3,11383.0,2905.0,12,Mountain
+2348,Chuanchow,0,11260.0,3116.0,12,Mountain
+2348,Chuanchow,1,11273.0,3131.0,12,Mountain
+2348,Chuanchow,2,11283.0,3149.0,12,Mountain
+2385,Lao-Kai,0,10688.0,3246.0,12,Mountain
+2385,Lao-Kai,1,10718.0,3279.0,12,Mountain
+2385,Lao-Kai,2,10724.0,3239.0,12,Mountain
+2385,Lao-Kai,3,10726.0,3310.0,12,Mountain
+2385,Lao-Kai,4,10745.0,3233.0,12,Mountain
+2385,Lao-Kai,5,10747.0,3269.0,12,Mountain
+2392,Tourane,0,10968.0,3680.0,11,Hills
+2395,Kratié,0,10942.0,3686.0,13,Forest
+2395,Kratié,1,10949.0,3708.0,13,Forest
+2434,Murun,0,10196.0,1851.0,12,Mountain
+2434,Murun,1,10220.0,1869.0,12,Mountain
+2434,Murun,2,10223.0,1810.0,12,Mountain
+2434,Murun,3,10231.0,1908.0,12,Mountain
+2434,Murun,4,10261.0,1859.0,12,Mountain
+2434,Murun,5,10278.0,1873.0,12,Mountain
+2437,Ulgii,0,9672.0,1858.0,12,Mountain
+2437,Ulgii,1,9696.0,1819.0,12,Mountain
+2437,Ulgii,2,9726.0,1865.0,12,Mountain
+2437,Ulgii,3,9745.0,1905.0,12,Mountain
+2437,Ulgii,4,9776.0,1833.0,12,Mountain
+2437,Ulgii,5,9826.0,1929.0,12,Mountain
+2437,Ulgii,6,9830.0,1866.0,12,Mountain
+2454,Niya,0,9394.0,2606.0,12,Mountain
+2454,Niya,1,9395.0,2596.0,12,Mountain
+2454,Niya,2,9407.0,2588.0,12,Mountain
+2454,Niya,3,9414.0,2598.0,12,Mountain
+2454,Niya,4,9416.0,2481.0,12,Mountain
+2454,Niya,5,9419.0,2512.0,12,Mountain
+2454,Niya,6,9424.0,2526.0,12,Mountain
+2454,Niya,7,9431.0,2495.0,12,Mountain
+2454,Niya,8,9431.0,2586.0,12,Mountain
+2454,Niya,9,9441.0,2550.0,12,Mountain
+2454,Niya,10,9444.0,2515.0,12,Mountain
+2454,Niya,11,9448.0,2595.0,12,Mountain
+2454,Niya,12,9455.0,2502.0,12,Mountain
+2454,Niya,13,9471.0,2492.0,12,Mountain
+2454,Niya,14,9472.0,2521.0,12,Mountain
+2454,Niya,15,9473.0,2600.0,12,Mountain
+2454,Niya,16,9476.0,2560.0,12,Mountain
+2454,Niya,17,9479.0,2618.0,12,Mountain
+2454,Niya,18,9482.0,2512.0,12,Mountain
+2454,Niya,19,9485.0,2636.0,12,Mountain
+2454,Niya,20,9493.0,2527.0,12,Mountain
+2454,Niya,21,9493.0,2618.0,12,Mountain
+2454,Niya,22,9497.0,2501.0,12,Mountain
+2454,Niya,23,9501.0,2573.0,12,Mountain
+2454,Niya,24,9502.0,2597.0,12,Mountain
+2454,Niya,25,9503.0,2635.0,12,Mountain
+2454,Niya,26,9505.0,2624.0,12,Mountain
+2454,Niya,27,9510.0,2527.0,12,Mountain
+2454,Niya,28,9511.0,2545.0,12,Mountain
+2454,Niya,29,9516.0,2620.0,12,Mountain
+2454,Niya,30,9529.0,2533.0,12,Mountain
+2454,Niya,31,9541.0,2636.0,12,Mountain
+2456,Chochiang,0,9711.0,2380.0,12,Mountain
+2456,Chochiang,1,9716.0,2407.0,12,Mountain
+2456,Chochiang,2,9716.0,2485.0,12,Mountain
+2456,Chochiang,3,9720.0,2458.0,12,Mountain
+2456,Chochiang,4,9726.0,2390.0,12,Mountain
+2456,Chochiang,5,9728.0,2437.0,12,Mountain
+2456,Chochiang,6,9731.0,2484.0,12,Mountain
+2456,Chochiang,7,9733.0,2380.0,12,Mountain
+2456,Chochiang,8,9737.0,2518.0,12,Mountain
+2456,Chochiang,9,9744.0,2454.0,12,Mountain
+2456,Chochiang,10,9768.0,2415.0,12,Mountain
+2456,Chochiang,11,9779.0,2386.0,12,Mountain
+2456,Chochiang,12,9824.0,2380.0,12,Mountain
+2456,Chochiang,13,9827.0,2403.0,12,Mountain
+2456,Chochiang,14,9839.0,2366.0,12,Mountain
+2458,Yutien,0,9254.0,2588.0,12,Mountain
+2458,Yutien,1,9271.0,2588.0,12,Mountain
+2458,Yutien,2,9274.0,2522.0,12,Mountain
+2458,Yutien,3,9275.0,2485.0,12,Mountain
+2458,Yutien,4,9280.0,2569.0,12,Mountain
+2458,Yutien,5,9282.0,2497.0,12,Mountain
+2458,Yutien,6,9283.0,2536.0,12,Mountain
+2458,Yutien,7,9298.0,2486.0,12,Mountain
+2458,Yutien,8,9299.0,2578.0,12,Mountain
+2458,Yutien,9,9302.0,2510.0,12,Mountain
+2458,Yutien,10,9310.0,2477.0,12,Mountain
+2458,Yutien,11,9318.0,2541.0,12,Mountain
+2458,Yutien,12,9319.0,2510.0,12,Mountain
+2458,Yutien,13,9323.0,2586.0,12,Mountain
+2458,Yutien,14,9331.0,2566.0,12,Mountain
+2458,Yutien,15,9333.0,2492.0,12,Mountain
+2458,Yutien,16,9336.0,2533.0,12,Mountain
+2458,Yutien,17,9345.0,2569.0,12,Mountain
+2458,Yutien,18,9348.0,2540.0,12,Mountain
+2458,Yutien,19,9351.0,2584.0,12,Mountain
+2458,Yutien,20,9359.0,2500.0,12,Mountain
+2458,Yutien,21,9367.0,2556.0,12,Mountain
+2458,Yutien,22,9373.0,2532.0,12,Mountain
+2458,Yutien,23,9384.0,2513.0,12,Mountain
+2472,Kargilik,0,9161.0,2505.0,12,Mountain
+2472,Kargilik,1,9171.0,2533.0,12,Mountain
+2472,Kargilik,2,9173.0,2495.0,12,Mountain
+2472,Kargilik,3,9178.0,2562.0,12,Mountain
+2472,Kargilik,4,9184.0,2515.0,12,Mountain
+2472,Kargilik,5,9186.0,2546.0,12,Mountain
+2472,Kargilik,6,9195.0,2569.0,12,Mountain
+2472,Kargilik,7,9200.0,2497.0,12,Mountain
+2472,Kargilik,8,9201.0,2531.0,12,Mountain
+2472,Kargilik,9,9201.0,2595.0,12,Mountain
+2472,Kargilik,10,9202.0,2583.0,12,Mountain
+2472,Kargilik,11,9207.0,2516.0,12,Mountain
+2472,Kargilik,12,9208.0,2557.0,12,Mountain
+2472,Kargilik,13,9215.0,2532.0,12,Mountain
+2472,Kargilik,14,9219.0,2476.0,12,Mountain
+2472,Kargilik,15,9222.0,2514.0,12,Mountain
+2472,Kargilik,16,9223.0,2497.0,12,Mountain
+2472,Kargilik,17,9223.0,2557.0,12,Mountain
+2472,Kargilik,18,9230.0,2482.0,12,Mountain
+2472,Kargilik,19,9246.0,2473.0,12,Mountain
+2474,Vash Shahri,0,9625.0,2451.0,12,Mountain
+2474,Vash Shahri,1,9635.0,2422.0,12,Mountain
+2474,Vash Shahri,2,9635.0,2472.0,12,Mountain
+2474,Vash Shahri,3,9636.0,2434.0,12,Mountain
+2474,Vash Shahri,4,9639.0,2458.0,12,Mountain
+2474,Vash Shahri,5,9647.0,2491.0,12,Mountain
+2474,Vash Shahri,6,9648.0,2408.0,12,Mountain
+2474,Vash Shahri,7,9668.0,2395.0,12,Mountain
+2474,Vash Shahri,8,9678.0,2395.0,12,Mountain
+2474,Vash Shahri,9,9678.0,2438.0,12,Mountain
+2474,Vash Shahri,10,9679.0,2460.0,12,Mountain
+2496,Iwamizawa,0,12040.0,2083.0,12,Mountain
+2496,Iwamizawa,1,12053.0,2076.0,12,Mountain
+2502,Kochi,0,11781.0,2659.0,12,Mountain
+2502,Kochi,1,11784.0,2653.0,12,Mountain
+2510,Yokohama,0,11983.0,2544.0,12,Mountain
+2510,Yokohama,1,11994.0,2548.0,12,Mountain
+2511,Nagoya,0,11938.0,2551.0,12,Mountain
+2511,Nagoya,1,11951.0,2550.0,12,Mountain
+2511,Nagoya,2,11955.0,2557.0,12,Mountain
+2521,Onjo,0,11598.0,2216.0,12,Mountain
+2521,Onjo,1,11603.0,2202.0,12,Mountain
+2521,Onjo,2,11622.0,2201.0,12,Mountain
+2522,Joshin,0,11566.0,2265.0,12,Mountain
+2522,Joshin,1,11576.0,2300.0,12,Mountain
+2523,Choshin,0,11493.0,2297.0,12,Mountain
+2523,Choshin,1,11512.0,2267.0,12,Mountain
+2523,Choshin,2,11520.0,2292.0,12,Mountain
+2542,Liangshan,0,10517.0,2982.0,12,Mountain
+2542,Liangshan,1,10530.0,2968.0,12,Mountain
+2542,Liangshan,2,10545.0,2991.0,12,Mountain
+2542,Liangshan,3,10547.0,3001.0,12,Mountain
+2542,Liangshan,4,10553.0,2979.0,12,Mountain
+2542,Liangshan,5,10557.0,3023.0,12,Mountain
+2542,Liangshan,6,10572.0,2978.0,12,Mountain
+2542,Liangshan,7,10574.0,3003.0,12,Mountain
+2542,Liangshan,8,10575.0,3040.0,12,Mountain
+2542,Liangshan,9,10576.0,3057.0,12,Mountain
+2542,Liangshan,10,10583.0,2956.0,12,Mountain
+2542,Liangshan,11,10585.0,2978.0,12,Mountain
+2542,Liangshan,12,10585.0,3029.0,12,Mountain
+2542,Liangshan,13,10589.0,2998.0,12,Mountain
+2542,Liangshan,14,10591.0,3054.0,12,Mountain
+2542,Liangshan,15,10594.0,2952.0,12,Mountain
+2542,Liangshan,16,10607.0,3009.0,12,Mountain
+2542,Liangshan,17,10610.0,3066.0,12,Mountain
+2542,Liangshan,18,10611.0,2985.0,12,Mountain
+2542,Liangshan,19,10616.0,3038.0,12,Mountain
+2542,Liangshan,20,10618.0,3014.0,12,Mountain
+2542,Liangshan,21,10626.0,2976.0,12,Mountain
+2542,Liangshan,22,10628.0,2996.0,12,Mountain
+2545,Ya'an,0,10590.0,2895.0,10,Plains
+2545,Ya'an,1,10595.0,2914.0,10,Plains
+2547,Garze,0,10572.0,2838.0,14,Urban
+2547,Garze,1,10587.0,2836.0,14,Urban
+2547,Garze,2,10587.0,2867.0,14,Urban
+2547,Garze,3,10598.0,2852.0,14,Urban
+2555,Daocheng,0,10466.0,2919.0,12,Mountain
+2555,Daocheng,1,10471.0,2898.0,12,Mountain
+2555,Daocheng,2,10475.0,2948.0,12,Mountain
+2555,Daocheng,3,10476.0,2936.0,12,Mountain
+2555,Daocheng,4,10485.0,2964.0,12,Mountain
+2555,Daocheng,5,10490.0,2920.0,12,Mountain
+2555,Daocheng,6,10495.0,2877.0,12,Mountain
+2555,Daocheng,7,10498.0,2953.0,12,Mountain
+2555,Daocheng,8,10507.0,2940.0,12,Mountain
+2555,Daocheng,9,10509.0,2882.0,12,Mountain
+2555,Daocheng,10,10527.0,2927.0,12,Mountain
+2555,Daocheng,11,10565.0,2908.0,12,Mountain
+2555,Daocheng,12,10575.0,2874.0,12,Mountain
+2564,Zogang,0,10321.0,2885.0,12,Mountain
+2564,Zogang,1,10321.0,2917.0,12,Mountain
+2564,Zogang,2,10330.0,2896.0,12,Mountain
+2564,Zogang,3,10333.0,2910.0,12,Mountain
+2564,Zogang,4,10346.0,2878.0,12,Mountain
+2564,Zogang,5,10348.0,2892.0,12,Mountain
+2564,Zogang,6,10356.0,2902.0,12,Mountain
+2564,Zogang,7,10361.0,2859.0,12,Mountain
+2564,Zogang,8,10365.0,2889.0,12,Mountain
+2564,Zogang,9,10377.0,2889.0,12,Mountain
+2564,Zogang,10,10381.0,2911.0,12,Mountain
+2564,Zogang,11,10382.0,2928.0,12,Mountain
+2564,Zogang,12,10389.0,2899.0,12,Mountain
+2564,Zogang,13,10401.0,2877.0,12,Mountain
+2564,Zogang,14,10402.0,2914.0,12,Mountain
+2564,Zogang,15,10418.0,2857.0,12,Mountain
+2564,Zogang,16,10419.0,2841.0,12,Mountain
+2564,Zogang,17,10420.0,2931.0,12,Mountain
+2564,Zogang,18,10426.0,2902.0,12,Mountain
+2564,Zogang,19,10427.0,2890.0,12,Mountain
+2564,Zogang,20,10436.0,2883.0,12,Mountain
+2564,Zogang,21,10444.0,2862.0,12,Mountain
+2610,Zadoi,0,10177.0,2779.0,12,Mountain
+2610,Zadoi,1,10202.0,2679.0,12,Mountain
+2610,Zadoi,2,10205.0,2814.0,12,Mountain
+2610,Zadoi,3,10213.0,2742.0,12,Mountain
+2610,Zadoi,4,10216.0,2797.0,12,Mountain
+2610,Zadoi,5,10217.0,2717.0,12,Mountain
+2610,Zadoi,6,10228.0,2697.0,12,Mountain
+2610,Zadoi,7,10229.0,2732.0,12,Mountain
+2610,Zadoi,8,10230.0,2790.0,12,Mountain
+2610,Zadoi,9,10235.0,2762.0,12,Mountain
+2610,Zadoi,10,10244.0,2787.0,12,Mountain
+2610,Zadoi,11,10251.0,2732.0,12,Mountain
+2610,Zadoi,12,10267.0,2678.0,12,Mountain
+2610,Zadoi,13,10275.0,2761.0,12,Mountain
+2610,Zadoi,14,10290.0,2714.0,12,Mountain
+2611,Long Poera,0,11265.0,4235.0,12,Mountain
+2611,Long Poera,1,11274.0,4269.0,12,Mountain
+2611,Long Poera,2,11297.0,4215.0,12,Mountain
+2621,Masamba,0,11526.0,4363.0,12,Mountain
+2625,Wutumeirenxiang,0,9791.0,2517.0,12,Mountain
+2625,Wutumeirenxiang,1,9822.0,2456.0,12,Mountain
+2625,Wutumeirenxiang,2,9829.0,2502.0,12,Mountain
+2625,Wutumeirenxiang,3,9836.0,2467.0,12,Mountain
+2625,Wutumeirenxiang,4,9873.0,2470.0,12,Mountain
+2625,Wutumeirenxiang,5,9875.0,2522.0,12,Mountain
+2625,Wutumeirenxiang,6,9880.0,2429.0,12,Mountain
+2625,Wutumeirenxiang,7,9909.0,2499.0,12,Mountain
+2625,Wutumeirenxiang,8,9922.0,2438.0,12,Mountain
+2625,Wutumeirenxiang,9,9945.0,2526.0,12,Mountain
+2625,Wutumeirenxiang,10,9947.0,2495.0,12,Mountain
+2625,Wutumeirenxiang,11,9961.0,2426.0,12,Mountain
+2625,Wutumeirenxiang,12,9967.0,2482.0,12,Mountain
+2625,Wutumeirenxiang,13,9968.0,2461.0,12,Mountain
+2625,Wutumeirenxiang,14,9998.0,2509.0,12,Mountain
+2634,Madoi,0,10124.0,2547.0,12,Mountain
+2634,Madoi,1,10137.0,2639.0,12,Mountain
+2634,Madoi,2,10142.0,2589.0,12,Mountain
+2634,Madoi,3,10160.0,2544.0,12,Mountain
+2634,Madoi,4,10180.0,2586.0,12,Mountain
+2634,Madoi,5,10182.0,2646.0,12,Mountain
+2634,Madoi,6,10201.0,2554.0,12,Mountain
+2634,Madoi,7,10205.0,2628.0,12,Mountain
+2634,Madoi,8,10210.0,2618.0,12,Mountain
+2634,Madoi,9,10211.0,2582.0,12,Mountain
+2634,Madoi,10,10243.0,2640.0,12,Mountain
+2669,Padang,0,10636.0,4323.0,12,Mountain
+2669,Padang,1,10668.0,4356.0,12,Mountain
+2723,Bairnsdale,0,12680.0,5742.0,13,Forest
+2723,Bairnsdale,1,12683.0,5727.0,13,Forest
+2723,Bairnsdale,2,12685.0,5756.0,13,Forest
+2725,Yaapeet,0,12435.0,5720.0,12,Mountain
+2725,Yaapeet,1,12435.0,5788.0,12,Mountain
+2725,Yaapeet,2,12438.0,5754.0,12,Mountain
+2730,Lismore,0,12753.0,5593.0,12,Mountain
+2730,Lismore,1,12754.0,5563.0,12,Mountain
+2730,Lismore,2,12781.0,5549.0,12,Mountain
+2744,Cairns,0,12461.0,5059.0,12,Mountain
+2744,Cairns,1,12489.0,5062.0,12,Mountain
+2744,Cairns,2,12491.0,5044.0,12,Mountain
+2744,Cairns,3,12503.0,5023.0,12,Mountain
+2771,Madang,0,12600.0,4469.0,12,Mountain
+2771,Madang,1,12608.0,4453.0,12,Mountain
+2771,Madang,2,12615.0,4459.0,12,Mountain
+2771,Madang,3,12625.0,4450.0,12,Mountain
+2772,Lae,0,12628.0,4503.0,12,Mountain
+2772,Lae,1,12649.0,4494.0,12,Mountain
+2772,Lae,2,12667.0,4490.0,12,Mountain
+2772,Lae,3,12674.0,4506.0,12,Mountain
+2772,Lae,4,12687.0,4506.0,12,Mountain
+2773,Morobe,0,12643.0,4553.0,12,Mountain
+2773,Morobe,1,12662.0,4565.0,12,Mountain
+2773,Morobe,2,12677.0,4558.0,12,Mountain
+2773,Morobe,3,12685.0,4575.0,12,Mountain
+2773,Morobe,4,12705.0,4590.0,12,Mountain
+2775,Agats,0,12417.0,4465.0,13,Forest
+2778,Tiom,0,12326.0,4391.0,12,Mountain
+2778,Tiom,1,12338.0,4410.0,12,Mountain
+2778,Tiom,2,12339.0,4401.0,12,Mountain
+2778,Tiom,3,12353.0,4397.0,12,Mountain
+2778,Tiom,4,12368.0,4405.0,12,Mountain
+2778,Tiom,5,12377.0,4418.0,12,Mountain
+2779,Aiambak,0,12466.0,4479.0,13,Forest
+2780,Tabubil,0,12422.0,4449.0,14,Urban
+2780,Tabubil,1,12430.0,4463.0,14,Urban
+2780,Tabubil,2,12447.0,4469.0,14,Urban
+2781,Wabag,0,12513.0,4481.0,12,Mountain
+2781,Wabag,1,12521.0,4472.0,12,Mountain
+2781,Wabag,2,12546.0,4470.0,12,Mountain
+2781,Wabag,3,12565.0,4454.0,12,Mountain
+2794,Otira,0,13149.0,6050.0,12,Mountain
+2794,Otira,1,13150.0,6058.0,12,Mountain
+2794,Otira,2,13162.0,6048.0,12,Mountain
+2794,Otira,3,13166.0,6043.0,12,Mountain
+2794,Otira,4,13174.0,6053.0,12,Mountain
+2800,Timaru,0,13148.0,6082.0,10,Plains
+2800,Timaru,1,13183.0,6066.0,10,Plains
+2805,Mokai,0,13404.0,5787.0,12,Mountain
+2805,Mokai,1,13423.0,5766.0,12,Mountain
+2805,Mokai,2,13426.0,5777.0,12,Mountain
+2805,Mokai,3,13436.0,5766.0,12,Mountain
+2810,Blenheim,0,13228.0,5977.0,12,Mountain
+2810,Blenheim,1,13239.0,5981.0,12,Mountain
+2810,Blenheim,2,13241.0,5993.0,12,Mountain
+2810,Blenheim,3,13248.0,5981.0,12,Mountain
+2810,Blenheim,4,13258.0,5981.0,12,Mountain
+2810,Blenheim,5,13266.0,5971.0,12,Mountain
+2812,Te Anau,0,12913.0,6192.0,12,Mountain
+2812,Te Anau,1,12928.0,6187.0,12,Mountain
+2812,Te Anau,2,12943.0,6175.0,12,Mountain
+2812,Te Anau,3,12954.0,6157.0,12,Mountain
+2812,Te Anau,4,12968.0,6157.0,12,Mountain
+2813,Hokitika,0,13089.0,6074.0,12,Mountain
+2813,Hokitika,1,13098.0,6076.0,12,Mountain
+2813,Hokitika,2,13106.0,6073.0,12,Mountain
+2813,Hokitika,3,13109.0,6094.0,12,Mountain
+2813,Hokitika,4,13115.0,6060.0,12,Mountain
+2813,Hokitika,5,13120.0,6082.0,12,Mountain
+2814,Wanaka,0,13004.0,6127.0,12,Mountain
+2814,Wanaka,1,13018.0,6133.0,12,Mountain
+2814,Wanaka,2,13025.0,6119.0,12,Mountain
+2814,Wanaka,3,13040.0,6131.0,12,Mountain
+2814,Wanaka,4,13051.0,6121.0,12,Mountain
+2814,Wanaka,5,13059.0,6102.0,12,Mountain
+2814,Wanaka,6,13072.0,6113.0,12,Mountain
+2832,Inta,0,8657.0,815.0,12,Mountain
+2832,Inta,1,8668.0,887.0,12,Mountain
+2832,Inta,2,8672.0,915.0,12,Mountain
+2832,Inta,3,8684.0,891.0,12,Mountain
+2832,Inta,4,8701.0,878.0,12,Mountain
+2832,Inta,5,8706.0,853.0,12,Mountain
+2832,Inta,6,8732.0,829.0,12,Mountain
+2832,Inta,7,8751.0,819.0,12,Mountain
+2832,Inta,8,8766.0,785.0,12,Mountain
+2832,Inta,9,8773.0,803.0,12,Mountain
+2832,Inta,10,8795.0,747.0,12,Mountain
+2832,Inta,11,8803.0,778.0,12,Mountain
+2832,Inta,12,8822.0,760.0,12,Mountain
+2864,Beryozovo,0,8672.0,975.0,12,Mountain
+2864,Beryozovo,1,8700.0,981.0,12,Mountain
+2864,Beryozovo,2,8713.0,958.0,12,Mountain
+2864,Beryozovo,3,8716.0,1010.0,12,Mountain
+2864,Beryozovo,4,8725.0,981.0,12,Mountain
+2864,Beryozovo,5,8741.0,965.0,12,Mountain
+2864,Beryozovo,6,8744.0,1019.0,12,Mountain
+2864,Beryozovo,7,8747.0,996.0,12,Mountain
+2864,Beryozovo,8,8765.0,1028.0,12,Mountain
+2865,Igrim,0,8662.0,1164.0,12,Mountain
+2865,Igrim,1,8670.0,1116.0,12,Mountain
+2865,Igrim,2,8671.0,1070.0,12,Mountain
+2865,Igrim,3,8676.0,1037.0,12,Mountain
+2865,Igrim,4,8688.0,1059.0,12,Mountain
+2865,Igrim,5,8696.0,1107.0,12,Mountain
+2865,Igrim,6,8700.0,1151.0,12,Mountain
+2865,Igrim,7,8725.0,1065.0,12,Mountain
+2865,Igrim,8,8729.0,1111.0,12,Mountain
+2865,Igrim,9,8741.0,1147.0,12,Mountain
+2865,Igrim,10,8742.0,1131.0,12,Mountain
+2865,Igrim,11,8748.0,1092.0,12,Mountain
+2865,Igrim,12,8770.0,1106.0,12,Mountain
+2865,Igrim,13,8771.0,1080.0,12,Mountain
+2897,Uchami,0,9914.0,864.0,12,Mountain
+2897,Uchami,1,9921.0,672.0,12,Mountain
+2897,Uchami,2,9923.0,771.0,12,Mountain
+2897,Uchami,3,9935.0,818.0,12,Mountain
+2897,Uchami,4,9941.0,902.0,12,Mountain
+2897,Uchami,5,9942.0,842.0,12,Mountain
+2897,Uchami,6,9943.0,754.0,12,Mountain
+2897,Uchami,7,9958.0,667.0,12,Mountain
+2897,Uchami,8,9967.0,712.0,12,Mountain
+2897,Uchami,9,9969.0,876.0,12,Mountain
+2897,Uchami,10,9978.0,851.0,12,Mountain
+2897,Uchami,11,9978.0,916.0,12,Mountain
+2897,Uchami,12,9988.0,789.0,12,Mountain
+2897,Uchami,13,10000.0,741.0,12,Mountain
+2897,Uchami,14,10017.0,928.0,12,Mountain
+2897,Uchami,15,10021.0,830.0,12,Mountain
+2897,Uchami,16,10027.0,857.0,12,Mountain
+2897,Uchami,17,10037.0,915.0,12,Mountain
+2950,Zyryanka,0,11571.0,788.0,12,Mountain
+2950,Zyryanka,1,11586.0,771.0,12,Mountain
+2950,Zyryanka,2,11618.0,789.0,12,Mountain
+2950,Zyryanka,3,11625.0,754.0,12,Mountain
+2950,Zyryanka,4,11650.0,780.0,12,Mountain
+2950,Zyryanka,5,11666.0,800.0,12,Mountain
+2950,Zyryanka,6,11674.0,750.0,12,Mountain
+2950,Zyryanka,7,11698.0,745.0,12,Mountain
+2950,Zyryanka,8,11703.0,724.0,12,Mountain
+2960,Ese-Khayya,0,11292.0,787.0,12,Mountain
+2960,Ese-Khayya,1,11292.0,842.0,12,Mountain
+2960,Ese-Khayya,2,11309.0,746.0,12,Mountain
+2960,Ese-Khayya,3,11328.0,695.0,12,Mountain
+2960,Ese-Khayya,4,11337.0,809.0,12,Mountain
+2960,Ese-Khayya,5,11351.0,740.0,12,Mountain
+2960,Ese-Khayya,6,11367.0,762.0,12,Mountain
+2960,Ese-Khayya,7,11370.0,714.0,12,Mountain
+2960,Ese-Khayya,8,11371.0,830.0,12,Mountain
+2971,Allakh-Yun,0,11429.0,1019.0,12,Mountain
+2971,Allakh-Yun,1,11429.0,1062.0,12,Mountain
+2971,Allakh-Yun,2,11433.0,1103.0,12,Mountain
+2971,Allakh-Yun,3,11434.0,936.0,12,Mountain
+2971,Allakh-Yun,4,11437.0,1076.0,12,Mountain
+2971,Allakh-Yun,5,11447.0,994.0,12,Mountain
+2971,Allakh-Yun,6,11455.0,1021.0,12,Mountain
+2971,Allakh-Yun,7,11465.0,959.0,12,Mountain
+2971,Allakh-Yun,8,11478.0,1003.0,12,Mountain
+2972,Yunkyur,0,11156.0,689.0,12,Mountain
+2972,Yunkyur,1,11158.0,796.0,12,Mountain
+2972,Yunkyur,2,11163.0,762.0,12,Mountain
+2972,Yunkyur,3,11194.0,707.0,12,Mountain
+2972,Yunkyur,4,11205.0,742.0,12,Mountain
+2972,Yunkyur,5,11211.0,823.0,12,Mountain
+2972,Yunkyur,6,11216.0,783.0,12,Mountain
+2972,Yunkyur,7,11224.0,671.0,12,Mountain
+2972,Yunkyur,8,11239.0,752.0,12,Mountain
+2972,Yunkyur,9,11255.0,783.0,12,Mountain
+2972,Yunkyur,10,11261.0,696.0,12,Mountain
+2979,Ayan,0,11585.0,1244.0,12,Mountain
+2979,Ayan,1,11594.0,1206.0,12,Mountain
+2979,Ayan,2,11598.0,1168.0,12,Mountain
+2979,Ayan,3,11605.0,1247.0,12,Mountain
+2979,Ayan,4,11619.0,1230.0,12,Mountain
+2979,Ayan,5,11634.0,1180.0,12,Mountain
+2979,Ayan,6,11642.0,1142.0,12,Mountain
+2979,Ayan,7,11645.0,1159.0,12,Mountain
+2979,Ayan,8,11651.0,1214.0,12,Mountain
+2979,Ayan,9,11666.0,1148.0,12,Mountain
+2979,Ayan,10,11667.0,1175.0,12,Mountain
+2993,Ekimchan,0,11343.0,1402.0,12,Mountain
+2993,Ekimchan,1,11388.0,1377.0,12,Mountain
+2993,Ekimchan,2,11394.0,1413.0,12,Mountain
+2993,Ekimchan,3,11453.0,1386.0,12,Mountain
+2993,Ekimchan,4,11453.0,1423.0,12,Mountain
+2993,Ekimchan,5,11491.0,1397.0,12,Mountain
+3006,Okhotsk,0,11698.0,1102.0,12,Mountain
+3006,Okhotsk,1,11700.0,1077.0,12,Mountain
+3006,Okhotsk,2,11728.0,1079.0,12,Mountain
+3006,Okhotsk,3,11736.0,1102.0,12,Mountain
+3006,Okhotsk,4,11743.0,1050.0,12,Mountain
+3006,Okhotsk,5,11779.0,1034.0,12,Mountain
+3006,Okhotsk,6,11795.0,1047.0,12,Mountain
+3006,Okhotsk,7,11843.0,1034.0,12,Mountain
+3007,Pevek,0,12886.0,650.0,12,Mountain
+3007,Pevek,1,12926.0,672.0,12,Mountain
+3007,Pevek,2,12932.0,674.0,12,Mountain
+3007,Pevek,3,12937.0,633.0,12,Mountain
+3007,Pevek,4,12972.0,691.0,12,Mountain
+3007,Pevek,5,12973.0,643.0,12,Mountain
+3007,Pevek,6,13001.0,618.0,12,Mountain
+3007,Pevek,7,13017.0,702.0,12,Mountain
+3007,Pevek,8,13059.0,633.0,12,Mountain
+3007,Pevek,9,13090.0,649.0,12,Mountain
+3007,Pevek,10,13111.0,620.0,12,Mountain
+3007,Pevek,11,13113.0,686.0,12,Mountain
+3008,Petropavlovsk-Kamchatsky,0,12469.0,1255.0,12,Mountain
+3008,Petropavlovsk-Kamchatsky,1,12502.0,1205.0,12,Mountain
+3008,Petropavlovsk-Kamchatsky,2,12514.0,1182.0,12,Mountain
+3008,Petropavlovsk-Kamchatsky,3,12518.0,1145.0,12,Mountain
+3008,Petropavlovsk-Kamchatsky,4,12539.0,1099.0,12,Mountain
+3008,Petropavlovsk-Kamchatsky,5,12549.0,1136.0,12,Mountain
+3008,Petropavlovsk-Kamchatsky,6,12567.0,1109.0,12,Mountain
+3008,Petropavlovsk-Kamchatsky,7,12579.0,1085.0,12,Mountain
+3009,Slautnoye,0,12705.0,628.0,12,Mountain
+3009,Slautnoye,1,12723.0,728.0,12,Mountain
+3009,Slautnoye,2,12739.0,682.0,12,Mountain
+3009,Slautnoye,3,12747.0,798.0,12,Mountain
+3009,Slautnoye,4,12765.0,754.0,12,Mountain
+3009,Slautnoye,5,12773.0,725.0,12,Mountain
+3009,Slautnoye,6,12800.0,632.0,12,Mountain
+3009,Slautnoye,7,12800.0,824.0,12,Mountain
+3009,Slautnoye,8,12806.0,793.0,12,Mountain
+3009,Slautnoye,9,12823.0,725.0,12,Mountain
+3009,Slautnoye,10,12836.0,769.0,12,Mountain
+3009,Slautnoye,11,12854.0,846.0,12,Mountain
+3009,Slautnoye,12,12861.0,814.0,12,Mountain
+3009,Slautnoye,13,12882.0,714.0,12,Mountain
+3009,Slautnoye,14,12884.0,741.0,12,Mountain
+3009,Slautnoye,15,12919.0,737.0,12,Mountain
+3010,Markovo,0,12942.0,843.0,12,Mountain
+3010,Markovo,1,12980.0,777.0,12,Mountain
+3010,Markovo,2,12995.0,822.0,12,Mountain
+3010,Markovo,3,13012.0,819.0,12,Mountain
+3010,Markovo,4,13026.0,752.0,12,Mountain
+3010,Markovo,5,13075.0,760.0,12,Mountain
+3011,Uelen,0,13110.0,803.0,12,Mountain
+3011,Uelen,1,13145.0,793.0,12,Mountain
+3011,Uelen,2,13161.0,750.0,12,Mountain
+3011,Uelen,3,13170.0,639.0,12,Mountain
+3011,Uelen,4,13196.0,678.0,12,Mountain
+3011,Uelen,5,13219.0,735.0,12,Mountain
+3011,Uelen,6,13264.0,657.0,12,Mountain
+3011,Uelen,7,13320.0,666.0,12,Mountain
+3011,Uelen,8,13392.0,709.0,12,Mountain
+3011,Uelen,9,13470.0,734.0,12,Mountain
+3013,Palana,0,12618.0,1007.0,12,Mountain
+3013,Palana,1,12622.0,1033.0,12,Mountain
+3013,Palana,2,12637.0,1012.0,12,Mountain
+3013,Palana,3,12644.0,985.0,12,Mountain
+3013,Palana,4,12663.0,959.0,12,Mountain
+3013,Palana,5,12690.0,931.0,12,Mountain
+3013,Palana,6,12714.0,913.0,12,Mountain
+3013,Palana,7,12727.0,897.0,12,Mountain
+3013,Palana,8,12763.0,862.0,12,Mountain
+3014,Ilirney,0,12155.0,708.0,12,Mountain
+3014,Ilirney,1,12194.0,725.0,12,Mountain
+3014,Ilirney,2,12230.0,784.0,12,Mountain
+3014,Ilirney,3,12247.0,873.0,12,Mountain
+3014,Ilirney,4,12248.0,806.0,12,Mountain
+3014,Ilirney,5,12262.0,844.0,12,Mountain
+3014,Ilirney,6,12266.0,903.0,12,Mountain
+3014,Ilirney,7,12274.0,793.0,12,Mountain
+3014,Ilirney,8,12282.0,816.0,12,Mountain
+3014,Ilirney,9,12292.0,768.0,12,Mountain
+3014,Ilirney,10,12305.0,677.0,12,Mountain
+3014,Ilirney,11,12306.0,841.0,12,Mountain
+3014,Ilirney,12,12316.0,791.0,12,Mountain
+3014,Ilirney,13,12344.0,752.0,12,Mountain
+3014,Ilirney,14,12349.0,775.0,12,Mountain
+3014,Ilirney,15,12379.0,623.0,12,Mountain
+3014,Ilirney,16,12381.0,764.0,12,Mountain
+3014,Ilirney,17,12383.0,798.0,12,Mountain
+3014,Ilirney,18,12441.0,674.0,12,Mountain
+3014,Ilirney,19,12479.0,586.0,12,Mountain
+3015,Gizhiga,0,12434.0,832.0,12,Mountain
+3015,Gizhiga,1,12454.0,803.0,12,Mountain
+3015,Gizhiga,2,12456.0,775.0,12,Mountain
+3015,Gizhiga,3,12458.0,741.0,12,Mountain
+3015,Gizhiga,4,12485.0,745.0,12,Mountain
+3015,Gizhiga,5,12486.0,716.0,12,Mountain
+3015,Gizhiga,6,12493.0,766.0,12,Mountain
+3015,Gizhiga,7,12506.0,810.0,12,Mountain
+3015,Gizhiga,8,12526.0,773.0,12,Mountain
+3015,Gizhiga,9,12554.0,650.0,12,Mountain
+3015,Gizhiga,10,12561.0,773.0,12,Mountain
+3015,Gizhiga,11,12587.0,773.0,12,Mountain
+3015,Gizhiga,12,12596.0,788.0,12,Mountain
+3015,Gizhiga,13,12605.0,725.0,12,Mountain
+3015,Gizhiga,14,12616.0,798.0,12,Mountain
+3015,Gizhiga,15,12626.0,761.0,12,Mountain
+3015,Gizhiga,16,12637.0,823.0,12,Mountain
+3015,Gizhiga,17,12644.0,755.0,12,Mountain
+3015,Gizhiga,18,12652.0,675.0,12,Mountain
+3015,Gizhiga,19,12655.0,738.0,12,Mountain
+3015,Gizhiga,20,12664.0,775.0,12,Mountain
+3015,Gizhiga,21,12672.0,815.0,12,Mountain
+3015,Gizhiga,22,12680.0,779.0,12,Mountain
+3017,Talon,0,11902.0,971.0,12,Mountain
+3017,Talon,1,11906.0,942.0,12,Mountain
+3017,Talon,2,11917.0,1004.0,12,Mountain
+3017,Talon,3,11927.0,909.0,12,Mountain
+3017,Talon,4,11931.0,978.0,12,Mountain
+3017,Talon,5,11932.0,956.0,12,Mountain
+3017,Talon,6,11955.0,931.0,12,Mountain
+3017,Talon,7,11955.0,1001.0,12,Mountain
+3017,Talon,8,11972.0,979.0,12,Mountain
+3018,Atka,0,12014.0,928.0,12,Mountain
+3018,Atka,1,12036.0,830.0,12,Mountain
+3018,Atka,2,12047.0,891.0,12,Mountain
+3018,Atka,3,12081.0,788.0,12,Mountain
+3018,Atka,4,12082.0,874.0,12,Mountain
+3018,Atka,5,12082.0,898.0,12,Mountain
+3018,Atka,6,12083.0,925.0,12,Mountain
+3018,Atka,7,12093.0,992.0,12,Mountain
+3018,Atka,8,12113.0,862.0,12,Mountain
+3018,Atka,9,12115.0,943.0,12,Mountain
+3018,Atka,10,12119.0,898.0,12,Mountain
+3018,Atka,11,12168.0,901.0,12,Mountain
+3018,Atka,12,12177.0,855.0,12,Mountain
+3020,Oymyakon,0,11526.0,1021.0,12,Mountain
+3020,Oymyakon,1,11538.0,1057.0,12,Mountain
+3020,Oymyakon,2,11557.0,1020.0,12,Mountain
+3020,Oymyakon,3,11589.0,1025.0,12,Mountain
+3020,Oymyakon,4,11590.0,1063.0,12,Mountain
+3020,Oymyakon,5,11617.0,1028.0,12,Mountain
+3020,Oymyakon,6,11619.0,1057.0,12,Mountain
+3020,Oymyakon,7,11625.0,1056.0,12,Mountain
+3020,Oymyakon,8,11628.0,997.0,12,Mountain
+3020,Oymyakon,9,11641.0,1058.0,12,Mountain
+3020,Oymyakon,10,11650.0,978.0,12,Mountain
+3020,Oymyakon,11,11650.0,1030.0,12,Mountain
+3020,Oymyakon,12,11657.0,999.0,12,Mountain
+3020,Oymyakon,13,11677.0,957.0,12,Mountain
+3020,Oymyakon,14,11705.0,1003.0,12,Mountain
+3021,Kholodny,0,11690.0,898.0,12,Mountain
+3021,Kholodny,1,11721.0,884.0,12,Mountain
+3021,Kholodny,2,11722.0,816.0,12,Mountain
+3021,Kholodny,3,11727.0,915.0,12,Mountain
+3021,Kholodny,4,11734.0,843.0,12,Mountain
+3021,Kholodny,5,11736.0,862.0,12,Mountain
+3021,Kholodny,6,11759.0,920.0,12,Mountain
+3021,Kholodny,7,11764.0,826.0,12,Mountain
+3021,Kholodny,8,11764.0,949.0,12,Mountain
+3021,Kholodny,9,11775.0,882.0,12,Mountain
+3021,Kholodny,10,11803.0,902.0,12,Mountain
+3021,Kholodny,11,11804.0,961.0,12,Mountain
+3021,Kholodny,12,11816.0,984.0,12,Mountain
+3021,Kholodny,13,11821.0,857.0,12,Mountain
+3021,Kholodny,14,11839.0,924.0,12,Mountain
+3021,Kholodny,15,11853.0,891.0,12,Mountain
+3027,Lybalakh,0,11011.0,603.0,12,Mountain
+3027,Lybalakh,1,11017.0,654.0,12,Mountain
+3027,Lybalakh,2,11024.0,696.0,12,Mountain
+3027,Lybalakh,3,11042.0,737.0,12,Mountain
+3027,Lybalakh,4,11051.0,798.0,12,Mountain
+3027,Lybalakh,5,11058.0,645.0,12,Mountain
+3027,Lybalakh,6,11077.0,773.0,12,Mountain
+3027,Lybalakh,7,11082.0,709.0,12,Mountain
+3027,Lybalakh,8,11099.0,685.0,12,Mountain
+3068,Krasnoturyinsk,0,8646.0,1305.0,12,Mountain
+3068,Krasnoturyinsk,1,8653.0,1241.0,12,Mountain
+3068,Krasnoturyinsk,2,8656.0,1354.0,12,Mountain
+3068,Krasnoturyinsk,3,8664.0,1295.0,12,Mountain
+3068,Krasnoturyinsk,4,8669.0,1395.0,12,Mountain
+3068,Krasnoturyinsk,5,8671.0,1246.0,12,Mountain
+3068,Krasnoturyinsk,6,8673.0,1219.0,12,Mountain
+3068,Krasnoturyinsk,7,8673.0,1271.0,12,Mountain
+3068,Krasnoturyinsk,8,8679.0,1367.0,12,Mountain
+3068,Krasnoturyinsk,9,8693.0,1340.0,12,Mountain
+3068,Krasnoturyinsk,10,8697.0,1287.0,12,Mountain
+3068,Krasnoturyinsk,11,8712.0,1241.0,12,Mountain
+3068,Krasnoturyinsk,12,8726.0,1210.0,12,Mountain
+3069,Verkhnyaya Salda,0,8624.0,1452.0,12,Mountain
+3069,Verkhnyaya Salda,1,8656.0,1464.0,12,Mountain
+3069,Verkhnyaya Salda,2,8676.0,1445.0,12,Mountain
+3069,Verkhnyaya Salda,3,8696.0,1467.0,12,Mountain
+3069,Verkhnyaya Salda,4,8728.0,1452.0,12,Mountain
+3069,Verkhnyaya Salda,5,8744.0,1481.0,12,Mountain
+3132,Murghab,0,9121.0,2448.0,12,Mountain
+3132,Murghab,1,9126.0,2489.0,12,Mountain
+3132,Murghab,2,9134.0,2434.0,12,Mountain
+3132,Murghab,3,9137.0,2475.0,12,Mountain
+3132,Murghab,4,9143.0,2446.0,12,Mountain
+3132,Murghab,5,9150.0,2463.0,12,Mountain
+3132,Murghab,6,9151.0,2410.0,12,Mountain
+3132,Murghab,7,9158.0,2427.0,12,Mountain
+3132,Murghab,8,9162.0,2448.0,12,Mountain
+3132,Murghab,9,9187.0,2454.0,12,Mountain
+3133,Panjakent,0,9047.0,2434.0,12,Mountain
+3133,Panjakent,1,9049.0,2404.0,12,Mountain
+3133,Panjakent,2,9062.0,2418.0,12,Mountain
+3133,Panjakent,3,9070.0,2389.0,12,Mountain
+3133,Panjakent,4,9091.0,2377.0,12,Mountain
+3137,Przhevalsk,0,9325.0,2096.0,12,Mountain
+3137,Przhevalsk,1,9327.0,2171.0,12,Mountain
+3137,Przhevalsk,2,9333.0,2207.0,12,Mountain
+3137,Przhevalsk,3,9338.0,2139.0,12,Mountain
+3137,Przhevalsk,4,9356.0,2179.0,12,Mountain
+3137,Przhevalsk,5,9360.0,2139.0,12,Mountain
+3142,Talovo,0,8581.0,1230.0,12,Mountain
+3142,Talovo,1,8593.0,1255.0,12,Mountain
+3142,Talovo,2,8605.0,1211.0,12,Mountain
+3169,Tiflis,0,8108.0,2303.0,12,Mountain
+3169,Tiflis,1,8111.0,2320.0,12,Mountain
+3169,Tiflis,2,8118.0,2311.0,12,Mountain
+3169,Tiflis,3,8131.0,2304.0,12,Mountain
+3169,Tiflis,4,8140.0,2305.0,12,Mountain
+3169,Tiflis,5,8148.0,2295.0,12,Mountain
+3169,Tiflis,6,8164.0,2293.0,12,Mountain
+3169,Tiflis,7,8168.0,2279.0,12,Mountain
+3172,Gori,0,8109.0,2269.0,12,Mountain
+3172,Gori,1,8121.0,2262.0,12,Mountain
+3172,Gori,2,8123.0,2244.0,12,Mountain
+3172,Gori,3,8133.0,2231.0,12,Mountain
+3172,Gori,4,8135.0,2258.0,12,Mountain
+3172,Gori,5,8145.0,2246.0,12,Mountain
+3172,Gori,6,8150.0,2236.0,12,Mountain
+3172,Gori,7,8162.0,2249.0,12,Mountain
+3179,Kutaisi,0,8059.0,2257.0,12,Mountain
+3179,Kutaisi,1,8071.0,2251.0,12,Mountain
+3179,Kutaisi,2,8075.0,2228.0,12,Mountain
+3179,Kutaisi,3,8077.0,2242.0,12,Mountain
+3179,Kutaisi,4,8097.0,2228.0,12,Mountain
+3179,Kutaisi,5,8100.0,2217.0,12,Mountain
+3181,Ilori,0,8003.0,2188.0,12,Mountain
+3181,Ilori,1,8022.0,2199.0,12,Mountain
+3181,Ilori,2,8027.0,2222.0,12,Mountain
+3181,Ilori,3,8030.0,2204.0,12,Mountain
+3181,Ilori,4,8049.0,2210.0,12,Mountain
+3188,Signalki,0,8191.0,2246.0,12,Mountain
+3188,Signalki,1,8201.0,2253.0,12,Mountain
+3188,Signalki,2,8202.0,2269.0,12,Mountain
+3188,Signalki,3,8205.0,2286.0,12,Mountain
+3188,Signalki,4,8206.0,2305.0,12,Mountain
+3188,Signalki,5,8214.0,2315.0,12,Mountain
+3188,Signalki,6,8222.0,2293.0,12,Mountain
+3188,Signalki,7,8223.0,2309.0,12,Mountain
+3188,Signalki,8,8236.0,2317.0,12,Mountain
+3188,Signalki,9,8247.0,2327.0,12,Mountain
