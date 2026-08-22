@@ -49,6 +49,7 @@ export class WorldRenderer {
   private roadMesh!: Mesh;
   private bridgeMesh!: Mesh;
   private tunnelMesh!: Mesh;
+  private engineeringMesh!: Mesh;
   private treeMesh!: Mesh;
   private buildingMesh!: Mesh;
   private shadowMesh!: Mesh;
@@ -68,6 +69,7 @@ export class WorldRenderer {
   private riverTexture!: GPUTexture;
   private coastTexture!: GPUTexture;
   private roadTexture!: GPUTexture;
+  private engineeringTexture!: GPUTexture;
   private materialTexture!: GPUTexture;
   private heightData!: Float32Array;
   private provinceData!: Uint16Array;
@@ -114,11 +116,12 @@ export class WorldRenderer {
     this.createLayouts();
 
     report('Loading terrain fields', 0.2);
-    const [heightBuffer, surfaceBuffer, riverFieldBuffer, roadFieldBuffer, coastBuffer, provinceBuffer, riverVertexBuffer, riverIndexBuffer, roadVertexBuffer, roadIndexBuffer, bridgeVertexBuffer, bridgeIndexBuffer, tunnelVertexBuffer, tunnelIndexBuffer, borderBuffer, treeBuffer, buildingBuffer, lampBuffer, barrierBuffer, signBuffer] = await Promise.all([
+    const [heightBuffer, surfaceBuffer, riverFieldBuffer, roadFieldBuffer, engineeringFieldBuffer, coastBuffer, provinceBuffer, riverVertexBuffer, riverIndexBuffer, roadVertexBuffer, roadIndexBuffer, bridgeVertexBuffer, bridgeIndexBuffer, tunnelVertexBuffer, tunnelIndexBuffer, engineeringVertexBuffer, engineeringIndexBuffer, borderBuffer, treeBuffer, buildingBuffer, lampBuffer, barrierBuffer, signBuffer] = await Promise.all([
       fetchBinary(`/world/${this.manifest.fields.height.url}`),
       fetchBinary(`/world/${this.manifest.fields.surface.url}`),
       fetchBinary(`/world/${this.manifest.fields.rivers.url}`),
       fetchBinary(`/world/${this.manifest.fields.roads.url}`),
+      fetchBinary(`/world/${this.manifest.fields.infrastructureEngineering.url}`),
       fetchBinary(`/world/${this.manifest.fields.coast.url}`),
       fetchBinary(`/world/${this.manifest.fields.provinceIds.url}`),
       fetchBinary(`/world/${this.manifest.buffers.riverVertices.url}`),
@@ -129,6 +132,8 @@ export class WorldRenderer {
       fetchBinary(`/world/${this.manifest.buffers.bridgeIndices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.tunnelVertices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.tunnelIndices.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.engineeringVertices.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.engineeringIndices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.borders.url}`),
       fetchBinary(`/world/${this.manifest.buffers.trees.url}`),
       fetchBinary(`/world/${this.manifest.buffers.buildings.url}`),
@@ -155,6 +160,10 @@ export class WorldRenderer {
     this.roadTexture = this.uploadTexture(
       'strategic road field', this.manifest.fields.roads.width, this.manifest.fields.roads.height,
       'rgba8unorm', new Uint8Array(roadFieldBuffer), this.manifest.fields.roads.width * 4,
+    );
+    this.engineeringTexture = this.uploadTexture(
+      'infrastructure engineering field', this.manifest.fields.infrastructureEngineering.width, this.manifest.fields.infrastructureEngineering.height,
+      'rgba8unorm', new Uint8Array(engineeringFieldBuffer), this.manifest.fields.infrastructureEngineering.width * 4,
     );
     this.coastTexture = this.uploadTexture(
       'filtered coast mask', this.manifest.fields.coast.width, this.manifest.fields.coast.height,
@@ -185,6 +194,7 @@ export class WorldRenderer {
         { binding: 6, resource: this.riverTexture.createView() },
         { binding: 7, resource: this.coastTexture.createView() },
         { binding: 8, resource: this.roadTexture.createView() },
+        { binding: 9, resource: this.engineeringTexture.createView() },
       ],
     });
 
@@ -196,6 +206,7 @@ export class WorldRenderer {
     this.roadMesh = this.uploadIndexedMesh('terrain roads', roadVertexBuffer, roadIndexBuffer, this.manifest.buffers.roadIndices.count);
     this.bridgeMesh = this.uploadIndexedMesh('road bridges', bridgeVertexBuffer, bridgeIndexBuffer, this.manifest.buffers.bridgeIndices.count);
     this.tunnelMesh = this.uploadIndexedMesh('road tunnels and indicators', tunnelVertexBuffer, tunnelIndexBuffer, this.manifest.buffers.tunnelIndices.count);
+    this.engineeringMesh = this.uploadIndexedMesh('road engineering works', engineeringVertexBuffer, engineeringIndexBuffer, this.manifest.buffers.engineeringIndices.count);
     this.treeMesh = this.createTreeMesh();
     this.buildingMesh = this.createBuildingMesh();
     this.shadowMesh = this.createShadowMesh();
@@ -271,6 +282,7 @@ export class WorldRenderer {
         { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+        { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       ],
     });
     this.instanceLayout = this.device.createBindGroupLayout({
@@ -744,6 +756,9 @@ export class WorldRenderer {
     pass.setVertexBuffer(0, this.tunnelMesh.vertex);
     pass.setIndexBuffer(this.tunnelMesh.index, 'uint32');
     this.drawChunkedInfrastructure(pass, this.tunnelMesh, this.manifest.infrastructureChunks.tunnels);
+    pass.setVertexBuffer(0, this.engineeringMesh.vertex);
+    pass.setIndexBuffer(this.engineeringMesh.index, 'uint32');
+    this.drawChunkedInfrastructure(pass, this.engineeringMesh, this.manifest.infrastructureChunks.engineering);
 
     pass.setPipeline(this.propPipeline);
     this.drawMeshInstances(pass, this.shadowMesh, this.trees);

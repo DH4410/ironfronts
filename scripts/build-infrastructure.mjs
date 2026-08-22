@@ -3,12 +3,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const TAU = Math.PI * 2;
-const ROUTING_CACHE_VERSION = 'hierarchical-roads-v3.4';
+const ROUTING_CACHE_VERSION = 'hierarchical-roads-v4.4';
+const AUDIT_VERSION = 'infrastructure-audit-v4.0';
+const MAX_AUDIT_PASSES = 12;
 const LEVEL_WIDTHS = [1.5, 2.2, 3.4, 4.8, 8.4];
 const ROLE_WIDTH_SCALE = [0.8, 1.0, 1.2];
 const MAX_GRADES = [0.18, 0.14, 0.10, 0.08, 0.06];
 const CUT_FILL_LIMITS = [1.5, 2.5, 4.0, 6.0, 8.0];
-const TUNNEL_MAX_LENGTHS = [0, 45, 90, 160, 240];
+const TUNNEL_MAX_LENGTHS = [45, 45, 90, 160, 240];
 const ROLE_LOCAL = 0;
 const ROLE_CONNECTOR = 1;
 const ROLE_TRUNK = 2;
@@ -62,19 +64,27 @@ function refineRiverSegments(points, riverCoreMask, width, height, worldWidth, w
     const bx = unwrapNear(points[index + 1].x, a.x, worldWidth);
     const bz = points[index + 1].z;
     const length = Math.hypot(bx - a.x, bz - a.z);
-    const steps = Math.max(1, Math.ceil(length / 2.2));
-    const samples = [];
+    const steps = Math.max(1, Math.ceil(length / 0.65));
+    const coreHits = [];
     let touchesCore = false;
     for (let step = 1; step <= steps; step += 1) {
       const t = step / steps;
       const point = { x: wrap(a.x + (bx - a.x) * t, worldWidth), z: a.z + (bz - a.z) * t };
-      samples.push(point);
-      touchesCore ||= sampleScalar(riverCoreMask, width, height, worldWidth, worldHeight, point.x, point.z) > 0.10;
+      if (sampleScalar(riverCoreMask, width, height, worldWidth, worldHeight, point.x, point.z) > 0.10) {
+        touchesCore = true;
+        coreHits.push(t);
+      }
     }
     // Extra samples are only needed where a segment intersects actual rendered
     // channel geometry. Keeping dry segments coarse controls mesh size.
-    if (touchesCore) refined.push(...samples);
-    else refined.push(points[index + 1]);
+    if (touchesCore) {
+      const parameters = new Set([1]);
+      for (let hit = 0; hit < coreHits.length; hit += Math.max(1, Math.ceil(coreHits.length / 4))) parameters.add(coreHits[hit]);
+      parameters.add(coreHits.at(-1));
+      for (const t of [...parameters].sort((left, right) => left - right)) {
+        refined.push({ x: wrap(a.x + (bx - a.x) * t, worldWidth), z: a.z + (bz - a.z) * t });
+      }
+    } else refined.push(points[index + 1]);
   }
   return refined;
 }
@@ -673,6 +683,317 @@ function addLocalStreets(routes, cityPlans, context) {
   }
 }
 
+function routeRoadWidth(route) {
+  const levelIndex = clamp(route.infrastructureLevel - 1, 0, 4);
+  return route.plaza ? 3.1 : route.localStreet ? Math.max(1.25, LEVEL_WIDTHS[levelIndex] * 0.62)
+    : LEVEL_WIDTHS[levelIndex] * ROLE_WIDTH_SCALE[route.corridorRole];
+}
+
+function intervalAt(route, segmentIndex, key) {
+  return (route[key] ?? []).find((interval) => segmentIndex >= interval.start && segmentIndex < interval.end);
+}
+
+function compileSharedPhysicalNetwork(routes, worldWidth) {
+  const cellSize = 7;
+  const cells = new Map();
+  const keyFor = (x, z) => `${Math.floor(wrap(x, worldWidth) / cellSize)},${Math.floor(z / cellSize)}`;
+  const ordered = [...routes].sort((a, b) => b.corridorRole - a.corridorRole
+    || b.infrastructureLevel - a.infrastructureLevel || b.importance - a.importance || a.id - b.id);
+  let sharedSegments = 0;
+  let sharedLength = 0;
+  for (const route of ordered) {
+    route.sharedSegmentOwners = new Int32Array(Math.max(0, route.points.length - 1));
+    route.sharedSegmentOwners.fill(-1);
+    route.sharedCorridorIds = new Set([route.id]);
+    for (let index = 0; index + 1 < route.points.length; index += 1) {
+      const a = route.points[index], b = route.points[index + 1];
+      const bx = unwrapNear(b.x, a.x, worldWidth);
+      const dx = bx - a.x, dz = b.z - a.z;
+      const length = Math.hypot(dx, dz);
+      if (length < 0.5) continue;
+      const midpoint = { x: wrap((a.x + bx) * 0.5, worldWidth), z: (a.z + b.z) * 0.5 };
+      const heading = Math.atan2(dz, dx);
+      const cellX = Math.floor(wrap(midpoint.x, worldWidth) / cellSize);
+      const cellZ = Math.floor(midpoint.z / cellSize);
+      let owner;
+      let ownerDistance = Number.POSITIVE_INFINITY;
+      for (let oz = -1; oz <= 1; oz += 1) {
+        for (let ox = -1; ox <= 1; ox += 1) {
+          const candidates = cells.get(`${cellX + ox},${cellZ + oz}`) ?? [];
+          for (const candidate of candidates) {
+            if (candidate.routeId === route.id) continue;
+            const angleDifference = Math.abs(Math.atan2(Math.sin(heading - candidate.heading), Math.cos(heading - candidate.heading)));
+            const parallelDifference = Math.min(angleDifference, Math.PI - angleDifference);
+            if (parallelDifference > 20 * Math.PI / 180) continue;
+            const distance = Math.hypot(unwrapNear(candidate.x, midpoint.x, worldWidth) - midpoint.x, candidate.z - midpoint.z);
+            const mergeDistance = Math.min(5, (routeRoadWidth(route) + candidate.width) * 0.5 + 1.25);
+            if (distance > mergeDistance || distance >= ownerDistance) continue;
+            owner = candidate;
+            ownerDistance = distance;
+          }
+        }
+      }
+      if (owner && !intervalAt(route, index, 'bridges') && !intervalAt(route, index, 'tunnels')) {
+        route.sharedSegmentOwners[index] = owner.routeId;
+        route.sharedCorridorIds.add(owner.routeId);
+        sharedSegments += 1;
+        sharedLength += length;
+      } else {
+        const entry = { routeId: route.id, segmentIndex: index, x: midpoint.x, z: midpoint.z, heading, width: routeRoadWidth(route) };
+        const key = keyFor(midpoint.x, midpoint.z);
+        if (!cells.has(key)) cells.set(key, []);
+        cells.get(key).push(entry);
+      }
+    }
+  }
+  return { sharedSegments, sharedLength };
+}
+
+function repairResidualRiverCrossings(routes, context, forceLongBridge = false) {
+  const { landField, riverMask, riverCoreMask, fieldWidth, fieldHeight, worldWidth, worldHeight } = context;
+  let added = 0;
+  for (const route of routes) {
+    if (route.suppressed) continue;
+    const halfWidth = routeRoadWidth(route) * 0.5 + 0.5;
+    const wetSegments = [];
+    for (let index = 0; index + 1 < route.points.length; index += 1) {
+      if (intervalAt(route, index, 'bridges')) continue;
+      const a = route.points[index], b = route.points[index + 1], bx = unwrapNear(b.x, a.x, worldWidth);
+      const length = Math.hypot(bx - a.x, b.z - a.z);
+      const steps = Math.max(1, Math.ceil(length / 0.40));
+      let wet = false;
+      const dx = bx - a.x, dz = b.z - a.z;
+      const inverseLength = 1 / Math.max(0.001, length);
+      const nx = -dz * inverseLength, nz = dx * inverseLength;
+      for (let step = 0; step <= steps && !wet; step += 1) {
+        const t = step / steps;
+        for (const lateral of [-halfWidth, 0, halfWidth]) {
+          wet ||= sampleScalar(riverCoreMask, fieldWidth, fieldHeight, worldWidth, worldHeight,
+            a.x + dx * t + nx * lateral, a.z + dz * t + nz * lateral) > 0.10;
+        }
+      }
+      if (wet) wetSegments.push(index);
+    }
+    if (!wetSegments.length) continue;
+    const groups = [];
+    for (const index of wetSegments) {
+      const previous = groups.at(-1);
+      if (previous && index <= previous.end + 1) previous.end = index;
+      else groups.push({ start: index, end: index });
+    }
+    for (const group of groups) {
+      let span = 0;
+      for (let index = group.start; index <= group.end; index += 1) span += Math.hypot(
+        unwrapNear(route.points[index + 1].x, route.points[index].x, worldWidth) - route.points[index].x,
+        route.points[index + 1].z - route.points[index].z);
+      if (span > 78 && !forceLongBridge) {
+        for (let index = group.start; index <= group.end + 1; index += 1) {
+          route.points[index] = moveToValidLand(route.points[index], landField, riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight, true);
+        }
+        continue;
+      }
+      route.bridges.push({ start: Math.max(0, group.start - 2), end: Math.min(route.points.length - 1, group.end + 3),
+        coreStart: group.start, coreEnd: group.end + 1 });
+      added += 1;
+    }
+    route.bridges.sort((a, b) => a.start - b.start);
+    const merged = [];
+    for (const interval of route.bridges) {
+      const previous = merged.at(-1);
+      if (previous && interval.start <= previous.end) {
+        previous.end = Math.max(previous.end, interval.end);
+        previous.coreStart = Math.min(previous.coreStart, interval.coreStart);
+        previous.coreEnd = Math.max(previous.coreEnd, interval.coreEnd);
+      } else merged.push({ ...interval });
+    }
+    route.bridges = merged;
+  }
+  return added;
+}
+
+function normalizeBridgeIntervals(routes, context) {
+  const { riverCoreMask, fieldWidth, fieldHeight, worldWidth, worldHeight } = context;
+  let intervals = 0;
+  for (const route of routes) {
+    const halfWidth = routeRoadWidth(route) * 0.5 + 0.5;
+    const wetSegments = [];
+    for (let index = 0; index + 1 < route.points.length; index += 1) {
+      const a = route.points[index], b = route.points[index + 1], bx = unwrapNear(b.x, a.x, worldWidth);
+      const dx = bx - a.x, dz = b.z - a.z, length = Math.max(0.001, Math.hypot(dx, dz));
+      const nx = -dz / length, nz = dx / length;
+      const steps = Math.max(1, Math.ceil(length / 0.4));
+      let wet = false;
+      for (let step = 0; step <= steps && !wet; step += 1) {
+        const t = step / steps;
+        for (const lateral of [-halfWidth, 0, halfWidth]) {
+          wet ||= sampleScalar(riverCoreMask, fieldWidth, fieldHeight, worldWidth, worldHeight,
+            a.x + dx * t + nx * lateral, a.z + dz * t + nz * lateral) > 0.10;
+        }
+      }
+      if (wet) wetSegments.push(index);
+    }
+    const groups = [];
+    for (const index of wetSegments) {
+      const previous = groups.at(-1);
+      if (previous && index <= previous.end + 1) previous.end = index;
+      else groups.push({ start: index, end: index });
+    }
+    route.bridges = groups.map((group) => ({
+      start: Math.max(0, group.start - 2),
+      end: Math.min(route.points.length - 1, group.end + 3),
+      coreStart: group.start,
+      coreEnd: group.end + 1,
+    }));
+    intervals += route.bridges.length;
+  }
+  return intervals;
+}
+
+function reinciseProtectedHydrology(heights, landField, riverMask, riverCoreMask, riverBed) {
+  for (let index = 0; index < heights.length; index += 1) {
+    if (!landField[index] || riverCoreMask[index] < 0.055) continue;
+    const channel = smoothstep(0.055, 0.68, riverCoreMask[index]);
+    const bedTarget = Number.isFinite(riverBed[index]) ? riverBed[index] - 0.38 : heights[index] - 0.7;
+    heights[index] += (Math.min(heights[index], bedTarget) - heights[index]) * channel;
+    heights[index] = Math.max(0.62, heights[index]);
+  }
+}
+
+function buildCorridorMetrics(routes, worldWidth) {
+  const metrics = new Float32Array(routes.length * 8);
+  const flags = new Uint32Array(routes.length * 4);
+  for (const route of routes) {
+    if (route.suppressed) {
+      flags.set([route.infrastructureLevel, route.corridorRole, route.surfaceMaterial ?? 0, 8], route.id * 4);
+      continue;
+    }
+    let length = 0, ascent = 0, descent = 0, maximumGrade = 0, curvature = 0, bridgeLength = 0, tunnelLength = 0;
+    for (let index = 0; index + 1 < route.points.length; index += 1) {
+      const a = route.points[index], b = route.points[index + 1];
+      const run = Math.max(0.001, Math.hypot(unwrapNear(b.x, a.x, worldWidth) - a.x, b.z - a.z));
+      const rise = route.profile[index + 1] - route.profile[index];
+      length += run;
+      if (rise > 0) ascent += rise; else descent -= rise;
+      maximumGrade = Math.max(maximumGrade, Math.abs(rise) / run);
+      if (intervalAt(route, index, 'bridges')) bridgeLength += run;
+      if (intervalAt(route, index, 'tunnels')) tunnelLength += run;
+      if (index > 0) {
+        const previous = route.points[index - 1];
+        const headingA = Math.atan2(a.z - previous.z, unwrapNear(a.x, previous.x, worldWidth) - previous.x);
+        const headingB = Math.atan2(b.z - a.z, unwrapNear(b.x, a.x, worldWidth) - a.x);
+        curvature += Math.abs(Math.atan2(Math.sin(headingB - headingA), Math.cos(headingB - headingA)));
+      }
+    }
+    const sharedLength = route.sharedSegmentOwners?.reduce((sum, owner, index) => owner >= 0 ? sum + Math.hypot(
+      unwrapNear(route.points[index + 1].x, route.points[index].x, worldWidth) - route.points[index].x,
+      route.points[index + 1].z - route.points[index].z) : sum, 0) ?? 0;
+    metrics.set([length, ascent, descent, maximumGrade, curvature / Math.max(1, route.points.length - 2),
+      length ? (bridgeLength + tunnelLength) / length : 0, bridgeLength, tunnelLength], route.id * 8);
+    const repairFlags = (sharedLength > 0 ? 1 : 0) | ((route.bridges?.length ?? 0) ? 2 : 0) | ((route.tunnels?.length ?? 0) ? 4 : 0);
+    flags.set([route.infrastructureLevel, route.corridorRole, route.surfaceMaterial ?? 0, repairFlags], route.id * 4);
+  }
+  return { corridorMetrics: metrics, corridorFlags: flags };
+}
+
+function escalateTerrainConflicts(routes, context) {
+  const { heights, riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight } = context;
+  let addedTunnels = 0;
+  let loweredViaducts = 0;
+  for (const route of routes) {
+    const levelIndex = clamp(route.infrastructureLevel - 1, 0, 4);
+    const halfWidth = routeRoadWidth(route) * 0.5;
+    const candidates = [];
+    for (let index = 1; index + 1 < route.points.length; index += 1) {
+      if ((route.bridges ?? []).some((interval) => index >= interval.start && index <= interval.end)
+        || (route.tunnels ?? []).some((interval) => index >= interval.start && index <= interval.end)) continue;
+      const point = route.points[index], previous = route.points[index - 1], next = route.points[index + 1];
+      const dx = unwrapNear(next.x, previous.x, worldWidth) - previous.x, dz = next.z - previous.z;
+      const length = Math.max(0.001, Math.hypot(dx, dz)), nx = -dz / length, nz = dx / length;
+      const centerTerrain = sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, point.x, point.z);
+      const leftTerrain = sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, point.x + nx * halfWidth, point.z + nz * halfWidth);
+      const rightTerrain = sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, point.x - nx * halfWidth, point.z - nz * halfWidth);
+      const crossTerrain = Math.max(centerTerrain, leftTerrain, rightTerrain);
+      const lowestTerrain = Math.min(centerTerrain, leftTerrain, rightTerrain);
+      if (route.profile[index] - centerTerrain > 18) {
+        route.profile[index] = centerTerrain + 8;
+        loweredViaducts += 1;
+      }
+      const dry = sampleScalar(riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight, point.x, point.z) < 0.10;
+      if (!route.localStreet && !route.gateway && dry
+        && (crossTerrain - route.profile[index] > CUT_FILL_LIMITS[levelIndex] * 0.72
+          || route.profile[index] - lowestTerrain > 18)) candidates.push(index);
+    }
+    if (!route.localStreet && !route.gateway) {
+      for (let index = 0; index + 1 < route.points.length; index += 1) {
+        if (intervalAt(route, index, 'bridges') || intervalAt(route, index, 'tunnels')) continue;
+        const a = route.points[index], b = route.points[index + 1], bx = unwrapNear(b.x, a.x, worldWidth);
+        const x = (a.x + bx) * 0.5, z = (a.z + b.z) * 0.5;
+        const dx = bx - a.x, dz = b.z - a.z, length = Math.max(0.001, Math.hypot(dx, dz));
+        const nx = -dz / length, nz = dx / length;
+        const profile = (route.profile[index] + route.profile[index + 1]) * 0.5;
+        const lowest = Math.min(
+          sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, x, z),
+          sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, x + nx * halfWidth, z + nz * halfWidth),
+          sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, x - nx * halfWidth, z - nz * halfWidth));
+        if (profile - lowest > 18 && sampleScalar(riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight, x, z) < 0.10) {
+          candidates.push(index, index + 1);
+        }
+      }
+    }
+    if (!candidates.length) continue;
+    candidates.sort((a, b) => a - b);
+    const groups = [];
+    for (const index of [...new Set(candidates)]) {
+      const previous = groups.at(-1);
+      if (previous && index <= previous.end + 1) previous.end = index;
+      else groups.push({ start: index, end: index });
+    }
+    for (const group of groups) {
+      const start = Math.max(0, group.start - 1), end = Math.min(route.points.length - 1, group.end + 1);
+      let cursor = start;
+      while (cursor < end) {
+        let finish = cursor;
+        let length = 0;
+        const maximumLength = TUNNEL_MAX_LENGTHS[levelIndex] * 0.92;
+        while (finish < end) {
+          const step = Math.hypot(unwrapNear(route.points[finish + 1].x, route.points[finish].x, worldWidth) - route.points[finish].x,
+            route.points[finish + 1].z - route.points[finish].z);
+          if (length + step > maximumLength && finish > cursor) break;
+          length += step;
+          finish += 1;
+        }
+        if (length >= 9 && finish > cursor + 1) {
+          route.tunnels.push({ start: cursor, end: finish, length });
+          for (let index = cursor + 1; index < finish; index += 1) {
+            const t = (index - cursor) / Math.max(1, finish - cursor);
+            route.profile[index] = route.profile[cursor] * (1 - t) + route.profile[finish] * t;
+          }
+          addedTunnels += 1;
+        }
+        cursor = finish;
+      }
+    }
+    route.tunnels.sort((a, b) => a.start - b.start);
+    const mergedTunnels = [];
+    for (const tunnel of route.tunnels) {
+      const expanded = { ...tunnel, start: Math.max(0, tunnel.start - 1), end: Math.min(route.points.length - 1, tunnel.end + 1) };
+      const previous = mergedTunnels.at(-1);
+      if (previous && expanded.start <= previous.end + 1) {
+        previous.end = Math.max(previous.end, expanded.end);
+      } else mergedTunnels.push(expanded);
+    }
+    for (const tunnel of mergedTunnels) {
+      let length = 0;
+      for (let index = tunnel.start; index < tunnel.end; index += 1) length += Math.hypot(
+        unwrapNear(route.points[index + 1].x, route.points[index].x, worldWidth) - route.points[index].x,
+        route.points[index + 1].z - route.points[index].z);
+      tunnel.length = length;
+    }
+    route.tunnels = mergedTunnels;
+  }
+  return { addedTunnels, loweredViaducts };
+}
+
 function gradeTerrain(routes, heights, riverMask, width, height, worldWidth, worldHeight) {
   const targets = new Float32Array(heights.length);
   const weights = new Float32Array(heights.length);
@@ -766,17 +1087,296 @@ function gradeTerrain(routes, heights, riverMask, width, height, worldWidth, wor
   }
 }
 
+function runInfrastructureAuditAndRepair(routes, context, engineeringWidth, engineeringHeight) {
+  const started = performance.now();
+  const { heights, landField, riverMask, riverCoreMask, riverBed, fieldWidth, fieldHeight, worldWidth, worldHeight } = context;
+  const engineeringField = new Uint8Array(engineeringWidth * engineeringHeight * 4);
+  for (let index = 0; index < engineeringWidth * engineeringHeight; index += 1) engineeringField[index * 4] = 128;
+  const repairedSites = [];
+  let initialViolations = 0;
+  let previousViolations = Number.POSITIVE_INFINITY;
+  let appliedRepairs = 0;
+  let passes = 0;
+
+  const markEngineering = (x, z, delta, support, drainage, risk) => {
+    const px = wrap(Math.floor(wrap(x, worldWidth) / worldWidth * engineeringWidth), engineeringWidth);
+    const pz = clamp(Math.floor(z / worldHeight * engineeringHeight), 0, engineeringHeight - 1);
+    const offset = (pz * engineeringWidth + px) * 4;
+    engineeringField[offset] = clamp(Math.round(128 + delta * 20), 0, 255);
+    engineeringField[offset + 1] = Math.max(engineeringField[offset + 1], Math.round(clamp(support, 0, 1) * 255));
+    engineeringField[offset + 2] = Math.max(engineeringField[offset + 2], Math.round(clamp(drainage, 0, 1) * 255));
+    engineeringField[offset + 3] = Math.max(engineeringField[offset + 3], Math.round(clamp(risk, 0, 1) * 255));
+  };
+
+  for (let pass = 0; pass < MAX_AUDIT_PASSES; pass += 1) {
+    passes = pass + 1;
+    // Re-seat the vertical solution toward the latest terrain before auditing,
+    // then project it back into the level-specific grade envelope.
+    for (const route of routes) {
+      if (route.suppressed) continue;
+      const levelIndex = clamp(route.infrastructureLevel - 1, 0, 4);
+      const maximumGrade = MAX_GRADES[levelIndex];
+      const limit = CUT_FILL_LIMITS[levelIndex];
+      for (let index = 1; index + 1 < route.points.length; index += 1) {
+        const structured = (route.bridges ?? []).some((interval) => index > interval.start && index < interval.end)
+          || (route.tunnels ?? []).some((interval) => index > interval.start && index < interval.end);
+        if (structured) continue;
+        const terrain = sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, route.points[index].x, route.points[index].z);
+        const seated = clamp(terrain, route.profile[index] - limit, route.profile[index] + limit);
+        route.profile[index] += (seated - route.profile[index]) * 0.32;
+      }
+      for (let projection = 0; projection < 3; projection += 1) {
+        for (let index = 1; index < route.profile.length; index += 1) {
+          const run = Math.max(0.001, Math.hypot(unwrapNear(route.points[index].x, route.points[index - 1].x, worldWidth) - route.points[index - 1].x,
+            route.points[index].z - route.points[index - 1].z));
+          route.profile[index] = clamp(route.profile[index], route.profile[index - 1] - maximumGrade * run, route.profile[index - 1] + maximumGrade * run);
+        }
+        for (let index = route.profile.length - 2; index >= 0; index -= 1) {
+          const run = Math.max(0.001, Math.hypot(unwrapNear(route.points[index + 1].x, route.points[index].x, worldWidth) - route.points[index].x,
+            route.points[index + 1].z - route.points[index].z));
+          route.profile[index] = clamp(route.profile[index], route.profile[index + 1] - maximumGrade * run, route.profile[index + 1] + maximumGrade * run);
+        }
+      }
+      for (let index = 0; index < route.profile.length; index += 1) {
+        const structured = (route.bridges ?? []).some((interval) => index > interval.start && index < interval.end)
+          || (route.tunnels ?? []).some((interval) => index > interval.start && index < interval.end);
+        if (structured) continue;
+        const terrain = sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, route.points[index].x, route.points[index].z);
+        route.profile[index] = Math.min(route.profile[index], terrain + 12);
+      }
+    }
+    const targets = new Float64Array(heights.length);
+    const weights = new Float32Array(heights.length);
+    let violations = 0;
+    let maximumPenetration = 0;
+    let maximumUnsupported = 0;
+    const passSites = [];
+
+    for (const route of routes) {
+      if (route.suppressed) continue;
+      const halfWidth = routeRoadWidth(route) * 0.5;
+      const lift = route.infrastructureLevel === 1 ? 0.055 : 0.10;
+      const levelIndex = clamp(route.infrastructureLevel - 1, 0, 4);
+      const cutFillLimit = CUT_FILL_LIMITS[levelIndex];
+      for (let index = 0; index + 1 < route.points.length; index += 1) {
+        if (route.sharedSegmentOwners?.[index] >= 0 || intervalAt(route, index, 'bridges') || intervalAt(route, index, 'tunnels')) continue;
+        const a = route.points[index], b = route.points[index + 1];
+        const bx = unwrapNear(b.x, a.x, worldWidth);
+        const dx = bx - a.x, dz = b.z - a.z;
+        const segmentLength = Math.max(0.001, Math.hypot(dx, dz));
+        const nx = -dz / segmentLength, nz = dx / segmentLength;
+        const auditStep = pass < 4 ? 4.0 : pass < 8 ? 2.0 : 1.0;
+        const steps = Math.max(1, Math.ceil(segmentLength / auditStep));
+        for (let step = 0; step <= steps; step += 1) {
+          const t = step / steps;
+          const x = wrap(a.x + dx * t, worldWidth), z = a.z + dz * t;
+          const roadBase = route.profile[index] * (1 - t) + route.profile[index + 1] * t;
+          const roadTop = roadBase + lift;
+          const water = sampleScalar(riverCoreMask, fieldWidth, fieldHeight, worldWidth, worldHeight, x, z) > 0.10;
+          if (water) {
+            violations += 1;
+            passSites.push({ type: 'unbridged-water', routeId: route.id, x, z, severity: 1 });
+            markEngineering(x, z, 0, 0, 1, 1);
+            continue;
+          }
+          for (const lateral of [-halfWidth, 0, halfWidth]) {
+            const sampleX = wrap(x + nx * lateral, worldWidth), sampleZ = z + nz * lateral;
+            const terrain = sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, sampleX, sampleZ);
+            const penetration = terrain - (roadTop - 0.03);
+            const unsupported = roadTop - terrain - 0.35;
+            if (penetration <= 0 && unsupported <= 0) continue;
+            violations += 1;
+            maximumPenetration = Math.max(maximumPenetration, penetration);
+            maximumUnsupported = Math.max(maximumUnsupported, unsupported);
+            const desiredTerrain = roadBase;
+            const fx = wrap(Math.round(sampleX / worldWidth * fieldWidth), fieldWidth);
+            const fz = clamp(Math.round(sampleZ / worldHeight * fieldHeight), 0, fieldHeight - 1);
+            const radius = Math.max(1, Math.ceil((halfWidth + 3.0) / worldWidth * fieldWidth));
+            for (let oz = -radius; oz <= radius; oz += 1) {
+              const pz = fz + oz;
+              if (pz < 0 || pz >= fieldHeight) continue;
+              for (let ox = -radius; ox <= radius; ox += 1) {
+                if (Math.hypot(ox, oz) > radius + 0.25) continue;
+                const px = wrap(fx + ox, fieldWidth);
+                const fieldIndex = pz * fieldWidth + px;
+                if (!landField[fieldIndex] || riverCoreMask[fieldIndex] > 0.055) continue;
+                const weight = 1 / (1 + Math.hypot(ox, oz));
+                const boundedTarget = clamp(desiredTerrain, heights[fieldIndex] - cutFillLimit, heights[fieldIndex] + cutFillLimit);
+                targets[fieldIndex] += boundedTarget * weight;
+                weights[fieldIndex] += weight;
+              }
+            }
+            const delta = desiredTerrain - terrain;
+            markEngineering(sampleX, sampleZ, delta, unsupported > 0 ? clamp(unsupported / 3, 0, 1) : 0,
+              sampleScalar(riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight, sampleX, sampleZ),
+              clamp(Math.max(penetration, unsupported) / 2, 0, 1));
+            if (passSites.length < 256) passSites.push({ type: penetration > unsupported ? 'buried-road' : 'unsupported-road', routeId: route.id,
+              x: sampleX, z: sampleZ, severity: Math.max(penetration, unsupported) });
+          }
+        }
+      }
+    }
+    if (pass === 0) initialViolations = violations;
+    if (!violations) {
+      previousViolations = 0;
+      break;
+    }
+    let changed = 0;
+    for (let index = 0; index < heights.length; index += 1) {
+      if (!weights[index]) continue;
+      const target = targets[index] / weights[index];
+      const delta = target - heights[index];
+      if (Math.abs(delta) < 0.002) continue;
+      heights[index] += delta * 0.92;
+      changed += 1;
+    }
+    appliedRepairs += changed;
+    repairedSites.push(...passSites.slice(0, Math.max(0, 512 - repairedSites.length)));
+    reinciseProtectedHydrology(heights, landField, riverMask, riverCoreMask, riverBed);
+    if (pass === 3 || pass === 7 || pass === 10) escalateTerrainConflicts(routes, context);
+    if (!changed || violations >= previousViolations && pass >= 4) {
+      // The final seating pass may move the center profile toward terrain when
+      // bounded grading alone cannot converge (typically conflicting mountain approaches).
+      for (const route of routes) {
+        if (route.suppressed) continue;
+        for (let index = 1; index + 1 < route.points.length; index += 1) {
+          if (intervalAt(route, index, 'bridges') || intervalAt(route, index, 'tunnels')) continue;
+          const terrain = sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, route.points[index].x, route.points[index].z);
+          const limit = CUT_FILL_LIMITS[clamp(route.infrastructureLevel - 1, 0, 4)];
+          route.profile[index] = clamp(route.profile[index], terrain - limit, terrain + limit);
+        }
+      }
+    }
+    previousViolations = violations;
+  }
+
+  // The late seating pass can expose a final cliff-edge conflict. Escalate it
+  // before the exact audit so every resulting tunnel interval is omitted from
+  // ordinary-road geometry rather than surfacing as a buried/flying ribbon.
+  escalateTerrainConflicts(routes, context);
+
+  // Visual-only city streets may be omitted when a city center sits directly
+  // on an extreme cliff or channel. They do not carry movement connectivity;
+  // emitting a flying local street is strictly worse than omitting that accent.
+  const suppressedLocalStreets = [];
+  for (const route of routes) {
+    if (!route.localStreet || route.suppressed) continue;
+    const halfWidth = routeRoadWidth(route) * 0.5;
+    const lift = route.infrastructureLevel === 1 ? 0.055 : 0.10;
+    let worst = 0;
+    for (let index = 0; index + 1 < route.points.length && worst <= 1; index += 1) {
+      if (intervalAt(route, index, 'bridges') || intervalAt(route, index, 'tunnels')) continue;
+      const a = route.points[index], b = route.points[index + 1];
+      const bx = unwrapNear(b.x, a.x, worldWidth), dx = bx - a.x, dz = b.z - a.z;
+      const length = Math.max(0.001, Math.hypot(dx, dz)), nx = -dz / length, nz = dx / length;
+      const steps = Math.max(1, Math.ceil(length));
+      for (let step = 0; step <= steps && worst <= 1; step += 1) {
+        const t = step / steps, x = wrap(a.x + dx * t, worldWidth), z = a.z + dz * t;
+        if (sampleScalar(riverCoreMask, fieldWidth, fieldHeight, worldWidth, worldHeight, x, z) > 0.10) { worst = 2; break; }
+        const top = route.profile[index] * (1 - t) + route.profile[index + 1] * t + lift;
+        for (const lateral of [-halfWidth, 0, halfWidth]) {
+          const terrain = sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, x + nx * lateral, z + nz * lateral);
+          worst = Math.max(worst, terrain - (top - 0.03), top - terrain - 0.35);
+        }
+      }
+    }
+    if (worst > 1) {
+      route.suppressed = true;
+      suppressedLocalStreets.push({ type: 'omitted-local-street', routeId: route.id, x: route.points[0].x, z: route.points[0].z, severity: worst });
+    }
+  }
+
+  // Exact final audit of every emitted ordinary-road cross-section.
+  const severe = [];
+  let maximumPenetration = 0, maximumUnsupported = 0, unbridgedWater = 0;
+  let worstPenetration, worstUnsupported;
+  for (const route of routes) {
+    if (route.suppressed) continue;
+    const halfWidth = routeRoadWidth(route) * 0.5;
+    const lift = route.infrastructureLevel === 1 ? 0.055 : 0.10;
+    for (let index = 0; index + 1 < route.points.length; index += 1) {
+      if (route.sharedSegmentOwners?.[index] >= 0 || intervalAt(route, index, 'bridges') || intervalAt(route, index, 'tunnels')) continue;
+      const a = route.points[index], b = route.points[index + 1];
+      const bx = unwrapNear(b.x, a.x, worldWidth), dx = bx - a.x, dz = b.z - a.z;
+      const length = Math.max(0.001, Math.hypot(dx, dz)), nx = -dz / length, nz = dx / length;
+      const steps = Math.max(1, Math.ceil(length));
+      for (let step = 0; step <= steps; step += 1) {
+        const t = step / steps, x = wrap(a.x + dx * t, worldWidth), z = a.z + dz * t;
+        if (sampleScalar(riverCoreMask, fieldWidth, fieldHeight, worldWidth, worldHeight, x, z) > 0.10) {
+          unbridgedWater += 1;
+          if (severe.length < 128) severe.push({ type: 'unbridged-water', routeId: route.id, x, z });
+        }
+        const top = route.profile[index] * (1 - t) + route.profile[index + 1] * t + lift;
+        for (const lateral of [-halfWidth, 0, halfWidth]) {
+          const terrain = sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, x + nx * lateral, z + nz * lateral);
+          const penetration = terrain - (top - 0.03);
+          const unsupported = top - terrain - 0.35;
+          if (penetration > maximumPenetration) {
+            maximumPenetration = penetration;
+            worstPenetration = { routeId: route.id, x: x + nx * lateral, z: z + nz * lateral };
+          }
+          if (unsupported > maximumUnsupported) {
+            maximumUnsupported = unsupported;
+            worstUnsupported = { routeId: route.id, x: x + nx * lateral, z: z + nz * lateral };
+          }
+        }
+      }
+    }
+  }
+  if (maximumPenetration > 0.035) severe.push({ type: 'terrain-penetration', severity: maximumPenetration });
+  if (maximumUnsupported > 0.36) severe.push({ type: 'unsupported-road', severity: maximumUnsupported });
+  const report = {
+    version: AUDIT_VERSION,
+    converged: severe.length === 0,
+    passes,
+    timingsMs: { auditRepair: Math.round((performance.now() - started) * 10) / 10 },
+    violations: { initial: initialViolations, final: severe.length, unbridgedWater, maximumPenetration, maximumUnsupported,
+      worstPenetration, worstUnsupported },
+    repairs: { terrainCells: appliedRepairs, sharedSegments: 0, sharedLength: 0 },
+    repairedSites,
+    severe,
+    warnings: suppressedLocalStreets,
+  };
+  return { engineeringField, report };
+}
+
 class InfrastructureMesh {
-  vertices = [];
+  vertices = new Float32Array(1_048_576);
+  vertexLength = 0;
   indices = [];
 
   vertex(position, normal, uv, level, role, surfaceMaterial, structureMaterial, corridorId) {
-    const index = this.vertices.length / 13;
-    this.vertices.push(...position, ...normal, ...uv, level, role, surfaceMaterial, structureMaterial, corridorId);
+    const values = [...position, ...normal, ...uv, level, role, surfaceMaterial, structureMaterial, corridorId];
+    const index = this.vertexLength / 13;
+    if (this.vertexLength + values.length > this.vertices.length) {
+      let capacity = this.vertices.length;
+      while (capacity < this.vertexLength + values.length) capacity *= 2;
+      const grown = new Float32Array(capacity);
+      grown.set(this.vertices.subarray(0, this.vertexLength));
+      this.vertices = grown;
+    }
+    this.vertices.set(values, this.vertexLength);
+    this.vertexLength += values.length;
     return index;
   }
 
+  packedVertices() { return this.vertices.subarray(0, this.vertexLength); }
+
   quad(a, b, c, d) { this.indices.push(a, b, c, a, c, d); }
+
+  wall(a, b, yMin, yMax, level, role, surfaceMaterial, structureMaterial, corridorId) {
+    const dx = b[0] - a[0], dz = b[1] - a[1];
+    const length = Math.max(0.001, Math.hypot(dx, dz));
+    const normal = [-dz / length, 0, dx / length];
+    const vertices = [
+      this.vertex([a[0], yMin, a[1]], normal, [0, 0], level, role, surfaceMaterial, structureMaterial, corridorId),
+      this.vertex([b[0], yMin, b[1]], normal, [1, 0], level, role, surfaceMaterial, structureMaterial, corridorId),
+      this.vertex([b[0], yMax, b[1]], normal, [1, 1], level, role, surfaceMaterial, structureMaterial, corridorId),
+      this.vertex([a[0], yMax, a[1]], normal, [0, 1], level, role, surfaceMaterial, structureMaterial, corridorId),
+    ];
+    this.quad(...vertices);
+    this.quad(vertices[3], vertices[2], vertices[1], vertices[0]);
+  }
 
   box(center, yMin, yMax, length, width, angle, level, role, surfaceMaterial, structureMaterial, corridorId) {
     const forward = [Math.cos(angle), Math.sin(angle)];
@@ -799,23 +1399,46 @@ class InfrastructureMesh {
       this.quad(...base);
     }
   }
+
+  compactBox(center, yMin, yMax, length, width, angle, level, role, surfaceMaterial, structureMaterial, corridorId) {
+    const forward = [Math.cos(angle), Math.sin(angle)];
+    const right = [-forward[1], forward[0]];
+    const footprint = [
+      [-length * 0.5, -width * 0.5], [length * 0.5, -width * 0.5],
+      [length * 0.5, width * 0.5], [-length * 0.5, width * 0.5],
+    ].map(([along, across]) => [center[0] + forward[0] * along + right[0] * across, center[1] + forward[1] * along + right[1] * across]);
+    const vertices = [];
+    for (const y of [yMin, yMax]) {
+      for (let index = 0; index < 4; index += 1) vertices.push(this.vertex([footprint[index][0], y, footprint[index][1]],
+        [0, y === yMax ? 1 : -1, 0], [index & 1, index >> 1], level, role, surfaceMaterial, structureMaterial, corridorId));
+    }
+    this.quad(vertices[4], vertices[5], vertices[6], vertices[7]);
+    this.quad(vertices[3], vertices[2], vertices[1], vertices[0]);
+    this.quad(vertices[0], vertices[1], vertices[5], vertices[4]);
+    this.quad(vertices[1], vertices[2], vertices[6], vertices[5]);
+    this.quad(vertices[2], vertices[3], vertices[7], vertices[6]);
+    this.quad(vertices[3], vertices[0], vertices[4], vertices[7]);
+  }
 }
 
 function buildMeshes(routes, heights, riverMask, riverBed, width, height, worldWidth, worldHeight, chunksX = 32, chunksY = 16) {
   const roads = new InfrastructureMesh();
   const bridges = new InfrastructureMesh();
   const tunnels = new InfrastructureMesh();
+  const engineering = new InfrastructureMesh();
   const bridgeRecords = [];
   const tunnelRecords = [];
   const roadBatches = [];
   const bridgeBatches = [];
   const tunnelBatches = [];
+  const engineeringBatches = [];
   const chunkFor = (x, z) => clamp(Math.floor(z / worldHeight * chunksY), 0, chunksY - 1) * chunksX
     + clamp(Math.floor(wrap(x, worldWidth) / worldWidth * chunksX), 0, chunksX - 1);
   const pushBatch = (batches, start, end, x, z) => {
     if (end > start) batches.push({ chunk: chunkFor(x, z), start, count: end - start });
   };
   for (const route of routes) {
+    if (route.suppressed) continue;
     const levelIndex = clamp(route.infrastructureLevel - 1, 0, 4);
     const roadWidth = route.plaza ? 3.1 : route.localStreet ? Math.max(1.25, LEVEL_WIDTHS[levelIndex] * 0.62)
       : LEVEL_WIDTHS[levelIndex] * ROLE_WIDTH_SCALE[route.corridorRole];
@@ -839,8 +1462,16 @@ function buildMeshes(routes, heights, riverMask, riverBed, width, height, worldW
       cumulative.push(cumulative[index - 1] + Math.hypot(unwrapNear(route.points[index].x, route.points[index - 1].x, worldWidth) - route.points[index - 1].x, route.points[index].z - route.points[index - 1].z));
     }
     const deckProfile = route.profile;
+    const emittedRoadSegments = Array.from({ length: Math.max(0, route.points.length - 1) }, (_, index) =>
+      route.sharedSegmentOwners?.[index] < 0
+      && !(bridgeAt[index] >= 0 && bridgeAt[index + 1] >= 0)
+      && !(tunnelAt[index] >= 0 && tunnelAt[index + 1] >= 0));
     const rings = [];
     for (let index = 0; index < route.points.length; index += 1) {
+      if (!emittedRoadSegments[index - 1] && !emittedRoadSegments[index]) {
+        rings.push(null);
+        continue;
+      }
       const point = route.points[index];
       const previous = route.points[Math.max(0, index - 1)];
       const next = route.points[Math.min(route.points.length - 1, index + 1)];
@@ -866,11 +1497,39 @@ function buildMeshes(routes, heights, riverMask, riverBed, width, height, worldW
         slot === 2 || slot === 3 ? 0 : slot === 0 || slot === 5 ? 7 : 6, corridorId)));
     }
     for (let index = 0; index + 1 < rings.length; index += 1) {
-      if (bridgeAt[index] >= 0 && bridgeAt[index + 1] >= 0 || tunnelAt[index] >= 0 && tunnelAt[index + 1] >= 0) continue;
+      if (!emittedRoadSegments[index]) continue;
       const batchStart = roads.indices.length;
       for (let strip = 0; strip < 5; strip += 1) roads.quad(rings[index][strip], rings[index + 1][strip], rings[index + 1][strip + 1], rings[index][strip + 1]);
       const a = route.points[index], b = route.points[index + 1];
       pushBatch(roadBatches, batchStart, roads.indices.length, (a.x + unwrapNear(b.x, a.x, worldWidth)) * 0.5, (a.z + b.z) * 0.5);
+
+      const bx = unwrapNear(b.x, a.x, worldWidth);
+      const segmentLength = Math.max(0.001, Math.hypot(bx - a.x, b.z - a.z));
+      const angle = Math.atan2(b.z - a.z, bx - a.x);
+      const rx = -Math.sin(angle), rz = Math.cos(angle);
+      const centerX = (a.x + bx) * 0.5, centerZ = (a.z + b.z) * 0.5;
+      const roadY = (deckProfile[index] + deckProfile[index + 1]) * 0.5;
+      const outerOffset = roadWidth * 0.5 + shoulder * 0.82;
+      for (const side of [-1, 1]) {
+        const x = centerX + rx * outerOffset * side, z = centerZ + rz * outerOffset * side;
+        const ground = sampleHeight(heights, width, height, worldWidth, worldHeight, x, z);
+        const difference = roadY - ground;
+        if (Math.abs(difference) < 4.0) continue;
+        const engineeringStart = engineering.indices.length;
+        const ax = a.x + rx * outerOffset * side, az = a.z + rz * outerOffset * side;
+        const endX = bx + rx * outerOffset * side, endZ = b.z + rz * outerOffset * side;
+        engineering.wall([ax, az], [endX, endZ], Math.min(ground, roadY - 0.08), Math.max(ground, roadY - 0.08),
+          route.infrastructureLevel, route.corridorRole, surfaceMaterial, difference > 0 ? 9 : 7, corridorId);
+        pushBatch(engineeringBatches, engineeringStart, engineering.indices.length, x, z);
+      }
+      const drainage = sampleScalar(riverMask, width, height, worldWidth, worldHeight, centerX, centerZ);
+      if (drainage > 0.025 && drainage <= 0.10 && Math.floor(cumulative[index] / 12) !== Math.floor(cumulative[index + 1] / 12)) {
+        const ground = sampleHeight(heights, width, height, worldWidth, worldHeight, centerX, centerZ);
+        const engineeringStart = engineering.indices.length;
+        engineering.box([centerX, centerZ], ground - 0.12, ground + 0.12, roadWidth + shoulder * 2 + 0.6, 0.42,
+          angle + Math.PI * 0.5, route.infrastructureLevel, route.corridorRole, surfaceMaterial, 10, corridorId);
+        pushBatch(engineeringBatches, engineeringStart, engineering.indices.length, centerX, centerZ);
+      }
     }
 
     for (const interval of route.bridges) {
@@ -882,10 +1541,21 @@ function buildMeshes(routes, heights, riverMask, riverBed, width, height, worldW
       const roadLift = route.infrastructureLevel === 1 ? 0.055 : 0.10;
       const startTop = deckProfile[interval.start] + roadLift;
       const endTop = deckProfile[interval.end] + roadLift;
+      const bridgeHalfWidth = (roadWidth + 1.0) * 0.5;
       let maximumWater = Number.NEGATIVE_INFINITY;
-      for (let index = coreStart; index <= coreEnd; index += 1) {
-        const bed = sampleScalar(riverBed, width, height, worldWidth, worldHeight, route.points[index].x, route.points[index].z);
-        if (Number.isFinite(bed)) maximumWater = Math.max(maximumWater, bed + 0.38);
+      for (let index = Math.max(interval.start, coreStart - 1); index < Math.min(interval.end, coreEnd + 1); index += 1) {
+        const a = route.points[index], b = route.points[index + 1], bx = unwrapNear(b.x, a.x, worldWidth);
+        const dx = bx - a.x, dz = b.z - a.z, length = Math.max(0.001, Math.hypot(dx, dz));
+        const nx = -dz / length, nz = dx / length;
+        const steps = Math.max(1, Math.ceil(length));
+        for (let step = 0; step <= steps; step += 1) {
+          const t = step / steps;
+          for (const lateral of [-bridgeHalfWidth, 0, bridgeHalfWidth]) {
+            const bed = sampleScalar(riverBed, width, height, worldWidth, worldHeight,
+              a.x + dx * t + nx * lateral, a.z + dz * t + nz * lateral);
+            if (Number.isFinite(bed)) maximumWater = Math.max(maximumWater, bed + 0.38);
+          }
+        }
       }
       if (!Number.isFinite(maximumWater)) {
         const midpoint = route.points[Math.floor((coreStart + coreEnd) * 0.5)];
@@ -908,7 +1578,10 @@ function buildMeshes(routes, heights, riverMask, riverBed, width, height, worldW
           deckTop = startTop * (1 - t) + coreStartTop * t;
         } else if (index >= coreEnd) {
           const approachLength = cumulative[interval.end] - cumulative[coreEnd];
-          const t = approachLength > 0.001 ? smoothstep(0, 1, (cumulative[index] - cumulative[coreEnd]) / approachLength) : 1;
+          // A river core can legitimately reach the terminal movement endpoint.
+          // With no dry exit ramp, keep the core deck height instead of pulling
+          // the final bridge section down into the rendered water surface.
+          const t = approachLength > 0.001 ? smoothstep(0, 1, (cumulative[index] - cumulative[coreEnd]) / approachLength) : 0;
           deckTop = coreEndTop * (1 - t) + endTop * t;
         } else {
           const t = (cumulative[index] - cumulative[coreStart]) / Math.max(0.001, cumulative[coreEnd] - cumulative[coreStart]);
@@ -916,37 +1589,55 @@ function buildMeshes(routes, heights, riverMask, riverBed, width, height, worldW
         }
         deckHeights.push(deckTop);
       }
-      for (let index = interval.start; index < interval.end; index += 1) {
+      const bridgeSections = [interval.start];
+      for (let index = interval.start + 1; index <= interval.end; index += 1) {
+        if (index === interval.end || cumulative[index] - cumulative[bridgeSections.at(-1)] >= 9.0) bridgeSections.push(index);
+      }
+      let minimumClearance = Number.POSITIVE_INFINITY;
+      for (let section = 0; section + 1 < bridgeSections.length; section += 1) {
+        const index = bridgeSections[section];
+        const nextIndex = bridgeSections[section + 1];
         const a = route.points[index];
-        const b = route.points[index + 1];
+        const b = route.points[nextIndex];
         const bx = unwrapNear(b.x, a.x, worldWidth);
         const length = Math.hypot(bx - a.x, b.z - a.z);
         const angle = Math.atan2(b.z - a.z, bx - a.x);
         const center = [(a.x + bx) * 0.5, (a.z + b.z) * 0.5];
-        const y = (deckHeights[index - interval.start] + deckHeights[index + 1 - interval.start]) * 0.5;
+        const averageDeckY = (deckHeights[index - interval.start] + deckHeights[nextIndex - interval.start]) * 0.5;
+        const sectionTouchesCore = nextIndex >= coreStart && index <= coreEnd;
+        const y = sectionTouchesCore ? Math.max(averageDeckY, requiredTop) : averageDeckY;
+        const clearanceSteps = Math.max(1, Math.ceil(length));
+        const dx = bx - a.x, dz = b.z - a.z;
+        const nx = -dz / Math.max(0.001, length), nz = dx / Math.max(0.001, length);
+        for (let step = 0; step <= clearanceSteps; step += 1) {
+          const t = step / clearanceSteps;
+          for (const lateral of [-bridgeHalfWidth, 0, bridgeHalfWidth]) {
+            const bed = sampleScalar(riverBed, width, height, worldWidth, worldHeight,
+              a.x + dx * t + nx * lateral, a.z + dz * t + nz * lateral);
+            if (Number.isFinite(bed)) minimumClearance = Math.min(minimumClearance, y - 0.58 - (bed + 0.38));
+          }
+        }
         const batchStart = bridges.indices.length;
-        bridges.box(center, y - 0.58, y, length + 0.18, roadWidth + 1.0, angle,
+        bridges.compactBox(center, y - 0.58, y, length + 0.18, roadWidth + 1.0, angle,
           route.infrastructureLevel, route.corridorRole, surfaceMaterial, 8, corridorId);
         const sideOffset = (roadWidth + 1.0) * 0.5 - 0.13;
         const rx = -Math.sin(angle), rz = Math.cos(angle);
         if (type > 0) {
           for (const side of [-1, 1]) {
             const girderCenter = [center[0] + rx * sideOffset * 0.72 * side, center[1] + rz * sideOffset * 0.72 * side];
-            bridges.box(girderCenter, y - 1.18, y - 0.46, length + 0.12, 0.24, angle,
+            bridges.compactBox(girderCenter, y - 1.18, y - 0.46, length + 0.12, 0.24, angle,
               route.infrastructureLevel, route.corridorRole, surfaceMaterial, 10, corridorId);
           }
         }
         for (const side of [-1, 1]) {
           const railCenter = [center[0] + rx * sideOffset * side, center[1] + rz * sideOffset * side];
           if (type === 0) {
-            bridges.box(railCenter, y, y + 0.58, length + 0.1, 0.20, angle,
+            bridges.compactBox(railCenter, y, y + 0.58, length + 0.1, 0.20, angle,
               route.infrastructureLevel, route.corridorRole, surfaceMaterial, route.infrastructureLevel <= 2 ? 2 : 9, corridorId);
           } else {
-            bridges.box(railCenter, y + 0.58, y + 0.72, length + 0.1, 0.16, angle,
+            bridges.compactBox(railCenter, y + 0.58, y + 0.72, length + 0.1, 0.16, angle,
               route.infrastructureLevel, route.corridorRole, surfaceMaterial, 10, corridorId);
-            bridges.box(railCenter, y + 0.29, y + 0.39, length + 0.1, 0.12, angle,
-              route.infrastructureLevel, route.corridorRole, surfaceMaterial, 10, corridorId);
-            bridges.box(railCenter, y, y + 0.70, 0.18, 0.18, angle,
+            if (section % 3 === 0) bridges.compactBox(railCenter, y, y + 0.70, 0.18, 0.18, angle,
               route.infrastructureLevel, route.corridorRole, surfaceMaterial, 10, corridorId);
           }
         }
@@ -971,7 +1662,7 @@ function buildMeshes(routes, heights, riverMask, riverBed, width, height, worldW
           // abutments; needle-like freestanding piers are visually misleading.
           if (pierHeight > 18) continue;
           const batchStart = bridges.indices.length;
-          bridges.box([point.x, point.z], ground, deckY, roadWidth * 0.58, 0.7, angle,
+          bridges.compactBox([point.x, point.z], ground, deckY, roadWidth * 0.58, 0.7, angle,
             route.infrastructureLevel, route.corridorRole, surfaceMaterial, 9, corridorId);
           maximumGeneratedPierHeight = Math.max(maximumGeneratedPierHeight, pierHeight);
           pushBatch(bridgeBatches, batchStart, bridges.indices.length, point.x, point.z);
@@ -984,23 +1675,21 @@ function buildMeshes(routes, heights, riverMask, riverBed, width, height, worldW
         const y = endpoint === interval.start ? deckHeights[0] : deckHeights.at(-1);
         const ground = Math.min(sampleHeight(heights, width, height, worldWidth, worldHeight, point.x, point.z), y - 0.42);
         const batchStart = bridges.indices.length;
-        bridges.box([point.x, point.z], ground, y - 0.08, 1.1, roadWidth + 1.8, angle,
+        bridges.compactBox([point.x, point.z], ground, y - 0.08, 1.1, roadWidth + 1.8, angle,
           route.infrastructureLevel, route.corridorRole, surfaceMaterial, 9, corridorId);
         pushBatch(bridgeBatches, batchStart, bridges.indices.length, point.x, point.z);
       }
       const midpoint = route.points[Math.floor((interval.start + interval.end) * 0.5)];
-      let minimumClearance = Number.POSITIVE_INFINITY;
-      for (let index = coreStart; index <= coreEnd; index += 1) {
-        const bed = sampleScalar(riverBed, width, height, worldWidth, worldHeight, route.points[index].x, route.points[index].z);
-        if (!Number.isFinite(bed)) continue;
-        minimumClearance = Math.min(minimumClearance, deckHeights[index - interval.start] - 0.58 - (bed + 0.38));
-      }
       bridgeRecords.push({
         routeId: route.id, start: interval.start, end: interval.end, coreStart, coreEnd,
         span: hydraulicSpan, type, x: midpoint.x, z: midpoint.z,
-        minimumClearance: Number.isFinite(minimumClearance) ? minimumClearance : 0,
+        minimumClearance: Number.isFinite(minimumClearance) ? minimumClearance : 1,
         maximumPierHeight: maximumGeneratedPierHeight,
-        seamError: Math.max(Math.abs(deckHeights[0] - startTop), Math.abs(deckHeights.at(-1) - endTop)),
+        // A terminal crossing has no ordinary-road seam on that side.
+        seamError: Math.max(
+          coreStart > interval.start ? Math.abs(deckHeights[0] - startTop) : 0,
+          coreEnd < interval.end ? Math.abs(deckHeights.at(-1) - endTop) : 0,
+        ),
       });
     }
 
@@ -1061,11 +1750,14 @@ function buildMeshes(routes, heights, riverMask, riverBed, width, height, worldW
   const packedRoads = reorderIndices(roads.indices, roadBatches);
   const packedBridges = reorderIndices(bridges.indices, bridgeBatches);
   const packedTunnels = reorderIndices(tunnels.indices, tunnelBatches);
+  const packedEngineering = reorderIndices(engineering.indices, engineeringBatches);
   return {
-    roadVertices: new Float32Array(roads.vertices), roadIndices: packedRoads.indices,
-    bridgeVertices: new Float32Array(bridges.vertices), bridgeIndices: packedBridges.indices, bridgeRecords,
-    tunnelVertices: new Float32Array(tunnels.vertices), tunnelIndices: packedTunnels.indices, tunnelRecords,
-    chunkRanges: { chunksX, chunksY, roads: packedRoads.ranges, bridges: packedBridges.ranges, tunnels: packedTunnels.ranges },
+    roadVertices: roads.packedVertices(), roadIndices: packedRoads.indices,
+    bridgeVertices: bridges.packedVertices(), bridgeIndices: packedBridges.indices, bridgeRecords,
+    tunnelVertices: tunnels.packedVertices(), tunnelIndices: packedTunnels.indices, tunnelRecords,
+    engineeringVertices: engineering.packedVertices(), engineeringIndices: packedEngineering.indices,
+    chunkRanges: { chunksX, chunksY, roads: packedRoads.ranges, bridges: packedBridges.ranges, tunnels: packedTunnels.ranges,
+      engineering: packedEngineering.ranges },
   };
 }
 
@@ -1073,6 +1765,7 @@ function rasterRoadField(routes, width, height, worldWidth, worldHeight, landFie
   const field = new Uint8Array(width * height * 4);
   const clearance = new Uint8Array(width * height);
   for (const route of routes) {
+    if (route.suppressed) continue;
     const levelIndex = clamp(route.infrastructureLevel - 1, 0, 4);
     const coreWorld = route.plaza ? 3.1 : route.localStreet ? Math.max(1.25, LEVEL_WIDTHS[levelIndex] * 0.62)
       : LEVEL_WIDTHS[levelIndex] * ROLE_WIDTH_SCALE[route.corridorRole];
@@ -1153,6 +1846,7 @@ function buildFurniture(routes, cityPlans, heights, width, height, worldWidth, w
     if ((Math.floor(plan.center[0] * 13 + plan.center[1] * 7) & 3) === 0) push(signs, plan.center[0] + plan.perpendicular.dx * 4, plan.center[1] + plan.perpendicular.dz * 4, 1, 1, 1, Math.atan2(plan.primary.dz, plan.primary.dx), 0.9, 0);
   }
   for (const route of routes) {
+    if (route.suppressed) continue;
     if (route.localStreet) continue;
     for (let index = 4; index + 4 < route.points.length; index += 18) {
       const point = route.points[index];
@@ -1181,7 +1875,10 @@ function buildFurniture(routes, cityPlans, heights, width, height, worldWidth, w
 function buildConnectionCorridorMap(routes, logicalRouteCount, segmentRecordCount) {
   const references = Array.from({ length: segmentRecordCount }, () => []);
   for (const route of routes.slice(0, logicalRouteCount)) {
-    const corridors = [route.startGateway, route.id, route.endGateway].filter((value, index, values) => Number.isInteger(value) && values.indexOf(value) === index);
+    const physicalOwners = route.sharedSegmentOwners ? [...new Set([...route.sharedSegmentOwners].filter((owner) => owner >= 0))] : [];
+    const emitsOwnGeometry = !route.sharedSegmentOwners || [...route.sharedSegmentOwners].some((owner) => owner < 0);
+    const corridors = [route.startGateway, ...(emitsOwnGeometry ? [route.id] : []), ...physicalOwners, route.endGateway]
+      .filter((value, index, values) => Number.isInteger(value) && values.indexOf(value) === index);
     for (const segmentId of route.segmentIds) references[segmentId]?.push(...corridors);
   }
   const offsets = new Uint32Array(segmentRecordCount + 1);
@@ -1244,7 +1941,7 @@ export function buildInfrastructure({
     }) && Math.abs(Math.sin(route.id * 19.731)) > 0.22;
     route.surfaceMaterial = route.infrastructureLevel === 1 ? 0 : route.infrastructureLevel === 2 ? contextualTimber ? 2 : 1 : route.infrastructureLevel;
   }
-  const context = { heights, landField, riverMask, riverCoreMask, riverTexture, fieldWidth, fieldHeight, worldWidth, worldHeight };
+  const context = { heights, landField, riverMask, riverCoreMask, riverTexture, riverBed, fieldWidth, fieldHeight, worldWidth, worldHeight };
   const logicalRouteCount = assembled.routes.length;
   const gatewayCount = buildSharedGateways(assembled.routes, assembled.nodes, provinces, context);
   adaptLogicalRoutesWithCache(assembled.routes.slice(0, logicalRouteCount), context, provinces);
@@ -1253,8 +1950,28 @@ export function buildInfrastructure({
   const localStreetStart = assembled.routes.length;
   addLocalStreets(assembled.routes, cityPlans, context);
   for (const route of assembled.routes.slice(localStreetStart)) adaptRoute(route, context);
+  const residualBridges = repairResidualRiverCrossings(assembled.routes, context)
+    + repairResidualRiverCrossings(assembled.routes, context)
+    + repairResidualRiverCrossings(assembled.routes, context, true);
+  normalizeBridgeIntervals(assembled.routes, context);
+  const networkRepair = compileSharedPhysicalNetwork(assembled.routes, worldWidth);
   gradeTerrain(assembled.routes, heights, riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight);
+  reinciseProtectedHydrology(heights, landField, riverMask, riverCoreMask, riverBed);
+  const structuralEscalation = escalateTerrainConflicts(assembled.routes, context);
+  const audit = runInfrastructureAuditAndRepair(assembled.routes, context, roadFieldWidth, roadFieldHeight);
+  for (const key of ['worstPenetration', 'worstUnsupported']) {
+    const site = audit.report.violations[key];
+    if (!site) continue;
+    const route = assembled.routes[site.routeId];
+    site.route = route ? { level: route.infrastructureLevel, role: route.corridorRole, localStreet: Boolean(route.localStreet),
+      gateway: Boolean(route.gateway), pointCount: route.points.length, bridges: route.bridges?.length ?? 0, tunnels: route.tunnels?.length ?? 0 } : null;
+  }
+  audit.report.repairs.sharedSegments = networkRepair.sharedSegments;
+  audit.report.repairs.sharedLength = networkRepair.sharedLength;
+  mkdirSync(path.resolve('artifacts'), { recursive: true });
+  writeFileSync(path.resolve('artifacts', 'infrastructure-audit-latest.json'), JSON.stringify(audit.report, null, 2));
   const meshes = buildMeshes(assembled.routes, heights, riverMask, riverBed, fieldWidth, fieldHeight, worldWidth, worldHeight);
+  const corridorData = buildCorridorMetrics(assembled.routes, worldWidth);
   const roadRaster = rasterRoadField(assembled.routes, roadFieldWidth, roadFieldHeight, worldWidth, worldHeight, landField, fieldWidth, fieldHeight);
   const furniture = buildFurniture(assembled.routes, cityPlans, heights, fieldWidth, fieldHeight, worldWidth, worldHeight);
   const mapping = buildConnectionCorridorMap(assembled.routes, logicalRouteCount, connectionData.segments.length);
@@ -1270,6 +1987,13 @@ export function buildInfrastructure({
   for (const province of provinces) provinceLevelCounts[province.infrastructureLevel - 1] += 1;
   const bridgeTypes = [0, 0, 0];
   for (const bridge of meshes.bridgeRecords) bridgeTypes[bridge.type] += 1;
+  const bridgeFailures = meshes.bridgeRecords.filter((bridge) => bridge.minimumClearance < 0.20 || bridge.seamError > 0.20 || bridge.maximumPierHeight > 18.01);
+  if (bridgeFailures.length) {
+    audit.report.severe.push(...bridgeFailures.slice(0, 64).map((bridge) => ({ type: 'invalid-bridge', routeId: bridge.routeId, x: bridge.x, z: bridge.z,
+      minimumClearance: bridge.minimumClearance, seamError: bridge.seamError, maximumPierHeight: bridge.maximumPierHeight })));
+    audit.report.violations.final = audit.report.severe.length;
+    audit.report.converged = false;
+  }
   let roadSamples = 0;
   let oceanRoadSamples = 0;
   let unbridgedRiverSamples = 0;
@@ -1303,13 +2027,20 @@ export function buildInfrastructure({
     if (!mountainRoute || elevation > mountainRoute.elevation) mountainRoute = { x: route.points[Math.floor(route.points.length * 0.5)].x, z: route.points[Math.floor(route.points.length * 0.5)].z, elevation };
   }
   return {
-    ...meshes, ...furniture, ...mapping, roadField: roadRaster.field, roadClearance: roadRaster.clearance, cityPlans,
+    ...meshes, ...furniture, ...mapping, ...corridorData,
+    roadField: roadRaster.field, engineeringField: audit.engineeringField, roadClearance: roadRaster.clearance, cityPlans,
+    infrastructureReport: audit.report,
     provinceLevels: classification.provinceLevels,
     stats: {
       landSegments: assembled.landSegmentCount, logicalRoutes: logicalRouteCount, localStreets: assembled.routes.filter((route) => route.localStreet).length,
       localRoutes: classCounts[0], regionalRoutes: classCounts[1], majorRoutes: classCounts[2],
       bridges: meshes.bridgeRecords.length, slabBridges: bridgeTypes[0], girderBridges: bridgeTypes[1], multiSpanBridges: bridgeTypes[2],
       tunnels: meshes.tunnelRecords.length, sharedGateways: gatewayCount, connectionCorridorReferences: mapping.connectionCorridorIds.length,
+      physicalSharedSegments: networkRepair.sharedSegments, physicalSharedLength: networkRepair.sharedLength,
+      residualBridges,
+      auditAddedTunnels: structuralEscalation.addedTunnels, auditLoweredViaducts: structuralEscalation.loweredViaducts,
+      auditPasses: audit.report.passes, auditInitialViolations: audit.report.violations.initial,
+      auditSevereViolations: audit.report.violations.final, auditTerrainRepairs: audit.report.repairs.terrainCells,
       level1Provinces: provinceLevelCounts[0], level2Provinces: provinceLevelCounts[1], level3Provinces: provinceLevelCounts[2],
       level4Provinces: provinceLevelCounts[3], level5Provinces: provinceLevelCounts[4],
       level1Routes: routeLevelCounts[0], level2Routes: routeLevelCounts[1], level3Routes: routeLevelCounts[2],

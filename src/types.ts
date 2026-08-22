@@ -34,6 +34,7 @@ export interface WorldManifest {
     surface: BinaryField;
     rivers: BinaryField;
     roads: BinaryField;
+    infrastructureEngineering: BinaryField;
     coast: BinaryField;
     provinceIds: BinaryField;
   };
@@ -48,6 +49,10 @@ export interface WorldManifest {
     bridgeIndices: BinaryBufferDescriptor;
     tunnelVertices: BinaryBufferDescriptor;
     tunnelIndices: BinaryBufferDescriptor;
+    engineeringVertices: BinaryBufferDescriptor;
+    engineeringIndices: BinaryBufferDescriptor;
+    corridorMetrics: BinaryBufferDescriptor;
+    corridorFlags: BinaryBufferDescriptor;
     connectionCorridorOffsets: BinaryBufferDescriptor;
     connectionCorridorIds: BinaryBufferDescriptor;
     trees: BinaryBufferDescriptor;
@@ -68,9 +73,11 @@ export interface WorldManifest {
     roads: Array<{ firstIndex: number; indexCount: number }>;
     bridges: Array<{ firstIndex: number; indexCount: number }>;
     tunnels: Array<{ firstIndex: number; indexCount: number }>;
+    engineering: Array<{ firstIndex: number; indexCount: number }>;
   };
+  reports: { infrastructure: { url: string; version: string } };
   showcases: {
-    urban: [number, number]; bridge: [number, number]; mountain: [number, number];
+    urban: [number, number]; bridge: [number, number]; bridgeClearance: [number, number]; bridgePier: [number, number]; mountain: [number, number];
     tunnel: [number, number]; timber: [number, number]; liangshan: [number, number];
   };
   counts: Record<string, number>;

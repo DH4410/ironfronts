@@ -7,14 +7,14 @@ interface GeneratedManifest {
   fields: Record<string, { width: number; height: number }>;
   buffers: Record<string, { count: number }>;
   counts: Record<string, number>;
-  infrastructureChunks: { roads: Array<{ firstIndex: number; indexCount: number }>; bridges: Array<{ firstIndex: number; indexCount: number }>; tunnels: Array<{ firstIndex: number; indexCount: number }> };
+  infrastructureChunks: { roads: Array<{ firstIndex: number; indexCount: number }>; bridges: Array<{ firstIndex: number; indexCount: number }>; tunnels: Array<{ firstIndex: number; indexCount: number }>; engineering: Array<{ firstIndex: number; indexCount: number }> };
   provinces: Array<{ id: number; name: string; center: [number, number]; terrain: string; infrastructureLevel: number }>;
 }
 
 describe('generated world package', () => {
   it('preserves the canonical world dimensions and province set', async () => {
     const manifest = JSON.parse(await readFile('public/world/world.json', 'utf8')) as GeneratedManifest;
-    expect(manifest.version).toBe(3);
+    expect(manifest.version).toBe(4);
     expect(manifest.world).toMatchObject({ width: 13_562, height: 7_000, wrapX: true });
     expect(manifest.provinces).toHaveLength(3_303);
     expect(new Set(manifest.provinces.map((province) => province.id)).size).toBe(3_303);
@@ -31,6 +31,9 @@ describe('generated world package', () => {
     expect(manifest.buffers.roadIndices.count).toBeGreaterThan(manifest.buffers.roadVertices.count * 3);
     expect(manifest.buffers.bridgeVertices.count).toBeGreaterThan(10_000);
     expect(manifest.buffers.tunnelVertices.count).toBeGreaterThan(1_000);
+    expect(manifest.buffers.engineeringVertices.count).toBeGreaterThan(0);
+    expect(manifest.buffers.corridorMetrics.count).toBeGreaterThan(manifest.counts.logicalRoutes);
+    expect(manifest.buffers.corridorFlags.count).toBe(manifest.buffers.corridorMetrics.count);
     expect(manifest.counts.logicalRoutes).toBeGreaterThan(9_000);
     expect(manifest.counts.landSegments).toBe(17_405);
     expect(manifest.counts.logicalRoutes).toBe(manifest.counts.localRoutes + manifest.counts.regionalRoutes + manifest.counts.majorRoutes);
@@ -51,14 +54,17 @@ describe('generated world package', () => {
     expect(manifest.infrastructureChunks.roads).toHaveLength(512);
     expect(manifest.infrastructureChunks.bridges).toHaveLength(512);
     expect(manifest.infrastructureChunks.tunnels).toHaveLength(512);
+    expect(manifest.infrastructureChunks.engineering).toHaveLength(512);
     expect(manifest.infrastructureChunks.roads.reduce((sum, range) => sum + range.indexCount, 0)).toBe(manifest.buffers.roadIndices.count);
     expect(manifest.infrastructureChunks.bridges.reduce((sum, range) => sum + range.indexCount, 0)).toBe(manifest.buffers.bridgeIndices.count);
+    expect(manifest.infrastructureChunks.engineering.reduce((sum, range) => sum + range.indexCount, 0)).toBe(manifest.buffers.engineeringIndices.count);
     expect(manifest.counts.rivers).toBeGreaterThan(800);
     expect(manifest.counts.riverMouths).toBeGreaterThan(100);
     expect(manifest.buffers.riverVertices.count).toBeGreaterThan(manifest.counts.rivers * 6);
     expect(manifest.buffers.riverIndices.count).toBeGreaterThan(manifest.counts.rivers * 12);
     expect(manifest.fields.rivers.width).toBe(2_048);
     expect(manifest.fields.roads.width).toBe(4_096);
+    expect(manifest.fields.infrastructureEngineering.width).toBe(4_096);
     expect(manifest.fields.provinceIds.width).toBe(4_096);
   });
 

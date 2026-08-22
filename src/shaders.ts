@@ -19,6 +19,7 @@ struct Uniforms {
 @group(0) @binding(6) var riverTexture: texture_2d<f32>;
 @group(0) @binding(7) var coastTexture: texture_2d<f32>;
 @group(0) @binding(8) var roadTexture: texture_2d<f32>;
+@group(0) @binding(9) var engineeringTexture: texture_2d<f32>;
 
 fn wrappedUv(uv: vec2f) -> vec2f {
   return vec2f(fract(uv.x + 1.0), clamp(uv.y, 0.0, 0.999999));
@@ -85,6 +86,10 @@ fn landAt(uvInput: vec2f) -> f32 {
 
 fn roadAt(uvInput: vec2f) -> vec4f {
   return textureSampleLevel(roadTexture, materialSampler, wrappedUv(uvInput), 0.0);
+}
+
+fn engineeringAt(uvInput: vec2f) -> vec4f {
+  return textureSampleLevel(engineeringTexture, materialSampler, wrappedUv(uvInput), 0.0);
 }
 
 fn terrainNormal(uv: vec2f) -> vec3f {
@@ -264,6 +269,19 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     lit = mix(vec3f(0.025), rolePalette[min(roadRole, 3u)], max(roadData.r, roadData.g * 0.35));
   } else if (debugMode == 7u) {
     lit = mix(vec3f(0.025), fieldRoadColors[min(roadMaterial, 5u)], max(roadData.r, roadData.g * 0.35));
+  } else if (debugMode == 8u) {
+    let engineering = engineeringAt(input.mapUv);
+    let signedWork = engineering.r * 2.0 - 1.0;
+    lit = mix(vec3f(0.045), select(vec3f(0.30, 0.58, 0.92), vec3f(0.92, 0.48, 0.20), signedWork > 0.0), abs(signedWork));
+  } else if (debugMode == 9u) {
+    let engineering = engineeringAt(input.mapUv);
+    lit = mix(vec3f(0.035), vec3f(0.93, 0.74, 0.22), engineering.g);
+  } else if (debugMode == 10u) {
+    let engineering = engineeringAt(input.mapUv);
+    lit = mix(vec3f(0.035), vec3f(0.20, 0.68, 0.88), engineering.b);
+  } else if (debugMode == 11u) {
+    let engineering = engineeringAt(input.mapUv);
+    lit = mix(vec3f(0.035), vec3f(0.96, 0.20, 0.18), engineering.a);
   }
 
   if (uniforms.terrainInfo.w > 0.5) {

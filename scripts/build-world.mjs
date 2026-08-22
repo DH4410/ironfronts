@@ -903,15 +903,8 @@ async function main() {
     fieldWidth: FIELD_WIDTH, fieldHeight: FIELD_HEIGHT, roadFieldWidth: ID_WIDTH, roadFieldHeight: ID_HEIGHT,
     worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
   });
-  // Road grading is forbidden from filling river cores, then the original drainage
-  // profile is re-incised to eliminate any bank interpolation introduced nearby.
-  for (let index = 0; index < heights.length; index += 1) {
-    if (!landField[index] || riverMask[index] < 0.035) continue;
-    const channel = Math.max(smoothstep(0.08, 0.68, riverCoreMask[index]), smoothstep(0.12, 0.88, riverMask[index]) * 0.78);
-    const bedTarget = Number.isFinite(riverBed[index]) ? riverBed[index] - 0.38 : heights[index] - 0.7;
-    heights[index] += (Math.min(heights[index], bedTarget) - heights[index]) * channel;
-    heights[index] = Math.max(0.62, heights[index]);
-  }
+  // Infrastructure owns the final bounded terrain/hydrology reconciliation.
+  // No height mutation is permitted after its audited meshes are emitted.
   const { trees, buildings } = buildInstances(metadata.provinces, geometryById, provinceIds, areaCounts, riverClearance, infrastructure.roadClearance, infrastructure.cityPlans);
 
   const provinceRecords = metadata.provinces.map((province) => ({
@@ -930,7 +923,7 @@ async function main() {
   for (const height of heights) maxHeight = Math.max(maxHeight, height);
 
   const manifest = {
-    version: 3,
+    version: 4,
     source: { mapId: mapMetadata.map_id, mapVersion: mapMetadata.map_version },
     generatedSeed: SEED,
     world: { width: WORLD_WIDTH, height: WORLD_HEIGHT, overlapX: 250, wrapX: true },
@@ -939,6 +932,7 @@ async function main() {
       surface: { url: 'surface.rgba8', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'rgba8uint' },
       rivers: { url: 'rivers.rgba8', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'rgba8unorm' },
       roads: { url: 'roads.rgba8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rgba8unorm' },
+      infrastructureEngineering: { url: 'infrastructure-engineering.rgba8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rgba8unorm' },
       coast: { url: 'coast.r8', width: ID_WIDTH, height: ID_HEIGHT, format: 'r8unorm' },
       provinceIds: { url: 'province-ids.u16', width: ID_WIDTH, height: ID_HEIGHT, format: 'r16uint' },
     },
@@ -953,6 +947,10 @@ async function main() {
       bridgeIndices: { url: 'bridge-indices.u32', count: infrastructure.bridgeIndices.length, stride: 1 },
       tunnelVertices: { url: 'tunnel-vertices.f32', count: infrastructure.tunnelVertices.length / 13, stride: 13 },
       tunnelIndices: { url: 'tunnel-indices.u32', count: infrastructure.tunnelIndices.length, stride: 1 },
+      engineeringVertices: { url: 'engineering-vertices.f32', count: infrastructure.engineeringVertices.length / 13, stride: 13 },
+      engineeringIndices: { url: 'engineering-indices.u32', count: infrastructure.engineeringIndices.length, stride: 1 },
+      corridorMetrics: { url: 'corridor-metrics.f32', count: infrastructure.corridorMetrics.length / 8, stride: 8, lazy: true },
+      corridorFlags: { url: 'corridor-flags.u32', count: infrastructure.corridorFlags.length / 4, stride: 4, lazy: true },
       connectionCorridorOffsets: { url: 'connection-corridor-offsets.u32', count: infrastructure.connectionCorridorOffsets.length, stride: 1, lazy: true },
       connectionCorridorIds: { url: 'connection-corridor-ids.u32', count: infrastructure.connectionCorridorIds.length, stride: 1, lazy: true },
       trees: { url: 'trees.f32', count: trees.length / 8, stride: 8 },
@@ -963,6 +961,7 @@ async function main() {
     },
     terrain: { chunksX: 32, chunksY: 16, gridResolution: 49, maxHeight },
     infrastructureChunks: infrastructure.chunkRanges,
+    reports: { infrastructure: { url: 'infrastructure-report.json', version: infrastructure.infrastructureReport.version } },
     showcases: infrastructure.showcases,
     counts: {
       provinces: provinceRecords.length,
@@ -986,6 +985,7 @@ async function main() {
     writeTyped('surface.rgba8', surface),
     writeTyped('rivers.rgba8', riverTexture),
     writeTyped('roads.rgba8', infrastructure.roadField),
+    writeTyped('infrastructure-engineering.rgba8', infrastructure.engineeringField),
     writeTyped('coast.r8', coastMask),
     writeTyped('river-vertices.f32', riverMesh.vertices),
     writeTyped('river-indices.u32', riverMesh.indices),
@@ -997,6 +997,10 @@ async function main() {
     writeTyped('bridge-indices.u32', infrastructure.bridgeIndices),
     writeTyped('tunnel-vertices.f32', infrastructure.tunnelVertices),
     writeTyped('tunnel-indices.u32', infrastructure.tunnelIndices),
+    writeTyped('engineering-vertices.f32', infrastructure.engineeringVertices),
+    writeTyped('engineering-indices.u32', infrastructure.engineeringIndices),
+    writeTyped('corridor-metrics.f32', infrastructure.corridorMetrics),
+    writeTyped('corridor-flags.u32', infrastructure.corridorFlags),
     writeTyped('connection-corridor-offsets.u32', infrastructure.connectionCorridorOffsets),
     writeTyped('connection-corridor-ids.u32', infrastructure.connectionCorridorIds),
     writeTyped('trees.f32', trees),
@@ -1004,6 +1008,7 @@ async function main() {
     writeTyped('lamps.f32', infrastructure.lamps),
     writeTyped('barriers.f32', infrastructure.barriers),
     writeTyped('signs.f32', infrastructure.signs),
+    writeFile(path.join(OUTPUT, 'infrastructure-report.json'), `${JSON.stringify(infrastructure.infrastructureReport, null, 2)}\n`),
     writeFile(path.join(OUTPUT, 'world.json'), `${JSON.stringify(manifest)}\n`),
   ]);
 
@@ -1013,6 +1018,7 @@ async function main() {
     .update(Buffer.from(surface.buffer))
     .update(Buffer.from(riverTexture.buffer))
     .update(Buffer.from(infrastructure.roadField.buffer))
+    .update(Buffer.from(infrastructure.engineeringField.buffer))
     .update(Buffer.from(coastMask.buffer))
     .update(Buffer.from(riverMesh.vertices.buffer))
     .update(Buffer.from(riverMesh.indices.buffer))
@@ -1024,6 +1030,10 @@ async function main() {
     .update(Buffer.from(infrastructure.bridgeIndices.buffer))
     .update(Buffer.from(infrastructure.tunnelVertices.buffer))
     .update(Buffer.from(infrastructure.tunnelIndices.buffer))
+    .update(Buffer.from(infrastructure.engineeringVertices.buffer))
+    .update(Buffer.from(infrastructure.engineeringIndices.buffer))
+    .update(Buffer.from(infrastructure.corridorMetrics.buffer))
+    .update(Buffer.from(infrastructure.corridorFlags.buffer))
     .update(Buffer.from(infrastructure.connectionCorridorOffsets.buffer))
     .update(Buffer.from(infrastructure.connectionCorridorIds.buffer))
     .update(Buffer.from(trees.buffer))
