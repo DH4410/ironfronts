@@ -381,6 +381,8 @@ async function main() {
       connections: { url: 'connections.f32', count: connections.length / 8, stride: 8, lazy: true },
       roadVertices: { url: 'road-vertices.f32', count: infrastructure.roadVertices.length / 13, stride: 13 },
       roadIndices: { url: 'road-indices.u32', count: infrastructure.roadIndices.length, stride: 1 },
+      hiddenConnectionVertices: { url: 'hidden-connection-vertices.f32', count: infrastructure.hiddenConnectionVertices.length / 13, stride: 13 },
+      hiddenConnectionIndices: { url: 'hidden-connection-indices.u32', count: infrastructure.hiddenConnectionIndices.length, stride: 1 },
       corridorMetrics: { url: 'corridor-metrics.f32', count: infrastructure.corridorMetrics.length / 6, stride: 6, lazy: true },
       corridorFlags: { url: 'corridor-flags.u32', count: infrastructure.corridorFlags.length / 4, stride: 4, lazy: true },
       connectionCorridorOffsets: { url: 'connection-corridor-offsets.u32', count: infrastructure.connectionCorridorOffsets.length, stride: 1, lazy: true },
@@ -419,6 +421,8 @@ async function main() {
     writeTyped('connections.f32', connections),
     writeTyped('road-vertices.f32', infrastructure.roadVertices),
     writeTyped('road-indices.u32', infrastructure.roadIndices),
+    writeTyped('hidden-connection-vertices.f32', infrastructure.hiddenConnectionVertices),
+    writeTyped('hidden-connection-indices.u32', infrastructure.hiddenConnectionIndices),
     writeTyped('corridor-metrics.f32', infrastructure.corridorMetrics),
     writeTyped('corridor-flags.u32', infrastructure.corridorFlags),
     writeTyped('connection-corridor-offsets.u32', infrastructure.connectionCorridorOffsets),
@@ -442,6 +446,8 @@ async function main() {
     .update(Buffer.from(connections.buffer))
     .update(Buffer.from(infrastructure.roadVertices.buffer))
     .update(Buffer.from(infrastructure.roadIndices.buffer))
+    .update(Buffer.from(infrastructure.hiddenConnectionVertices.buffer))
+    .update(Buffer.from(infrastructure.hiddenConnectionIndices.buffer))
     .update(Buffer.from(infrastructure.corridorMetrics.buffer))
     .update(Buffer.from(infrastructure.corridorFlags.buffer))
     .update(Buffer.from(infrastructure.connectionCorridorOffsets.buffer))

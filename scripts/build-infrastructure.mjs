@@ -178,6 +178,7 @@ export function buildInfrastructure({
   const dirtRoute = assembled.routes.find((route) => !route.suppressed && route.surfaceMaterial === 0);
   const steepRoute = assembled.routes.slice(0, logicalRouteCount).filter((route) => !route.suppressed)
     .sort((a, b) => b.maximumObservedGrade - a.maximumObservedGrade)[0];
+  const hiddenShowcase = hiddenRoads.find((road) => road.reason === 'water') ?? hiddenRoads[0];
 
   console.log(`Hidden physical roads: ${hiddenRoads.length} (${Object.entries(hiddenByReason).map(([reason, count]) => `${reason}=${count}`).join(', ') || 'none'})`);
   return {
@@ -193,6 +194,7 @@ export function buildInfrastructure({
       emittedRoutes: assembled.routes.slice(0, logicalRouteCount).filter((route) => !route.suppressed).length,
       hiddenRoutes: hiddenRoads.length, hiddenWaterRoutes: hiddenByReason.water ?? 0, hiddenGradeRoutes: hiddenByReason.grade ?? 0,
       hiddenCrossingRoutes: hiddenByReason.crossing ?? 0,
+      hiddenConnectorRoutes: hiddenRoads.length,
       unmappedLandSegments: assembled.unmappedLandSegments.length,
       localStreets: 0,
       localRoutes: classCounts[0], regionalRoutes: classCounts[1], majorRoutes: classCounts[2], sharedGateways: 0,
@@ -209,6 +211,7 @@ export function buildInfrastructure({
       mountain: mountainRoute ? [mountainRoute.points[Math.floor(mountainRoute.points.length * 0.5)].x, mountainRoute.points[Math.floor(mountainRoute.points.length * 0.5)].z] : [largestCity.center_x, largestCity.center_y],
       steepRoad: steepRoute ? [steepRoute.points[Math.floor(steepRoute.points.length * 0.5)].x, steepRoute.points[Math.floor(steepRoute.points.length * 0.5)].z] : [largestCity.center_x, largestCity.center_y],
       dirtRoad: dirtRoute ? [dirtRoute.points[Math.floor(dirtRoute.points.length * 0.5)].x, dirtRoute.points[Math.floor(dirtRoute.points.length * 0.5)].z] : [largestCity.center_x, largestCity.center_y],
+      hiddenConnection: hiddenShowcase ? [hiddenShowcase.x, hiddenShowcase.z] : [largestCity.center_x, largestCity.center_y],
       europe: [7_050, 1_900], lakeRoad: [7_600, 2_600], liangshan: [10_583, 2_990],
     },
   };

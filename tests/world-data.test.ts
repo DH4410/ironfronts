@@ -7,7 +7,10 @@ interface Manifest {
   fields: Record<string, { width: number; height: number }>;
   buffers: Record<string, { count: number; stride: number }>;
   terrain: { maxHeight: number };
-  infrastructureChunks: { roads: Array<{ firstIndex: number; indexCount: number }> };
+  infrastructureChunks: {
+    roads: Array<{ firstIndex: number; indexCount: number }>;
+    hiddenConnections: Array<{ firstIndex: number; indexCount: number }>;
+  };
   counts: Record<string, number>;
   provinces: Array<{ id: number; name: string; terrain: string; infrastructureLevel: number }>;
 }
@@ -41,6 +44,7 @@ describe('generated v5 world package', () => {
       level1Provinces: 3_303, level2Provinces: 0, level3Provinces: 0,
       localStreets: 0, regionalRoutes: 0, majorRoutes: 0,
       sharedGateways: 0, physicalSharedSegments: 0, physicalSharedLength: 0,
+      hiddenConnectorRoutes: data.counts.hiddenRoutes,
     }));
   });
 
@@ -106,6 +110,26 @@ describe('generated v5 world package', () => {
     expect(data.infrastructureChunks.roads).toHaveLength(512);
     expect(data.infrastructureChunks.roads.reduce((sum, range) => sum + range.indexCount, 0)).toBe(indices.length);
   }, 20_000);
+
+  it('renders every omitted road as a floating dotted connector', async () => {
+    const data = await manifest();
+    const [vertexBytes, indexBytes] = await Promise.all([
+      readFile('public/world/hidden-connection-vertices.f32'),
+      readFile('public/world/hidden-connection-indices.u32'),
+    ]);
+    const vertices = viewF32(vertexBytes), indices = viewU32(indexBytes);
+    expect(data.buffers.hiddenConnectionVertices.count).toBeGreaterThan(0);
+    expect(vertices.length).toBe(data.buffers.hiddenConnectionVertices.count * 13);
+    expect(indices.length).toBe(data.buffers.hiddenConnectionIndices.count);
+    expect(vertices.every(Number.isFinite)).toBe(true);
+    for (let vertex = 0; vertex < data.buffers.hiddenConnectionVertices.count; vertex += 97) {
+      expect(vertices[vertex * 13 + 1]).toBeGreaterThanOrEqual(0.7);
+      expect(vertices[vertex * 13 + 11]).toBe(12);
+    }
+    for (let index = 0; index < indices.length; index += 101) expect(indices[index]).toBeLessThan(data.buffers.hiddenConnectionVertices.count);
+    expect(data.infrastructureChunks.hiddenConnections).toHaveLength(512);
+    expect(data.infrastructureChunks.hiddenConnections.reduce((sum, range) => sum + range.indexCount, 0)).toBe(indices.length);
+  });
 
   it('maps every land connection and reports every hidden physical corridor', async () => {
     const data = await manifest();

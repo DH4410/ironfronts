@@ -10,6 +10,11 @@ describe('WGSL programs', () => {
     expect(terrainShader).not.toContain('if (elevation < 12.0)');
   });
 
+  it('renders suppressed-road geometry as floating dotted connectors', () => {
+    expect(infrastructureShader).toContain('structure == 12u && fract(input.roadUv.x / 6.4) > 0.40');
+    expect(infrastructureShader).toContain('vec3f(0.96, 0.73, 0.25)');
+  });
+
   it.each([
     ['terrain', terrainShader, ['terrainVertex'], ['terrainFragment']],
     ['water', waterShader, ['waterVertex'], ['waterFragment']],

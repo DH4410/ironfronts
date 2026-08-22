@@ -1,4 +1,4 @@
-import { LEVEL_WIDTHS, ROLE_WIDTH_SCALE, clamp, sampleHeight, unwrapNear, wrap } from './common.mjs';
+import { LEVEL_WIDTHS, ROLE_WIDTH_SCALE, clamp, sampleHeight, sampleScalar, unwrapNear, wrap } from './common.mjs';
 
 class RoadMesh {
   indices = [];
@@ -34,8 +34,11 @@ function roadWidth(route) {
 
 export function buildMeshes(routes, heights, landField, width, height, worldWidth, worldHeight, chunksX = 32, chunksY = 16) {
   const vertexCapacity = routes.reduce((sum, route) => sum + (route.suppressed ? 0 : route.points.length * 2), 0);
+  const hiddenVertexCapacity = routes.reduce((sum, route) => sum + (route.suppressed ? route.points.length * 2 : 0), 0);
   const roads = new RoadMesh(vertexCapacity);
+  const hiddenConnections = new RoadMesh(hiddenVertexCapacity);
   const batches = [];
+  const hiddenBatches = [];
   const chunkFor = (x, z) => clamp(Math.floor(z / worldHeight * chunksY), 0, chunksY - 1) * chunksX
     + clamp(Math.floor(wrap(x, worldWidth) / worldWidth * chunksX), 0, chunksX - 1);
 
@@ -84,19 +87,58 @@ export function buildMeshes(routes, heights, landField, width, height, worldWidt
     }
   }
 
-  const byChunk = Array.from({ length: chunksX * chunksY }, () => []);
-  for (const batch of batches) byChunk[batch.chunk].push(batch);
-  const sorted = new Uint32Array(roads.indices.length);
-  let sortedLength = 0;
-  const ranges = [];
-  for (const chunk of byChunk) {
-    const firstIndex = sortedLength;
-    for (const batch of chunk) for (let index = batch.firstIndex; index < batch.firstIndex + batch.indexCount; index += 1) sorted[sortedLength++] = roads.indices[index];
-    ranges.push({ firstIndex, indexCount: sortedLength - firstIndex });
+  // Suppressed roads remain visible as narrow floating dotted connectors. They
+  // are deliberately excluded from the road field and clearance maps: this is
+  // a visual statement of logical connectivity, not physical infrastructure.
+  for (const route of routes) {
+    if (!route.suppressed || route.points.length < 2) continue;
+    const halfWidth = 0.48;
+    const cumulative = [0];
+    for (let index = 1; index < route.points.length; index += 1) cumulative.push(cumulative[index - 1] + Math.hypot(
+      unwrapNear(route.points[index].x, route.points[index - 1].x, worldWidth) - route.points[index - 1].x,
+      route.points[index].z - route.points[index - 1].z));
+    const rings = [];
+    for (let index = 0; index < route.points.length; index += 1) {
+      const point = route.points[index], previous = route.points[Math.max(0, index - 1)], next = route.points[Math.min(route.points.length - 1, index + 1)];
+      const dx = unwrapNear(next.x, previous.x, worldWidth) - previous.x, dz = next.z - previous.z;
+      const length = Math.max(0.001, Math.hypot(dx, dz)), nx = -dz / length, nz = dx / length;
+      rings.push([-halfWidth, halfWidth].map((offset, slot) => {
+        const x = point.x + nx * offset, z = point.z + nz * offset;
+        const dry = sampleScalar(landField, width, height, worldWidth, worldHeight, x, z) >= 0.5;
+        const y = dry ? sampleHeight(heights, width, height, worldWidth, worldHeight, x, z) + 0.72 : 1.72;
+        return hiddenConnections.vertex([x, y, z], [0, 1, 0], [cumulative[index], slot],
+          route.infrastructureLevel, route.corridorRole, route.surfaceMaterial ?? 0, 12, route.id);
+      }));
+    }
+    for (let index = 0; index + 1 < route.points.length; index += 1) {
+      const firstIndex = hiddenConnections.indices.length;
+      hiddenConnections.quad(rings[index][0], rings[index + 1][0], rings[index + 1][1], rings[index][1]);
+      const a = route.points[index], b = route.points[index + 1];
+      hiddenBatches.push({ chunk: chunkFor((a.x + unwrapNear(b.x, a.x, worldWidth)) * 0.5, (a.z + b.z) * 0.5),
+        firstIndex, indexCount: hiddenConnections.indices.length - firstIndex });
+    }
   }
+
+  const sortByChunk = (mesh, sourceBatches) => {
+    const byChunk = Array.from({ length: chunksX * chunksY }, () => []);
+    for (const batch of sourceBatches) byChunk[batch.chunk].push(batch);
+    const sorted = new Uint32Array(mesh.indices.length);
+    let sortedLength = 0;
+    const ranges = [];
+    for (const chunk of byChunk) {
+      const firstIndex = sortedLength;
+      for (const batch of chunk) for (let index = batch.firstIndex; index < batch.firstIndex + batch.indexCount; index += 1) sorted[sortedLength++] = mesh.indices[index];
+      ranges.push({ firstIndex, indexCount: sortedLength - firstIndex });
+    }
+    return { indices: sorted, ranges };
+  };
+  const sortedRoads = sortByChunk(roads, batches);
+  const sortedHidden = sortByChunk(hiddenConnections, hiddenBatches);
   return {
     roadVertices: roads.vertices.slice(0, roads.vertexCount * 13),
-    roadIndices: sorted,
-    chunkRanges: { chunksX, chunksY, roads: ranges },
+    roadIndices: sortedRoads.indices,
+    hiddenConnectionVertices: hiddenConnections.vertices.slice(0, hiddenConnections.vertexCount * 13),
+    hiddenConnectionIndices: sortedHidden.indices,
+    chunkRanges: { chunksX, chunksY, roads: sortedRoads.ranges, hiddenConnections: sortedHidden.ranges },
   };
 }

@@ -90,6 +90,7 @@ if (!status.unsupported) {
   await captureShowcase('steepRoad', 'roads-steep.png', 360);
   await captureShowcase('liangshan', 'roads-liangshan.png', 520);
   await captureShowcase('dirtRoad', 'roads-dirt.png', 300);
+  await captureShowcase('hiddenConnection', 'roads-hidden-connection.png', 340);
   await captureShowcase('europe', 'terrain-europe.png', 620);
   await capturePoint([5_822, 2_564], 'terrain-iberia.png', 520);
   await capturePoint([6_520, 3_931], 'terrain-africa.png', 620);

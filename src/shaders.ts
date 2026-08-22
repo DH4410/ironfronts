@@ -363,7 +363,7 @@ fn infrastructureVertex(input: InfrastructureInput, @builtin(instance_index) ins
   output.structureMaterial = input.structureMaterial;
   var geometryEnd = select(select(2200.0, 3200.0, input.level > 1.5), 4000.0, input.level > 2.5);
   geometryEnd += input.role * 120.0;
-  if (input.structureMaterial > 10.5 && input.structureMaterial < 11.5) {
+  if (input.structureMaterial > 10.5 && input.structureMaterial < 12.5) {
     geometryEnd = select(8000.0, 16000.0, input.level > 2.5);
   }
   output.visibility = 1.0 - smoothstep(geometryEnd - 650.0, geometryEnd, cameraDistance);
@@ -377,6 +377,7 @@ fn infrastructureFragment(input: InfrastructureOutput) -> @location(0) vec4f {
   let structure = u32(input.structureMaterial + 0.5);
   let mapUv = input.worldPosition.xz / uniforms.map.xy;
   if (structure <= 7u && landAt(mapUv) < 0.52) { discard; }
+  if (structure == 12u && fract(input.roadUv.x / 6.4) > 0.40) { discard; }
   let grit = fract(sin(dot(floor(input.worldPosition.xz * 2.2), vec2f(12.9898, 78.233))) * 43758.5453);
   let broadWear = sin(input.roadUv.x * 0.78 + sin(input.roadUv.x * 0.17) * 0.7) * 0.5 + 0.5;
   var color = vec3f(0.34, 0.35, 0.34);
@@ -409,6 +410,8 @@ fn infrastructureFragment(input: InfrastructureOutput) -> @location(0) vec4f {
     color = vec3f(0.16, 0.18, 0.18) * (0.86 + grit * 0.18);
   } else if (structure == 11u) {
     color = vec3f(0.91, 0.76, 0.38) * (0.92 + grit * 0.08);
+  } else if (structure == 12u) {
+    color = vec3f(0.96, 0.73, 0.25) * (0.94 + grit * 0.06);
   } else {
     color = vec3f(0.055, 0.065, 0.062);
   }

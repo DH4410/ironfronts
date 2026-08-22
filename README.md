@@ -43,3 +43,5 @@ The generated `world-generation-report.json` records topography statistics and e
 Terrain materials blend by gameplay terrain, biome, slope, and macro variation. Beach sand is restricted to the actual shoreline mask, while low inland regions retain their biome. Forest ground transitions to a cheap canopy-green signal as individual trees fade. Ocean and lake water uses coastal depth, waves, foam, Fresnel reflection, and sun sparkle.
 
 Road levels 1–5 remain available for future gameplay upgrades, but every initial province and road is level 1. Each unique land-adjacent province pair receives one independent dirt path between its two province centers; the generator emits no shared stems, gateway roads, plazas, or local city streets. Full-width route audits reject static-water incursions, and every road vertex independently samples the frozen terrain with a small deterministic lift.
+
+When a physical dirt road is omitted by the water, grade, or crossing audit, its logical connection remains visible as a thin floating amber dotted line. These indicators do not enter the road field, reserve clearance, or represent constructed infrastructure.

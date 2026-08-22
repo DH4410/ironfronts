@@ -42,6 +42,7 @@ export class WorldRenderer {
   private terrainMesh!: Mesh;
   private waterMesh!: Mesh;
   private roadMesh!: Mesh;
+  private hiddenConnectionMesh!: Mesh;
   private treeMesh!: Mesh;
   private buildingMesh!: Mesh;
   private shadowMesh!: Mesh;
@@ -106,7 +107,8 @@ export class WorldRenderer {
     this.createLayouts();
 
     report('Loading terrain fields', 0.2);
-    const [heightBuffer, surfaceBuffer, roadFieldBuffer, coastBuffer, provinceBuffer, roadVertexBuffer, roadIndexBuffer, borderBuffer, treeBuffer, buildingBuffer, lampBuffer, barrierBuffer, signBuffer] = await Promise.all([
+    const [heightBuffer, surfaceBuffer, roadFieldBuffer, coastBuffer, provinceBuffer, roadVertexBuffer, roadIndexBuffer,
+      hiddenConnectionVertexBuffer, hiddenConnectionIndexBuffer, borderBuffer, treeBuffer, buildingBuffer, lampBuffer, barrierBuffer, signBuffer] = await Promise.all([
       fetchBinary(`/world/${this.manifest.fields.height.url}`),
       fetchBinary(`/world/${this.manifest.fields.surface.url}`),
       fetchBinary(`/world/${this.manifest.fields.roads.url}`),
@@ -114,6 +116,8 @@ export class WorldRenderer {
       fetchBinary(`/world/${this.manifest.fields.provinceIds.url}`),
       fetchBinary(`/world/${this.manifest.buffers.roadVertices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.roadIndices.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.hiddenConnectionVertices.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.hiddenConnectionIndices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.borders.url}`),
       fetchBinary(`/world/${this.manifest.buffers.trees.url}`),
       fetchBinary(`/world/${this.manifest.buffers.buildings.url}`),
@@ -173,6 +177,8 @@ export class WorldRenderer {
     this.terrainMesh = createTerrainMesh(this.device, this.manifest.terrain.gridResolution);
     this.waterMesh = createTerrainMesh(this.device, 33);
     this.roadMesh = uploadIndexedMesh(this.device, 'terrain roads', roadVertexBuffer, roadIndexBuffer, this.manifest.buffers.roadIndices.count);
+    this.hiddenConnectionMesh = uploadIndexedMesh(this.device, 'floating hidden connections', hiddenConnectionVertexBuffer,
+      hiddenConnectionIndexBuffer, this.manifest.buffers.hiddenConnectionIndices.count);
     this.treeMesh = createTreeMesh(this.device);
     this.buildingMesh = createBuildingMesh(this.device);
     this.shadowMesh = createShadowMesh(this.device);
@@ -487,6 +493,9 @@ export class WorldRenderer {
     pass.setVertexBuffer(0, this.roadMesh.vertex);
     pass.setIndexBuffer(this.roadMesh.index, 'uint32');
     this.drawChunkedInfrastructure(pass, this.roadMesh, this.manifest.infrastructureChunks.roads);
+    pass.setVertexBuffer(0, this.hiddenConnectionMesh.vertex);
+    pass.setIndexBuffer(this.hiddenConnectionMesh.index, 'uint32');
+    this.drawChunkedInfrastructure(pass, this.hiddenConnectionMesh, this.manifest.infrastructureChunks.hiddenConnections, 8_000);
 
     pass.setPipeline(this.propPipeline);
     this.drawMeshInstances(pass, this.shadowMesh, this.trees);
@@ -518,13 +527,13 @@ export class WorldRenderer {
     else pass.drawIndexed(mesh.indexCount, layer.count, 0, 0, layer.count);
   }
 
-  private drawChunkedInfrastructure(pass: GPURenderPassEncoder, mesh: Mesh, ranges: Array<{ firstIndex: number; indexCount: number }>): void {
-    if (this.camera.distance >= 4_000) return;
+  private drawChunkedInfrastructure(pass: GPURenderPassEncoder, mesh: Mesh, ranges: Array<{ firstIndex: number; indexCount: number }>, maximumDistance = 4_000): void {
+    if (this.camera.distance >= maximumDistance) return;
     const chunksX = this.manifest.infrastructureChunks.chunksX;
     const chunksY = this.manifest.infrastructureChunks.chunksY;
     const chunkWidth = this.manifest.world.width / chunksX;
     const chunkHeight = this.manifest.world.height / chunksY;
-    const radius = clamp(this.camera.distance * 1.48 + 720, 940, 4_300);
+    const radius = clamp(this.camera.distance * 1.48 + 720, 940, maximumDistance + 300);
     const edgeRange = 1_800;
     for (let chunkY = 0; chunkY < chunksY; chunkY += 1) {
       for (let chunkX = 0; chunkX < chunksX; chunkX += 1) {
