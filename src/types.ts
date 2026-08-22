@@ -21,6 +21,7 @@ export interface ProvinceRecord {
   visualBiome: string;
   population: number;
   coastal: boolean;
+  infrastructureLevel: number;
 }
 
 export interface WorldManifest {
@@ -45,6 +46,10 @@ export interface WorldManifest {
     roadIndices: BinaryBufferDescriptor;
     bridgeVertices: BinaryBufferDescriptor;
     bridgeIndices: BinaryBufferDescriptor;
+    tunnelVertices: BinaryBufferDescriptor;
+    tunnelIndices: BinaryBufferDescriptor;
+    connectionCorridorOffsets: BinaryBufferDescriptor;
+    connectionCorridorIds: BinaryBufferDescriptor;
     trees: BinaryBufferDescriptor;
     buildings: BinaryBufferDescriptor;
     lamps: BinaryBufferDescriptor;
@@ -62,8 +67,12 @@ export interface WorldManifest {
     chunksY: number;
     roads: Array<{ firstIndex: number; indexCount: number }>;
     bridges: Array<{ firstIndex: number; indexCount: number }>;
+    tunnels: Array<{ firstIndex: number; indexCount: number }>;
   };
-  showcases: { urban: [number, number]; bridge: [number, number]; mountain: [number, number] };
+  showcases: {
+    urban: [number, number]; bridge: [number, number]; mountain: [number, number];
+    tunnel: [number, number]; timber: [number, number]; liangshan: [number, number];
+  };
   counts: Record<string, number>;
   provinces: ProvinceRecord[];
 }

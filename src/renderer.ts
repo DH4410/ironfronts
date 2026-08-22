@@ -48,6 +48,7 @@ export class WorldRenderer {
   private riverMesh!: Mesh;
   private roadMesh!: Mesh;
   private bridgeMesh!: Mesh;
+  private tunnelMesh!: Mesh;
   private treeMesh!: Mesh;
   private buildingMesh!: Mesh;
   private shadowMesh!: Mesh;
@@ -112,7 +113,7 @@ export class WorldRenderer {
     this.createLayouts();
 
     report('Loading terrain fields', 0.2);
-    const [heightBuffer, surfaceBuffer, riverFieldBuffer, roadFieldBuffer, coastBuffer, provinceBuffer, riverVertexBuffer, riverIndexBuffer, roadVertexBuffer, roadIndexBuffer, bridgeVertexBuffer, bridgeIndexBuffer, borderBuffer, treeBuffer, buildingBuffer, lampBuffer, barrierBuffer, signBuffer] = await Promise.all([
+    const [heightBuffer, surfaceBuffer, riverFieldBuffer, roadFieldBuffer, coastBuffer, provinceBuffer, riverVertexBuffer, riverIndexBuffer, roadVertexBuffer, roadIndexBuffer, bridgeVertexBuffer, bridgeIndexBuffer, tunnelVertexBuffer, tunnelIndexBuffer, borderBuffer, treeBuffer, buildingBuffer, lampBuffer, barrierBuffer, signBuffer] = await Promise.all([
       fetchBinary(`/world/${this.manifest.fields.height.url}`),
       fetchBinary(`/world/${this.manifest.fields.surface.url}`),
       fetchBinary(`/world/${this.manifest.fields.rivers.url}`),
@@ -125,6 +126,8 @@ export class WorldRenderer {
       fetchBinary(`/world/${this.manifest.buffers.roadIndices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.bridgeVertices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.bridgeIndices.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.tunnelVertices.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.tunnelIndices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.borders.url}`),
       fetchBinary(`/world/${this.manifest.buffers.trees.url}`),
       fetchBinary(`/world/${this.manifest.buffers.buildings.url}`),
@@ -191,6 +194,7 @@ export class WorldRenderer {
     this.riverMesh = this.uploadRiverMesh(riverVertexBuffer, riverIndexBuffer, this.manifest.buffers.riverIndices.count);
     this.roadMesh = this.uploadIndexedMesh('terrain roads', roadVertexBuffer, roadIndexBuffer, this.manifest.buffers.roadIndices.count);
     this.bridgeMesh = this.uploadIndexedMesh('road bridges', bridgeVertexBuffer, bridgeIndexBuffer, this.manifest.buffers.bridgeIndices.count);
+    this.tunnelMesh = this.uploadIndexedMesh('road tunnels and indicators', tunnelVertexBuffer, tunnelIndexBuffer, this.manifest.buffers.tunnelIndices.count);
     this.treeMesh = this.createTreeMesh();
     this.buildingMesh = this.createBuildingMesh();
     this.shadowMesh = this.createShadowMesh();
@@ -349,13 +353,16 @@ export class WorldRenderer {
         module: infrastructureModule,
         entryPoint: 'infrastructureVertex',
         buffers: [{
-          arrayStride: 40,
+          arrayStride: 52,
           attributes: [
             { shaderLocation: 0, offset: 0, format: 'float32x3' },
             { shaderLocation: 1, offset: 12, format: 'float32x3' },
             { shaderLocation: 2, offset: 24, format: 'float32x2' },
             { shaderLocation: 3, offset: 32, format: 'float32' },
             { shaderLocation: 4, offset: 36, format: 'float32' },
+            { shaderLocation: 5, offset: 40, format: 'float32' },
+            { shaderLocation: 6, offset: 44, format: 'float32' },
+            { shaderLocation: 7, offset: 48, format: 'float32' },
           ],
         }],
       },
@@ -733,6 +740,9 @@ export class WorldRenderer {
     pass.setVertexBuffer(0, this.bridgeMesh.vertex);
     pass.setIndexBuffer(this.bridgeMesh.index, 'uint32');
     this.drawChunkedInfrastructure(pass, this.bridgeMesh, this.manifest.infrastructureChunks.bridges);
+    pass.setVertexBuffer(0, this.tunnelMesh.vertex);
+    pass.setIndexBuffer(this.tunnelMesh.index, 'uint32');
+    this.drawChunkedInfrastructure(pass, this.tunnelMesh, this.manifest.infrastructureChunks.tunnels);
 
     pass.setPipeline(this.propPipeline);
     this.drawMeshInstances(pass, this.shadowMesh, this.trees);

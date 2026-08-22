@@ -903,6 +903,15 @@ async function main() {
     fieldWidth: FIELD_WIDTH, fieldHeight: FIELD_HEIGHT, roadFieldWidth: ID_WIDTH, roadFieldHeight: ID_HEIGHT,
     worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
   });
+  // Road grading is forbidden from filling river cores, then the original drainage
+  // profile is re-incised to eliminate any bank interpolation introduced nearby.
+  for (let index = 0; index < heights.length; index += 1) {
+    if (!landField[index] || riverMask[index] < 0.035) continue;
+    const channel = Math.max(smoothstep(0.08, 0.68, riverCoreMask[index]), smoothstep(0.12, 0.88, riverMask[index]) * 0.78);
+    const bedTarget = Number.isFinite(riverBed[index]) ? riverBed[index] - 0.38 : heights[index] - 0.7;
+    heights[index] += (Math.min(heights[index], bedTarget) - heights[index]) * channel;
+    heights[index] = Math.max(0.62, heights[index]);
+  }
   const { trees, buildings } = buildInstances(metadata.provinces, geometryById, provinceIds, areaCounts, riverClearance, infrastructure.roadClearance, infrastructure.cityPlans);
 
   const provinceRecords = metadata.provinces.map((province) => ({
@@ -914,13 +923,14 @@ async function main() {
     visualBiome: province.visual_terrain_tag ?? '',
     population: province.population ?? 0,
     coastal: province.coastal_flag,
+    infrastructureLevel: infrastructure.provinceLevels.get(province.province_id) ?? 1,
   }));
 
   let maxHeight = 0;
   for (const height of heights) maxHeight = Math.max(maxHeight, height);
 
   const manifest = {
-    version: 2,
+    version: 3,
     source: { mapId: mapMetadata.map_id, mapVersion: mapMetadata.map_version },
     generatedSeed: SEED,
     world: { width: WORLD_WIDTH, height: WORLD_HEIGHT, overlapX: 250, wrapX: true },
@@ -937,10 +947,14 @@ async function main() {
       riverVertices: { url: 'river-vertices.f32', count: riverMesh.vertices.length / 8, stride: 8 },
       riverIndices: { url: 'river-indices.u32', count: riverMesh.indices.length, stride: 1 },
       connections: { url: 'connections.f32', count: connections.length / 8, stride: 8, lazy: true },
-      roadVertices: { url: 'road-vertices.f32', count: infrastructure.roadVertices.length / 10, stride: 10 },
+      roadVertices: { url: 'road-vertices.f32', count: infrastructure.roadVertices.length / 13, stride: 13 },
       roadIndices: { url: 'road-indices.u32', count: infrastructure.roadIndices.length, stride: 1 },
-      bridgeVertices: { url: 'bridge-vertices.f32', count: infrastructure.bridgeVertices.length / 10, stride: 10 },
+      bridgeVertices: { url: 'bridge-vertices.f32', count: infrastructure.bridgeVertices.length / 13, stride: 13 },
       bridgeIndices: { url: 'bridge-indices.u32', count: infrastructure.bridgeIndices.length, stride: 1 },
+      tunnelVertices: { url: 'tunnel-vertices.f32', count: infrastructure.tunnelVertices.length / 13, stride: 13 },
+      tunnelIndices: { url: 'tunnel-indices.u32', count: infrastructure.tunnelIndices.length, stride: 1 },
+      connectionCorridorOffsets: { url: 'connection-corridor-offsets.u32', count: infrastructure.connectionCorridorOffsets.length, stride: 1, lazy: true },
+      connectionCorridorIds: { url: 'connection-corridor-ids.u32', count: infrastructure.connectionCorridorIds.length, stride: 1, lazy: true },
       trees: { url: 'trees.f32', count: trees.length / 8, stride: 8 },
       buildings: { url: 'buildings.f32', count: buildings.length / 8, stride: 8 },
       lamps: { url: 'lamps.f32', count: infrastructure.lamps.length / 8, stride: 8 },
@@ -981,6 +995,10 @@ async function main() {
     writeTyped('road-indices.u32', infrastructure.roadIndices),
     writeTyped('bridge-vertices.f32', infrastructure.bridgeVertices),
     writeTyped('bridge-indices.u32', infrastructure.bridgeIndices),
+    writeTyped('tunnel-vertices.f32', infrastructure.tunnelVertices),
+    writeTyped('tunnel-indices.u32', infrastructure.tunnelIndices),
+    writeTyped('connection-corridor-offsets.u32', infrastructure.connectionCorridorOffsets),
+    writeTyped('connection-corridor-ids.u32', infrastructure.connectionCorridorIds),
     writeTyped('trees.f32', trees),
     writeTyped('buildings.f32', buildings),
     writeTyped('lamps.f32', infrastructure.lamps),
@@ -1004,6 +1022,10 @@ async function main() {
     .update(Buffer.from(infrastructure.roadIndices.buffer))
     .update(Buffer.from(infrastructure.bridgeVertices.buffer))
     .update(Buffer.from(infrastructure.bridgeIndices.buffer))
+    .update(Buffer.from(infrastructure.tunnelVertices.buffer))
+    .update(Buffer.from(infrastructure.tunnelIndices.buffer))
+    .update(Buffer.from(infrastructure.connectionCorridorOffsets.buffer))
+    .update(Buffer.from(infrastructure.connectionCorridorIds.buffer))
     .update(Buffer.from(trees.buffer))
     .update(Buffer.from(buildings.buffer))
     .digest('hex');

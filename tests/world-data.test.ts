@@ -2,17 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
 
 interface GeneratedManifest {
+  version: number;
   world: { width: number; height: number; wrapX: boolean };
   fields: Record<string, { width: number; height: number }>;
   buffers: Record<string, { count: number }>;
   counts: Record<string, number>;
-  infrastructureChunks: { roads: Array<{ firstIndex: number; indexCount: number }>; bridges: Array<{ firstIndex: number; indexCount: number }> };
-  provinces: Array<{ id: number; name: string; terrain: string }>;
+  infrastructureChunks: { roads: Array<{ firstIndex: number; indexCount: number }>; bridges: Array<{ firstIndex: number; indexCount: number }>; tunnels: Array<{ firstIndex: number; indexCount: number }> };
+  provinces: Array<{ id: number; name: string; center: [number, number]; terrain: string; infrastructureLevel: number }>;
 }
 
 describe('generated world package', () => {
   it('preserves the canonical world dimensions and province set', async () => {
     const manifest = JSON.parse(await readFile('public/world/world.json', 'utf8')) as GeneratedManifest;
+    expect(manifest.version).toBe(3);
     expect(manifest.world).toMatchObject({ width: 13_562, height: 7_000, wrapX: true });
     expect(manifest.provinces).toHaveLength(3_303);
     expect(new Set(manifest.provinces.map((province) => province.id)).size).toBe(3_303);
@@ -28,16 +30,24 @@ describe('generated world package', () => {
     expect(manifest.buffers.roadVertices.count).toBeGreaterThan(300_000);
     expect(manifest.buffers.roadIndices.count).toBeGreaterThan(manifest.buffers.roadVertices.count * 3);
     expect(manifest.buffers.bridgeVertices.count).toBeGreaterThan(10_000);
+    expect(manifest.buffers.tunnelVertices.count).toBeGreaterThan(1_000);
     expect(manifest.counts.logicalRoutes).toBeGreaterThan(9_000);
     expect(manifest.counts.landSegments).toBe(17_405);
     expect(manifest.counts.logicalRoutes).toBe(manifest.counts.localRoutes + manifest.counts.regionalRoutes + manifest.counts.majorRoutes);
     expect(manifest.counts.bridges).toBeGreaterThan(100);
     expect(manifest.counts.oceanRoadSamples).toBe(0);
     expect(manifest.counts.unbridgedRiverSamples).toBe(0);
+    expect(manifest.counts.tunnels).toBeGreaterThan(50);
+    expect(manifest.counts.sharedGateways).toBeGreaterThan(3_000);
+    expect(manifest.counts.sharedGateways).toBeLessThanOrEqual(3_303 * 3);
+    expect(manifest.counts.level1Provinces + manifest.counts.level2Provinces + manifest.counts.level3Provinces).toBe(3_303);
+    expect(manifest.counts.level3Provinces / 3_303).toBeGreaterThanOrEqual(0.12);
+    expect(manifest.counts.level3Provinces / 3_303).toBeLessThanOrEqual(0.16);
     expect(manifest.counts.localStreets).toBeGreaterThan(1_000);
     expect(manifest.buffers.lamps.count).toBeGreaterThan(1_000);
     expect(manifest.infrastructureChunks.roads).toHaveLength(512);
     expect(manifest.infrastructureChunks.bridges).toHaveLength(512);
+    expect(manifest.infrastructureChunks.tunnels).toHaveLength(512);
     expect(manifest.infrastructureChunks.roads.reduce((sum, range) => sum + range.indexCount, 0)).toBe(manifest.buffers.roadIndices.count);
     expect(manifest.infrastructureChunks.bridges.reduce((sum, range) => sum + range.indexCount, 0)).toBe(manifest.buffers.bridgeIndices.count);
     expect(manifest.counts.rivers).toBeGreaterThan(800);
@@ -49,39 +59,90 @@ describe('generated world package', () => {
     expect(manifest.fields.provinceIds.width).toBe(4_096);
   });
 
-  it('encodes a classified road field with core, shoulders, and local streets', async () => {
+  it('encodes a sparse five-level road field with roles and contextual surfaces', async () => {
     const bytes = await readFile('public/world/roads.rgba8');
     let core = 0;
     let shoulder = 0;
-    let major = 0;
+    let level3 = 0;
     let localStreet = 0;
+    let timber = 0;
     for (let index = 0; index < bytes.length; index += 4) {
       if (bytes[index] > 32) core += 1;
       if (bytes[index + 1] > 32) shoulder += 1;
-      if (bytes[index + 2] > 220) major += 1;
-      if (bytes[index + 3] > 220) localStreet += 1;
+      if (Math.round(bytes[index + 2] / 51) === 3) level3 += 1;
+      if ((bytes[index + 3] & 4) !== 0) localStreet += 1;
+      if (((bytes[index + 3] >> 3) & 7) === 2) timber += 1;
     }
-    expect(core).toBeGreaterThan(100_000);
+    expect(core).toBeGreaterThan(80_000);
     expect(shoulder).toBeGreaterThan(core);
-    expect(major).toBeGreaterThan(10_000);
+    expect(core / (bytes.length / 4)).toBeLessThanOrEqual(0.024);
+    expect(level3).toBeGreaterThan(10_000);
     expect(localStreet).toBeGreaterThan(5_000);
+    expect(timber).toBeGreaterThan(5_000);
+
+    const manifest = JSON.parse(await readFile('public/world/world.json', 'utf8')) as GeneratedManifest;
+    const width = manifest.fields.roads.width;
+    const height = manifest.fields.roads.height;
+    const coverages = manifest.provinces.map((province) => {
+      const centerX = Math.round(province.center[0] / manifest.world.width * width);
+      const centerY = Math.round(province.center[1] / manifest.world.height * height);
+      const radiusX = Math.ceil(75 / manifest.world.width * width);
+      const radiusY = Math.ceil(75 / manifest.world.height * height);
+      let covered = 0;
+      let samples = 0;
+      for (let offsetY = -radiusY; offsetY <= radiusY; offsetY += 1) {
+        const y = centerY + offsetY;
+        if (y < 0 || y >= height) continue;
+        for (let offsetX = -radiusX; offsetX <= radiusX; offsetX += 1) {
+          if ((offsetX / radiusX) ** 2 + (offsetY / radiusY) ** 2 > 1) continue;
+          const x = (centerX + offsetX + width) % width;
+          samples += 1;
+          if (bytes[(y * width + x) * 4] > 32) covered += 1;
+        }
+      }
+      return covered / samples;
+    }).sort((a, b) => a - b);
+    expect(coverages[Math.floor(coverages.length * 0.9)]).toBeLessThanOrEqual(0.13);
+  });
+
+  it('maps every land movement segment to one or more visual corridors', async () => {
+    const manifest = JSON.parse(await readFile('public/world/world.json', 'utf8')) as GeneratedManifest;
+    const source = JSON.parse(await readFile('material/movement/connection_segments.json', 'utf8')) as { segments: Array<{ segment_id: number; medium: string }> };
+    const [offsetBytes, idBytes] = await Promise.all([
+      readFile('public/world/connection-corridor-offsets.u32'), readFile('public/world/connection-corridor-ids.u32'),
+    ]);
+    const offsets = new Uint32Array(offsetBytes.buffer, offsetBytes.byteOffset, offsetBytes.byteLength / 4);
+    const ids = new Uint32Array(idBytes.buffer, idBytes.byteOffset, idBytes.byteLength / 4);
+    expect(offsets).toHaveLength(source.segments.length + 1);
+    expect(offsets.at(-1)).toBe(ids.length);
+    for (const segment of source.segments) {
+      const count = offsets[segment.segment_id + 1] - offsets[segment.segment_id];
+      if (segment.medium === 'land') expect(count).toBeGreaterThan(0);
+      else expect(count).toBe(0);
+    }
+    expect(Math.max(...ids.filter((_, index) => index % 37 === 0))).toBeLessThan(manifest.counts.logicalRoutes + manifest.counts.sharedGateways);
   });
 
   it('keeps compiled infrastructure finite, indexed, and off ocean pixels', async () => {
     const manifest = JSON.parse(await readFile('public/world/world.json', 'utf8')) as GeneratedManifest;
-    const [roadBytes, roadIndexBytes, bridgeBytes, bridgeIndexBytes, roadField, provinceBytes] = await Promise.all([
+    const [roadBytes, roadIndexBytes, bridgeBytes, bridgeIndexBytes, tunnelBytes, tunnelIndexBytes, roadField, provinceBytes] = await Promise.all([
       readFile('public/world/road-vertices.f32'), readFile('public/world/road-indices.u32'),
       readFile('public/world/bridge-vertices.f32'), readFile('public/world/bridge-indices.u32'),
+      readFile('public/world/tunnel-vertices.f32'), readFile('public/world/tunnel-indices.u32'),
       readFile('public/world/roads.rgba8'), readFile('public/world/province-ids.u16'),
     ]);
     const roadVertices = new Float32Array(roadBytes.buffer, roadBytes.byteOffset, roadBytes.byteLength / 4);
     const roadIndices = new Uint32Array(roadIndexBytes.buffer, roadIndexBytes.byteOffset, roadIndexBytes.byteLength / 4);
     const bridgeVertices = new Float32Array(bridgeBytes.buffer, bridgeBytes.byteOffset, bridgeBytes.byteLength / 4);
     const bridgeIndices = new Uint32Array(bridgeIndexBytes.buffer, bridgeIndexBytes.byteOffset, bridgeIndexBytes.byteLength / 4);
+    const tunnelVertices = new Float32Array(tunnelBytes.buffer, tunnelBytes.byteOffset, tunnelBytes.byteLength / 4);
+    const tunnelIndices = new Uint32Array(tunnelIndexBytes.buffer, tunnelIndexBytes.byteOffset, tunnelIndexBytes.byteLength / 4);
     expect(roadVertices.every(Number.isFinite)).toBe(true);
     expect(bridgeVertices.every(Number.isFinite)).toBe(true);
+    expect(tunnelVertices.every(Number.isFinite)).toBe(true);
     expect(Math.max(...roadIndices.filter((_, index) => index % 251 === 0))).toBeLessThan(manifest.buffers.roadVertices.count);
     expect(Math.max(...bridgeIndices.filter((_, index) => index % 101 === 0))).toBeLessThan(manifest.buffers.bridgeVertices.count);
+    expect(Math.max(...tunnelIndices.filter((_, index) => index % 101 === 0))).toBeLessThan(manifest.buffers.tunnelVertices.count);
     const provinceIds = new Uint16Array(provinceBytes.buffer, provinceBytes.byteOffset, provinceBytes.byteLength / 2);
     let oceanRoadPixels = 0;
     for (let pixel = 0; pixel < provinceIds.length; pixel += 1) {

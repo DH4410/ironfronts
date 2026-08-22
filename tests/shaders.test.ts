@@ -54,10 +54,11 @@ describe('WGSL programs', () => {
     const depthStencil: GPUDepthStencilState = { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' };
     await expect(device.createRenderPipelineAsync({
       layout: device.createPipelineLayout({ bindGroupLayouts: [common] }),
-      vertex: { module: modules.get('infrastructure')!, entryPoint: 'infrastructureVertex', buffers: [{ arrayStride: 40, attributes: [
+      vertex: { module: modules.get('infrastructure')!, entryPoint: 'infrastructureVertex', buffers: [{ arrayStride: 52, attributes: [
         { shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' },
         { shaderLocation: 2, offset: 24, format: 'float32x2' }, { shaderLocation: 3, offset: 32, format: 'float32' },
-        { shaderLocation: 4, offset: 36, format: 'float32' },
+        { shaderLocation: 4, offset: 36, format: 'float32' }, { shaderLocation: 5, offset: 40, format: 'float32' },
+        { shaderLocation: 6, offset: 44, format: 'float32' }, { shaderLocation: 7, offset: 48, format: 'float32' },
       ] }] },
       fragment: { module: modules.get('infrastructure')!, entryPoint: 'infrastructureFragment', targets: [{ format: 'bgra8unorm' }] },
       primitive: { topology: 'triangle-list', cullMode: 'none' }, depthStencil,

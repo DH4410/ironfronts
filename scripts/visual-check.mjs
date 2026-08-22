@@ -60,9 +60,18 @@ if (!status.unsupported) {
   await captureShowcase('urban', 'roads-urban.png', 410);
   await captureShowcase('bridge', 'roads-bridge.png', 330);
   await captureShowcase('mountain', 'roads-mountain.png', 480);
+  await captureShowcase('liangshan', 'roads-liangshan.png', 520);
+  await captureShowcase('tunnel', 'roads-tunnel.png', 360);
+  await captureShowcase('timber', 'roads-timber.png', 300);
   await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(5));
   await page.waitForTimeout(300);
-  await page.screenshot({ path: path.join(outputDirectory, 'roads-classes.png') });
+  await page.screenshot({ path: path.join(outputDirectory, 'roads-levels.png') });
+  await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(6));
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(outputDirectory, 'roads-roles.png') });
+  await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(7));
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(outputDirectory, 'roads-surfaces.png') });
 }
 
 console.log(JSON.stringify({ ...status, errors }, null, 2));

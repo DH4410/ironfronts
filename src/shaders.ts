@@ -206,16 +206,25 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   baseColor = mix(baseColor, baseColor * vec3f(0.46, 0.57, 0.51), wetBank * 0.68);
 
   let roadData = roadAt(input.mapUv);
-  let roadClass = select(select(0.0, 1.0, roadData.b > 0.42), 2.0, roadData.b > 0.80);
+  let roadLevel = u32(clamp(round(roadData.b * 5.0), 0.0, 5.0));
+  let roadMeta = u32(round(roadData.a * 255.0));
+  let roadRole = roadMeta & 3u;
+  let roadMaterial = (roadMeta >> 3u) & 7u;
   let roadDistance = distance(uniforms.camera.xyz, input.worldPosition);
-  let roadRange = select(select(4200.0, 7000.0, roadClass > 0.5), 16000.0, roadClass > 1.5);
+  var roadRange = select(select(4800.0, 8000.0, roadLevel >= 2u), 16000.0, roadLevel >= 3u);
+  roadRange += f32(roadRole) * 420.0;
   let rangeVisibility = 1.0 - smoothstep(roadRange * 0.82, roadRange, roadDistance);
   let strategicBlend = mix(0.22, 1.0, smoothstep(1500.0, 3300.0, roadDistance));
   let roadCore = roadData.r * rangeVisibility * strategicBlend * (1.0 - smoothstep(0.12, 0.42, river));
   let roadShoulder = max(0.0, roadData.g - roadData.r * 0.72) * rangeVisibility * 0.48;
   let aggregate = 0.88 + 0.12 * sin(input.worldPosition.x * 0.91 + sin(input.worldPosition.z * 1.37));
-  baseColor = mix(baseColor, vec3f(0.29, 0.285, 0.27) * aggregate, roadShoulder);
-  baseColor = mix(baseColor, vec3f(0.34, 0.35, 0.34) * aggregate, roadCore * 0.84);
+  let fieldRoadColors = array<vec3f, 6>(
+    vec3f(0.29, 0.235, 0.15), vec3f(0.39, 0.36, 0.30), vec3f(0.30, 0.22, 0.14),
+    vec3f(0.34, 0.35, 0.34), vec3f(0.28, 0.29, 0.29), vec3f(0.20, 0.215, 0.22)
+  );
+  let roadColor = fieldRoadColors[min(roadMaterial, 5u)] * aggregate;
+  baseColor = mix(baseColor, mix(baseColor, roadColor, 0.48), roadShoulder);
+  baseColor = mix(baseColor, roadColor, roadCore * select(0.66, 0.84, roadLevel >= 2u));
 
   baseColor *= 0.92 + variation * 0.14;
   let sunDirection = normalize(uniforms.sunTime.xyz);
@@ -247,7 +256,14 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   } else if (debugMode == 4u) {
     lit = normal * 0.5 + 0.5;
   } else if (debugMode == 5u) {
-    lit = mix(vec3f(0.025), array<vec3f, 3>(vec3f(0.45, 0.38, 0.25), vec3f(0.74, 0.62, 0.30), vec3f(0.94, 0.80, 0.40))[u32(roadClass)], max(roadData.r, roadData.g * 0.42));
+    let levelPalette = array<vec3f, 6>(vec3f(0.02), vec3f(0.45, 0.30, 0.16), vec3f(0.69, 0.56, 0.28),
+      vec3f(0.78, 0.72, 0.50), vec3f(0.78, 0.50, 0.28), vec3f(0.92, 0.80, 0.38));
+    lit = mix(vec3f(0.025), levelPalette[roadLevel], max(roadData.r, roadData.g * 0.42));
+  } else if (debugMode == 6u) {
+    let rolePalette = array<vec3f, 4>(vec3f(0.34, 0.45, 0.26), vec3f(0.34, 0.62, 0.76), vec3f(0.92, 0.64, 0.20), vec3f(0.78, 0.38, 0.68));
+    lit = mix(vec3f(0.025), rolePalette[min(roadRole, 3u)], max(roadData.r, roadData.g * 0.35));
+  } else if (debugMode == 7u) {
+    lit = mix(vec3f(0.025), fieldRoadColors[min(roadMaterial, 5u)], max(roadData.r, roadData.g * 0.35));
   }
 
   if (uniforms.terrainInfo.w > 0.5) {
@@ -392,8 +408,11 @@ struct InfrastructureInput {
   @location(0) position: vec3f,
   @location(1) normal: vec3f,
   @location(2) roadUv: vec2f,
-  @location(3) roadClass: f32,
-  @location(4) material: f32,
+  @location(3) level: f32,
+  @location(4) role: f32,
+  @location(5) surfaceMaterial: f32,
+  @location(6) structureMaterial: f32,
+  @location(7) corridorId: f32,
 };
 
 struct InfrastructureOutput {
@@ -401,9 +420,11 @@ struct InfrastructureOutput {
   @location(0) worldPosition: vec3f,
   @location(1) normal: vec3f,
   @location(2) roadUv: vec2f,
-  @location(3) @interpolate(flat) roadClass: f32,
-  @location(4) @interpolate(flat) material: f32,
-  @location(5) visibility: f32,
+  @location(3) @interpolate(flat) level: f32,
+  @location(4) @interpolate(flat) role: f32,
+  @location(5) @interpolate(flat) surfaceMaterial: f32,
+  @location(6) @interpolate(flat) structureMaterial: f32,
+  @location(7) visibility: f32,
 };
 
 @vertex
@@ -416,36 +437,60 @@ fn infrastructureVertex(input: InfrastructureInput, @builtin(instance_index) ins
   output.worldPosition = worldPosition;
   output.normal = input.normal;
   output.roadUv = input.roadUv;
-  output.roadClass = input.roadClass;
-  output.material = input.material;
-  output.visibility = 1.0 - smoothstep(2200.0, 4000.0, cameraDistance);
+  output.level = input.level;
+  output.role = input.role;
+  output.surfaceMaterial = input.surfaceMaterial;
+  output.structureMaterial = input.structureMaterial;
+  var geometryEnd = select(select(2200.0, 3200.0, input.level > 1.5), 4000.0, input.level > 2.5);
+  geometryEnd += input.role * 120.0;
+  if (input.structureMaterial > 10.5 && input.structureMaterial < 11.5) {
+    geometryEnd = select(8000.0, 16000.0, input.level > 2.5);
+  }
+  output.visibility = 1.0 - smoothstep(geometryEnd - 650.0, geometryEnd, cameraDistance);
   return output;
 }
 
 @fragment
 fn infrastructureFragment(input: InfrastructureOutput) -> @location(0) vec4f {
   if (input.visibility < 0.025) { discard; }
-  let material = u32(input.material + 0.5);
+  let surface = u32(input.surfaceMaterial + 0.5);
+  let structure = u32(input.structureMaterial + 0.5);
   let mapUv = input.worldPosition.xz / uniforms.map.xy;
-  if (material <= 2u && landAt(mapUv) < 0.52) { discard; }
+  if (structure <= 7u && landAt(mapUv) < 0.52) { discard; }
   let grit = fract(sin(dot(floor(input.worldPosition.xz * 2.2), vec2f(12.9898, 78.233))) * 43758.5453);
   let broadWear = sin(input.roadUv.x * 0.78 + sin(input.roadUv.x * 0.17) * 0.7) * 0.5 + 0.5;
-  var color = vec3f(0.34, 0.35, 0.34) * (0.86 + grit * 0.20);
-  if (material == 0u) {
-    let wheelWear = smoothstep(0.05, 0.20, abs(input.roadUv.y - 0.46)) * (1.0 - smoothstep(0.20, 0.34, abs(input.roadUv.y - 0.46)));
-    color *= 0.91 + broadWear * 0.07 + wheelWear * 0.04;
-  } else if (material == 1u) {
-    color = mix(vec3f(0.31, 0.29, 0.25), vec3f(0.46, 0.42, 0.34), grit * 0.42);
-  } else if (material == 2u) {
-    color = mix(vec3f(0.25, 0.235, 0.20), vec3f(0.36, 0.33, 0.26), grit);
-  } else if (material == 3u) {
-    color = mix(vec3f(0.38, 0.37, 0.34), vec3f(0.53, 0.50, 0.43), grit * 0.55);
-  } else if (material == 4u) {
-    color = mix(vec3f(0.29, 0.31, 0.31), vec3f(0.43, 0.45, 0.43), grit * 0.35);
-  } else if (material == 5u) {
-    color = vec3f(0.16, 0.18, 0.17) * (0.86 + grit * 0.18);
+  var color = vec3f(0.34, 0.35, 0.34);
+  if (structure == 0u) {
+    if (surface == 0u) {
+      let rutA = 1.0 - smoothstep(0.045, 0.12, abs(input.roadUv.y - 0.43));
+      let rutB = 1.0 - smoothstep(0.045, 0.12, abs(input.roadUv.y - 0.57));
+      color = mix(vec3f(0.36, 0.285, 0.17), vec3f(0.245, 0.19, 0.115), max(rutA, rutB) * 0.55) * (0.90 + grit * 0.16);
+    } else if (surface == 1u) {
+      color = mix(vec3f(0.35, 0.33, 0.28), vec3f(0.52, 0.48, 0.39), grit * 0.46);
+    } else if (surface == 2u) {
+      let plank = smoothstep(0.72, 0.92, fract(input.roadUv.x * 4.8));
+      color = mix(vec3f(0.26, 0.18, 0.105), vec3f(0.42, 0.30, 0.16), plank * 0.52 + grit * 0.12);
+    } else if (surface == 3u) {
+      color = mix(vec3f(0.34, 0.345, 0.33), vec3f(0.48, 0.47, 0.42), grit * 0.42) * (0.94 + broadWear * 0.05);
+    } else if (surface == 4u) {
+      color = mix(vec3f(0.255, 0.27, 0.275), vec3f(0.39, 0.405, 0.40), grit * 0.30);
+    } else {
+      color = vec3f(0.175, 0.19, 0.195) * (0.90 + grit * 0.16);
+    }
+  } else if (structure == 6u) {
+    color = mix(vec3f(0.30, 0.255, 0.18), vec3f(0.42, 0.38, 0.28), grit * 0.36);
+  } else if (structure == 7u) {
+    color = mix(vec3f(0.30, 0.29, 0.265), vec3f(0.46, 0.44, 0.39), grit * 0.48);
+  } else if (structure == 8u) {
+    color = select(vec3f(0.37, 0.38, 0.365), vec3f(0.34, 0.285, 0.19), surface <= 2u);
+  } else if (structure == 9u) {
+    color = mix(vec3f(0.35, 0.34, 0.31), vec3f(0.53, 0.50, 0.43), grit * 0.48);
+  } else if (structure == 10u) {
+    color = vec3f(0.16, 0.18, 0.18) * (0.86 + grit * 0.18);
+  } else if (structure == 11u) {
+    color = vec3f(0.91, 0.76, 0.38) * (0.92 + grit * 0.08);
   } else {
-    color = vec3f(0.35, 0.36, 0.35) * (0.87 + grit * 0.18 + broadWear * 0.05);
+    color = vec3f(0.055, 0.065, 0.062);
   }
   let normal = normalize(input.normal);
   let diffuse = max(dot(normal, normalize(uniforms.sunTime.xyz)), 0.0);
