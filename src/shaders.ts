@@ -457,6 +457,9 @@ fn infrastructureFragment(input: InfrastructureOutput) -> @location(0) vec4f {
   let structure = u32(input.structureMaterial + 0.5);
   let mapUv = input.worldPosition.xz / uniforms.map.xy;
   if (structure <= 7u && landAt(mapUv) < 0.52) { discard; }
+  // Ordinary road surfaces may never survive beneath rendered channel water.
+  // Bridge materials (8+) are intentionally exempt.
+  if (structure <= 7u && riverAt(mapUv).r > 0.12) { discard; }
   let grit = fract(sin(dot(floor(input.worldPosition.xz * 2.2), vec2f(12.9898, 78.233))) * 43758.5453);
   let broadWear = sin(input.roadUv.x * 0.78 + sin(input.roadUv.x * 0.17) * 0.7) * 0.5 + 0.5;
   var color = vec3f(0.34, 0.35, 0.34);

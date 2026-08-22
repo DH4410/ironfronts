@@ -899,7 +899,7 @@ async function main() {
   const connections = buildConnections(connectionData);
   console.log('Compiling terrain-aware roads, bridges, and city streets...');
   const infrastructure = buildInfrastructure({
-    connectionData, networkData, provinces: metadata.provinces, heights, landField, riverMask, riverTexture, riverBed,
+    connectionData, networkData, provinces: metadata.provinces, heights, landField, riverMask, riverCoreMask, riverTexture, riverBed,
     fieldWidth: FIELD_WIDTH, fieldHeight: FIELD_HEIGHT, roadFieldWidth: ID_WIDTH, roadFieldHeight: ID_HEIGHT,
     worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
   });

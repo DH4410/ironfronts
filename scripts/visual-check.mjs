@@ -1,11 +1,16 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 
 const executablePath = process.env.IRONFRONTS_BROWSER ?? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const outputDirectory = fileURLToPath(new URL('../artifacts/', import.meta.url));
-const headless = process.env.IRONFRONTS_HEADLESS !== 'false';
+// Chrome's Windows headless backend does not expose the machine's WebGPU
+// adapter reliably. Default to a short-lived headed window on Windows; CI can
+// still opt into headless mode explicitly.
+const headless = process.env.IRONFRONTS_HEADLESS
+  ? process.env.IRONFRONTS_HEADLESS !== 'false'
+  : process.platform !== 'win32';
 await mkdir(outputDirectory, { recursive: true });
 
 const browser = await chromium.launch({
@@ -32,8 +37,26 @@ await page.waitForTimeout(1_000);
 const status = await page.evaluate(() => ({
   webgpu: Boolean(navigator.gpu),
   unsupported: !(document.querySelector('#unsupported')?.hasAttribute('hidden') ?? true),
-  message: document.querySelector('#unsupported p:last-child')?.textContent ?? '',
+  message: !(document.querySelector('#unsupported')?.hasAttribute('hidden') ?? true)
+    ? document.querySelector('#unsupported p:last-child')?.textContent ?? ''
+    : '',
 }));
+const validation = await page.evaluate(async () => {
+  const manifest = await fetch('/world/world.json').then((response) => response.json());
+  const counts = manifest.counts;
+  return {
+    oceanRoadSamples: counts.oceanRoadSamples,
+    unbridgedRiverSamples: counts.unbridgedRiverSamples,
+    minimumBridgeClearance: counts.minimumBridgeClearance,
+    maximumBridgeSeamError: counts.maximumBridgeSeamError,
+    maximumBridgePierHeight: counts.maximumBridgePierHeight,
+  };
+});
+if (validation.oceanRoadSamples !== 0) errors.push(`validation: ${validation.oceanRoadSamples} road samples enter ocean/lakes`);
+if (validation.unbridgedRiverSamples !== 0) errors.push(`validation: ${validation.unbridgedRiverSamples} river-core road samples lack bridges`);
+if (validation.minimumBridgeClearance < 0.20) errors.push(`validation: bridge clearance ${validation.minimumBridgeClearance.toFixed(3)} is below 0.20`);
+if (validation.maximumBridgeSeamError > 0.20) errors.push(`validation: bridge seam ${validation.maximumBridgeSeamError.toFixed(3)} exceeds 0.20`);
+if (validation.maximumBridgePierHeight > 18.01) errors.push(`validation: bridge pier ${validation.maximumBridgePierHeight.toFixed(3)} exceeds 18.0`);
 await page.screenshot({ path: path.join(outputDirectory, 'overview.png') });
 
 if (!status.unsupported) {
@@ -59,6 +82,9 @@ if (!status.unsupported) {
   await page.keyboard.press('F3');
   await captureShowcase('urban', 'roads-urban.png', 410);
   await captureShowcase('bridge', 'roads-bridge.png', 330);
+  await captureShowcase('bridge', 'roads-bridge-close.png', 190);
+  await captureShowcase('bridgeClearance', 'roads-bridge-clearance.png', 190);
+  await captureShowcase('bridgePier', 'roads-bridge-pier.png', 210);
   await captureShowcase('mountain', 'roads-mountain.png', 480);
   await captureShowcase('liangshan', 'roads-liangshan.png', 520);
   await captureShowcase('tunnel', 'roads-tunnel.png', 360);
@@ -74,6 +100,8 @@ if (!status.unsupported) {
   await page.screenshot({ path: path.join(outputDirectory, 'roads-surfaces.png') });
 }
 
-console.log(JSON.stringify({ ...status, errors }, null, 2));
+const report = { ...status, headless, validation, errors };
+await writeFile(path.join(outputDirectory, 'visual-report.json'), `${JSON.stringify(report, null, 2)}\n`);
+console.log(JSON.stringify(report, null, 2));
 await browser.close();
-if (status.unsupported) process.exitCode = 1;
+if (status.unsupported || errors.length) process.exitCode = 1;

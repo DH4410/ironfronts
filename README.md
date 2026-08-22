@@ -13,7 +13,7 @@ npm run dev
 
 The development command first converts the source map into compact files under `public/world/`, then starts Vite. Production builds use `npm run build`. Run the data and Dawn-backed shader checks with `npm test`.
 
-With the dev server running, `npm run visual-check` launches the installed Chrome executable through Playwright and writes overview, close-terrain, and diagnostics captures under `artifacts/`. Set `IRONFRONTS_BROWSER` to use a different Chromium executable.
+With the dev server running, `npm run visual-check` launches the installed Chrome executable through Playwright and writes overview, bridge-clearance, tallest-pier, close-terrain, and diagnostics captures plus `artifacts/visual-report.json`. On Windows it uses a short-lived headed window because Chrome's headless backend does not reliably expose the hardware WebGPU adapter. Set `IRONFRONTS_BROWSER` to use a different Chromium executable or `IRONFRONTS_HEADLESS=true` when a CI GPU adapter is available.
 
 ## Controls
 

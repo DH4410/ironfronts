@@ -37,6 +37,9 @@ describe('generated world package', () => {
     expect(manifest.counts.bridges).toBeGreaterThan(100);
     expect(manifest.counts.oceanRoadSamples).toBe(0);
     expect(manifest.counts.unbridgedRiverSamples).toBe(0);
+    expect(manifest.counts.minimumBridgeClearance).toBeGreaterThanOrEqual(0.2);
+    expect(manifest.counts.maximumBridgeSeamError).toBeLessThanOrEqual(0.2);
+    expect(manifest.counts.maximumBridgePierHeight).toBeLessThanOrEqual(18.01);
     expect(manifest.counts.tunnels).toBeGreaterThan(50);
     expect(manifest.counts.sharedGateways).toBeGreaterThan(3_000);
     expect(manifest.counts.sharedGateways).toBeLessThanOrEqual(3_303 * 3);

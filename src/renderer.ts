@@ -99,7 +99,8 @@ export class WorldRenderer {
 
     report('Requesting WebGPU device', 0.1);
     this.adapter = (await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
-      ?? await navigator.gpu.requestAdapter()) as GPUAdapter;
+      ?? await navigator.gpu.requestAdapter()
+      ?? await navigator.gpu.requestAdapter({ forceFallbackAdapter: true })) as GPUAdapter;
     if (!this.adapter) throw new Error('No compatible WebGPU adapter was found');
     this.device = await this.adapter.requestDevice();
     this.device.lost.then((info) => {
