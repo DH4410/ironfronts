@@ -1,0 +1,128 @@
+:root {
+  color: #f2f3ec;
+  background: #7893a0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #world { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+
+body { user-select: none; }
+
+#world {
+  display: block;
+  touch-action: none;
+  cursor: grab;
+  background: linear-gradient(#7f9ba8, #adbec1);
+}
+
+#world:active { cursor: grabbing; }
+
+.brand {
+  position: fixed;
+  left: 28px;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  color: rgba(248, 246, 231, .94);
+  text-shadow: 0 2px 18px rgba(10, 23, 25, .36);
+  pointer-events: none;
+}
+
+.brand__eyebrow { font-size: 9px; font-weight: 700; letter-spacing: .28em; opacity: .7; }
+.brand__title { margin-top: 2px; font-family: Georgia, serif; font-size: 25px; letter-spacing: .08em; }
+
+.loading {
+  position: fixed;
+  left: 50%;
+  bottom: 56px;
+  width: min(420px, calc(100vw - 48px));
+  transform: translateX(-50%);
+  transition: opacity .45s ease, transform .45s ease;
+}
+
+.loading.is-done { opacity: 0; transform: translate(-50%, 8px); pointer-events: none; }
+.loading__line { display: flex; justify-content: space-between; margin-bottom: 9px; font-size: 10px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; text-shadow: 0 2px 12px #20383c; }
+.loading__track { height: 2px; overflow: hidden; background: rgba(255,255,255,.22); }
+.loading__track span { display: block; width: 0; height: 100%; background: #f2dfae; transition: width .25s ease; }
+
+.tooltip {
+  position: fixed;
+  z-index: 4;
+  min-width: 120px;
+  padding: 8px 11px 9px;
+  transform: translate(14px, 14px);
+  border: 1px solid rgba(241, 226, 190, .42);
+  border-radius: 3px;
+  background: rgba(19, 30, 29, .88);
+  box-shadow: 0 8px 30px rgba(4, 12, 12, .28);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+
+.tooltip strong, .tooltip span { display: block; }
+.tooltip strong { color: #f3ead3; font-family: Georgia, serif; font-size: 14px; font-weight: 500; letter-spacing: .015em; }
+.tooltip span { margin-top: 3px; color: #b9c4ba; font-size: 9px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+
+.diagnostics {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 250px;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 5px;
+  background: rgba(11, 20, 21, .88);
+  box-shadow: 0 12px 40px rgba(0,0,0,.25);
+  backdrop-filter: blur(10px);
+  font-size: 11px;
+}
+
+.diagnostics__head { display: flex; justify-content: space-between; color: #e8d8ad; letter-spacing: .14em; }
+.diagnostics__head span { opacity: .48; }
+.diagnostics pre { margin: 12px 0; color: #a9beb5; font: 10px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+.diagnostics label { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: #cad3cb; }
+.diagnostics label:first-of-type { justify-content: space-between; }
+.diagnostics select { padding: 3px 6px; border: 1px solid #4b5f5d; border-radius: 3px; color: #dce5dc; background: #1b2b2a; }
+.diagnostics input { accent-color: #c9b477; }
+
+.controls {
+  position: fixed;
+  right: 22px;
+  bottom: 18px;
+  display: flex;
+  gap: 14px;
+  color: rgba(244,244,233,.7);
+  font-size: 9px;
+  letter-spacing: .06em;
+  text-shadow: 0 1px 6px #203438;
+  pointer-events: none;
+}
+
+kbd { padding: 2px 5px; border: 1px solid rgba(255,255,255,.24); border-radius: 3px; background: rgba(13,28,29,.28); font: inherit; }
+
+.unsupported {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: 32px;
+  color: #e9e8dc;
+  text-align: center;
+  background: radial-gradient(circle at 50% 38%, #536c70, #1d2c2e 72%);
+}
+
+.unsupported[hidden] { display: none; }
+.unsupported__eyebrow { margin: 0; color: #c9b477; font-size: 10px; font-weight: 700; letter-spacing: .22em; }
+.unsupported h1 { margin: 14px 0 8px; font-family: Georgia, serif; font-weight: 400; }
+.unsupported p:last-child { max-width: 520px; color: #b9c5c0; line-height: 1.6; }
+
+@media (max-width: 720px) {
+  .brand { left: 18px; top: 18px; }
+  .controls { display: none; }
+  .diagnostics { inset: 12px 12px auto auto; }
+}

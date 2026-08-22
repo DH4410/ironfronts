@@ -1,0 +1,29 @@
+{
+  "name": "ironfronts-renderer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "predev": "npm run build:world",
+    "dev": "vite",
+    "build:world": "node scripts/build-world.mjs",
+    "build": "npm run build:world && tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "pretest": "npm run build:world",
+    "test": "vitest run",
+    "visual-check": "node scripts/visual-check.mjs"
+  },
+  "dependencies": {
+    "gl-matrix": "^3.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@webgpu/types": "^0.1.64",
+    "playwright-core": "^1.62.1",
+    "typescript": "^5.9.2",
+    "vite": "^7.1.3",
+    "vitest": "^3.2.4",
+    "webgpu": "^0.4.0",
+    "wgsl_reflect": "^1.5.0"
+  }
+}

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#7692a0" />
+    <link rel="icon" href="data:," />
+    <title>Ironfronts — World Renderer</title>
+  </head>
+  <body>
+    <canvas id="world" aria-label="Interactive 3D world map"></canvas>
+
+    <header class="brand" aria-label="Ironfronts renderer">
+      <span class="brand__eyebrow">WORLD RENDERER</span>
+      <span class="brand__title">IRONFRONTS</span>
+    </header>
+
+    <section id="loading" class="loading" aria-live="polite">
+      <div class="loading__line"><span id="loading-stage">Preparing WebGPU</span><span id="loading-value">0%</span></div>
+      <div class="loading__track"><span id="loading-bar"></span></div>
+    </section>
+
+    <div id="tooltip" class="tooltip" hidden>
+      <strong id="tooltip-name"></strong>
+      <span id="tooltip-terrain"></span>
+    </div>
+
+    <aside id="diagnostics" class="diagnostics" hidden>
+      <div class="diagnostics__head"><strong>RENDERER</strong><span>F3</span></div>
+      <pre id="diagnostics-stats"></pre>
+      <label>View
+        <select id="debug-view">
+          <option value="0">Beauty</option>
+          <option value="1">Elevation</option>
+          <option value="2">Terrain classes</option>
+          <option value="3">Province IDs</option>
+          <option value="4">Surface normals</option>
+        </select>
+      </label>
+      <label><input id="debug-connections" type="checkbox" /> Movement graph</label>
+      <label><input id="debug-wireframe" type="checkbox" /> Terrain grid</label>
+    </aside>
+
+    <div class="controls" aria-hidden="true">
+      <span><kbd>Drag</kbd> pan</span>
+      <span><kbd>Wheel</kbd> zoom</span>
+      <span><kbd>Right drag</kbd> orbit</span>
+      <span><kbd>F3</kbd> diagnostics</span>
+    </div>
+
+    <section id="unsupported" class="unsupported" hidden>
+      <p class="unsupported__eyebrow">RENDERER UNAVAILABLE</p>
+      <h1>WebGPU is required.</h1>
+      <p>Open this build in a current desktop version of Chrome or Edge with hardware acceleration enabled.</p>
+    </section>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
