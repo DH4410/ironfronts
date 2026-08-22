@@ -14,8 +14,6 @@ export function rasterRoadField(routes, width, height, worldWidth, worldHeight, 
     const surfaceMaterial = route.surfaceMaterial ?? (route.infrastructureLevel === 1 ? 0 : route.infrastructureLevel === 2 ? 1 : route.infrastructureLevel);
     const packedMetadata = (route.corridorRole & 3) | (route.localStreet ? 4 : 0) | ((surfaceMaterial & 7) << 3);
     for (let pointIndex = 0; pointIndex < route.points.length; pointIndex += 1) {
-      if ((route.tunnels ?? []).some((tunnel) => pointIndex > tunnel.start && pointIndex < tunnel.end)) continue;
-      if ((route.bridges ?? []).some((bridge) => pointIndex > bridge.start && pointIndex < bridge.end)) continue;
       const point = route.points[pointIndex];
       const fx = wrap(point.x, worldWidth) / worldWidth * width;
       const fz = point.z / worldHeight * height;

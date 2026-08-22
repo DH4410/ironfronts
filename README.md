@@ -1,6 +1,6 @@
 # Ironfronts renderer
 
-A native WebGPU world renderer built on the static map package in `material/`. The current milestone is deliberately visual: regional topography, biome materials, animated oceans and terrain-following rivers, a terrain-aware 3D road network with bridges, road-shaped cities, province borders and hover feedback, forests, and a hidden diagnostics view. It contains no ownership, units, gameplay, persistence, or server.
+A native WebGPU world renderer built from the static map package in `material/`. This visual milestone includes bounded regional topography, biome materials, oceans and source lakes, a terrain-draped hierarchical road network, road-shaped cities, province borders, forests, and diagnostics. Rivers, bridges, tunnels, ownership, units, gameplay, persistence, and servers are intentionally absent.
 
 ## Run locally
 
@@ -11,9 +11,9 @@ npm install
 npm run dev
 ```
 
-The development command first converts the source map into compact files under `public/world/`, then starts Vite. Production builds use `npm run build`. Run the data and Dawn-backed shader checks with `npm test`.
+`npm run dev` first bakes manifest v5 into `public/world/`, then starts Vite. Use `npm run build` for a production build and `npm test` for generated-data plus Dawn-backed shader validation.
 
-With the dev server running, `npm run visual-check` launches the installed Chrome executable through Playwright and writes overview, bridge-clearance, tallest-pier, close-terrain, and diagnostics captures plus `artifacts/visual-report.json`. On Windows it uses a short-lived headed window because Chrome's headless backend does not reliably expose the hardware WebGPU adapter. Set `IRONFRONTS_BROWSER` to use a different Chromium executable or `IRONFRONTS_HEADLESS=true` when a CI GPU adapter is available.
+With the dev server running, `npm run visual-check` launches Chrome through Playwright and writes world, mountain, city, lake-road, and diagnostic captures plus `artifacts/visual-report.json`. On Windows it defaults to a short-lived headed browser because Chrome headless does not reliably expose the hardware WebGPU adapter. Set `IRONFRONTS_BROWSER` to select another Chromium executable or `IRONFRONTS_HEADLESS=true` when a CI GPU adapter is available.
 
 ## Controls
 
@@ -23,24 +23,23 @@ With the dev server running, `npm run visual-check` launches the installed Chrom
 - WASD or arrow keys: pan
 - F3: diagnostics and renderer debug views
 
-## Code layout
+## Generation pipeline
 
-World generation is staged rather than monolithic:
+World generation is staged and deterministic:
 
-- `scripts/build-world.mjs` orchestrates source loading, field generation, and package emission.
-- `scripts/world/` contains shared dimensions, raster operations, and hydrology/river meshing.
-- `scripts/build-infrastructure.mjs` coordinates the infrastructure bake and preserves its public API.
-- `scripts/infrastructure/` separates graph classification, routing, shared-corridor compilation, terrain auditing, mesh emission, generated fields, and spatial utilities.
-- `src/renderer.ts` owns renderer lifecycle and frame submission; `scene-meshes.ts`, `geometry.ts`, and `material-texture.ts` own reusable GPU construction.
+1. Rasterize immutable land, lake, and ocean masks.
+2. Generate capped continuous topography with broad hill and mountain envelopes.
+3. Use the classified shared movement graph to shape broad traversable passes.
+4. Freeze the heightfield permanently.
+5. Route and drape visible roads onto the frozen terrain; impossible physical roads are hidden and reported without changing logical connectivity.
+6. Place city streets, buildings, trees, lamps, fences, and signs after road clearances are final.
 
-Province borders grow stronger as the camera approaches. Hovering a province highlights its complete boundary and shows its name and gameplay terrain.
+`scripts/build-world.mjs` orchestrates generation, `scripts/world/topography.mjs` owns the heightfield, and `scripts/build-infrastructure.mjs` coordinates road classification, routing, sharing, audit, and mesh output. Expensive route results are cached under ignored `artifacts/road-cache/`.
 
-## Data and rendering
+The generated `world-generation-report.json` records topography statistics and every hidden corridor with its reason, endpoints, ID, and affected source connections. The source `material/` directory remains untouched.
 
-The source `material/` directory remains untouched. `scripts/build-world.mjs` rasterizes exact province IDs, produces a continuous periodic heightfield with multi-scale mountain uplift, traces depression-free watersheds, carves river channels, packs topology and future movement paths, and creates deterministic tree/building instance buffers. The browser only downloads these generated renderer assets.
+## Rendering
 
-Terrain shaders blend the generated material set by gameplay terrain, visual biome, elevation, slope, and macro variation. Forest ground transitions to a cheap canopy-green signal when individual trees fade out. Ocean shading uses coastal depth, vertex waves, foam, Fresnel reflection and sun sparkle. Rivers combine a terrain-conforming water layer with continuous reflective network meshes, rounded confluences, cleared banks, downhill bed profiles, distance-aware strategic visibility, and flared lake/ocean outlets.
+Terrain materials blend by gameplay terrain, biome, elevation, slope, and macro variation. Forest ground transitions to a cheap canopy-green signal as individual trees fade. Ocean and lake water uses coastal depth, waves, foam, Fresnel reflection, and sun sparkle.
 
-The road compiler preserves every land movement link while separating province infrastructure level from local, connector, and trunk corridor roles. Initial levels are population-led, component-aware, and restricted to levels 1–3; the renderer already supports the full dirt-to-highway 1–5 progression. Shared gateway stems reduce city starbursts, global lateral optimization removes mountain sawteeth, constrained vertical profiles produce bounded cuts and fills, and levels 2–5 may create modeled tunnels with terrain-projected dotted indicators. Contextual level-2 roads use gravel or timber reinforcement in wet forest biomes. Every source connection maps back to its generated corridor IDs, while sea movement links remain diagnostic-only.
-
-Roads, bridges, and tunnels are chunked by their actual segment positions. Their terrain field stores core coverage, verge coverage, infrastructure level, corridor role, city-street state, and surface material for strategic LOD and F3 inspection. Expensive centerline results are cached deterministically under ignored `artifacts/road-cache/`.
+Road levels 1–5 and local/connector/trunk roles are independent. The initial world assigns province levels 1–3, ranging from dirt through timber/gravel to paved aggregate. Shared gateways reduce city starbursts, full-width route audits reject static-water incursions, and every road vertex independently samples the frozen terrain with a small deterministic lift. The terrain road field preserves hierarchy at strategic zoom while nearby indexed geometry provides the 3D surface.

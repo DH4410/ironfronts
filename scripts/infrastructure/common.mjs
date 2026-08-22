@@ -1,12 +1,8 @@
 export const TAU = Math.PI * 2;
-export const ROUTING_CACHE_VERSION = 'hierarchical-roads-v4.4';
-export const AUDIT_VERSION = 'infrastructure-audit-v4.0';
-export const MAX_AUDIT_PASSES = 12;
+export const ROUTING_CACHE_VERSION = 'terrain-draped-roads-v5.1';
 export const LEVEL_WIDTHS = [1.5, 2.2, 3.4, 4.8, 8.4];
 export const ROLE_WIDTH_SCALE = [0.8, 1.0, 1.2];
 export const MAX_GRADES = [0.18, 0.14, 0.10, 0.08, 0.06];
-export const CUT_FILL_LIMITS = [1.5, 2.5, 4.0, 6.0, 8.0];
-export const TUNNEL_MAX_LENGTHS = [45, 45, 90, 160, 240];
 export const ROLE_LOCAL = 0;
 export const ROLE_CONNECTOR = 1;
 export const ROLE_TRUNK = 2;
@@ -50,8 +46,4 @@ export function routeRoadWidth(route) {
   const levelIndex = clamp(route.infrastructureLevel - 1, 0, 4);
   return route.plaza ? 3.1 : route.localStreet ? Math.max(1.25, LEVEL_WIDTHS[levelIndex] * 0.62)
     : LEVEL_WIDTHS[levelIndex] * ROLE_WIDTH_SCALE[route.corridorRole];
-}
-
-export function intervalAt(route, segmentIndex, key) {
-  return (route[key] ?? []).find((interval) => segmentIndex >= interval.start && segmentIndex < interval.end);
 }

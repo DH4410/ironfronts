@@ -87,14 +87,6 @@ function uploadMesh(device: GPUDevice, label: string, vertices: Float32Array, in
   return { vertex, index, indexCount: indices.length };
 }
 
-export function uploadRiverMesh(device: GPUDevice, vertexData: ArrayBuffer, indexData: ArrayBuffer, indexCount: number): Mesh {
-  const vertex = device.createBuffer({ label: 'river network vertices', size: align4(vertexData.byteLength), usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
-  const index = device.createBuffer({ label: 'river network indices', size: align4(indexData.byteLength), usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
-  device.queue.writeBuffer(vertex, 0, vertexData);
-  device.queue.writeBuffer(index, 0, indexData);
-  return { vertex, index, indexCount };
-}
-
 export function uploadIndexedMesh(device: GPUDevice, label: string, vertexData: ArrayBuffer, indexData: ArrayBuffer, indexCount: number): Mesh {
   const vertex = device.createBuffer({ label: `${label} vertices`, size: align4(vertexData.byteLength), usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
   const index = device.createBuffer({ label: `${label} indices`, size: align4(indexData.byteLength), usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
@@ -102,4 +94,3 @@ export function uploadIndexedMesh(device: GPUDevice, label: string, vertexData: 
   device.queue.writeBuffer(index, 0, indexData);
   return { vertex, index, indexCount };
 }
-

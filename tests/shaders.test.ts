@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { WgslReflect } from 'wgsl_reflect/wgsl_reflect.module.js';
 import { create, globals } from 'webgpu';
-import { infrastructureShader, lineShader, propShader, riverShader, terrainShader, waterShader } from '../src/shaders';
+import { infrastructureShader, lineShader, propShader, terrainShader, waterShader } from '../src/shaders';
 
 describe('WGSL programs', () => {
   it.each([
     ['terrain', terrainShader, ['terrainVertex'], ['terrainFragment']],
     ['water', waterShader, ['waterVertex'], ['waterFragment']],
-    ['rivers', riverShader, ['riverVertex'], ['riverFragment']],
     ['infrastructure', infrastructureShader, ['infrastructureVertex'], ['infrastructureFragment']],
     ['props', propShader, ['propVertex'], ['propFragment']],
     ['lines', lineShader, ['lineVertex'], ['lineFragment']],
@@ -27,7 +26,7 @@ describe('WGSL programs', () => {
     const device = await adapter.requestDevice();
     const modules = new Map<string, GPUShaderModule>();
     for (const [label, source] of [
-      ['terrain', terrainShader], ['water', waterShader], ['rivers', riverShader], ['infrastructure', infrastructureShader], ['props', propShader], ['lines', lineShader],
+      ['terrain', terrainShader], ['water', waterShader], ['infrastructure', infrastructureShader], ['props', propShader], ['lines', lineShader],
     ] as const) {
       const module = device.createShaderModule({ label, code: source });
       modules.set(label, module);
@@ -45,8 +44,6 @@ describe('WGSL programs', () => {
       { binding: 5, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
       { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-      { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-      { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ] });
     const layer = device.createBindGroupLayout({ entries: [
       { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
@@ -75,16 +72,6 @@ describe('WGSL programs', () => {
       vertex: { module: modules.get('water')!, entryPoint: 'waterVertex', buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }] },
       fragment: { module: modules.get('water')!, entryPoint: 'waterFragment', targets: [{ format: 'bgra8unorm' }] },
       primitive: { topology: 'triangle-list' }, depthStencil,
-    })).resolves.toBeDefined();
-    await expect(device.createRenderPipelineAsync({
-      layout: device.createPipelineLayout({ bindGroupLayouts: [common] }),
-      vertex: { module: modules.get('rivers')!, entryPoint: 'riverVertex', buffers: [{ arrayStride: 32, attributes: [
-        { shaderLocation: 0, offset: 0, format: 'float32x2' }, { shaderLocation: 1, offset: 8, format: 'float32x2' },
-        { shaderLocation: 2, offset: 16, format: 'float32' }, { shaderLocation: 3, offset: 20, format: 'float32' },
-        { shaderLocation: 4, offset: 24, format: 'float32' }, { shaderLocation: 5, offset: 28, format: 'float32' },
-      ] }] },
-      fragment: { module: modules.get('rivers')!, entryPoint: 'riverFragment', targets: [{ format: 'bgra8unorm' }] },
-      primitive: { topology: 'triangle-list' }, depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'less-equal' },
     })).resolves.toBeDefined();
     await expect(device.createRenderPipelineAsync({
       layout: device.createPipelineLayout({ bindGroupLayouts: [common, layer] }),

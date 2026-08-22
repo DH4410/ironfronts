@@ -2,7 +2,6 @@ import {
   LEVEL_WIDTHS, MAX_GRADES, ROLE_CONNECTOR, ROLE_LOCAL, ROLE_TRUNK, ROLE_WIDTH_SCALE, TAU, clamp, sampleHeight,
   sampleScalar, smoothstep, unwrapNear, wrap,
 } from './common.mjs';
-import { refineRiverSegments } from './network.mjs';
 
 function smoothAndResample(source, spacing, worldWidth) {
   let points = source.map((point) => ({ ...point }));
@@ -11,8 +10,9 @@ function smoothAndResample(source, spacing, worldWidth) {
     for (let index = 0; index + 1 < points.length; index += 1) {
       const a = points[index];
       const b = points[index + 1];
-      next.push({ x: a.x * 0.72 + b.x * 0.28, z: a.z * 0.72 + b.z * 0.28 });
-      next.push({ x: a.x * 0.28 + b.x * 0.72, z: a.z * 0.28 + b.z * 0.72 });
+      const bx = unwrapNear(b.x, a.x, worldWidth);
+      next.push({ x: a.x * 0.72 + bx * 0.28, z: a.z * 0.72 + b.z * 0.28 });
+      next.push({ x: a.x * 0.28 + bx * 0.72, z: a.z * 0.28 + b.z * 0.72 });
     }
     next.push(points.at(-1));
     points = next;
@@ -21,18 +21,19 @@ function smoothAndResample(source, spacing, worldWidth) {
   for (let index = 0; index + 1 < points.length; index += 1) {
     const a = points[index];
     const b = points[index + 1];
-    const length = Math.hypot(b.x - a.x, b.z - a.z);
+    const bx = unwrapNear(b.x, a.x, worldWidth);
+    const length = Math.hypot(bx - a.x, b.z - a.z);
     const steps = Math.max(1, Math.ceil(length / spacing));
     for (let step = 1; step <= steps; step += 1) {
       const t = step / steps;
-      sampled.push({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t });
+      sampled.push({ x: a.x + (bx - a.x) * t, z: a.z + (b.z - a.z) * t });
     }
   }
   for (const point of sampled) point.x = wrap(point.x, worldWidth);
   return sampled;
 }
 
-export function moveToValidLand(point, landField, riverMask, width, height, worldWidth, worldHeight, avoidRiver, preferredSide = 0, flow = [0, 0]) {
+export function moveToValidLand(point, landField, width, height, worldWidth, worldHeight) {
   const fx = wrap(point.x, worldWidth) / worldWidth * width;
   const fz = point.z / worldHeight * height;
   const cx = Math.round(fx);
@@ -47,16 +48,12 @@ export function moveToValidLand(point, landField, riverMask, width, height, worl
         if (radius && Math.abs(ox) !== radius && Math.abs(oz) !== radius) continue;
         const px = wrap(cx + ox, width);
         const index = pz * width + px;
-        if (landField[index] < 0.5 || avoidRiver && riverMask[index] > 0.05) continue;
+        if (landField[index] < 0.5) continue;
         const wx = (px + 0.5) / width * worldWidth;
         const wz = (pz + 0.5) / height * worldHeight;
         let dx = unwrapNear(wx, point.x, worldWidth) - point.x;
         const dz = wz - point.z;
         let penalty = Math.hypot(dx, dz);
-        if (preferredSide) {
-          const side = Math.sign((-flow[1]) * dx + flow[0] * dz);
-          if (side && side !== preferredSide) penalty += 80;
-        }
         if (!fallback || penalty < fallback.penalty) fallback = { x: wrap(point.x + dx, worldWidth), z: wz, penalty };
         let coastSafe = true;
         for (let sy = -1; sy <= 1 && coastSafe; sy += 1) {
@@ -74,7 +71,7 @@ export function moveToValidLand(point, landField, riverMask, width, height, worl
 }
 
 function optimizeRouteThroughTerrain(points, route, context) {
-  const { heights, landField, riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight } = context;
+  const { heights, landField, fieldWidth, fieldHeight, worldWidth, worldHeight } = context;
   if (points.length < 3) return;
   const original = points.map((point) => ({ ...point }));
   const maximumOffset = route.corridorRole === ROLE_TRUNK ? 24 : route.corridorRole === ROLE_CONNECTOR ? 18 : 12;
@@ -95,7 +92,6 @@ function optimizeRouteThroughTerrain(points, route, context) {
       const land = sampleScalar(landField, fieldWidth, fieldHeight, worldWidth, worldHeight, candidate.x, candidate.z);
       candidate.valid = land >= 0.5 && candidate.z >= 0 && candidate.z <= worldHeight;
       candidate.height = sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, candidate.x, candidate.z);
-      candidate.river = sampleScalar(riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight, candidate.x, candidate.z);
       return candidate;
     });
   });
@@ -115,8 +111,7 @@ function optimizeRouteThroughTerrain(points, route, context) {
         const deviation = Math.abs(current.offset) / Math.max(1, maximumOffset);
         const gradeExcess = Math.max(0, grade - maximumGrade);
         const transitionCost = grade * grade * 34 + gradeExcess * gradeExcess * 420
-          + offsetDelta * offsetDelta * 0.035 + deviation * deviation * 0.16
-          + current.river * (route.corridorRole === ROLE_TRUNK ? 2.8 : 5.6);
+          + offsetDelta * offsetDelta * 0.035 + deviation * deviation * 0.16;
         const total = costs[index - 1][priorIndex] + transitionCost;
         if (total < costs[index][currentIndex]) {
           costs[index][currentIndex] = total;
@@ -148,8 +143,8 @@ function optimizeRouteThroughTerrain(points, route, context) {
 }
 
 export function adaptRoute(route, context) {
-  const { landField, riverMask, riverCoreMask, riverTexture, fieldWidth, fieldHeight, worldWidth, worldHeight } = context;
-  let points = smoothAndResample(route.points, 6.8, worldWidth);
+  const { landField, fieldWidth, fieldHeight, worldWidth, worldHeight } = context;
+  let points = smoothAndResample(route.points, 4.0, worldWidth);
   for (let index = 0; index < points.length; index += 1) {
     const fx = wrap(Math.floor(points[index].x / worldWidth * fieldWidth), fieldWidth);
     const fz = clamp(Math.floor(points[index].z / worldHeight * fieldHeight), 0, fieldHeight - 1);
@@ -157,87 +152,22 @@ export function adaptRoute(route, context) {
       const pz = fz + oz;
       return pz < 0 || pz >= fieldHeight || landField[pz * fieldWidth + wrap(fx + ox, fieldWidth)] < 0.5;
     });
-    if (coastUnsafe) {
-      points[index] = moveToValidLand(points[index], landField, riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight, false);
-    }
+    if (coastUnsafe) points[index] = moveToValidLand(points[index], landField, fieldWidth, fieldHeight, worldWidth, worldHeight);
   }
   optimizeRouteThroughTerrain(points, route, context);
-  for (let index = 0; index < points.length; index += 1) {
-    if (sampleScalar(landField, fieldWidth, fieldHeight, worldWidth, worldHeight, points[index].x, points[index].z) < 0.5) {
-      points[index] = moveToValidLand(points[index], landField, riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight, false);
+  for (let pass = 0; pass < 2; pass += 1) {
+    const source = points.map((point) => ({ ...point }));
+    for (let index = 1; index + 1 < points.length; index += 1) {
+      const candidate = {
+        x: wrap(source[index].x * 0.54 + (unwrapNear(source[index - 1].x, source[index].x, worldWidth)
+          + unwrapNear(source[index + 1].x, source[index].x, worldWidth)) * 0.23, worldWidth),
+        z: source[index].z * 0.54 + (source[index - 1].z + source[index + 1].z) * 0.23,
+      };
+      if (sampleScalar(landField, fieldWidth, fieldHeight, worldWidth, worldHeight, candidate.x, candidate.z) >= 0.5) points[index] = candidate;
     }
   }
-
-  points = refineRiverSegments(points, riverCoreMask, fieldWidth, fieldHeight, worldWidth, worldHeight);
-  for (let index = 0; index < points.length; index += 1) {
-    if (sampleScalar(landField, fieldWidth, fieldHeight, worldWidth, worldHeight, points[index].x, points[index].z) < 0.5) {
-      points[index] = moveToValidLand(points[index], landField, riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight, false);
-    }
-  }
-
-  const bridges = [];
-  let cursor = 0;
-  while (cursor < points.length) {
-    const wet = sampleScalar(riverCoreMask, fieldWidth, fieldHeight, worldWidth, worldHeight, points[cursor].x, points[cursor].z) > 0.10;
-    if (!wet) { cursor += 1; continue; }
-    let end = cursor;
-    while (end + 1 < points.length && sampleScalar(riverCoreMask, fieldWidth, fieldHeight, worldWidth, worldHeight, points[end + 1].x, points[end + 1].z) > 0.06) end += 1;
-    let wetStart = cursor;
-    let wetEnd = end;
-    while (wetStart > 0 && sampleScalar(riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight, points[wetStart - 1].x, points[wetStart - 1].z) > 0.10) wetStart -= 1;
-    while (wetEnd + 1 < points.length && sampleScalar(riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight, points[wetEnd + 1].x, points[wetEnd + 1].z) > 0.10) wetEnd += 1;
-    // Two dry samples provide modeled approach ramps and keep the abutments out
-    // of the feathered wet bank.
-    const before = Math.max(0, wetStart - 2);
-    const after = Math.min(points.length - 1, wetEnd + 2);
-    const midpoint = points[Math.floor((cursor + end) * 0.5)];
-    const fieldX = wrap(Math.floor(midpoint.x / worldWidth * fieldWidth), fieldWidth);
-    const fieldZ = clamp(Math.floor(midpoint.z / worldHeight * fieldHeight), 0, fieldHeight - 1);
-    const textureOffset = (fieldZ * fieldWidth + fieldX) * 4;
-    const flow = [riverTexture[textureOffset + 1] / 127.5 - 1, riverTexture[textureOffset + 2] / 127.5 - 1];
-    const flowLength = Math.max(0.001, Math.hypot(flow[0], flow[1]));
-    flow[0] /= flowLength; flow[1] /= flowLength;
-    const normal = [-flow[1], flow[0]];
-    const bx = unwrapNear(points[before].x, midpoint.x, worldWidth) - midpoint.x;
-    const bz = points[before].z - midpoint.z;
-    const ax = unwrapNear(points[after].x, midpoint.x, worldWidth) - midpoint.x;
-    const az = points[after].z - midpoint.z;
-    const sideBefore = Math.sign(bx * normal[0] + bz * normal[1]);
-    const sideAfter = Math.sign(ax * normal[0] + az * normal[1]);
-    const roadX = unwrapNear(points[after].x, points[before].x, worldWidth) - points[before].x;
-    const roadZ = points[after].z - points[before].z;
-    const roadLength = Math.max(0.001, Math.hypot(roadX, roadZ));
-    const acrossAlignment = Math.abs(roadX / roadLength * normal[0] + roadZ / roadLength * normal[1]);
-    const span = Math.hypot(roadX, roadZ);
-    const crossesBanks = sideBefore * sideAfter < 0 || acrossAlignment > 0.35;
-    const isCrossing = before < wetStart && after > wetEnd && crossesBanks && span < 78;
-    if (isCrossing) {
-      bridges.push({ start: before, end: after, coreStart: cursor, coreEnd: end });
-    } else {
-      const preferredSide = sideBefore || sideAfter || 1;
-      for (let index = wetStart; index <= wetEnd; index += 1) {
-        points[index] = moveToValidLand(points[index], landField, riverMask, fieldWidth, fieldHeight, worldWidth, worldHeight, true, preferredSide, flow);
-      }
-    }
-    cursor = wetEnd + 1;
-  }
-
-  // Merge overlapping bridge intervals and annotate samples.
-  bridges.sort((a, b) => a.start - b.start);
-  const merged = [];
-  for (const bridge of bridges) {
-    const previous = merged.at(-1);
-    if (previous && bridge.start <= previous.end + 1) {
-      previous.end = Math.max(previous.end, bridge.end);
-      previous.coreStart = Math.min(previous.coreStart, bridge.coreStart);
-      previous.coreEnd = Math.max(previous.coreEnd, bridge.coreEnd);
-    }
-    else merged.push({ ...bridge });
-  }
-  route.points = points;
-  route.bridges = merged;
+  route.points = smoothAndResample(points, 2.0, worldWidth);
 }
-
 export function buildSharedGateways(routes, nodes, provinces, context) {
   const provinceById = new Map(provinces.map((province) => [province.province_id, province]));
   const approachesByProvince = new Map();
@@ -293,9 +223,8 @@ export function buildSharedGateways(routes, nodes, provinces, context) {
       }));
       const gatewayRadius = clamp(Math.min(radius, minimumReach * 0.34), 4.5, radius);
       let gateway = { x: wrap(center.x + cluster.dx * gatewayRadius, context.worldWidth), z: center.z + cluster.dz * gatewayRadius };
-      if (sampleScalar(context.landField, context.fieldWidth, context.fieldHeight, context.worldWidth, context.worldHeight, gateway.x, gateway.z) < 0.5
-        || sampleScalar(context.riverMask, context.fieldWidth, context.fieldHeight, context.worldWidth, context.worldHeight, gateway.x, gateway.z) > 0.16) {
-        gateway = moveToValidLand(gateway, context.landField, context.riverMask, context.fieldWidth, context.fieldHeight, context.worldWidth, context.worldHeight, true);
+      if (sampleScalar(context.landField, context.fieldWidth, context.fieldHeight, context.worldWidth, context.worldHeight, gateway.x, gateway.z) < 0.5) {
+        gateway = moveToValidLand(gateway, context.landField, context.fieldWidth, context.fieldHeight, context.worldWidth, context.worldHeight);
       }
       const level = Math.max(...cluster.members.map((member) => member.route.infrastructureLevel));
       const role = Math.max(...cluster.members.map((member) => member.route.corridorRole));
@@ -307,7 +236,7 @@ export function buildSharedGateways(routes, nodes, provinces, context) {
         points: smoothAndResample([center, gateway], 4.6, context.worldWidth),
         infrastructureLevel: level, corridorRole: role, roadClass: role,
         importance: Math.max(...cluster.members.map((member) => member.route.importance)),
-        bridges: [], gateway: true, provinceId,
+        gateway: true, provinceId,
       };
       for (const member of cluster.members) {
         if (member.atStart) {
@@ -390,11 +319,10 @@ export function addLocalStreets(routes, cityPlans, context) {
     const acceptedStreets = [];
     for (const street of plan.streets) {
       const points = smoothAndResample([{ x: street.x1, z: street.z1 }, { x: street.x2, z: street.z2 }], 4.8, context.worldWidth);
-      if (points.some((point) => sampleScalar(context.landField, context.fieldWidth, context.fieldHeight, context.worldWidth, context.worldHeight, point.x, point.z) < 0.5
-        || sampleScalar(context.riverMask, context.fieldWidth, context.fieldHeight, context.worldWidth, context.worldHeight, point.x, point.z) >= 0.22)) continue;
+      if (points.some((point) => sampleScalar(context.landField, context.fieldWidth, context.fieldHeight, context.worldWidth, context.worldHeight, point.x, point.z) < 0.5)) continue;
       if (points.length < 2) continue;
       routes.push({ id: routes.length, start: -1, end: -1, nodeIds: [], segmentIds: [], provinceIds: [provinceId], points,
-        infrastructureLevel: plan.infrastructureLevel, corridorRole: ROLE_LOCAL, roadClass: ROLE_LOCAL, importance: 0, bridges: [], localStreet: true, provinceId });
+        infrastructureLevel: plan.infrastructureLevel, corridorRole: ROLE_LOCAL, roadClass: ROLE_LOCAL, importance: 0, localStreet: true, provinceId });
       acceptedStreets.push(street);
     }
     const plazaRadius = clamp(3.0 + (plan.streets.length - 2) * 0.34, 3.0, 4.5);
@@ -403,10 +331,9 @@ export function addLocalStreets(routes, cityPlans, context) {
       const angle = step / 14 * TAU;
       plazaPoints.push({ x: plan.center[0] + Math.cos(angle) * plazaRadius, z: plan.center[1] + Math.sin(angle) * plazaRadius });
     }
-    if (plazaPoints.every((point) => sampleScalar(context.landField, context.fieldWidth, context.fieldHeight, context.worldWidth, context.worldHeight, point.x, point.z) > 0.5
-      && sampleScalar(context.riverMask, context.fieldWidth, context.fieldHeight, context.worldWidth, context.worldHeight, point.x, point.z) < 0.22)) {
+    if (plazaPoints.every((point) => sampleScalar(context.landField, context.fieldWidth, context.fieldHeight, context.worldWidth, context.worldHeight, point.x, point.z) > 0.5)) {
       routes.push({ id: routes.length, start: -1, end: -1, nodeIds: [], segmentIds: [], provinceIds: [provinceId], points: plazaPoints,
-        infrastructureLevel: plan.infrastructureLevel, corridorRole: ROLE_LOCAL, roadClass: ROLE_LOCAL, importance: 0, bridges: [], localStreet: true, plaza: true, provinceId });
+        infrastructureLevel: plan.infrastructureLevel, corridorRole: ROLE_LOCAL, roadClass: ROLE_LOCAL, importance: 0, localStreet: true, plaza: true, provinceId });
     }
     plan.streets = acceptedStreets;
   }

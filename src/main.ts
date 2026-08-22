@@ -88,7 +88,6 @@ function updateDiagnostics(stats: FrameStats): void {
     `trees     ${stats.trees.toLocaleString()}`,
     `buildings ${stats.buildings.toLocaleString()}`,
     `roads     ${stats.roads.toLocaleString()}`,
-    `bridges   ${stats.bridges.toLocaleString()}`,
     `borders   ${stats.borderEdges.toLocaleString()}`,
   ].join('\n');
 }

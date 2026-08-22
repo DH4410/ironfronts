@@ -1,6 +1,4 @@
-import {
-  ROLE_CONNECTOR, ROLE_LOCAL, ROLE_TRUNK, clamp, sampleScalar, unwrapNear, wrap,
-} from './common.mjs';
+import { ROLE_CONNECTOR, ROLE_LOCAL, ROLE_TRUNK, clamp, unwrapNear, wrap } from './common.mjs';
 
 function percentileRanks(values) {
   const sorted = values.map((value, index) => ({ value, index })).sort((a, b) => a.value - b.value);
@@ -10,38 +8,6 @@ function percentileRanks(values) {
   return ranks;
 }
 
-
-export function refineRiverSegments(points, riverCoreMask, width, height, worldWidth, worldHeight) {
-  const refined = [points[0]];
-  for (let index = 0; index + 1 < points.length; index += 1) {
-    const a = points[index];
-    const bx = unwrapNear(points[index + 1].x, a.x, worldWidth);
-    const bz = points[index + 1].z;
-    const length = Math.hypot(bx - a.x, bz - a.z);
-    const steps = Math.max(1, Math.ceil(length / 0.65));
-    const coreHits = [];
-    let touchesCore = false;
-    for (let step = 1; step <= steps; step += 1) {
-      const t = step / steps;
-      const point = { x: wrap(a.x + (bx - a.x) * t, worldWidth), z: a.z + (bz - a.z) * t };
-      if (sampleScalar(riverCoreMask, width, height, worldWidth, worldHeight, point.x, point.z) > 0.10) {
-        touchesCore = true;
-        coreHits.push(t);
-      }
-    }
-    // Extra samples are only needed where a segment intersects actual rendered
-    // channel geometry. Keeping dry segments coarse controls mesh size.
-    if (touchesCore) {
-      const parameters = new Set([1]);
-      for (let hit = 0; hit < coreHits.length; hit += Math.max(1, Math.ceil(coreHits.length / 4))) parameters.add(coreHits[hit]);
-      parameters.add(coreHits.at(-1));
-      for (const t of [...parameters].sort((left, right) => left - right)) {
-        refined.push({ x: wrap(a.x + (bx - a.x) * t, worldWidth), z: a.z + (bz - a.z) * t });
-      }
-    } else refined.push(points[index + 1]);
-  }
-  return refined;
-}
 
 export function assembleRoutes(connectionData, networkData, worldWidth) {
   const nodes = new Map(networkData.nodes.map((node) => [node.node_id, node]));

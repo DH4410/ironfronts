@@ -32,25 +32,15 @@ export interface WorldManifest {
   fields: {
     height: BinaryField;
     surface: BinaryField;
-    rivers: BinaryField;
     roads: BinaryField;
-    infrastructureEngineering: BinaryField;
     coast: BinaryField;
     provinceIds: BinaryField;
   };
   buffers: {
     borders: BinaryBufferDescriptor;
-    riverVertices: BinaryBufferDescriptor;
-    riverIndices: BinaryBufferDescriptor;
     connections: BinaryBufferDescriptor;
     roadVertices: BinaryBufferDescriptor;
     roadIndices: BinaryBufferDescriptor;
-    bridgeVertices: BinaryBufferDescriptor;
-    bridgeIndices: BinaryBufferDescriptor;
-    tunnelVertices: BinaryBufferDescriptor;
-    tunnelIndices: BinaryBufferDescriptor;
-    engineeringVertices: BinaryBufferDescriptor;
-    engineeringIndices: BinaryBufferDescriptor;
     corridorMetrics: BinaryBufferDescriptor;
     corridorFlags: BinaryBufferDescriptor;
     connectionCorridorOffsets: BinaryBufferDescriptor;
@@ -71,14 +61,11 @@ export interface WorldManifest {
     chunksX: number;
     chunksY: number;
     roads: Array<{ firstIndex: number; indexCount: number }>;
-    bridges: Array<{ firstIndex: number; indexCount: number }>;
-    tunnels: Array<{ firstIndex: number; indexCount: number }>;
-    engineering: Array<{ firstIndex: number; indexCount: number }>;
   };
-  reports: { infrastructure: { url: string; version: string } };
+  reports: { generation: { url: string; version: string } };
   showcases: {
-    urban: [number, number]; bridge: [number, number]; bridgeClearance: [number, number]; bridgePier: [number, number]; mountain: [number, number];
-    tunnel: [number, number]; timber: [number, number]; liangshan: [number, number];
+    urban: [number, number]; mountain: [number, number]; steepRoad: [number, number];
+    timber: [number, number]; europe: [number, number]; lakeRoad: [number, number]; liangshan: [number, number];
   };
   counts: Record<string, number>;
   provinces: ProvinceRecord[];
@@ -100,7 +87,6 @@ export interface FrameStats {
   buildings: number;
   borderEdges: number;
   roads: number;
-  bridges: number;
   debugView: number;
 }
 

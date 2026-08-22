@@ -16,10 +16,8 @@ struct Uniforms {
 @group(0) @binding(3) var provinceTexture: texture_2d<u32>;
 @group(0) @binding(4) var materialTexture: texture_2d_array<f32>;
 @group(0) @binding(5) var materialSampler: sampler;
-@group(0) @binding(6) var riverTexture: texture_2d<f32>;
-@group(0) @binding(7) var coastTexture: texture_2d<f32>;
-@group(0) @binding(8) var roadTexture: texture_2d<f32>;
-@group(0) @binding(9) var engineeringTexture: texture_2d<f32>;
+@group(0) @binding(6) var coastTexture: texture_2d<f32>;
+@group(0) @binding(7) var roadTexture: texture_2d<f32>;
 
 fn wrappedUv(uv: vec2f) -> vec2f {
   return vec2f(fract(uv.x + 1.0), clamp(uv.y, 0.0, 0.999999));
@@ -60,11 +58,6 @@ fn surfaceAt(uvInput: vec2f) -> vec4u {
   return textureLoad(surfaceTexture, coordinate, 0);
 }
 
-fn riverAt(uvInput: vec2f) -> vec4f {
-  let uv = wrappedUv(uvInput);
-  return textureSampleLevel(riverTexture, materialSampler, uv, 0.0);
-}
-
 fn waterDepthAt(uvInput: vec2f) -> f32 {
   let uv = wrappedUv(uvInput);
   let dimensions = vec2i(textureDimensions(surfaceTexture));
@@ -86,10 +79,6 @@ fn landAt(uvInput: vec2f) -> f32 {
 
 fn roadAt(uvInput: vec2f) -> vec4f {
   return textureSampleLevel(roadTexture, materialSampler, wrappedUv(uvInput), 0.0);
-}
-
-fn engineeringAt(uvInput: vec2f) -> vec4f {
-  return textureSampleLevel(engineeringTexture, materialSampler, wrappedUv(uvInput), 0.0);
 }
 
 fn terrainNormal(uv: vec2f) -> vec3f {
@@ -205,11 +194,6 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   }
 
 
-  let riverData = riverAt(input.mapUv);
-  let river = riverData.r;
-  let wetBank = smoothstep(0.015, 0.62, river) * (1.0 - smoothstep(0.68, 0.99, river));
-  baseColor = mix(baseColor, baseColor * vec3f(0.46, 0.57, 0.51), wetBank * 0.68);
-
   let roadData = roadAt(input.mapUv);
   let roadLevel = u32(clamp(round(roadData.b * 5.0), 0.0, 5.0));
   let roadMeta = u32(round(roadData.a * 255.0));
@@ -220,7 +204,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   roadRange += f32(roadRole) * 420.0;
   let rangeVisibility = 1.0 - smoothstep(roadRange * 0.82, roadRange, roadDistance);
   let strategicBlend = mix(0.22, 1.0, smoothstep(1500.0, 3300.0, roadDistance));
-  let roadCore = roadData.r * rangeVisibility * strategicBlend * (1.0 - smoothstep(0.12, 0.42, river));
+  let roadCore = roadData.r * rangeVisibility * strategicBlend;
   let roadShoulder = max(0.0, roadData.g - roadData.r * 0.72) * rangeVisibility * 0.48;
   let aggregate = 0.88 + 0.12 * sin(input.worldPosition.x * 0.91 + sin(input.worldPosition.z * 1.37));
   let fieldRoadColors = array<vec3f, 6>(
@@ -239,15 +223,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   lit += vec3f(0.12, 0.15, 0.13) * pow(max(dot(normal, normalize(sunDirection + normalize(uniforms.camera.xyz - input.worldPosition))), 0.0), 24.0) * 0.08;
 
   let debugMode = u32(uniforms.map.w + 0.5);
-  if (debugMode == 0u) {
-    let riverCore = smoothstep(0.34, 0.72, river);
-    let flow = normalize(riverData.gb * 2.0 - 1.0 + vec2f(0.0001, 0.0));
-    let flowWave = sin(dot(input.worldPosition.xz, flow) * 0.16 - uniforms.sunTime.w * 2.1);
-    var riverWater = mix(vec3f(0.045, 0.245, 0.30), vec3f(0.13, 0.39, 0.43), flowWave * 0.5 + 0.5);
-    let glint = pow(max(dot(reflect(-sunDirection, normal), normalize(uniforms.camera.xyz - input.worldPosition)), 0.0), 48.0);
-    riverWater += vec3f(0.88, 0.81, 0.63) * glint * 0.24;
-    lit = mix(lit, riverWater, riverCore * 0.94);
-  } else if (debugMode == 1u) {
+  if (debugMode == 1u) {
     let h = elevation / max(1.0, uniforms.map.z);
     lit = vec3f(h);
   } else if (debugMode == 2u) {
@@ -269,19 +245,6 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     lit = mix(vec3f(0.025), rolePalette[min(roadRole, 3u)], max(roadData.r, roadData.g * 0.35));
   } else if (debugMode == 7u) {
     lit = mix(vec3f(0.025), fieldRoadColors[min(roadMaterial, 5u)], max(roadData.r, roadData.g * 0.35));
-  } else if (debugMode == 8u) {
-    let engineering = engineeringAt(input.mapUv);
-    let signedWork = engineering.r * 2.0 - 1.0;
-    lit = mix(vec3f(0.045), select(vec3f(0.30, 0.58, 0.92), vec3f(0.92, 0.48, 0.20), signedWork > 0.0), abs(signedWork));
-  } else if (debugMode == 9u) {
-    let engineering = engineeringAt(input.mapUv);
-    lit = mix(vec3f(0.035), vec3f(0.93, 0.74, 0.22), engineering.g);
-  } else if (debugMode == 10u) {
-    let engineering = engineeringAt(input.mapUv);
-    lit = mix(vec3f(0.035), vec3f(0.20, 0.68, 0.88), engineering.b);
-  } else if (debugMode == 11u) {
-    let engineering = engineeringAt(input.mapUv);
-    lit = mix(vec3f(0.035), vec3f(0.96, 0.20, 0.18), engineering.a);
   }
 
   if (uniforms.terrainInfo.w > 0.5) {
@@ -357,70 +320,6 @@ fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
 }
 `;
 
-export const riverShader = commonWgsl + /* wgsl */ `
-struct RiverVertexInput {
-  @location(0) center: vec2f,
-  @location(1) offset: vec2f,
-  @location(2) bed: f32,
-  @location(3) strength: f32,
-  @location(4) steepness: f32,
-  @location(5) edge: f32,
-};
-
-struct RiverOutput {
-  @builtin(position) position: vec4f,
-  @location(0) worldPosition: vec3f,
-  @location(1) edge: f32,
-  @location(2) strength: f32,
-  @location(3) steepness: f32,
-  @location(4) mapUv: vec2f,
-};
-
-@vertex
-fn riverVertex(input: RiverVertexInput, @builtin(instance_index) instanceIndex: u32) -> RiverOutput {
-  let copyOffset = f32(i32(instanceIndex) - 1) * uniforms.map.x;
-  let centerWorld = vec3f(input.center.x + copyOffset, input.bed + 0.38, input.center.y);
-  let cameraDistance = distance(uniforms.camera.xyz, centerWorld);
-  let strategyScale = 1.0 + smoothstep(1500.0, 6800.0, cameraDistance) * 0.72;
-  let worldPosition = centerWorld + vec3f(input.offset.x * strategyScale, 0.0, input.offset.y * strategyScale);
-  var output: RiverOutput;
-  output.position = uniforms.viewProjection * vec4f(worldPosition, 1.0);
-  output.worldPosition = worldPosition;
-  output.edge = input.edge;
-  output.strength = input.strength;
-  output.steepness = input.steepness;
-  output.mapUv = vec2f((input.center.x + input.offset.x * strategyScale) / uniforms.map.x, (input.center.y + input.offset.y * strategyScale) / uniforms.map.y);
-  return output;
-}
-
-@fragment
-fn riverFragment(input: RiverOutput) -> @location(0) vec4f {
-  let coverage = 1.0 - smoothstep(0.72, 1.0, input.edge);
-  let time = uniforms.sunTime.w;
-  let flowDirection = normalize(riverAt(input.mapUv).gb * 2.0 - 1.0 + vec2f(0.0001, 0.0));
-  let crossDirection = vec2f(-flowDirection.y, flowDirection.x);
-  let along = dot(input.worldPosition.xz, flowDirection);
-  let across = dot(input.worldPosition.xz, crossDirection);
-  let flowRipple = sin(along * 0.16 - time * (2.5 + input.steepness * 3.1) + sin(across * 0.045) * 0.52);
-  let fineStreak = sin(along * 0.34 - time * 4.2 + sin(across * 0.095) * 0.38);
-  let crossRipple = sin(across * 0.072 + along * 0.018 - time * 0.46);
-  let surfaceSlope = flowDirection * (flowRipple * 0.052 + fineStreak * 0.018) + crossDirection * crossRipple * 0.024;
-  let normal = normalize(vec3f(-surfaceSlope.x, 1.0, -surfaceSlope.y));
-  let viewDirection = normalize(uniforms.camera.xyz - input.worldPosition);
-  let fresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 3.2);
-  let sparkle = pow(max(dot(reflect(-normalize(uniforms.sunTime.xyz), normal), viewDirection), 0.0), 74.0);
-  var color = mix(vec3f(0.055, 0.245, 0.29), vec3f(0.22, 0.50, 0.53), fresnel * 0.68);
-  color += vec3f(0.92, 0.84, 0.63) * sparkle * 0.38;
-  let bankFoam = smoothstep(0.58, 0.96, input.edge) * (0.42 + fineStreak * 0.13);
-  color = mix(color, vec3f(0.65, 0.75, 0.69), bankFoam * 0.34);
-  let rapidFoam = input.steepness * smoothstep(0.05, 0.76, fineStreak) * (0.34 + flowRipple * 0.10);
-  color = mix(color, vec3f(0.78, 0.84, 0.79), rapidFoam * 0.72);
-  let fog = smoothstep(3600.0, 11000.0, distance(uniforms.camera.xyz, input.worldPosition));
-  let receivingWaterFade = smoothstep(0.03, 0.62, landAt(input.mapUv));
-  return vec4f(mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.78), coverage * receivingWaterFade * (0.90 + input.strength * 0.08));
-}
-`;
-
 export const infrastructureShader = commonWgsl + /* wgsl */ `
 struct InfrastructureInput {
   @location(0) position: vec3f,
@@ -475,9 +374,6 @@ fn infrastructureFragment(input: InfrastructureOutput) -> @location(0) vec4f {
   let structure = u32(input.structureMaterial + 0.5);
   let mapUv = input.worldPosition.xz / uniforms.map.xy;
   if (structure <= 7u && landAt(mapUv) < 0.52) { discard; }
-  // Ordinary road surfaces may never survive beneath rendered channel water.
-  // Bridge materials (8+) are intentionally exempt.
-  if (structure <= 7u && riverAt(mapUv).r > 0.12) { discard; }
   let grit = fract(sin(dot(floor(input.worldPosition.xz * 2.2), vec2f(12.9898, 78.233))) * 43758.5453);
   let broadWear = sin(input.roadUv.x * 0.78 + sin(input.roadUv.x * 0.17) * 0.7) * 0.5 + 0.5;
   var color = vec3f(0.34, 0.35, 0.34);

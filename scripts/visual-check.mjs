@@ -43,24 +43,24 @@ const status = await page.evaluate(() => ({
 }));
 const validation = await page.evaluate(async () => {
   const manifest = await fetch('/world/world.json').then((response) => response.json());
+  const report = await fetch('/world/world-generation-report.json').then((response) => response.json());
   const counts = manifest.counts;
   return {
     oceanRoadSamples: counts.oceanRoadSamples,
-    unbridgedRiverSamples: counts.unbridgedRiverSamples,
-    minimumBridgeClearance: counts.minimumBridgeClearance,
-    maximumBridgeSeamError: counts.maximumBridgeSeamError,
-    maximumBridgePierHeight: counts.maximumBridgePierHeight,
+    maximumHeight: report.topography.maximumHeight,
+    maximumSlopeStep: report.topography.maximumSlopeStep,
+    capViolations: report.topography.capViolations,
+    hiddenRoads: report.roads.hiddenCorridors,
   };
 });
 if (validation.oceanRoadSamples !== 0) errors.push(`validation: ${validation.oceanRoadSamples} road samples enter ocean/lakes`);
-if (validation.unbridgedRiverSamples !== 0) errors.push(`validation: ${validation.unbridgedRiverSamples} river-core road samples lack bridges`);
-if (validation.minimumBridgeClearance < 0.20) errors.push(`validation: bridge clearance ${validation.minimumBridgeClearance.toFixed(3)} is below 0.20`);
-if (validation.maximumBridgeSeamError > 0.20) errors.push(`validation: bridge seam ${validation.maximumBridgeSeamError.toFixed(3)} exceeds 0.20`);
-if (validation.maximumBridgePierHeight > 18.01) errors.push(`validation: bridge pier ${validation.maximumBridgePierHeight.toFixed(3)} exceeds 18.0`);
+if (validation.maximumHeight > 50.5) errors.push(`validation: maximum elevation ${validation.maximumHeight.toFixed(3)} exceeds 50.5`);
+if (validation.maximumSlopeStep > 2.01) errors.push(`validation: terrain step ${validation.maximumSlopeStep.toFixed(3)} exceeds 2.01`);
+if (validation.capViolations !== 0) errors.push(`validation: ${validation.capViolations} terrain samples exceed their local cap`);
 await page.screenshot({ path: path.join(outputDirectory, 'overview.png') });
 
 if (!status.unsupported) {
-  // Central Africa gives the close pass forests, topography, and several major rivers.
+  // Start with a close landscape pass before deterministic showcase captures.
   await page.mouse.move(900, 625);
   await page.mouse.wheel(0, -3_700);
   await page.waitForTimeout(1_200);
@@ -81,14 +81,12 @@ if (!status.unsupported) {
   };
   await page.keyboard.press('F3');
   await captureShowcase('urban', 'roads-urban.png', 410);
-  await captureShowcase('bridge', 'roads-bridge.png', 330);
-  await captureShowcase('bridge', 'roads-bridge-close.png', 190);
-  await captureShowcase('bridgeClearance', 'roads-bridge-clearance.png', 190);
-  await captureShowcase('bridgePier', 'roads-bridge-pier.png', 210);
   await captureShowcase('mountain', 'roads-mountain.png', 480);
+  await captureShowcase('steepRoad', 'roads-steep.png', 360);
   await captureShowcase('liangshan', 'roads-liangshan.png', 520);
-  await captureShowcase('tunnel', 'roads-tunnel.png', 360);
   await captureShowcase('timber', 'roads-timber.png', 300);
+  await captureShowcase('europe', 'terrain-europe.png', 620);
+  await captureShowcase('lakeRoad', 'roads-lake.png', 380);
   await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(5));
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(outputDirectory, 'roads-levels.png') });
