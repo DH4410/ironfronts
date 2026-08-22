@@ -32,6 +32,7 @@ export interface WorldManifest {
     height: BinaryField;
     surface: BinaryField;
     rivers: BinaryField;
+    roads: BinaryField;
     coast: BinaryField;
     provinceIds: BinaryField;
   };
@@ -40,8 +41,15 @@ export interface WorldManifest {
     riverVertices: BinaryBufferDescriptor;
     riverIndices: BinaryBufferDescriptor;
     connections: BinaryBufferDescriptor;
+    roadVertices: BinaryBufferDescriptor;
+    roadIndices: BinaryBufferDescriptor;
+    bridgeVertices: BinaryBufferDescriptor;
+    bridgeIndices: BinaryBufferDescriptor;
     trees: BinaryBufferDescriptor;
     buildings: BinaryBufferDescriptor;
+    lamps: BinaryBufferDescriptor;
+    barriers: BinaryBufferDescriptor;
+    signs: BinaryBufferDescriptor;
   };
   terrain: {
     chunksX: number;
@@ -49,6 +57,13 @@ export interface WorldManifest {
     gridResolution: number;
     maxHeight: number;
   };
+  infrastructureChunks: {
+    chunksX: number;
+    chunksY: number;
+    roads: Array<{ firstIndex: number; indexCount: number }>;
+    bridges: Array<{ firstIndex: number; indexCount: number }>;
+  };
+  showcases: { urban: [number, number]; bridge: [number, number]; mountain: [number, number] };
   counts: Record<string, number>;
   provinces: ProvinceRecord[];
 }
@@ -68,6 +83,8 @@ export interface FrameStats {
   trees: number;
   buildings: number;
   borderEdges: number;
+  roads: number;
+  bridges: number;
   debugView: number;
 }
 

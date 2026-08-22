@@ -26,6 +26,7 @@ if (!navigator.gpu) {
 
 async function start(): Promise<void> {
   const renderer = new WorldRenderer(canvas);
+  if (import.meta.env.DEV) (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
   renderer.onHover = updateTooltip;
   renderer.onStats = updateDiagnostics;
 
@@ -86,6 +87,8 @@ function updateDiagnostics(stats: FrameStats): void {
     `province  ${stats.hoveredProvince ?? '—'}`,
     `trees     ${stats.trees.toLocaleString()}`,
     `buildings ${stats.buildings.toLocaleString()}`,
+    `roads     ${stats.roads.toLocaleString()}`,
+    `bridges   ${stats.bridges.toLocaleString()}`,
     `borders   ${stats.borderEdges.toLocaleString()}`,
   ].join('\n');
 }

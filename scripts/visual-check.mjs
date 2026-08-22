@@ -16,6 +16,7 @@ const browser = await chromium.launch({
     '--enable-unsafe-swiftshader',
     '--enable-features=Vulkan',
     '--use-angle=swiftshader',
+    '--disable-vulkan-surface',
   ] : ['--enable-unsafe-webgpu'],
 });
 const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 });
@@ -44,6 +45,24 @@ if (!status.unsupported) {
   await page.keyboard.press('F3');
   await page.waitForTimeout(250);
   await page.screenshot({ path: path.join(outputDirectory, 'diagnostics.png') });
+
+  const captureShowcase = async (key, filename, distance) => {
+    await page.evaluate(async ({ key, distance }) => {
+      const manifest = await fetch('/world/world.json').then((response) => response.json());
+      const renderer = window.__ironfrontsRenderer;
+      const point = manifest.showcases[key];
+      renderer?.focus(point[0], point[1], distance);
+    }, { key, distance });
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: path.join(outputDirectory, filename) });
+  };
+  await page.keyboard.press('F3');
+  await captureShowcase('urban', 'roads-urban.png', 410);
+  await captureShowcase('bridge', 'roads-bridge.png', 330);
+  await captureShowcase('mountain', 'roads-mountain.png', 480);
+  await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(5));
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(outputDirectory, 'roads-classes.png') });
 }
 
 console.log(JSON.stringify({ ...status, errors }, null, 2));

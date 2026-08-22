@@ -1,6 +1,6 @@
 import { mat4, vec3 } from 'gl-matrix';
 import { StrategyCamera } from './camera';
-import { lineShader, propShader, riverShader, terrainShader, waterShader } from './shaders';
+import { infrastructureShader, lineShader, propShader, riverShader, terrainShader, waterShader } from './shaders';
 import type { FrameStats, HoverInfo, ProgressReporter, ProvinceRecord, WorldManifest } from './types';
 
 const MATERIAL_NAMES = ['grassland', 'dry-earth', 'desert-sand', 'forest-floor', 'exposed-rock', 'tundra-snow', 'urban-ground', 'shoreline'];
@@ -40,16 +40,25 @@ export class WorldRenderer {
   private terrainPipeline!: GPURenderPipeline;
   private waterPipeline!: GPURenderPipeline;
   private riverPipeline!: GPURenderPipeline;
+  private infrastructurePipeline!: GPURenderPipeline;
   private propPipeline!: GPURenderPipeline;
   private linePipeline!: GPURenderPipeline;
   private terrainMesh!: Mesh;
   private waterMesh!: Mesh;
   private riverMesh!: Mesh;
+  private roadMesh!: Mesh;
+  private bridgeMesh!: Mesh;
   private treeMesh!: Mesh;
   private buildingMesh!: Mesh;
   private shadowMesh!: Mesh;
+  private lampMesh!: Mesh;
+  private barrierMesh!: Mesh;
+  private signMesh!: Mesh;
   private trees!: InstanceLayer;
   private buildings!: InstanceLayer;
+  private lamps!: InstanceLayer;
+  private barriers!: InstanceLayer;
+  private signs!: InstanceLayer;
   private borders!: InstanceLayer;
   private connections?: InstanceLayer;
   private heightTexture!: GPUTexture;
@@ -57,6 +66,7 @@ export class WorldRenderer {
   private provinceTexture!: GPUTexture;
   private riverTexture!: GPUTexture;
   private coastTexture!: GPUTexture;
+  private roadTexture!: GPUTexture;
   private materialTexture!: GPUTexture;
   private heightData!: Float32Array;
   private provinceData!: Uint16Array;
@@ -87,7 +97,8 @@ export class WorldRenderer {
     this.camera.minimumAltitude = this.manifest.terrain.maxHeight + 82;
 
     report('Requesting WebGPU device', 0.1);
-    this.adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' }) as GPUAdapter;
+    this.adapter = (await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' })
+      ?? await navigator.gpu.requestAdapter()) as GPUAdapter;
     if (!this.adapter) throw new Error('No compatible WebGPU adapter was found');
     this.device = await this.adapter.requestDevice();
     this.device.lost.then((info) => {
@@ -101,17 +112,25 @@ export class WorldRenderer {
     this.createLayouts();
 
     report('Loading terrain fields', 0.2);
-    const [heightBuffer, surfaceBuffer, riverFieldBuffer, coastBuffer, provinceBuffer, riverVertexBuffer, riverIndexBuffer, borderBuffer, treeBuffer, buildingBuffer] = await Promise.all([
+    const [heightBuffer, surfaceBuffer, riverFieldBuffer, roadFieldBuffer, coastBuffer, provinceBuffer, riverVertexBuffer, riverIndexBuffer, roadVertexBuffer, roadIndexBuffer, bridgeVertexBuffer, bridgeIndexBuffer, borderBuffer, treeBuffer, buildingBuffer, lampBuffer, barrierBuffer, signBuffer] = await Promise.all([
       fetchBinary(`/world/${this.manifest.fields.height.url}`),
       fetchBinary(`/world/${this.manifest.fields.surface.url}`),
       fetchBinary(`/world/${this.manifest.fields.rivers.url}`),
+      fetchBinary(`/world/${this.manifest.fields.roads.url}`),
       fetchBinary(`/world/${this.manifest.fields.coast.url}`),
       fetchBinary(`/world/${this.manifest.fields.provinceIds.url}`),
       fetchBinary(`/world/${this.manifest.buffers.riverVertices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.riverIndices.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.roadVertices.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.roadIndices.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.bridgeVertices.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.bridgeIndices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.borders.url}`),
       fetchBinary(`/world/${this.manifest.buffers.trees.url}`),
       fetchBinary(`/world/${this.manifest.buffers.buildings.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.lamps.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.barriers.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.signs.url}`),
     ]);
     this.heightData = new Float32Array(heightBuffer);
     this.provinceData = new Uint16Array(provinceBuffer);
@@ -128,6 +147,10 @@ export class WorldRenderer {
     this.riverTexture = this.uploadTexture(
       'river field', this.manifest.fields.rivers.width, this.manifest.fields.rivers.height,
       'rgba8unorm', new Uint8Array(riverFieldBuffer), this.manifest.fields.rivers.width * 4,
+    );
+    this.roadTexture = this.uploadTexture(
+      'strategic road field', this.manifest.fields.roads.width, this.manifest.fields.roads.height,
+      'rgba8unorm', new Uint8Array(roadFieldBuffer), this.manifest.fields.roads.width * 4,
     );
     this.coastTexture = this.uploadTexture(
       'filtered coast mask', this.manifest.fields.coast.width, this.manifest.fields.coast.height,
@@ -157,6 +180,7 @@ export class WorldRenderer {
         { binding: 5, resource: this.device.createSampler({ addressModeU: 'repeat', addressModeV: 'clamp-to-edge', magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' }) },
         { binding: 6, resource: this.riverTexture.createView() },
         { binding: 7, resource: this.coastTexture.createView() },
+        { binding: 8, resource: this.roadTexture.createView() },
       ],
     });
 
@@ -165,13 +189,21 @@ export class WorldRenderer {
     this.terrainMesh = this.createTerrainMesh(this.manifest.terrain.gridResolution);
     this.waterMesh = this.createTerrainMesh(33);
     this.riverMesh = this.uploadRiverMesh(riverVertexBuffer, riverIndexBuffer, this.manifest.buffers.riverIndices.count);
+    this.roadMesh = this.uploadIndexedMesh('terrain roads', roadVertexBuffer, roadIndexBuffer, this.manifest.buffers.roadIndices.count);
+    this.bridgeMesh = this.uploadIndexedMesh('road bridges', bridgeVertexBuffer, bridgeIndexBuffer, this.manifest.buffers.bridgeIndices.count);
     this.treeMesh = this.createTreeMesh();
     this.buildingMesh = this.createBuildingMesh();
     this.shadowMesh = this.createShadowMesh();
+    this.lampMesh = this.createLampMesh();
+    this.barrierMesh = this.createBarrierMesh();
+    this.signMesh = this.createSignMesh();
 
     report('Uploading world geometry', 0.78);
     this.trees = this.createInstanceLayer('trees', treeBuffer, this.manifest.buffers.trees.count, 0, this.instanceLayout);
     this.buildings = this.createInstanceLayer('buildings', buildingBuffer, this.manifest.buffers.buildings.count, 1, this.instanceLayout);
+    this.lamps = this.createInstanceLayer('road lamps', lampBuffer, this.manifest.buffers.lamps.count, 2, this.instanceLayout);
+    this.barriers = this.createInstanceLayer('road barriers', barrierBuffer, this.manifest.buffers.barriers.count, 3, this.instanceLayout);
+    this.signs = this.createInstanceLayer('road signs', signBuffer, this.manifest.buffers.signs.count, 4, this.instanceLayout);
     this.borders = this.createInstanceLayer('borders', borderBuffer, this.manifest.buffers.borders.count, 0, this.lineLayout);
 
     this.camera.attach(this.canvas);
@@ -205,6 +237,15 @@ export class WorldRenderer {
     this.showWireframe = enabled;
   }
 
+  focus(x: number, z: number, distance = 520, yaw = -0.48, pitch = 0.82): void {
+    this.camera.target[0] = wrap(x, this.manifest.world.width);
+    this.camera.target[2] = clamp(z, 0, this.manifest.world.height);
+    this.camera.distance = clamp(distance, this.camera.minDistance, this.camera.maxDistance);
+    this.camera.yaw = yaw;
+    this.camera.pitch = pitch;
+    this.camera.update(0);
+  }
+
   async setConnectionsVisible(enabled: boolean): Promise<void> {
     this.showConnections = enabled;
     if (!enabled || this.connections) return;
@@ -224,6 +265,7 @@ export class WorldRenderer {
         { binding: 5, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
         { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+        { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       ],
     });
     this.instanceLayout = this.device.createBindGroupLayout({
@@ -247,6 +289,7 @@ export class WorldRenderer {
     const terrainModule = this.device.createShaderModule({ label: 'terrain shader', code: terrainShader });
     const waterModule = this.device.createShaderModule({ label: 'water shader', code: waterShader });
     const riverModule = this.device.createShaderModule({ label: 'river shader', code: riverShader });
+    const infrastructureModule = this.device.createShaderModule({ label: 'roads and bridges shader', code: infrastructureShader });
     const propModule = this.device.createShaderModule({ label: 'prop shader', code: propShader });
     const lineModule = this.device.createShaderModule({ label: 'line shader', code: lineShader });
 
@@ -259,7 +302,7 @@ export class WorldRenderer {
         buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
       },
       fragment: { module: terrainModule, entryPoint: 'terrainFragment', targets: [{ format: this.format }] },
-      primitive: { topology: 'triangle-list', cullMode: 'back' },
+      primitive: { topology: 'triangle-list', cullMode: 'none' },
       depthStencil,
     });
 
@@ -297,6 +340,28 @@ export class WorldRenderer {
       fragment: { module: riverModule, entryPoint: 'riverFragment', targets: [{ format: this.format, blend: alphaBlend }] },
       primitive: { topology: 'triangle-list', cullMode: 'none' },
       depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less-equal' },
+    });
+
+    this.infrastructurePipeline = this.device.createRenderPipeline({
+      label: 'roads and bridges pipeline',
+      layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.commonLayout] }),
+      vertex: {
+        module: infrastructureModule,
+        entryPoint: 'infrastructureVertex',
+        buffers: [{
+          arrayStride: 40,
+          attributes: [
+            { shaderLocation: 0, offset: 0, format: 'float32x3' },
+            { shaderLocation: 1, offset: 12, format: 'float32x3' },
+            { shaderLocation: 2, offset: 24, format: 'float32x2' },
+            { shaderLocation: 3, offset: 32, format: 'float32' },
+            { shaderLocation: 4, offset: 36, format: 'float32' },
+          ],
+        }],
+      },
+      fragment: { module: infrastructureModule, entryPoint: 'infrastructureFragment', targets: [{ format: this.format, blend: alphaBlend }] },
+      primitive: { topology: 'triangle-list', cullMode: 'none' },
+      depthStencil,
     });
 
     this.propPipeline = this.device.createRenderPipeline({
@@ -486,13 +551,40 @@ export class WorldRenderer {
 
   private createBuildingMesh(): Mesh {
     const builder = new MeshBuilder();
-    builder.addBox(-0.5, 0, -0.5, 0.5, 1, 0.5, 0, 1);
+    builder.addBox(-0.5, 0, -0.5, 0.5, 1, 0.5, 0);
+    builder.addGableRoof(-0.56, 1, -0.56, 0.56, 1.24, 0.56, 1);
+    builder.addBox(-0.68, 0, -0.38, 0.68, 0.42, 0.38, 2, 2);
+    builder.addBox(-0.18, 1, -0.18, 0.18, 1.52, 0.18, 3, 3);
+    builder.addHipRoof(0, 1, 0, 0.62, 1.24, 4);
+    builder.addBox(-0.54, 1, -0.54, 0.54, 1.055, 0.54, 5, 5);
     return this.uploadMesh('building mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
+  }
+
+  private createLampMesh(): Mesh {
+    const builder = new MeshBuilder();
+    builder.addBox(-0.07, 0, -0.07, 0.07, 3.2, 0.07, 0);
+    builder.addBox(-0.10, 3.0, -0.10, 0.10, 3.42, 0.10, 0);
+    builder.addBox(-0.18, 3.38, -0.18, 0.18, 3.57, 0.18, 1, 1);
+    return this.uploadMesh('road lamp mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
+  }
+
+  private createBarrierMesh(): Mesh {
+    const builder = new MeshBuilder();
+    for (const x of [-0.46, 0, 0.46]) builder.addBox(x - 0.025, 0, -0.07, x + 0.025, 0.86, 0.07, 0);
+    builder.addBox(-0.5, 0.58, -0.055, 0.5, 0.72, 0.055, 1, 1);
+    return this.uploadMesh('road barrier mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
+  }
+
+  private createSignMesh(): Mesh {
+    const builder = new MeshBuilder();
+    builder.addBox(-0.045, 0, -0.045, 0.045, 1.55, 0.045, 0);
+    builder.addBox(-0.42, 1.08, -0.055, 0.42, 1.52, 0.055, 1, 1);
+    return this.uploadMesh('road sign mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
   }
 
   private createShadowMesh(): Mesh {
     const builder = new MeshBuilder();
-    builder.addPlane(2);
+    builder.addPlane(9);
     return this.uploadMesh('contact shadow mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
   }
 
@@ -507,6 +599,14 @@ export class WorldRenderer {
   private uploadRiverMesh(vertexData: ArrayBuffer, indexData: ArrayBuffer, indexCount: number): Mesh {
     const vertex = this.device.createBuffer({ label: 'river network vertices', size: align4(vertexData.byteLength), usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
     const index = this.device.createBuffer({ label: 'river network indices', size: align4(indexData.byteLength), usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
+    this.device.queue.writeBuffer(vertex, 0, vertexData);
+    this.device.queue.writeBuffer(index, 0, indexData);
+    return { vertex, index, indexCount };
+  }
+
+  private uploadIndexedMesh(label: string, vertexData: ArrayBuffer, indexData: ArrayBuffer, indexCount: number): Mesh {
+    const vertex = this.device.createBuffer({ label: `${label} vertices`, size: align4(vertexData.byteLength), usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
+    const index = this.device.createBuffer({ label: `${label} indices`, size: align4(indexData.byteLength), usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
     this.device.queue.writeBuffer(vertex, 0, vertexData);
     this.device.queue.writeBuffer(index, 0, indexData);
     return { vertex, index, indexCount };
@@ -626,11 +726,22 @@ export class WorldRenderer {
     pass.setIndexBuffer(this.riverMesh.index, 'uint32');
     pass.drawIndexed(this.riverMesh.indexCount, 3);
 
+    pass.setPipeline(this.infrastructurePipeline);
+    pass.setVertexBuffer(0, this.roadMesh.vertex);
+    pass.setIndexBuffer(this.roadMesh.index, 'uint32');
+    this.drawChunkedInfrastructure(pass, this.roadMesh, this.manifest.infrastructureChunks.roads);
+    pass.setVertexBuffer(0, this.bridgeMesh.vertex);
+    pass.setIndexBuffer(this.bridgeMesh.index, 'uint32');
+    this.drawChunkedInfrastructure(pass, this.bridgeMesh, this.manifest.infrastructureChunks.bridges);
+
     pass.setPipeline(this.propPipeline);
     this.drawMeshInstances(pass, this.shadowMesh, this.trees);
     this.drawMeshInstances(pass, this.shadowMesh, this.buildings);
     this.drawMeshInstances(pass, this.treeMesh, this.trees);
     this.drawMeshInstances(pass, this.buildingMesh, this.buildings);
+    this.drawMeshInstances(pass, this.lampMesh, this.lamps);
+    this.drawMeshInstances(pass, this.barrierMesh, this.barriers);
+    this.drawMeshInstances(pass, this.signMesh, this.signs);
 
     pass.setPipeline(this.linePipeline);
     pass.setBindGroup(1, this.borders.bindGroup);
@@ -647,7 +758,34 @@ export class WorldRenderer {
     pass.setBindGroup(1, layer.bindGroup);
     pass.setVertexBuffer(0, mesh.vertex);
     pass.setIndexBuffer(mesh.index, 'uint16');
-    pass.drawIndexed(mesh.indexCount, layer.count * 3);
+    const edgeRange = 1_800;
+    if (this.camera.target[0] < edgeRange) pass.drawIndexed(mesh.indexCount, layer.count * 2, 0, 0, 0);
+    else if (this.camera.target[0] > this.manifest.world.width - edgeRange) pass.drawIndexed(mesh.indexCount, layer.count * 2, 0, 0, layer.count);
+    else pass.drawIndexed(mesh.indexCount, layer.count, 0, 0, layer.count);
+  }
+
+  private drawChunkedInfrastructure(pass: GPURenderPassEncoder, mesh: Mesh, ranges: Array<{ firstIndex: number; indexCount: number }>): void {
+    if (this.camera.distance >= 4_000) return;
+    const chunksX = this.manifest.infrastructureChunks.chunksX;
+    const chunksY = this.manifest.infrastructureChunks.chunksY;
+    const chunkWidth = this.manifest.world.width / chunksX;
+    const chunkHeight = this.manifest.world.height / chunksY;
+    const radius = clamp(this.camera.distance * 1.48 + 720, 940, 4_300);
+    const edgeRange = 1_800;
+    for (let chunkY = 0; chunkY < chunksY; chunkY += 1) {
+      for (let chunkX = 0; chunkX < chunksX; chunkX += 1) {
+        const range = ranges[chunkY * chunksX + chunkX];
+        if (!range?.indexCount) continue;
+        let dx = (chunkX + 0.5) * chunkWidth - this.camera.target[0];
+        if (dx > this.manifest.world.width * 0.5) dx -= this.manifest.world.width;
+        if (dx < -this.manifest.world.width * 0.5) dx += this.manifest.world.width;
+        const dz = (chunkY + 0.5) * chunkHeight - this.camera.target[2];
+        if (Math.hypot(dx, dz) > radius + Math.hypot(chunkWidth, chunkHeight) * 0.6) continue;
+        if (this.camera.target[0] < edgeRange) pass.drawIndexed(range.indexCount, 2, range.firstIndex, 0, 0);
+        else if (this.camera.target[0] > this.manifest.world.width - edgeRange) pass.drawIndexed(range.indexCount, 2, range.firstIndex, 0, 1);
+        else pass.drawIndexed(range.indexCount, 1, range.firstIndex, 0, 1);
+      }
+    }
   }
 
   private pickProvince(clientX: number, clientY: number): void {
@@ -719,6 +857,8 @@ export class WorldRenderer {
       trees: this.trees.count,
       buildings: this.buildings.count,
       borderEdges: this.borders.count,
+      roads: this.manifest.counts.logicalRoutes,
+      bridges: this.manifest.counts.bridges,
       debugView: this.debugView,
     });
   }
@@ -765,6 +905,48 @@ class MeshBuilder {
       this.indices.push(start, start + 1, start + 2);
     }
     void tipStart;
+  }
+
+  addGableRoof(minX: number, baseY: number, minZ: number, maxX: number, ridgeY: number, maxZ: number, material: number): void {
+    const halfWidth = Math.max(0.001, (maxX - minX) * 0.5);
+    const rise = ridgeY - baseY;
+    const slopeLength = Math.hypot(halfWidth, rise);
+    const faces: Array<[number[], number[]]> = [
+      [[minX,baseY,minZ, minX,baseY,maxZ, 0,ridgeY,maxZ, 0,ridgeY,minZ], [-rise / slopeLength, halfWidth / slopeLength, 0]],
+      [[maxX,baseY,maxZ, maxX,baseY,minZ, 0,ridgeY,minZ, 0,ridgeY,maxZ], [rise / slopeLength, halfWidth / slopeLength, 0]],
+    ];
+    for (const [positions, normal] of faces) {
+      const start = this.vertices.length / 7;
+      for (let vertex = 0; vertex < 4; vertex += 1) this.vertices.push(positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2], ...normal, material);
+      this.indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
+    }
+    for (const [positions, normal] of [
+      [[minX,baseY,minZ, maxX,baseY,minZ, 0,ridgeY,minZ], [0,0,-1]],
+      [[maxX,baseY,maxZ, minX,baseY,maxZ, 0,ridgeY,maxZ], [0,0,1]],
+    ] as Array<[number[], number[]]>) {
+      const start = this.vertices.length / 7;
+      for (let vertex = 0; vertex < 3; vertex += 1) this.vertices.push(positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2], ...normal, material);
+      this.indices.push(start, start + 1, start + 2);
+    }
+  }
+
+  addHipRoof(x: number, baseY: number, z: number, radius: number, tipY: number, material: number): void {
+    const corners = [[-radius,-radius], [radius,-radius], [radius,radius], [-radius,radius]];
+    for (let side = 0; side < 4; side += 1) {
+      const a = corners[side];
+      const b = corners[(side + 1) % 4];
+      const midX = (a[0] + b[0]) * 0.5;
+      const midZ = (a[1] + b[1]) * 0.5;
+      const length = Math.max(0.001, Math.hypot(midX, tipY - baseY, midZ));
+      const normal = [-midX / length, radius / length, -midZ / length];
+      const start = this.vertices.length / 7;
+      this.vertices.push(
+        x + a[0], baseY, z + a[1], ...normal, material,
+        x + b[0], baseY, z + b[1], ...normal, material,
+        x, tipY, z, ...normal, material,
+      );
+      this.indices.push(start, start + 2, start + 1);
+    }
   }
 
   addPlane(material: number): void {

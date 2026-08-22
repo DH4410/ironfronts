@@ -1,6 +1,6 @@
 # Ironfronts renderer
 
-A native WebGPU world renderer built on the static map package in `material/`. The current milestone is deliberately visual: regional topography, biome materials, animated oceans and terrain-following rivers, province borders and hover feedback, forests, compact cities, and a hidden diagnostics view. It contains no ownership, units, gameplay, persistence, or server.
+A native WebGPU world renderer built on the static map package in `material/`. The current milestone is deliberately visual: regional topography, biome materials, animated oceans and terrain-following rivers, a terrain-aware 3D road network with bridges, road-shaped cities, province borders and hover feedback, forests, and a hidden diagnostics view. It contains no ownership, units, gameplay, persistence, or server.
 
 ## Run locally
 
@@ -29,4 +29,6 @@ Province borders grow stronger as the camera approaches. Hovering a province hig
 
 The source `material/` directory remains untouched. `scripts/build-world.mjs` rasterizes exact province IDs, produces a continuous periodic heightfield with multi-scale mountain uplift, traces depression-free watersheds, carves river channels, packs topology and future movement paths, and creates deterministic tree/building instance buffers. The browser only downloads these generated renderer assets.
 
-Terrain shaders blend the generated material set by gameplay terrain, visual biome, elevation, slope, and macro variation. Forest ground transitions to a cheap canopy-green signal when individual trees fade out. Ocean shading uses coastal depth, vertex waves, foam, Fresnel reflection and sun sparkle. Rivers combine a terrain-conforming water layer with continuous reflective network meshes, rounded confluences, cleared banks, downhill bed profiles, distance-aware strategic visibility, and flared lake/ocean outlets. Material names are stable, so the PNG files under `public/textures/` can later be replaced without changing shader or world data.
+Terrain shaders blend the generated material set by gameplay terrain, visual biome, elevation, slope, and macro variation. Forest ground transitions to a cheap canopy-green signal when individual trees fade out. Ocean shading uses coastal depth, vertex waves, foam, Fresnel reflection and sun sparkle. Rivers combine a terrain-conforming water layer with continuous reflective network meshes, rounded confluences, cleared banks, downhill bed profiles, distance-aware strategic visibility, and flared lake/ocean outlets.
+
+The road compiler preserves every land movement link while ranking it into local, regional, or major visual classes. It grades narrow terrain corridors, moves river-parallel routes onto a bank, generates adaptive bridge decks at genuine crossings, clears roadside vegetation, and emits both close-range indexed geometry and a strategic road field for distant zoom. Urban buildings align to generated streets and use biome-aware roof and material variants. Sea movement links remain available only in the F3 diagnostics view. Material names are stable, so the PNG files under `public/textures/` can later be replaced without changing shader or world data.

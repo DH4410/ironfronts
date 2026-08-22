@@ -18,6 +18,7 @@ struct Uniforms {
 @group(0) @binding(5) var materialSampler: sampler;
 @group(0) @binding(6) var riverTexture: texture_2d<f32>;
 @group(0) @binding(7) var coastTexture: texture_2d<f32>;
+@group(0) @binding(8) var roadTexture: texture_2d<f32>;
 
 fn wrappedUv(uv: vec2f) -> vec2f {
   return vec2f(fract(uv.x + 1.0), clamp(uv.y, 0.0, 0.999999));
@@ -80,6 +81,10 @@ fn waterDepthAt(uvInput: vec2f) -> f32 {
 
 fn landAt(uvInput: vec2f) -> f32 {
   return textureSampleLevel(coastTexture, materialSampler, wrappedUv(uvInput), 0.0).r;
+}
+
+fn roadAt(uvInput: vec2f) -> vec4f {
+  return textureSampleLevel(roadTexture, materialSampler, wrappedUv(uvInput), 0.0);
 }
 
 fn terrainNormal(uv: vec2f) -> vec3f {
@@ -200,6 +205,18 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let wetBank = smoothstep(0.015, 0.62, river) * (1.0 - smoothstep(0.68, 0.99, river));
   baseColor = mix(baseColor, baseColor * vec3f(0.46, 0.57, 0.51), wetBank * 0.68);
 
+  let roadData = roadAt(input.mapUv);
+  let roadClass = select(select(0.0, 1.0, roadData.b > 0.42), 2.0, roadData.b > 0.80);
+  let roadDistance = distance(uniforms.camera.xyz, input.worldPosition);
+  let roadRange = select(select(4200.0, 7000.0, roadClass > 0.5), 16000.0, roadClass > 1.5);
+  let rangeVisibility = 1.0 - smoothstep(roadRange * 0.82, roadRange, roadDistance);
+  let strategicBlend = mix(0.22, 1.0, smoothstep(1500.0, 3300.0, roadDistance));
+  let roadCore = roadData.r * rangeVisibility * strategicBlend * (1.0 - smoothstep(0.12, 0.42, river));
+  let roadShoulder = max(0.0, roadData.g - roadData.r * 0.72) * rangeVisibility * 0.48;
+  let aggregate = 0.88 + 0.12 * sin(input.worldPosition.x * 0.91 + sin(input.worldPosition.z * 1.37));
+  baseColor = mix(baseColor, vec3f(0.29, 0.285, 0.27) * aggregate, roadShoulder);
+  baseColor = mix(baseColor, vec3f(0.34, 0.35, 0.34) * aggregate, roadCore * 0.84);
+
   baseColor *= 0.92 + variation * 0.14;
   let sunDirection = normalize(uniforms.sunTime.xyz);
   let diffuse = max(dot(normal, sunDirection), 0.0);
@@ -229,6 +246,8 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     lit = hashColor(provinceId);
   } else if (debugMode == 4u) {
     lit = normal * 0.5 + 0.5;
+  } else if (debugMode == 5u) {
+    lit = mix(vec3f(0.025), array<vec3f, 3>(vec3f(0.45, 0.38, 0.25), vec3f(0.74, 0.62, 0.30), vec3f(0.94, 0.80, 0.40))[u32(roadClass)], max(roadData.r, roadData.g * 0.42));
   }
 
   if (uniforms.terrainInfo.w > 0.5) {
@@ -368,6 +387,75 @@ fn riverFragment(input: RiverOutput) -> @location(0) vec4f {
 }
 `;
 
+export const infrastructureShader = commonWgsl + /* wgsl */ `
+struct InfrastructureInput {
+  @location(0) position: vec3f,
+  @location(1) normal: vec3f,
+  @location(2) roadUv: vec2f,
+  @location(3) roadClass: f32,
+  @location(4) material: f32,
+};
+
+struct InfrastructureOutput {
+  @builtin(position) position: vec4f,
+  @location(0) worldPosition: vec3f,
+  @location(1) normal: vec3f,
+  @location(2) roadUv: vec2f,
+  @location(3) @interpolate(flat) roadClass: f32,
+  @location(4) @interpolate(flat) material: f32,
+  @location(5) visibility: f32,
+};
+
+@vertex
+fn infrastructureVertex(input: InfrastructureInput, @builtin(instance_index) instanceIndex: u32) -> InfrastructureOutput {
+  let copyOffset = f32(i32(instanceIndex) - 1) * uniforms.map.x;
+  let worldPosition = input.position + vec3f(copyOffset, 0.0, 0.0);
+  let cameraDistance = distance(uniforms.camera.xyz, worldPosition);
+  var output: InfrastructureOutput;
+  output.position = uniforms.viewProjection * vec4f(worldPosition, 1.0);
+  output.worldPosition = worldPosition;
+  output.normal = input.normal;
+  output.roadUv = input.roadUv;
+  output.roadClass = input.roadClass;
+  output.material = input.material;
+  output.visibility = 1.0 - smoothstep(2200.0, 4000.0, cameraDistance);
+  return output;
+}
+
+@fragment
+fn infrastructureFragment(input: InfrastructureOutput) -> @location(0) vec4f {
+  if (input.visibility < 0.025) { discard; }
+  let material = u32(input.material + 0.5);
+  let mapUv = input.worldPosition.xz / uniforms.map.xy;
+  if (material <= 2u && landAt(mapUv) < 0.52) { discard; }
+  let grit = fract(sin(dot(floor(input.worldPosition.xz * 2.2), vec2f(12.9898, 78.233))) * 43758.5453);
+  let broadWear = sin(input.roadUv.x * 0.78 + sin(input.roadUv.x * 0.17) * 0.7) * 0.5 + 0.5;
+  var color = vec3f(0.34, 0.35, 0.34) * (0.86 + grit * 0.20);
+  if (material == 0u) {
+    let wheelWear = smoothstep(0.05, 0.20, abs(input.roadUv.y - 0.46)) * (1.0 - smoothstep(0.20, 0.34, abs(input.roadUv.y - 0.46)));
+    color *= 0.91 + broadWear * 0.07 + wheelWear * 0.04;
+  } else if (material == 1u) {
+    color = mix(vec3f(0.31, 0.29, 0.25), vec3f(0.46, 0.42, 0.34), grit * 0.42);
+  } else if (material == 2u) {
+    color = mix(vec3f(0.25, 0.235, 0.20), vec3f(0.36, 0.33, 0.26), grit);
+  } else if (material == 3u) {
+    color = mix(vec3f(0.38, 0.37, 0.34), vec3f(0.53, 0.50, 0.43), grit * 0.55);
+  } else if (material == 4u) {
+    color = mix(vec3f(0.29, 0.31, 0.31), vec3f(0.43, 0.45, 0.43), grit * 0.35);
+  } else if (material == 5u) {
+    color = vec3f(0.16, 0.18, 0.17) * (0.86 + grit * 0.18);
+  } else {
+    color = vec3f(0.35, 0.36, 0.35) * (0.87 + grit * 0.18 + broadWear * 0.05);
+  }
+  let normal = normalize(input.normal);
+  let diffuse = max(dot(normal, normalize(uniforms.sunTime.xyz)), 0.0);
+  let light = 0.48 + normal.y * 0.16 + diffuse * 0.58;
+  let fog = smoothstep(3500.0, 11000.0, distance(uniforms.camera.xyz, input.worldPosition));
+  color = mix(color * light, vec3f(0.58, 0.69, 0.72), fog * 0.78);
+  return vec4f(color, input.visibility);
+}
+`;
+
 export const propShader = commonWgsl + /* wgsl */ `
 struct InstanceRecord { a: vec4f, b: vec4f };
 struct InstanceParams { count: u32, kind: u32, enabled: u32, padding: u32 };
@@ -409,7 +497,7 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
   var transformedNormal = input.normal;
   var opacity = 1.0;
 
-  if (input.materialPart > 1.5) {
+  if (input.materialPart > 8.5) {
     angle = select(record.b.y, record.b.x, instanceParams.kind == 0u);
     if (instanceParams.kind == 0u) {
       local = vec3f(local.x * record.a.z * 4.1, 0.32, local.z * record.a.z * 4.1);
@@ -432,17 +520,50 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
     } else {
       color = vec3f(0.18, 0.43, 0.24) * record.b.y;
     }
+  } else if (instanceParams.kind == 1u) {
+    let archetype = u32(record.b.w + 0.5);
+    let palette = u32(floor(record.b.z));
+    let tint = fract(record.b.z);
+    if (input.materialPart > 1.5 && input.materialPart < 2.5 && archetype != 3u) { opacity = 0.0; }
+    if (input.materialPart > 2.5 && input.materialPart < 3.5 && archetype != 4u) { opacity = 0.0; }
+    if (input.materialPart > 3.5 && input.materialPart < 4.5 && archetype != 1u) { opacity = 0.0; }
+    if (input.materialPart > 4.5 && input.materialPart < 5.5 && archetype != 2u) { opacity = 0.0; }
+    if (input.materialPart > 0.5 && input.materialPart < 1.5 && (archetype == 1u || archetype == 2u)) { opacity = 0.0; }
+    if (archetype == 2u && input.materialPart > 0.5 && input.materialPart < 1.5) {
+      local.y = 1.0 + (local.y - 1.0) * 0.16;
+    } else if (archetype == 3u && input.materialPart > 0.5 && input.materialPart < 1.5) {
+      local.y = 1.0 + (local.y - 1.0) * 0.42;
+    }
+    local *= vec3f(record.a.z, record.a.w, record.b.x);
+    angle = record.b.y;
+    transformedNormal = rotateY(input.normal, angle);
+    let wallPalette = array<vec3f, 4>(
+      vec3f(0.47, 0.44, 0.38), vec3f(0.67, 0.57, 0.43),
+      vec3f(0.64, 0.59, 0.49), vec3f(0.43, 0.45, 0.43)
+    );
+    color = wallPalette[min(palette, 3u)] * (0.82 + tint * 0.22);
+    if ((input.materialPart > 0.5 && input.materialPart < 1.5) || (input.materialPart > 3.5 && input.materialPart < 5.5)) {
+      let roofPalette = array<vec3f, 4>(vec3f(0.25, 0.18, 0.14), vec3f(0.44, 0.31, 0.20), vec3f(0.39, 0.25, 0.18), vec3f(0.22, 0.25, 0.25));
+      color = roofPalette[min(palette, 3u)] * (0.86 + tint * 0.12);
+    } else if (input.materialPart > 1.5) {
+      color = select(vec3f(0.31, 0.32, 0.30), vec3f(0.47, 0.43, 0.35), archetype == 4u);
+    }
   } else {
     local *= vec3f(record.a.z, record.a.w, record.b.x);
     angle = record.b.y;
     transformedNormal = rotateY(input.normal, angle);
-    color = mix(vec3f(0.36, 0.37, 0.35), vec3f(0.56, 0.51, 0.43), record.b.z - 0.7);
-    if (input.materialPart > 0.5) { color *= vec3f(0.72, 0.68, 0.62); }
+    if (instanceParams.kind == 2u) {
+      color = select(vec3f(0.15, 0.17, 0.16), vec3f(1.0, 0.72, 0.34), input.materialPart > 0.5);
+    } else if (instanceParams.kind == 3u) {
+      color = select(vec3f(0.25, 0.22, 0.17), vec3f(0.29, 0.31, 0.30), record.b.w < 0.5);
+    } else {
+      color = select(vec3f(0.24, 0.27, 0.25), vec3f(0.72, 0.62, 0.39), input.materialPart > 0.5);
+    }
   }
 
   local = rotateY(local, angle);
   let worldPosition = vec3f(record.a.x + copyOffset + local.x, ground + local.y, record.a.y + local.z);
-  let maximumDistance = select(3200.0, 2600.0, instanceParams.kind == 0u);
+  let maximumDistance = select(select(1900.0, 2600.0, instanceParams.kind == 1u), 3200.0, instanceParams.kind == 0u);
   let visibility = 1.0 - smoothstep(maximumDistance * 0.75, maximumDistance, distance(uniforms.camera.xyz, worldPosition));
   var output: PropVertexOutput;
   output.position = uniforms.viewProjection * vec4f(worldPosition, 1.0);
@@ -456,7 +577,7 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
 
 @fragment
 fn propFragment(input: PropVertexOutput) -> @location(0) vec4f {
-  if (input.visibility < 0.03) { discard; }
+  if (input.visibility < 0.03 || input.opacity < 0.03) { discard; }
   let normal = normalize(input.normal);
   let diffuse = max(dot(normal, normalize(uniforms.sunTime.xyz)), 0.0);
   let light = 0.42 + normal.y * 0.18 + diffuse * 0.62;

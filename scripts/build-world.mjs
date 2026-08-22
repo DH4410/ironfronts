@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildInfrastructure } from './build-infrastructure.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MATERIAL = path.join(ROOT, 'material');
@@ -621,7 +622,7 @@ function buildConnections(connectionData) {
   return new Float32Array(records);
 }
 
-function buildInstances(provinces, geometryById, provinceIds, areaCounts, riverClearance) {
+function buildInstances(provinces, geometryById, provinceIds, areaCounts, riverClearance, roadClearance, cityPlans) {
   const trees = [];
   const buildings = [];
 
@@ -650,6 +651,8 @@ function buildInstances(provinces, geometryById, provinceIds, areaCounts, riverC
         if (pointProvince(provinceIds, x, y) !== encodedId) continue;
         const riverIndex = clamp(Math.floor(y / WORLD_HEIGHT * FIELD_HEIGHT), 0, FIELD_HEIGHT - 1) * FIELD_WIDTH + wrap(Math.floor(x / WORLD_WIDTH * FIELD_WIDTH), FIELD_WIDTH);
         if (riverClearance[riverIndex] > 0.012) continue;
+        const roadIndex = clamp(Math.floor(y / WORLD_HEIGHT * ID_HEIGHT), 0, ID_HEIGHT - 1) * ID_WIDTH + wrap(Math.floor(x / WORLD_WIDTH * ID_WIDTH), ID_WIDTH);
+        if (roadClearance[roadIndex] > 20) continue;
         const treeType = visual === 'Jungle' ? 2 : visual === 'Boreal' || visual === 'Tundra' ? 1 : 0;
         trees.push(x, y, 0.72 + rng() * 0.72, treeType, rng() * Math.PI * 2, 0.82 + rng() * 0.28, encodedId, 0);
         placed += 1;
@@ -658,21 +661,53 @@ function buildInstances(provinces, geometryById, provinceIds, areaCounts, riverC
 
     if (province.terrain_type_id === 14) {
       const populationScale = Math.log10(Math.max(1_000, province.population ?? 1_000));
-      const target = clamp(Math.round((populationScale - 3) * 13), 9, 42);
-      const radius = clamp(Math.sqrt(Math.max(30, area)) * 1.9, 9, 38);
-      for (let attempt = 0, placed = 0; attempt < target * 18 && placed < target; attempt += 1) {
-        const angle = rng() * Math.PI * 2;
-        const distance = Math.sqrt(rng()) * radius;
-        const x = province.center_x + Math.cos(angle) * distance;
-        const y = province.center_y + Math.sin(angle) * distance * 0.72;
+      const target = clamp(Math.round((populationScale - 3) * 17), 12, 54);
+      const plan = cityPlans.get(province.province_id);
+      const radius = plan?.radius ?? clamp(Math.sqrt(Math.max(30, area)) * 1.9, 9, 38);
+      const placedBuildings = [];
+      for (let attempt = 0, placed = 0; attempt < target * 56 && placed < target; attempt += 1) {
+        const street = plan?.streets[Math.floor(rng() * plan.streets.length)];
+        let angle;
+        let x;
+        let y;
+        let distance;
+        if (street) {
+          const t = 0.08 + rng() * 0.84;
+          const dx = street.x2 - street.x1;
+          const dy = street.z2 - street.z1;
+          angle = Math.atan2(dy, dx);
+          const side = rng() < 0.5 ? -1 : 1;
+          const setback = 4.4 + rng() * Math.max(5.2, radius * 0.34);
+          x = street.x1 + dx * t - Math.sin(angle) * side * setback;
+          y = street.z1 + dy * t + Math.cos(angle) * side * setback;
+          distance = Math.hypot(x - province.center_x, y - province.center_y);
+        } else {
+          angle = rng() * Math.PI * 2;
+          distance = Math.sqrt(rng()) * radius;
+          x = province.center_x + Math.cos(angle) * distance;
+          y = province.center_y + Math.sin(angle) * distance * 0.72;
+        }
         if (pointProvince(provinceIds, x, y) !== encodedId) continue;
         const riverIndex = clamp(Math.floor(y / WORLD_HEIGHT * FIELD_HEIGHT), 0, FIELD_HEIGHT - 1) * FIELD_WIDTH + wrap(Math.floor(x / WORLD_WIDTH * FIELD_WIDTH), FIELD_WIDTH);
         if (riverClearance[riverIndex] > 0.055) continue;
+        const roadIndex = clamp(Math.floor(y / WORLD_HEIGHT * ID_HEIGHT), 0, ID_HEIGHT - 1) * ID_WIDTH + wrap(Math.floor(x / WORLD_WIDTH * ID_WIDTH), ID_WIDTH);
+        if (roadClearance[roadIndex] > 178) continue;
         const centerBias = 1 - distance / radius;
-        const sx = 2.6 + rng() * 4.5;
-        const sz = 2.6 + rng() * 4.5;
-        const sy = 4.5 + rng() * 10 + centerBias * Math.max(0, populationScale - 4) * 5;
-        buildings.push(x, y, sx, sy, sz, rng() * Math.PI * 2, 0.74 + rng() * 0.22, encodedId);
+        let archetype;
+        const visual = province.visual_terrain_tag ?? '';
+        if (placed === 0 && populationScale > 5.35) archetype = 4;
+        else if (rng() < 0.10) archetype = 3;
+        else if (visual === 'Desert' || visual === 'Sand Dunes' || visual === 'Mediterranean') archetype = rng() < 0.72 ? 2 : 1;
+        else archetype = rng() < 0.46 ? 0 : rng() < 0.72 ? 1 : 2;
+        const sx = archetype === 3 ? 5.4 + rng() * 5.2 : 2.8 + rng() * 4.2;
+        const sz = archetype === 3 ? 4.8 + rng() * 5.8 : 2.8 + rng() * 4.4;
+        if (placedBuildings.some((other) => Math.hypot(other.x - x, other.y - y) < (other.radius + Math.max(sx, sz)) * 0.34)) continue;
+        let sy = 4.2 + rng() * 7.5 + Math.max(0, centerBias) * Math.max(0, populationScale - 4) * 3.6;
+        if (archetype === 4) sy *= 1.55;
+        if (archetype === 3) sy *= 0.68;
+        const palette = visual === 'Desert' || visual === 'Sand Dunes' ? 1 : visual === 'Mediterranean' ? 2 : visual === 'Boreal' || visual === 'Tundra' ? 3 : 0;
+        buildings.push(x, y, sx, sy, sz, angle + (rng() - 0.5) * 0.08, palette + 0.72 + rng() * 0.24, archetype);
+        placedBuildings.push({ x, y, radius: Math.max(sx, sz) });
         placed += 1;
       }
     }
@@ -682,12 +717,13 @@ function buildInstances(provinces, geometryById, provinceIds, areaCounts, riverC
 }
 
 async function main() {
-  const [geometry, metadata, markers, borderData, connectionData, mapMetadata] = await Promise.all([
+  const [geometry, metadata, markers, borderData, connectionData, networkData, mapMetadata] = await Promise.all([
     readJson('geometry/province_polygons_decoded.json'),
     readJson('metadata/provinces.json'),
     readJson('geometry/terrain_marker_positions.json'),
     readJson('topology/logical_border_segments.json'),
     readJson('movement/connection_segments.json'),
+    readJson('movement/network_nodes.json'),
     readJson('metadata/map_metadata.json'),
   ]);
 
@@ -861,7 +897,13 @@ async function main() {
 
   const borders = buildBorders(borderData);
   const connections = buildConnections(connectionData);
-  const { trees, buildings } = buildInstances(metadata.provinces, geometryById, provinceIds, areaCounts, riverClearance);
+  console.log('Compiling terrain-aware roads, bridges, and city streets...');
+  const infrastructure = buildInfrastructure({
+    connectionData, networkData, provinces: metadata.provinces, heights, landField, riverMask, riverTexture, riverBed,
+    fieldWidth: FIELD_WIDTH, fieldHeight: FIELD_HEIGHT, roadFieldWidth: ID_WIDTH, roadFieldHeight: ID_HEIGHT,
+    worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
+  });
+  const { trees, buildings } = buildInstances(metadata.provinces, geometryById, provinceIds, areaCounts, riverClearance, infrastructure.roadClearance, infrastructure.cityPlans);
 
   const provinceRecords = metadata.provinces.map((province) => ({
     id: province.province_id,
@@ -878,7 +920,7 @@ async function main() {
   for (const height of heights) maxHeight = Math.max(maxHeight, height);
 
   const manifest = {
-    version: 1,
+    version: 2,
     source: { mapId: mapMetadata.map_id, mapVersion: mapMetadata.map_version },
     generatedSeed: SEED,
     world: { width: WORLD_WIDTH, height: WORLD_HEIGHT, overlapX: 250, wrapX: true },
@@ -886,6 +928,7 @@ async function main() {
       height: { url: 'height.f32', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'r32float' },
       surface: { url: 'surface.rgba8', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'rgba8uint' },
       rivers: { url: 'rivers.rgba8', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'rgba8unorm' },
+      roads: { url: 'roads.rgba8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rgba8unorm' },
       coast: { url: 'coast.r8', width: ID_WIDTH, height: ID_HEIGHT, format: 'r8unorm' },
       provinceIds: { url: 'province-ids.u16', width: ID_WIDTH, height: ID_HEIGHT, format: 'r16uint' },
     },
@@ -894,10 +937,19 @@ async function main() {
       riverVertices: { url: 'river-vertices.f32', count: riverMesh.vertices.length / 8, stride: 8 },
       riverIndices: { url: 'river-indices.u32', count: riverMesh.indices.length, stride: 1 },
       connections: { url: 'connections.f32', count: connections.length / 8, stride: 8, lazy: true },
+      roadVertices: { url: 'road-vertices.f32', count: infrastructure.roadVertices.length / 10, stride: 10 },
+      roadIndices: { url: 'road-indices.u32', count: infrastructure.roadIndices.length, stride: 1 },
+      bridgeVertices: { url: 'bridge-vertices.f32', count: infrastructure.bridgeVertices.length / 10, stride: 10 },
+      bridgeIndices: { url: 'bridge-indices.u32', count: infrastructure.bridgeIndices.length, stride: 1 },
       trees: { url: 'trees.f32', count: trees.length / 8, stride: 8 },
       buildings: { url: 'buildings.f32', count: buildings.length / 8, stride: 8 },
+      lamps: { url: 'lamps.f32', count: infrastructure.lamps.length / 8, stride: 8 },
+      barriers: { url: 'barriers.f32', count: infrastructure.barriers.length / 8, stride: 8 },
+      signs: { url: 'signs.f32', count: infrastructure.signs.length / 8, stride: 8 },
     },
     terrain: { chunksX: 32, chunksY: 16, gridResolution: 49, maxHeight },
+    infrastructureChunks: infrastructure.chunkRanges,
+    showcases: infrastructure.showcases,
     counts: {
       provinces: provinceRecords.length,
       borders: borders.length / 8,
@@ -906,6 +958,10 @@ async function main() {
       connections: connections.length / 8,
       rivers: riverCount,
       riverMouths: riverMouthCount,
+      ...infrastructure.stats,
+      lamps: infrastructure.lamps.length / 8,
+      barriers: infrastructure.barriers.length / 8,
+      signs: infrastructure.signs.length / 8,
     },
     provinces: provinceRecords,
   };
@@ -915,13 +971,21 @@ async function main() {
     writeTyped('height.f32', heights),
     writeTyped('surface.rgba8', surface),
     writeTyped('rivers.rgba8', riverTexture),
+    writeTyped('roads.rgba8', infrastructure.roadField),
     writeTyped('coast.r8', coastMask),
     writeTyped('river-vertices.f32', riverMesh.vertices),
     writeTyped('river-indices.u32', riverMesh.indices),
     writeTyped('borders.f32', borders),
     writeTyped('connections.f32', connections),
+    writeTyped('road-vertices.f32', infrastructure.roadVertices),
+    writeTyped('road-indices.u32', infrastructure.roadIndices),
+    writeTyped('bridge-vertices.f32', infrastructure.bridgeVertices),
+    writeTyped('bridge-indices.u32', infrastructure.bridgeIndices),
     writeTyped('trees.f32', trees),
     writeTyped('buildings.f32', buildings),
+    writeTyped('lamps.f32', infrastructure.lamps),
+    writeTyped('barriers.f32', infrastructure.barriers),
+    writeTyped('signs.f32', infrastructure.signs),
     writeFile(path.join(OUTPUT, 'world.json'), `${JSON.stringify(manifest)}\n`),
   ]);
 
@@ -930,16 +994,21 @@ async function main() {
     .update(Buffer.from(heights.buffer))
     .update(Buffer.from(surface.buffer))
     .update(Buffer.from(riverTexture.buffer))
+    .update(Buffer.from(infrastructure.roadField.buffer))
     .update(Buffer.from(coastMask.buffer))
     .update(Buffer.from(riverMesh.vertices.buffer))
     .update(Buffer.from(riverMesh.indices.buffer))
     .update(Buffer.from(borders.buffer))
     .update(Buffer.from(connections.buffer))
+    .update(Buffer.from(infrastructure.roadVertices.buffer))
+    .update(Buffer.from(infrastructure.roadIndices.buffer))
+    .update(Buffer.from(infrastructure.bridgeVertices.buffer))
+    .update(Buffer.from(infrastructure.bridgeIndices.buffer))
     .update(Buffer.from(trees.buffer))
     .update(Buffer.from(buildings.buffer))
     .digest('hex');
   await writeFile(path.join(OUTPUT, 'build.json'), `${JSON.stringify({ digest }, null, 2)}\n`);
-  console.log(`World assets ready: ${provinceRecords.length} provinces, ${riverCount} river reaches, ${borders.length / 8} border edges, ${trees.length / 8} trees, ${buildings.length / 8} buildings.`);
+  console.log(`World assets ready: ${provinceRecords.length} provinces, ${riverCount} river reaches, ${infrastructure.stats.logicalRoutes} roads, ${infrastructure.stats.bridges} bridges, ${trees.length / 8} trees, ${buildings.length / 8} buildings.`);
   console.log(`Digest ${digest}`);
 }
 
