@@ -158,7 +158,10 @@ fn sampleMaterial(layer: i32, worldPosition: vec3f, scale: f32) -> vec3f {
 
 @fragment
 fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
-  if (landAt(input.mapUv) < 0.5) { discard; }
+  // The waterway mask is baked from the same dense samples as the river mesh.
+  // Clip coarse terrain triangles out of that corridor so they cannot bridge
+  // a narrow authored gap and progressively bury the water surface.
+  if (landAt(input.mapUv) < 0.5 || waterwayAt(input.mapUv) > 0.45) { discard; }
   let provinceId = provinceAt(input.mapUv);
 
   let surface = surfaceAt(input.mapUv);
@@ -305,7 +308,7 @@ fn waterVertex(input: WaterVertexInput, @builtin(instance_index) instanceIndex: 
 
 @fragment
 fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
-  if (landAt(input.mapUv) >= 0.5 || waterwayAt(input.mapUv) > 0.08) { discard; }
+  if (landAt(input.mapUv) >= 0.5 || waterwayAt(input.mapUv) > 0.45) { discard; }
   let time = uniforms.sunTime.w;
   let waveA = sin(input.worldPosition.x * 0.018 + input.worldPosition.z * 0.011 + time * 0.58);
   let waveB = cos(input.worldPosition.x * -0.009 + input.worldPosition.z * 0.024 - time * 0.43);

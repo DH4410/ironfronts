@@ -79,12 +79,24 @@ describe('generated v6 world package', () => {
     expect(maskBytes.byteLength).toBe(data.fields.waterways.width * data.fields.waterways.height);
     expect(maskBytes.some((value) => value > 0)).toBe(true);
     expect(vertices.every(Number.isFinite)).toBe(true);
+    let centerVertices = 0;
     for (let vertex = 0; vertex < data.buffers.waterwayVertices.count; vertex += 113) {
       const offset = vertex * 8;
       expect(vertices[offset + 1]).toBeGreaterThanOrEqual(0.4);
       expect(vertices[offset + 1]).toBeLessThanOrEqual(50.5);
       expect([0, 1]).toContain(vertices[offset + 6]);
     }
+    for (let vertex = 0; vertex < data.buffers.waterwayVertices.count; vertex += 1) {
+      const offset = vertex * 8;
+      if (vertices[offset + 5] > 0.01) continue;
+      centerVertices += 1;
+      const px = Math.min(data.fields.waterways.width - 1, Math.max(0,
+        Math.floor(((vertices[offset] % data.world.width) + data.world.width) % data.world.width / data.world.width * data.fields.waterways.width)));
+      const pz = Math.min(data.fields.waterways.height - 1, Math.max(0,
+        Math.floor(vertices[offset + 2] / data.world.height * data.fields.waterways.height)));
+      expect(maskBytes[pz * data.fields.waterways.width + px]).toBe(255);
+    }
+    expect(centerVertices).toBeGreaterThan(10_000);
     for (let index = 0; index < indices.length; index += 127) expect(indices[index]).toBeLessThan(data.buffers.waterwayVertices.count);
     expect(data.infrastructureChunks.waterways).toHaveLength(512);
     expect(data.infrastructureChunks.waterways.reduce((sum, range) => sum + range.indexCount, 0)).toBe(indices.length);

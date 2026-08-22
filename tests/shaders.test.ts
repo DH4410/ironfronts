@@ -19,6 +19,7 @@ describe('WGSL programs', () => {
     expect(waterwayShader).not.toContain('uniforms.sunTime.w');
     expect(waterwayShader).toContain('let canal = input.kind > 0.5');
     expect(waterwayShader).toContain('oceanDeep');
+    expect(terrainShader).toContain('waterwayAt(input.mapUv) > 0.45');
   });
 
   it.each([

@@ -9,7 +9,10 @@ export const RIVER_NAMES = new Set([
 
 export const CANAL_NAMES = new Set(['Kiel Canal', 'Suez Channel']);
 
-const SAMPLE_SPACING = 1.8;
+// The terrain grid is intentionally much coarser than roads and waterways.
+// Sub-unit sampling keeps the solved channel, its clip mask, and its rendered
+// surface locked together through narrow valleys and mountain shoulders.
+const SAMPLE_SPACING = 0.75;
 const OPEN_WATER_HEIGHT = 0.42;
 
 function nodeName(node) {
@@ -111,7 +114,10 @@ function crossSection(context, x, z, dx, dz, kind) {
   const nz = dx / length;
   const leftBank = scanBank(context, x, z, nx, nz, 1);
   const rightBank = scanBank(context, x, z, nx, nz, -1);
-  const minimum = kind === 1 ? 2.25 : 1.35;
+  // A river narrower than roughly two high-resolution mask texels can vanish
+  // under oblique projection. Keep a strategy-readable minimum while bank
+  // scans still allow major channels to widen naturally.
+  const minimum = kind === 1 ? 4.2 : 4.0;
   const maximum = kind === 1 ? 6.5 : 8.5;
   const left = clamp((leftBank?.distance ?? minimum) + 0.55, minimum, maximum);
   const right = clamp((rightBank?.distance ?? minimum) + 0.55, minimum, maximum);
@@ -133,18 +139,57 @@ function makeNodeSurface(context, node, incidentEdges, nodes, kind) {
   return { y, radius };
 }
 
-function markClearance(clearance, width, height, worldWidth, worldHeight, x, z, radius) {
+function markCircle(field, width, height, worldWidth, worldHeight, x, z, radius, conservative = false) {
   const cx = x / worldWidth * width;
   const cz = z / worldHeight * height;
-  const rx = Math.max(1, Math.ceil(radius / worldWidth * width));
-  const rz = Math.max(1, Math.ceil(radius / worldHeight * height));
+  const pixelWidth = worldWidth / width;
+  const pixelHeight = worldHeight / height;
+  const padding = conservative ? Math.hypot(pixelWidth, pixelHeight) * 0.5 : 0;
+  const effectiveRadius = radius + padding;
+  const rx = Math.max(1, Math.ceil(effectiveRadius / pixelWidth));
+  const rz = Math.max(1, Math.ceil(effectiveRadius / pixelHeight));
   for (let oz = -rz; oz <= rz; oz += 1) {
     const py = Math.floor(cz + oz);
     if (py < 0 || py >= height) continue;
     for (let ox = -rx; ox <= rx; ox += 1) {
-      if ((ox / rx) ** 2 + (oz / rz) ** 2 > 1) continue;
       const px = wrap(Math.floor(cx + ox), width);
-      clearance[py * width + px] = 255;
+      let deltaPixelsX = px + 0.5 - cx;
+      if (deltaPixelsX > width * 0.5) deltaPixelsX -= width;
+      if (deltaPixelsX < -width * 0.5) deltaPixelsX += width;
+      const dx = deltaPixelsX * pixelWidth;
+      const dz = (py + 0.5 - cz) * pixelHeight;
+      if (dx * dx + dz * dz > effectiveRadius * effectiveRadius) continue;
+      field[py * width + px] = 255;
+    }
+  }
+}
+
+function markCorridor(field, width, height, worldWidth, worldHeight, x, z, section, extraWidth = 0) {
+  const cx = x / worldWidth * width;
+  const cz = z / worldHeight * height;
+  const pixelWidth = worldWidth / width;
+  const pixelHeight = worldHeight / height;
+  const alongPadding = Math.hypot(pixelWidth, pixelHeight) * 0.55;
+  const radius = Math.max(section.left, section.right) + extraWidth + alongPadding;
+  const rx = Math.max(1, Math.ceil(radius / pixelWidth));
+  const rz = Math.max(1, Math.ceil(radius / pixelHeight));
+  const tx = -section.nz;
+  const tz = section.nx;
+  for (let oz = -rz; oz <= rz; oz += 1) {
+    const py = Math.floor(cz + oz);
+    if (py < 0 || py >= height) continue;
+    for (let ox = -rx; ox <= rx; ox += 1) {
+      const px = wrap(Math.floor(cx + ox), width);
+      let deltaPixelsX = px + 0.5 - cx;
+      if (deltaPixelsX > width * 0.5) deltaPixelsX -= width;
+      if (deltaPixelsX < -width * 0.5) deltaPixelsX += width;
+      const dx = deltaPixelsX * pixelWidth;
+      const dz = (py + 0.5 - cz) * pixelHeight;
+      const lateral = dx * section.nx + dz * section.nz;
+      const longitudinal = dx * tx + dz * tz;
+      if (Math.abs(longitudinal) > SAMPLE_SPACING * 0.6 + alongPadding) continue;
+      if (lateral > section.left + extraWidth || lateral < -section.right - extraWidth) continue;
+      field[py * width + px] = 255;
     }
   }
 }
@@ -216,15 +261,29 @@ export function buildWaterways({
     const aSurface = nodeSurfaces.get(edge.node_a);
     const bSurface = nodeSurfaces.get(edge.node_b);
     const rings = [];
+    const samples = [];
     totalLength += length;
     for (let index = 0; index <= segments; index += 1) {
       const t = index / segments;
       const x = a.x + dx * t;
       const z = a.y + dz * t;
       const section = crossSection(context, x, z, dx, dz, edge.kind);
-      const endpointHeight = aSurface.y + (bSurface.y - aSurface.y) * t;
-      const endpointInfluence = Math.max(0, 1 - Math.min(t, 1 - t) * 5);
-      const y = section.waterHeight + (endpointHeight - section.waterHeight) * endpointInfluence;
+      samples.push({ x, z, t, section });
+    }
+    let profile = samples.map((sample) => sample.section.waterHeight);
+    profile[0] = aSurface.y;
+    profile[profile.length - 1] = bSurface.y;
+    for (let pass = 0; pass < 6; pass += 1) {
+      const next = profile.slice();
+      for (let index = 1; index + 1 < profile.length; index += 1) {
+        const smoothed = (profile[index - 1] + profile[index] * 2 + profile[index + 1]) * 0.25;
+        next[index] = clamp(smoothed, 0.48, samples[index].section.waterHeight + 0.12);
+      }
+      profile = next;
+    }
+    for (let index = 0; index < samples.length; index += 1) {
+      const { x, z, t, section } = samples[index];
+      const y = profile[index];
       const left = x + section.nx * section.left;
       const leftZ = z + section.nz * section.left;
       const right = x - section.nx * section.right;
@@ -234,8 +293,8 @@ export function buildWaterways({
         addVertex([x, y + 0.015, z], [length * t / 24, 0.5], 0, edge.kind, edgeId),
         addVertex([right, y, rightZ], [length * t / 24, 1], 1, edge.kind, edgeId),
       ]);
-      markClearance(clearance, idWidth, idHeight, worldWidth, worldHeight, x, z, Math.max(section.left, section.right) + 2.5);
-      markClearance(mask, idWidth, idHeight, worldWidth, worldHeight, x, z, Math.max(section.left, section.right) + 0.65);
+      markCorridor(clearance, idWidth, idHeight, worldWidth, worldHeight, x, z, section, 2.5);
+      markCorridor(mask, idWidth, idHeight, worldWidth, worldHeight, x, z, section, 0);
       minimumHeight = Math.min(minimumHeight, y);
       maximumHeight = Math.max(maximumHeight, y);
       minimumWidth = Math.min(minimumWidth, section.left + section.right);
@@ -268,8 +327,8 @@ export function buildWaterways({
     }
     for (let step = 0; step < 12; step += 1) indices.push(center, ring[step], ring[(step + 1) % 12]);
     batches.push({ chunk: chunkFor(node.x, node.y), firstIndex, indexCount: indices.length - firstIndex });
-    markClearance(mask, idWidth, idHeight, worldWidth, worldHeight, node.x, node.y, surface.radius + 0.65);
-    markClearance(clearance, idWidth, idHeight, worldWidth, worldHeight, node.x, node.y, surface.radius + 2.5);
+    markCircle(mask, idWidth, idHeight, worldWidth, worldHeight, node.x, node.y, surface.radius + 0.35);
+    markCircle(clearance, idWidth, idHeight, worldWidth, worldHeight, node.x, node.y, surface.radius + 2.5, true);
   }
 
   const sorted = sortIndicesByChunk(indices, batches, chunksX, chunksY);
@@ -287,6 +346,8 @@ export function buildWaterways({
   const report = {
     source: 'material/movement network sea_point graph',
     staticSurface: true,
+    sampleSpacing: SAMPLE_SPACING,
+    terrainClipMask: true,
     riverSystems: [...new Set(riverNodes.map(nodeName))].sort(),
     riverSourcePoints: riverNodes.length,
     riverSegments: riverEdges.length,
