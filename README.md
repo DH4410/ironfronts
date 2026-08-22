@@ -23,6 +23,16 @@ With the dev server running, `npm run visual-check` launches the installed Chrom
 - WASD or arrow keys: pan
 - F3: diagnostics and renderer debug views
 
+## Code layout
+
+World generation is staged rather than monolithic:
+
+- `scripts/build-world.mjs` orchestrates source loading, field generation, and package emission.
+- `scripts/world/` contains shared dimensions, raster operations, and hydrology/river meshing.
+- `scripts/build-infrastructure.mjs` coordinates the infrastructure bake and preserves its public API.
+- `scripts/infrastructure/` separates graph classification, routing, shared-corridor compilation, terrain auditing, mesh emission, generated fields, and spatial utilities.
+- `src/renderer.ts` owns renderer lifecycle and frame submission; `scene-meshes.ts`, `geometry.ts`, and `material-texture.ts` own reusable GPU construction.
+
 Province borders grow stronger as the camera approaches. Hovering a province highlights its complete boundary and shows its name and gameplay terrain.
 
 ## Data and rendering

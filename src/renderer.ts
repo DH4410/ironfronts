@@ -1,16 +1,13 @@
 import { mat4, vec3 } from 'gl-matrix';
 import { StrategyCamera } from './camera';
+import { createMaterialTexture } from './material-texture';
+import {
+  createBarrierMesh, createBuildingMesh, createLampMesh, createShadowMesh, createSignMesh, createTerrainMesh,
+  createTreeMesh, uploadIndexedMesh, uploadRiverMesh,
+} from './scene-meshes';
+import type { Mesh } from './scene-meshes';
 import { infrastructureShader, lineShader, propShader, riverShader, terrainShader, waterShader } from './shaders';
 import type { FrameStats, HoverInfo, ProgressReporter, ProvinceRecord, WorldManifest } from './types';
-
-const MATERIAL_NAMES = ['grassland', 'dry-earth', 'desert-sand', 'forest-floor', 'exposed-rock', 'tundra-snow', 'urban-ground', 'shoreline'];
-const FALLBACK_COLORS = ['#718456', '#987e55', '#bba36b', '#43533a', '#77736b', '#a9aaa0', '#68665f', '#bea978'];
-
-interface Mesh {
-  vertex: GPUBuffer;
-  index: GPUBuffer;
-  indexCount: number;
-}
 
 interface InstanceLayer {
   buffer: GPUBuffer;
@@ -175,7 +172,7 @@ export class WorldRenderer {
     );
 
     report('Preparing terrain materials', 0.49);
-    this.materialTexture = await this.createMaterialTexture();
+    this.materialTexture = await createMaterialTexture(this.device);
     this.uniformBuffer = this.device.createBuffer({
       label: 'frame uniforms',
       size: 256,
@@ -200,19 +197,19 @@ export class WorldRenderer {
 
     report('Compiling WebGPU pipelines', 0.62);
     this.createPipelines();
-    this.terrainMesh = this.createTerrainMesh(this.manifest.terrain.gridResolution);
-    this.waterMesh = this.createTerrainMesh(33);
-    this.riverMesh = this.uploadRiverMesh(riverVertexBuffer, riverIndexBuffer, this.manifest.buffers.riverIndices.count);
-    this.roadMesh = this.uploadIndexedMesh('terrain roads', roadVertexBuffer, roadIndexBuffer, this.manifest.buffers.roadIndices.count);
-    this.bridgeMesh = this.uploadIndexedMesh('road bridges', bridgeVertexBuffer, bridgeIndexBuffer, this.manifest.buffers.bridgeIndices.count);
-    this.tunnelMesh = this.uploadIndexedMesh('road tunnels and indicators', tunnelVertexBuffer, tunnelIndexBuffer, this.manifest.buffers.tunnelIndices.count);
-    this.engineeringMesh = this.uploadIndexedMesh('road engineering works', engineeringVertexBuffer, engineeringIndexBuffer, this.manifest.buffers.engineeringIndices.count);
-    this.treeMesh = this.createTreeMesh();
-    this.buildingMesh = this.createBuildingMesh();
-    this.shadowMesh = this.createShadowMesh();
-    this.lampMesh = this.createLampMesh();
-    this.barrierMesh = this.createBarrierMesh();
-    this.signMesh = this.createSignMesh();
+    this.terrainMesh = createTerrainMesh(this.device, this.manifest.terrain.gridResolution);
+    this.waterMesh = createTerrainMesh(this.device, 33);
+    this.riverMesh = uploadRiverMesh(this.device, riverVertexBuffer, riverIndexBuffer, this.manifest.buffers.riverIndices.count);
+    this.roadMesh = uploadIndexedMesh(this.device, 'terrain roads', roadVertexBuffer, roadIndexBuffer, this.manifest.buffers.roadIndices.count);
+    this.bridgeMesh = uploadIndexedMesh(this.device, 'road bridges', bridgeVertexBuffer, bridgeIndexBuffer, this.manifest.buffers.bridgeIndices.count);
+    this.tunnelMesh = uploadIndexedMesh(this.device, 'road tunnels and indicators', tunnelVertexBuffer, tunnelIndexBuffer, this.manifest.buffers.tunnelIndices.count);
+    this.engineeringMesh = uploadIndexedMesh(this.device, 'road engineering works', engineeringVertexBuffer, engineeringIndexBuffer, this.manifest.buffers.engineeringIndices.count);
+    this.treeMesh = createTreeMesh(this.device);
+    this.buildingMesh = createBuildingMesh(this.device);
+    this.shadowMesh = createShadowMesh(this.device);
+    this.lampMesh = createLampMesh(this.device);
+    this.barrierMesh = createBarrierMesh(this.device);
+    this.signMesh = createSignMesh(this.device);
 
     report('Uploading world geometry', 0.78);
     this.trees = this.createInstanceLayer('trees', treeBuffer, this.manifest.buffers.trees.count, 0, this.instanceLayout);
@@ -432,204 +429,6 @@ export class WorldRenderer {
       [width, height],
     );
     return texture;
-  }
-
-  private async createMaterialTexture(): Promise<GPUTexture> {
-    const size = 512;
-    const mipLevelCount = Math.floor(Math.log2(size)) + 1;
-    const texture = this.device.createTexture({
-      label: 'terrain material array',
-      size: [size, size, MATERIAL_NAMES.length],
-      format: 'rgba8unorm-srgb',
-      mipLevelCount,
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    });
-
-    for (let layer = 0; layer < MATERIAL_NAMES.length; layer += 1) {
-      let source: ImageBitmap;
-      try {
-        const response = await fetch(`/textures/${MATERIAL_NAMES[layer]}.png`);
-        if (!response.ok) throw new Error(String(response.status));
-        source = await createImageBitmap(await response.blob(), { resizeWidth: size, resizeHeight: size, resizeQuality: 'high' });
-      } catch {
-        source = await this.createFallbackMaterial(size, FALLBACK_COLORS[layer], layer);
-      }
-      this.device.queue.copyExternalImageToTexture({ source }, { texture, origin: [0, 0, layer] }, [size, size]);
-      source.close();
-    }
-    this.generateMipmaps(texture, size, MATERIAL_NAMES.length, mipLevelCount);
-    return texture;
-  }
-
-  private generateMipmaps(texture: GPUTexture, size: number, layers: number, mipLevelCount: number): void {
-    const module = this.device.createShaderModule({ label: 'material mipmap shader', code: /* wgsl */ `
-      @group(0) @binding(0) var sourceTexture: texture_2d<f32>;
-      @group(0) @binding(1) var sourceSampler: sampler;
-
-      struct Output { @builtin(position) position: vec4f, @location(0) uv: vec2f };
-
-      @vertex fn vertexMain(@builtin(vertex_index) index: u32) -> Output {
-        let positions = array<vec2f, 3>(vec2f(-1.0, -1.0), vec2f(3.0, -1.0), vec2f(-1.0, 3.0));
-        var output: Output;
-        output.position = vec4f(positions[index], 0.0, 1.0);
-        output.uv = output.position.xy * vec2f(0.5, -0.5) + 0.5;
-        return output;
-      }
-
-      @fragment fn fragmentMain(input: Output) -> @location(0) vec4f {
-        return textureSample(sourceTexture, sourceSampler, input.uv);
-      }
-    ` });
-    const pipeline = this.device.createRenderPipeline({
-      label: 'material mipmap pipeline',
-      layout: 'auto',
-      vertex: { module, entryPoint: 'vertexMain' },
-      fragment: { module, entryPoint: 'fragmentMain', targets: [{ format: 'rgba8unorm-srgb' }] },
-      primitive: { topology: 'triangle-list' },
-    });
-    const sampler = this.device.createSampler({ minFilter: 'linear', magFilter: 'linear' });
-    const encoder = this.device.createCommandEncoder({ label: 'generate material mipmaps' });
-    for (let layer = 0; layer < layers; layer += 1) {
-      for (let mip = 1; mip < mipLevelCount; mip += 1) {
-        const bindGroup = this.device.createBindGroup({
-          layout: pipeline.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: texture.createView({ dimension: '2d', baseMipLevel: mip - 1, mipLevelCount: 1, baseArrayLayer: layer, arrayLayerCount: 1 }) },
-            { binding: 1, resource: sampler },
-          ],
-        });
-        const pass = encoder.beginRenderPass({
-          colorAttachments: [{
-            view: texture.createView({ dimension: '2d', baseMipLevel: mip, mipLevelCount: 1, baseArrayLayer: layer, arrayLayerCount: 1 }),
-            loadOp: 'clear', storeOp: 'store', clearValue: { r: 0, g: 0, b: 0, a: 1 },
-          }],
-        });
-        pass.setPipeline(pipeline);
-        pass.setBindGroup(0, bindGroup);
-        pass.draw(3);
-        pass.end();
-      }
-    }
-    this.device.queue.submit([encoder.finish()]);
-    void size;
-  }
-
-  private async createFallbackMaterial(size: number, color: string, seed: number): Promise<ImageBitmap> {
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const context = canvas.getContext('2d') as CanvasRenderingContext2D;
-    context.fillStyle = color;
-    context.fillRect(0, 0, size, size);
-    const image = context.getImageData(0, 0, size, size);
-    let state = (seed + 1) * 0x9e3779b1;
-    for (let y = 0; y < size; y += 1) {
-      for (let x = 0; x < size; x += 1) {
-        state ^= state << 13; state ^= state >>> 17; state ^= state << 5;
-        const noise = ((state >>> 0) / 0xffffffff - 0.5) * 24;
-        const index = (y * size + x) * 4;
-        image.data[index] = clamp(image.data[index] + noise, 0, 255);
-        image.data[index + 1] = clamp(image.data[index + 1] + noise, 0, 255);
-        image.data[index + 2] = clamp(image.data[index + 2] + noise, 0, 255);
-      }
-    }
-    context.putImageData(image, 0, 0);
-    return createImageBitmap(canvas);
-  }
-
-  private createTerrainMesh(resolution: number): Mesh {
-    const vertices = new Float32Array(resolution * resolution * 2);
-    let cursor = 0;
-    for (let y = 0; y < resolution; y += 1) {
-      for (let x = 0; x < resolution; x += 1) {
-        vertices[cursor++] = x / (resolution - 1);
-        vertices[cursor++] = y / (resolution - 1);
-      }
-    }
-    const indices = new Uint16Array((resolution - 1) * (resolution - 1) * 6);
-    cursor = 0;
-    for (let y = 0; y < resolution - 1; y += 1) {
-      for (let x = 0; x < resolution - 1; x += 1) {
-        const a = y * resolution + x;
-        const b = a + 1;
-        const c = a + resolution;
-        const d = c + 1;
-        indices.set([a, c, b, b, c, d], cursor);
-        cursor += 6;
-      }
-    }
-    return this.uploadMesh('terrain grid', vertices, indices);
-  }
-
-  private createTreeMesh(): Mesh {
-    const builder = new MeshBuilder();
-    builder.addBox(-0.55, 0, -0.55, 0.55, 4.1, 0.55, 0);
-    builder.addCone(0, 3.0, 0, 3.5, 11.5, 9, 1);
-    builder.addCone(0, 6.2, 0, 2.8, 13.3, 9, 1);
-    return this.uploadMesh('tree mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
-  }
-
-  private createBuildingMesh(): Mesh {
-    const builder = new MeshBuilder();
-    builder.addBox(-0.5, 0, -0.5, 0.5, 1, 0.5, 0);
-    builder.addGableRoof(-0.56, 1, -0.56, 0.56, 1.24, 0.56, 1);
-    builder.addBox(-0.68, 0, -0.38, 0.68, 0.42, 0.38, 2, 2);
-    builder.addBox(-0.18, 1, -0.18, 0.18, 1.52, 0.18, 3, 3);
-    builder.addHipRoof(0, 1, 0, 0.62, 1.24, 4);
-    builder.addBox(-0.54, 1, -0.54, 0.54, 1.055, 0.54, 5, 5);
-    return this.uploadMesh('building mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
-  }
-
-  private createLampMesh(): Mesh {
-    const builder = new MeshBuilder();
-    builder.addBox(-0.07, 0, -0.07, 0.07, 3.2, 0.07, 0);
-    builder.addBox(-0.10, 3.0, -0.10, 0.10, 3.42, 0.10, 0);
-    builder.addBox(-0.18, 3.38, -0.18, 0.18, 3.57, 0.18, 1, 1);
-    return this.uploadMesh('road lamp mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
-  }
-
-  private createBarrierMesh(): Mesh {
-    const builder = new MeshBuilder();
-    for (const x of [-0.46, 0, 0.46]) builder.addBox(x - 0.025, 0, -0.07, x + 0.025, 0.86, 0.07, 0);
-    builder.addBox(-0.5, 0.58, -0.055, 0.5, 0.72, 0.055, 1, 1);
-    return this.uploadMesh('road barrier mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
-  }
-
-  private createSignMesh(): Mesh {
-    const builder = new MeshBuilder();
-    builder.addBox(-0.045, 0, -0.045, 0.045, 1.55, 0.045, 0);
-    builder.addBox(-0.42, 1.08, -0.055, 0.42, 1.52, 0.055, 1, 1);
-    return this.uploadMesh('road sign mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
-  }
-
-  private createShadowMesh(): Mesh {
-    const builder = new MeshBuilder();
-    builder.addPlane(9);
-    return this.uploadMesh('contact shadow mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
-  }
-
-  private uploadMesh(label: string, vertices: Float32Array, indices: Uint16Array): Mesh {
-    const vertex = this.device.createBuffer({ label: `${label} vertices`, size: align4(vertices.byteLength), usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
-    const index = this.device.createBuffer({ label: `${label} indices`, size: align4(indices.byteLength), usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
-    this.device.queue.writeBuffer(vertex, 0, vertices.buffer as ArrayBuffer, vertices.byteOffset, vertices.byteLength);
-    this.device.queue.writeBuffer(index, 0, indices.buffer as ArrayBuffer, indices.byteOffset, indices.byteLength);
-    return { vertex, index, indexCount: indices.length };
-  }
-
-  private uploadRiverMesh(vertexData: ArrayBuffer, indexData: ArrayBuffer, indexCount: number): Mesh {
-    const vertex = this.device.createBuffer({ label: 'river network vertices', size: align4(vertexData.byteLength), usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
-    const index = this.device.createBuffer({ label: 'river network indices', size: align4(indexData.byteLength), usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
-    this.device.queue.writeBuffer(vertex, 0, vertexData);
-    this.device.queue.writeBuffer(index, 0, indexData);
-    return { vertex, index, indexCount };
-  }
-
-  private uploadIndexedMesh(label: string, vertexData: ArrayBuffer, indexData: ArrayBuffer, indexCount: number): Mesh {
-    const vertex = this.device.createBuffer({ label: `${label} vertices`, size: align4(vertexData.byteLength), usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
-    const index = this.device.createBuffer({ label: `${label} indices`, size: align4(indexData.byteLength), usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
-    this.device.queue.writeBuffer(vertex, 0, vertexData);
-    this.device.queue.writeBuffer(index, 0, indexData);
-    return { vertex, index, indexCount };
   }
 
   private createInstanceLayer(label: string, data: ArrayBuffer, count: number, kind: number, layout: GPUBindGroupLayout): InstanceLayer {
@@ -894,98 +693,6 @@ const alphaBlend: GPUBlendState = {
   color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
   alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
 };
-
-class MeshBuilder {
-  vertices: number[] = [];
-  indices: number[] = [];
-
-  addBox(minX: number, minY: number, minZ: number, maxX: number, maxY: number, maxZ: number, sideMaterial: number, topMaterial = sideMaterial): void {
-    const faces: Array<[number[], number[], number]> = [
-      [[minX,minY,maxZ, maxX,minY,maxZ, maxX,maxY,maxZ, minX,maxY,maxZ], [0,0,1], sideMaterial],
-      [[maxX,minY,minZ, minX,minY,minZ, minX,maxY,minZ, maxX,maxY,minZ], [0,0,-1], sideMaterial],
-      [[maxX,minY,maxZ, maxX,minY,minZ, maxX,maxY,minZ, maxX,maxY,maxZ], [1,0,0], sideMaterial],
-      [[minX,minY,minZ, minX,minY,maxZ, minX,maxY,maxZ, minX,maxY,minZ], [-1,0,0], sideMaterial],
-      [[minX,maxY,maxZ, maxX,maxY,maxZ, maxX,maxY,minZ, minX,maxY,minZ], [0,1,0], topMaterial],
-      [[minX,minY,minZ, maxX,minY,minZ, maxX,minY,maxZ, minX,minY,maxZ], [0,-1,0], sideMaterial],
-    ];
-    for (const [positions, normal, material] of faces) {
-      const start = this.vertices.length / 7;
-      for (let vertex = 0; vertex < 4; vertex += 1) {
-        this.vertices.push(positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2], normal[0], normal[1], normal[2], material);
-      }
-      this.indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
-    }
-  }
-
-  addCone(x: number, baseY: number, z: number, radius: number, tipY: number, sides: number, material: number): void {
-    const tipStart = this.vertices.length / 7;
-    for (let side = 0; side < sides; side += 1) {
-      const angleA = side / sides * Math.PI * 2;
-      const angleB = (side + 1) / sides * Math.PI * 2;
-      const mid = (angleA + angleB) * 0.5;
-      const normal = [Math.sin(mid) * 0.86, 0.5, Math.cos(mid) * 0.86];
-      const start = this.vertices.length / 7;
-      this.vertices.push(x, tipY, z, ...normal, material);
-      this.vertices.push(x + Math.sin(angleA) * radius, baseY, z + Math.cos(angleA) * radius, ...normal, material);
-      this.vertices.push(x + Math.sin(angleB) * radius, baseY, z + Math.cos(angleB) * radius, ...normal, material);
-      this.indices.push(start, start + 1, start + 2);
-    }
-    void tipStart;
-  }
-
-  addGableRoof(minX: number, baseY: number, minZ: number, maxX: number, ridgeY: number, maxZ: number, material: number): void {
-    const halfWidth = Math.max(0.001, (maxX - minX) * 0.5);
-    const rise = ridgeY - baseY;
-    const slopeLength = Math.hypot(halfWidth, rise);
-    const faces: Array<[number[], number[]]> = [
-      [[minX,baseY,minZ, minX,baseY,maxZ, 0,ridgeY,maxZ, 0,ridgeY,minZ], [-rise / slopeLength, halfWidth / slopeLength, 0]],
-      [[maxX,baseY,maxZ, maxX,baseY,minZ, 0,ridgeY,minZ, 0,ridgeY,maxZ], [rise / slopeLength, halfWidth / slopeLength, 0]],
-    ];
-    for (const [positions, normal] of faces) {
-      const start = this.vertices.length / 7;
-      for (let vertex = 0; vertex < 4; vertex += 1) this.vertices.push(positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2], ...normal, material);
-      this.indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
-    }
-    for (const [positions, normal] of [
-      [[minX,baseY,minZ, maxX,baseY,minZ, 0,ridgeY,minZ], [0,0,-1]],
-      [[maxX,baseY,maxZ, minX,baseY,maxZ, 0,ridgeY,maxZ], [0,0,1]],
-    ] as Array<[number[], number[]]>) {
-      const start = this.vertices.length / 7;
-      for (let vertex = 0; vertex < 3; vertex += 1) this.vertices.push(positions[vertex * 3], positions[vertex * 3 + 1], positions[vertex * 3 + 2], ...normal, material);
-      this.indices.push(start, start + 1, start + 2);
-    }
-  }
-
-  addHipRoof(x: number, baseY: number, z: number, radius: number, tipY: number, material: number): void {
-    const corners = [[-radius,-radius], [radius,-radius], [radius,radius], [-radius,radius]];
-    for (let side = 0; side < 4; side += 1) {
-      const a = corners[side];
-      const b = corners[(side + 1) % 4];
-      const midX = (a[0] + b[0]) * 0.5;
-      const midZ = (a[1] + b[1]) * 0.5;
-      const length = Math.max(0.001, Math.hypot(midX, tipY - baseY, midZ));
-      const normal = [-midX / length, radius / length, -midZ / length];
-      const start = this.vertices.length / 7;
-      this.vertices.push(
-        x + a[0], baseY, z + a[1], ...normal, material,
-        x + b[0], baseY, z + b[1], ...normal, material,
-        x, tipY, z, ...normal, material,
-      );
-      this.indices.push(start, start + 2, start + 1);
-    }
-  }
-
-  addPlane(material: number): void {
-    const start = this.vertices.length / 7;
-    this.vertices.push(
-      -1, 0, -1, 0, 1, 0, material,
-      -1, 0, 1, 0, 1, 0, material,
-      1, 0, -1, 0, 1, 0, material,
-      1, 0, 1, 0, 1, 0, material,
-    );
-    this.indices.push(start, start + 1, start + 2, start + 2, start + 1, start + 3);
-  }
-}
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);
