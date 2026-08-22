@@ -1,7 +1,6 @@
 import { FIELD_HEIGHT, FIELD_WIDTH, SEED, WORLD_HEIGHT, WORLD_WIDTH } from './config.mjs';
 import { blurField, clamp, smoothstep, wrap } from './raster.mjs';
-import { assembleRoutes, classifyInfrastructure } from '../infrastructure/network.mjs';
-import { compileSharedPhysicalNetwork } from '../infrastructure/network-compiler.mjs';
+import { assembleProvinceRoutes } from '../infrastructure/network.mjs';
 
 const MAX_GRADES = [0.18, 0.14, 0.10, 0.08, 0.06];
 
@@ -99,10 +98,8 @@ function cleanAndProject(heights, caps, limits, landField, passes = 10) {
   }
 }
 
-function conditionMovementCorridors(heights, caps, limits, landField, terrainField, provinceField, connectionData, networkData, provinces) {
-  const assembled = assembleRoutes(connectionData, networkData, WORLD_WIDTH);
-  classifyInfrastructure(assembled.routes, assembled.nodes, assembled.adjacency, provinces, assembled.land);
-  compileSharedPhysicalNetwork(assembled.routes, WORLD_WIDTH);
+function conditionMovementCorridors(heights, caps, limits, landField, terrainField, provinceField, borderData, connectionData, networkData, provinces) {
+  const assembled = assembleProvinceRoutes(borderData, connectionData, networkData, provinces, WORLD_WIDTH);
   const baseline = heights.slice();
   const accumulated = new Float32Array(heights.length);
   const classLowerBudgets = [4, 6, 12, 4, 4];
@@ -117,7 +114,6 @@ function conditionMovementCorridors(heights, caps, limits, landField, terrainFie
     for (const route of assembled.routes) {
       const maximumGrade = MAX_GRADES[clamp(route.infrastructureLevel - 1, 0, 4)];
       for (let segment = 0; segment + 1 < route.points.length; segment += 1) {
-        if (route.sharedSegmentOwners?.[segment] >= 0) continue;
         const a = route.points[segment], b = route.points[segment + 1];
         let dx = b.x - a.x;
         if (dx > WORLD_WIDTH * 0.5) dx -= WORLD_WIDTH;
@@ -245,7 +241,7 @@ function conditionMovementCorridors(heights, caps, limits, landField, terrainFie
   return { passes, conditionedSamples, maximumAdjustment, provinceAdjustments };
 }
 
-export function generateTopography({ landField, terrainField, provinceField, coastBlend, landDistance, markers, connectionData, networkData, provinces }) {
+export function generateTopography({ landField, terrainField, provinceField, coastBlend, landDistance, markers, borderData, connectionData, networkData, provinces }) {
   const mountainMask = new Float32Array(landField.length);
   const hillMask = new Float32Array(landField.length);
   for (let index = 0; index < landField.length; index += 1) {
@@ -296,7 +292,7 @@ export function generateTopography({ landField, terrainField, provinceField, coa
     }
   }
   cleanAndProject(heights, caps, limits, landField, 12);
-  const conditioning = conditionMovementCorridors(heights, caps, limits, landField, terrainField, provinceField, connectionData, networkData, provinces);
+  const conditioning = conditionMovementCorridors(heights, caps, limits, landField, terrainField, provinceField, borderData, connectionData, networkData, provinces);
   let maximumHeight = 0, maximumSlopeStep = 0, capViolations = 0;
   const classMaxima = [0, 0, 0, 0, 0], classMinima = [Infinity, Infinity, Infinity, Infinity, Infinity];
   const classSums = [0, 0, 0, 0, 0], classCounts = [0, 0, 0, 0, 0], classSlopeSteps = [0, 0, 0, 0, 0];

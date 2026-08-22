@@ -65,7 +65,7 @@ export interface WorldManifest {
   reports: { generation: { url: string; version: string } };
   showcases: {
     urban: [number, number]; mountain: [number, number]; steepRoad: [number, number];
-    timber: [number, number]; europe: [number, number]; lakeRoad: [number, number]; liangshan: [number, number];
+    dirtRoad: [number, number]; europe: [number, number]; lakeRoad: [number, number]; liangshan: [number, number];
   };
   counts: Record<string, number>;
   provinces: ProvinceRecord[];

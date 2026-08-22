@@ -34,12 +34,12 @@ World generation is staged and deterministic:
 5. Route and drape visible roads onto the frozen terrain; impossible physical roads are hidden and reported without changing logical connectivity.
 6. Place city streets, buildings, trees, lamps, fences, and signs after road clearances are final.
 
-`scripts/build-world.mjs` orchestrates generation, `scripts/world/topography.mjs` owns the heightfield, and `scripts/build-infrastructure.mjs` coordinates road classification, routing, sharing, audit, and mesh output. Expensive route results are cached under ignored `artifacts/road-cache/`.
+`scripts/build-world.mjs` orchestrates generation, `scripts/world/topography.mjs` owns the heightfield, and `scripts/build-infrastructure.mjs` coordinates direct province-center routing, audit, and mesh output. Expensive route results are cached under ignored `artifacts/road-cache/`.
 
 The generated `world-generation-report.json` records topography statistics and every hidden corridor with its reason, endpoints, ID, and affected source connections. The source `material/` directory remains untouched.
 
 ## Rendering
 
-Terrain materials blend by gameplay terrain, biome, elevation, slope, and macro variation. Forest ground transitions to a cheap canopy-green signal as individual trees fade. Ocean and lake water uses coastal depth, waves, foam, Fresnel reflection, and sun sparkle.
+Terrain materials blend by gameplay terrain, biome, slope, and macro variation. Beach sand is restricted to the actual shoreline mask, while low inland regions retain their biome. Forest ground transitions to a cheap canopy-green signal as individual trees fade. Ocean and lake water uses coastal depth, waves, foam, Fresnel reflection, and sun sparkle.
 
-Road levels 1–5 and local/connector/trunk roles are independent. The initial world assigns province levels 1–3, ranging from dirt through timber/gravel to paved aggregate. Shared gateways reduce city starbursts, full-width route audits reject static-water incursions, and every road vertex independently samples the frozen terrain with a small deterministic lift. The terrain road field preserves hierarchy at strategic zoom while nearby indexed geometry provides the 3D surface.
+Road levels 1–5 remain available for future gameplay upgrades, but every initial province and road is level 1. Each unique land-adjacent province pair receives one independent dirt path between its two province centers; the generator emits no shared stems, gateway roads, plazas, or local city streets. Full-width route audits reject static-water incursions, and every road vertex independently samples the frozen terrain with a small deterministic lift.

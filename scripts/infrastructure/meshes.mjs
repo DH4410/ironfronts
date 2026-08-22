@@ -48,7 +48,8 @@ export function buildMeshes(routes, heights, landField, width, height, worldWidt
     for (let index = 1; index < route.points.length; index += 1) cumulative.push(cumulative[index - 1] + Math.hypot(
       unwrapNear(route.points[index].x, route.points[index - 1].x, worldWidth) - route.points[index - 1].x,
       route.points[index].z - route.points[index - 1].z));
-    const emitted = Array.from({ length: route.points.length - 1 }, (_, index) => route.sharedSegmentOwners?.[index] < 0);
+    const emitted = Array.from({ length: route.points.length - 1 }, (_, index) =>
+      route.sharedSegmentOwners ? route.sharedSegmentOwners[index] < 0 : true);
     const rings = [];
     // The nearby mesh represents the physical road core. Verges and ditches
     // remain in the terrain road field, avoiding a second coplanar ribbon and

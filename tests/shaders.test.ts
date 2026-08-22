@@ -4,6 +4,12 @@ import { create, globals } from 'webgpu';
 import { infrastructureShader, lineShader, propShader, terrainShader, waterShader } from '../src/shaders';
 
 describe('WGSL programs', () => {
+  it('limits beach material to the actual shoreline mask', () => {
+    expect(terrainShader).toContain('shoreline = 1.0 - smoothstep');
+    expect(terrainShader).toContain('landAt(input.mapUv)');
+    expect(terrainShader).not.toContain('if (elevation < 12.0)');
+  });
+
   it.each([
     ['terrain', terrainShader, ['terrainVertex'], ['terrainFragment']],
     ['water', waterShader, ['waterVertex'], ['waterFragment']],

@@ -79,13 +79,20 @@ if (!status.unsupported) {
     await page.waitForTimeout(900);
     await page.screenshot({ path: path.join(outputDirectory, filename) });
   };
+  const capturePoint = async (point, filename, distance) => {
+    await page.evaluate(({ point, distance }) => window.__ironfrontsRenderer?.focus(point[0], point[1], distance), { point, distance });
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: path.join(outputDirectory, filename) });
+  };
   await page.keyboard.press('F3');
   await captureShowcase('urban', 'roads-urban.png', 410);
   await captureShowcase('mountain', 'roads-mountain.png', 480);
   await captureShowcase('steepRoad', 'roads-steep.png', 360);
   await captureShowcase('liangshan', 'roads-liangshan.png', 520);
-  await captureShowcase('timber', 'roads-timber.png', 300);
+  await captureShowcase('dirtRoad', 'roads-dirt.png', 300);
   await captureShowcase('europe', 'terrain-europe.png', 620);
+  await capturePoint([5_822, 2_564], 'terrain-iberia.png', 520);
+  await capturePoint([6_520, 3_931], 'terrain-africa.png', 620);
   await captureShowcase('lakeRoad', 'roads-lake.png', 380);
   await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(5));
   await page.waitForTimeout(300);

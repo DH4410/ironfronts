@@ -1,5 +1,5 @@
 export const TAU = Math.PI * 2;
-export const ROUTING_CACHE_VERSION = 'terrain-draped-roads-v5.1';
+export const ROUTING_CACHE_VERSION = 'direct-province-roads-v5.2';
 export const LEVEL_WIDTHS = [1.5, 2.2, 3.4, 4.8, 8.4];
 export const ROLE_WIDTH_SCALE = [0.8, 1.0, 1.2];
 export const MAX_GRADES = [0.18, 0.14, 0.10, 0.08, 0.06];

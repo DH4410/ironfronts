@@ -315,7 +315,7 @@ async function main() {
   const landDistance = distanceToValue(landField, FIELD_WIDTH, FIELD_HEIGHT, 0);
   const oceanDistance = distanceToValue(landField, FIELD_WIDTH, FIELD_HEIGHT, 1);
   const { heights, report: topographyReport } = generateTopography({
-    landField, terrainField, provinceField, coastBlend, landDistance, markers, connectionData, networkData, provinces: metadata.provinces,
+    landField, terrainField, provinceField, coastBlend, landDistance, markers, borderData, connectionData, networkData, provinces: metadata.provinces,
   });
   for (let y = 0; y < FIELD_HEIGHT; y += 1) {
     const v = y / Math.max(1, FIELD_HEIGHT - 1);
@@ -335,9 +335,9 @@ async function main() {
   console.log('Packing borders, movement graph, forests, and cities…');
   const borders = buildBorders(borderData);
   const connections = buildConnections(connectionData);
-  console.log('Compiling terrain-draped roads and city streets...');
+  console.log('Compiling direct province-center roads and city placement...');
   const infrastructure = buildInfrastructure({
-    connectionData, networkData, provinces: metadata.provinces, heights, landField,
+    borderData, connectionData, networkData, provinces: metadata.provinces, heights, landField,
     fieldWidth: FIELD_WIDTH, fieldHeight: FIELD_HEIGHT, roadFieldWidth: ID_WIDTH, roadFieldHeight: ID_HEIGHT,
     worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
   });

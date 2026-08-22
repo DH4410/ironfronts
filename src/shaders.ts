@@ -189,9 +189,12 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     baseColor = mix(sampleMaterial(6, input.worldPosition, 54.0), sampleMaterial(1, input.worldPosition, 68.0), 0.22);
   }
 
-  if (elevation < 12.0) {
-    baseColor = mix(sampleMaterial(7, input.worldPosition, 52.0), baseColor, smoothstep(5.0, 12.0, elevation));
-  }
+  // Beaches follow the actual land/water boundary. Low inland terrain is not
+  // coastal and must retain its biome material (the old elevation-only test
+  // turned most of Africa and Iberia into sand).
+  let shoreline = 1.0 - smoothstep(0.78, 0.995, landAt(input.mapUv));
+  let beachElevation = 1.0 - smoothstep(5.0, 10.0, elevation);
+  baseColor = mix(baseColor, sampleMaterial(7, input.worldPosition, 52.0), shoreline * beachElevation * 0.92);
 
 
   let roadData = roadAt(input.mapUv);

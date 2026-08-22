@@ -3,10 +3,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { MAX_GRADES, ROUTING_CACHE_VERSION, routeRoadWidth, sampleHeight, sampleScalar, unwrapNear, wrap } from './infrastructure/common.mjs';
 import { buildMeshes } from './infrastructure/meshes.mjs';
-import { assembleRoutes, classifyInfrastructure } from './infrastructure/network.mjs';
-import { buildCorridorMetrics, compileSharedPhysicalNetwork } from './infrastructure/network-compiler.mjs';
+import { assembleProvinceRoutes } from './infrastructure/network.mjs';
+import { buildCorridorMetrics } from './infrastructure/network-compiler.mjs';
 import { buildConnectionCorridorMap, buildFurniture, rasterRoadField } from './infrastructure/outputs.mjs';
-import { adaptRoute, addLocalStreets, buildCityPlans, buildSharedGateways } from './infrastructure/routing.mjs';
+import { adaptRoute, buildCityPlans } from './infrastructure/routing.mjs';
 
 function routeCachePath(routes, provinces, heights, landField) {
   const digest = createHash('sha256')
@@ -127,29 +127,16 @@ function suppressIllegalCrossings(routes, logicalRouteCount, worldWidth) {
 }
 
 export function buildInfrastructure({
-  connectionData, networkData, provinces, heights, landField,
+  borderData, connectionData, networkData, provinces, heights, landField,
   fieldWidth, fieldHeight, roadFieldWidth, roadFieldHeight, worldWidth, worldHeight,
 }) {
-  const assembled = assembleRoutes(connectionData, networkData, worldWidth);
-  const classification = classifyInfrastructure(assembled.routes, assembled.nodes, assembled.adjacency, provinces, assembled.land);
-  for (const province of provinces) province.infrastructureLevel = classification.provinceLevels.get(province.province_id) ?? 1;
-  const provinceById = new Map(provinces.map((province) => [province.province_id, province]));
-  for (const route of assembled.routes) {
-    const timber = route.infrastructureLevel === 2 && route.provinceIds.some((id) => {
-      const province = provinceById.get(id);
-      return province?.terrain_type_id === 13 || province?.visual_terrain_tag === 'Boreal' || province?.visual_terrain_tag === 'Jungle';
-    }) && Math.abs(Math.sin(route.id * 19.731)) > 0.22;
-    route.surfaceMaterial = route.infrastructureLevel === 1 ? 0 : route.infrastructureLevel === 2 ? timber ? 2 : 1 : route.infrastructureLevel;
-  }
+  const assembled = assembleProvinceRoutes(borderData, connectionData, networkData, provinces, worldWidth);
+  const provinceLevels = new Map(provinces.map((province) => [province.province_id, 1]));
+  for (const province of provinces) province.infrastructureLevel = 1;
   const context = { heights, landField, fieldWidth, fieldHeight, worldWidth, worldHeight };
   const logicalRouteCount = assembled.routes.length;
-  const gatewayCount = buildSharedGateways(assembled.routes, assembled.nodes, provinces, context);
-  adaptLogicalRoutesWithCache(assembled.routes.slice(0, logicalRouteCount), context, provinces);
-  for (const route of assembled.routes.slice(logicalRouteCount)) adaptRoute(route, context);
+  adaptLogicalRoutesWithCache(assembled.routes, context, provinces);
   const cityPlans = buildCityPlans(assembled.routes, assembled.nodes, provinces);
-  const localStreetStart = assembled.routes.length;
-  addLocalStreets(assembled.routes, cityPlans, context);
-  for (const route of assembled.routes.slice(localStreetStart)) adaptRoute(route, context);
 
   const hiddenRoads = [];
   for (const route of assembled.routes) {
@@ -170,7 +157,6 @@ export function buildInfrastructure({
       otherCorridorId: conflict.otherCorridorId, maximumGrade: route.maximumObservedGrade });
   }
 
-  const network = compileSharedPhysicalNetwork(assembled.routes, worldWidth);
   const meshes = buildMeshes(assembled.routes, heights, landField, fieldWidth, fieldHeight, worldWidth, worldHeight);
   const corridorData = buildCorridorMetrics(assembled.routes, worldWidth);
   const roadRaster = rasterRoadField(assembled.routes, roadFieldWidth, roadFieldHeight, worldWidth, worldHeight, landField, fieldWidth, fieldHeight);
@@ -189,7 +175,7 @@ export function buildInfrastructure({
   const largestCity = [...provinces].filter((province) => province.terrain_type_id === 14).sort((a, b) => (b.population ?? 0) - (a.population ?? 0))[0];
   const mountainRoute = assembled.routes.slice(0, logicalRouteCount).filter((route) => !route.suppressed)
     .sort((a, b) => Math.max(...b.profile) - Math.max(...a.profile))[0];
-  const timberRoute = assembled.routes.find((route) => !route.suppressed && route.surfaceMaterial === 2);
+  const dirtRoute = assembled.routes.find((route) => !route.suppressed && route.surfaceMaterial === 0);
   const steepRoute = assembled.routes.slice(0, logicalRouteCount).filter((route) => !route.suppressed)
     .sort((a, b) => b.maximumObservedGrade - a.maximumObservedGrade)[0];
 
@@ -197,18 +183,20 @@ export function buildInfrastructure({
   return {
     ...meshes, ...furniture, ...mapping, ...corridorData,
     roadField: roadRaster.field, roadClearance: roadRaster.clearance, cityPlans,
-    provinceLevels: classification.provinceLevels,
+    provinceLevels,
     roadReport: { version: 'world-generation-v5', logicalCorridors: logicalRouteCount,
       emittedCorridors: assembled.routes.slice(0, logicalRouteCount).filter((route) => !route.suppressed).length,
-      hiddenCorridors: hiddenRoads.length, hiddenByReason, hiddenRoads, sharedSegments: network.sharedSegments, sharedLength: network.sharedLength },
+      hiddenCorridors: hiddenRoads.length, hiddenByReason, hiddenRoads,
+      unmappedLandSegments: assembled.unmappedLandSegments, sharedSegments: 0, sharedLength: 0 },
     stats: {
       landSegments: assembled.landSegmentCount, logicalRoutes: logicalRouteCount,
       emittedRoutes: assembled.routes.slice(0, logicalRouteCount).filter((route) => !route.suppressed).length,
       hiddenRoutes: hiddenRoads.length, hiddenWaterRoutes: hiddenByReason.water ?? 0, hiddenGradeRoutes: hiddenByReason.grade ?? 0,
       hiddenCrossingRoutes: hiddenByReason.crossing ?? 0,
-      localStreets: assembled.routes.filter((route) => route.localStreet && !route.suppressed).length,
-      localRoutes: classCounts[0], regionalRoutes: classCounts[1], majorRoutes: classCounts[2], sharedGateways: gatewayCount,
-      physicalSharedSegments: network.sharedSegments, physicalSharedLength: network.sharedLength,
+      unmappedLandSegments: assembled.unmappedLandSegments.length,
+      localStreets: 0,
+      localRoutes: classCounts[0], regionalRoutes: classCounts[1], majorRoutes: classCounts[2], sharedGateways: 0,
+      physicalSharedSegments: 0, physicalSharedLength: 0,
       connectionCorridorReferences: mapping.connectionCorridorIds.length,
       level1Provinces: provinceLevelCounts[0], level2Provinces: provinceLevelCounts[1], level3Provinces: provinceLevelCounts[2],
       level4Provinces: provinceLevelCounts[3], level5Provinces: provinceLevelCounts[4],
@@ -220,7 +208,7 @@ export function buildInfrastructure({
       urban: [largestCity.center_x, largestCity.center_y],
       mountain: mountainRoute ? [mountainRoute.points[Math.floor(mountainRoute.points.length * 0.5)].x, mountainRoute.points[Math.floor(mountainRoute.points.length * 0.5)].z] : [largestCity.center_x, largestCity.center_y],
       steepRoad: steepRoute ? [steepRoute.points[Math.floor(steepRoute.points.length * 0.5)].x, steepRoute.points[Math.floor(steepRoute.points.length * 0.5)].z] : [largestCity.center_x, largestCity.center_y],
-      timber: timberRoute ? [timberRoute.points[Math.floor(timberRoute.points.length * 0.5)].x, timberRoute.points[Math.floor(timberRoute.points.length * 0.5)].z] : [largestCity.center_x, largestCity.center_y],
+      dirtRoad: dirtRoute ? [dirtRoute.points[Math.floor(dirtRoute.points.length * 0.5)].x, dirtRoute.points[Math.floor(dirtRoute.points.length * 0.5)].z] : [largestCity.center_x, largestCity.center_y],
       europe: [7_050, 1_900], lakeRoad: [7_600, 2_600], liangshan: [10_583, 2_990],
     },
   };

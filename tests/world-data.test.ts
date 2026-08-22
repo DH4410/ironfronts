@@ -36,7 +36,12 @@ describe('generated v5 world package', () => {
     for (const obsolete of ['riverVertices', 'riverIndices', 'bridgeVertices', 'bridgeIndices', 'tunnelVertices', 'tunnelIndices', 'engineeringVertices', 'engineeringIndices']) {
       expect(data.buffers[obsolete]).toBeUndefined();
     }
-    expect(data.provinces.every((province) => province.infrastructureLevel >= 1 && province.infrastructureLevel <= 3)).toBe(true);
+    expect(data.provinces.every((province) => province.infrastructureLevel === 1)).toBe(true);
+    expect(data.counts).toEqual(expect.objectContaining({
+      level1Provinces: 3_303, level2Provinces: 0, level3Provinces: 0,
+      localStreets: 0, regionalRoutes: 0, majorRoutes: 0,
+      sharedGateways: 0, physicalSharedSegments: 0, physicalSharedLength: 0,
+    }));
   });
 
   it('emits finite capped topography without terrain-class spikes', async () => {
@@ -109,18 +114,30 @@ describe('generated v5 world package', () => {
       readFile('public/world/connection-corridor-ids.u32'), readFile('public/world/corridor-flags.u32'),
       readFile('public/world/world-generation-report.json', 'utf8'),
     ]);
-    const source = JSON.parse(sourceBytes) as { segments: Array<{ medium: string }> };
+    const source = JSON.parse(sourceBytes) as { segments: Array<{ segment_id: number; medium: string }> };
     const offsets = viewU32(offsetBytes), ids = viewU32(idBytes), flags = viewU32(flagBytes);
     const report = JSON.parse(reportBytes);
     expect(offsets.length).toBe(source.segments.length + 1);
     expect(offsets.at(-1)).toBe(ids.length);
+    const unmapped = new Set<number>(report.roads.unmappedLandSegments);
+    let mappedLand = 0;
     for (let segment = 0; segment < source.segments.length; segment += 1) {
-      if (source.segments[segment].medium === 'land') expect(offsets[segment + 1]).toBeGreaterThan(offsets[segment]);
+      if (source.segments[segment].medium !== 'land') continue;
+      if (unmapped.has(source.segments[segment].segment_id)) expect(offsets[segment + 1]).toBe(offsets[segment]);
+      else {
+        expect(offsets[segment + 1]).toBeGreaterThan(offsets[segment]);
+        mappedLand += 1;
+      }
     }
     for (let index = 0; index < ids.length; index += 101) expect(ids[index] * 4 + 3).toBeLessThan(flags.length);
     expect(report.roads.hiddenCorridors).toBe(data.counts.hiddenRoutes);
     expect(report.roads.hiddenRoads).toHaveLength(data.counts.hiddenRoutes);
     expect(report.roads.emittedCorridors + report.roads.hiddenCorridors).toBe(report.roads.logicalCorridors);
+    expect(report.roads.logicalCorridors).toBe(7_805);
+    expect(mappedLand + unmapped.size).toBe(data.counts.landSegments);
+    expect(unmapped.size).toBe(data.counts.unmappedLandSegments);
+    expect(report.roads.sharedSegments).toBe(0);
+    expect(report.roads.sharedLength).toBe(0);
   });
 
   it('removes all obsolete v4 files from generated output', async () => {
