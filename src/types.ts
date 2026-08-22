@@ -33,6 +33,7 @@ export interface WorldManifest {
     height: BinaryField;
     surface: BinaryField;
     roads: BinaryField;
+    waterways: BinaryField;
     coast: BinaryField;
     provinceIds: BinaryField;
   };
@@ -43,6 +44,8 @@ export interface WorldManifest {
     roadIndices: BinaryBufferDescriptor;
     hiddenConnectionVertices: BinaryBufferDescriptor;
     hiddenConnectionIndices: BinaryBufferDescriptor;
+    waterwayVertices: BinaryBufferDescriptor;
+    waterwayIndices: BinaryBufferDescriptor;
     corridorMetrics: BinaryBufferDescriptor;
     corridorFlags: BinaryBufferDescriptor;
     connectionCorridorOffsets: BinaryBufferDescriptor;
@@ -64,12 +67,15 @@ export interface WorldManifest {
     chunksY: number;
     roads: Array<{ firstIndex: number; indexCount: number }>;
     hiddenConnections: Array<{ firstIndex: number; indexCount: number }>;
+    waterways: Array<{ firstIndex: number; indexCount: number }>;
   };
   reports: { generation: { url: string; version: string } };
   showcases: {
     urban: [number, number]; mountain: [number, number]; steepRoad: [number, number];
     dirtRoad: [number, number]; hiddenConnection: [number, number];
     europe: [number, number]; lakeRoad: [number, number]; liangshan: [number, number];
+    river: [number, number]; riverMouth: [number, number];
+    kielCanal: [number, number]; suezCanal: [number, number];
   };
   counts: Record<string, number>;
   provinces: ProvinceRecord[];

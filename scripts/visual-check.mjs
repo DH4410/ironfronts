@@ -54,6 +54,9 @@ const validation = await page.evaluate(async () => {
     hiddenGradeRoads: counts.hiddenGradeRoutes,
     steepRoads: counts.steepRoadRoutes,
     steepEmittedRoads: counts.steepEmittedRoutes,
+    riverSystems: counts.riverSystems,
+    riverSegments: counts.riverSegments,
+    canalSystems: counts.canalSystems,
   };
 });
 if (validation.oceanRoadSamples !== 0) errors.push(`validation: ${validation.oceanRoadSamples} road samples enter ocean/lakes`);
@@ -62,6 +65,8 @@ if (validation.maximumSlopeStep > 2.01) errors.push(`validation: terrain step ${
 if (validation.capViolations !== 0) errors.push(`validation: ${validation.capViolations} terrain samples exceed their local cap`);
 if (validation.hiddenGradeRoads !== 0) errors.push(`validation: ${validation.hiddenGradeRoads} roads remain hidden only because of incline`);
 if (validation.steepEmittedRoads <= 0) errors.push('validation: no incline-warning roads were emitted');
+if (validation.riverSystems !== 24 || validation.riverSegments !== 527) errors.push('validation: authoritative river graph is incomplete');
+if (validation.canalSystems !== 2) errors.push('validation: Kiel and Suez canal surfaces are incomplete');
 await page.screenshot({ path: path.join(outputDirectory, 'overview.png') });
 
 if (!status.unsupported) {
@@ -100,6 +105,10 @@ if (!status.unsupported) {
   await capturePoint([5_822, 2_564], 'terrain-iberia.png', 520);
   await capturePoint([6_520, 3_931], 'terrain-africa.png', 620);
   await captureShowcase('lakeRoad', 'roads-lake.png', 380);
+  await captureShowcase('river', 'waterways-river.png', 420);
+  await captureShowcase('riverMouth', 'waterways-mouth.png', 460);
+  await captureShowcase('kielCanal', 'waterways-kiel-canal.png', 240);
+  await captureShowcase('suezCanal', 'waterways-suez-canal.png', 320);
   await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(5));
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(outputDirectory, 'roads-levels.png') });

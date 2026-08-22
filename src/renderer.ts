@@ -6,7 +6,7 @@ import {
   createTreeMesh, uploadIndexedMesh,
 } from './scene-meshes';
 import type { Mesh } from './scene-meshes';
-import { infrastructureShader, lineShader, propShader, terrainShader, waterShader } from './shaders';
+import { infrastructureShader, lineShader, propShader, terrainShader, waterShader, waterwayShader } from './shaders';
 import type { FrameStats, HoverInfo, ProgressReporter, ProvinceRecord, WorldManifest } from './types';
 
 interface InstanceLayer {
@@ -36,6 +36,7 @@ export class WorldRenderer {
   private uniformBuffer!: GPUBuffer;
   private terrainPipeline!: GPURenderPipeline;
   private waterPipeline!: GPURenderPipeline;
+  private waterwayPipeline!: GPURenderPipeline;
   private infrastructurePipeline!: GPURenderPipeline;
   private propPipeline!: GPURenderPipeline;
   private linePipeline!: GPURenderPipeline;
@@ -43,6 +44,7 @@ export class WorldRenderer {
   private waterMesh!: Mesh;
   private roadMesh!: Mesh;
   private hiddenConnectionMesh!: Mesh;
+  private waterwayMesh!: Mesh;
   private treeMesh!: Mesh;
   private buildingMesh!: Mesh;
   private shadowMesh!: Mesh;
@@ -61,6 +63,7 @@ export class WorldRenderer {
   private provinceTexture!: GPUTexture;
   private coastTexture!: GPUTexture;
   private roadTexture!: GPUTexture;
+  private waterwayTexture!: GPUTexture;
   private materialTexture!: GPUTexture;
   private heightData!: Float32Array;
   private provinceData!: Uint16Array;
@@ -107,17 +110,21 @@ export class WorldRenderer {
     this.createLayouts();
 
     report('Loading terrain fields', 0.2);
-    const [heightBuffer, surfaceBuffer, roadFieldBuffer, coastBuffer, provinceBuffer, roadVertexBuffer, roadIndexBuffer,
-      hiddenConnectionVertexBuffer, hiddenConnectionIndexBuffer, borderBuffer, treeBuffer, buildingBuffer, lampBuffer, barrierBuffer, signBuffer] = await Promise.all([
+    const [heightBuffer, surfaceBuffer, roadFieldBuffer, waterwayFieldBuffer, coastBuffer, provinceBuffer, roadVertexBuffer, roadIndexBuffer,
+      hiddenConnectionVertexBuffer, hiddenConnectionIndexBuffer, waterwayVertexBuffer, waterwayIndexBuffer,
+      borderBuffer, treeBuffer, buildingBuffer, lampBuffer, barrierBuffer, signBuffer] = await Promise.all([
       fetchBinary(`/world/${this.manifest.fields.height.url}`),
       fetchBinary(`/world/${this.manifest.fields.surface.url}`),
       fetchBinary(`/world/${this.manifest.fields.roads.url}`),
+      fetchBinary(`/world/${this.manifest.fields.waterways.url}`),
       fetchBinary(`/world/${this.manifest.fields.coast.url}`),
       fetchBinary(`/world/${this.manifest.fields.provinceIds.url}`),
       fetchBinary(`/world/${this.manifest.buffers.roadVertices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.roadIndices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.hiddenConnectionVertices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.hiddenConnectionIndices.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.waterwayVertices.url}`),
+      fetchBinary(`/world/${this.manifest.buffers.waterwayIndices.url}`),
       fetchBinary(`/world/${this.manifest.buffers.borders.url}`),
       fetchBinary(`/world/${this.manifest.buffers.trees.url}`),
       fetchBinary(`/world/${this.manifest.buffers.buildings.url}`),
@@ -140,6 +147,10 @@ export class WorldRenderer {
     this.roadTexture = this.uploadTexture(
       'strategic road field', this.manifest.fields.roads.width, this.manifest.fields.roads.height,
       'rgba8unorm', new Uint8Array(roadFieldBuffer), this.manifest.fields.roads.width * 4,
+    );
+    this.waterwayTexture = this.uploadTexture(
+      'authored waterway mask', this.manifest.fields.waterways.width, this.manifest.fields.waterways.height,
+      'r8unorm', new Uint8Array(waterwayFieldBuffer), this.manifest.fields.waterways.width,
     );
     this.coastTexture = this.uploadTexture(
       'filtered coast mask', this.manifest.fields.coast.width, this.manifest.fields.coast.height,
@@ -169,6 +180,7 @@ export class WorldRenderer {
         { binding: 5, resource: this.device.createSampler({ addressModeU: 'repeat', addressModeV: 'clamp-to-edge', magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' }) },
         { binding: 6, resource: this.coastTexture.createView() },
         { binding: 7, resource: this.roadTexture.createView() },
+        { binding: 8, resource: this.waterwayTexture.createView() },
       ],
     });
 
@@ -179,6 +191,8 @@ export class WorldRenderer {
     this.roadMesh = uploadIndexedMesh(this.device, 'terrain roads', roadVertexBuffer, roadIndexBuffer, this.manifest.buffers.roadIndices.count);
     this.hiddenConnectionMesh = uploadIndexedMesh(this.device, 'floating hidden connections', hiddenConnectionVertexBuffer,
       hiddenConnectionIndexBuffer, this.manifest.buffers.hiddenConnectionIndices.count);
+    this.waterwayMesh = uploadIndexedMesh(this.device, 'supplied rivers and canals', waterwayVertexBuffer,
+      waterwayIndexBuffer, this.manifest.buffers.waterwayIndices.count);
     this.treeMesh = createTreeMesh(this.device);
     this.buildingMesh = createBuildingMesh(this.device);
     this.shadowMesh = createShadowMesh(this.device);
@@ -253,6 +267,7 @@ export class WorldRenderer {
         { binding: 5, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
         { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
         { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+        { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       ],
     });
     this.instanceLayout = this.device.createBindGroupLayout({
@@ -275,6 +290,7 @@ export class WorldRenderer {
     const depthStencil: GPUDepthStencilState = { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' };
     const terrainModule = this.device.createShaderModule({ label: 'terrain shader', code: terrainShader });
     const waterModule = this.device.createShaderModule({ label: 'water shader', code: waterShader });
+    const waterwayModule = this.device.createShaderModule({ label: 'static waterway shader', code: waterwayShader });
     const infrastructureModule = this.device.createShaderModule({ label: 'terrain-draped road shader', code: infrastructureShader });
     const propModule = this.device.createShaderModule({ label: 'prop shader', code: propShader });
     const lineModule = this.device.createShaderModule({ label: 'line shader', code: lineShader });
@@ -301,6 +317,28 @@ export class WorldRenderer {
         buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
       },
       fragment: { module: waterModule, entryPoint: 'waterFragment', targets: [{ format: this.format }] },
+      primitive: { topology: 'triangle-list', cullMode: 'none' },
+      depthStencil,
+    });
+
+    this.waterwayPipeline = this.device.createRenderPipeline({
+      label: 'static waterway pipeline',
+      layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.commonLayout] }),
+      vertex: {
+        module: waterwayModule,
+        entryPoint: 'waterwayVertex',
+        buffers: [{
+          arrayStride: 32,
+          attributes: [
+            { shaderLocation: 0, offset: 0, format: 'float32x3' },
+            { shaderLocation: 1, offset: 12, format: 'float32x2' },
+            { shaderLocation: 2, offset: 20, format: 'float32' },
+            { shaderLocation: 3, offset: 24, format: 'float32' },
+            { shaderLocation: 4, offset: 28, format: 'float32' },
+          ],
+        }],
+      },
+      fragment: { module: waterwayModule, entryPoint: 'waterwayFragment', targets: [{ format: this.format, blend: alphaBlend }] },
       primitive: { topology: 'triangle-list', cullMode: 'none' },
       depthStencil,
     });
@@ -488,6 +526,11 @@ export class WorldRenderer {
     pass.setVertexBuffer(0, this.terrainMesh.vertex);
     pass.setIndexBuffer(this.terrainMesh.index, 'uint16');
     pass.drawIndexed(this.terrainMesh.indexCount, this.manifest.terrain.chunksX * this.manifest.terrain.chunksY * 3);
+
+    pass.setPipeline(this.waterwayPipeline);
+    pass.setVertexBuffer(0, this.waterwayMesh.vertex);
+    pass.setIndexBuffer(this.waterwayMesh.index, 'uint32');
+    this.drawChunkedInfrastructure(pass, this.waterwayMesh, this.manifest.infrastructureChunks.waterways, 9_200);
 
     pass.setPipeline(this.infrastructurePipeline);
     pass.setVertexBuffer(0, this.roadMesh.vertex);

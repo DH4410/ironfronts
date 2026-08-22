@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WgslReflect } from 'wgsl_reflect/wgsl_reflect.module.js';
 import { create, globals } from 'webgpu';
-import { infrastructureShader, lineShader, propShader, terrainShader, waterShader } from '../src/shaders';
+import { infrastructureShader, lineShader, propShader, terrainShader, waterShader, waterwayShader } from '../src/shaders';
 
 describe('WGSL programs', () => {
   it('limits beach material to the actual shoreline mask', () => {
@@ -15,9 +15,16 @@ describe('WGSL programs', () => {
     expect(infrastructureShader).toContain('vec3f(0.96, 0.73, 0.25)');
   });
 
+  it('keeps supplied waterways static and gives canals the ocean palette', () => {
+    expect(waterwayShader).not.toContain('uniforms.sunTime.w');
+    expect(waterwayShader).toContain('let canal = input.kind > 0.5');
+    expect(waterwayShader).toContain('oceanDeep');
+  });
+
   it.each([
     ['terrain', terrainShader, ['terrainVertex'], ['terrainFragment']],
     ['water', waterShader, ['waterVertex'], ['waterFragment']],
+    ['waterways', waterwayShader, ['waterwayVertex'], ['waterwayFragment']],
     ['infrastructure', infrastructureShader, ['infrastructureVertex'], ['infrastructureFragment']],
     ['props', propShader, ['propVertex'], ['propFragment']],
     ['lines', lineShader, ['lineVertex'], ['lineFragment']],
@@ -37,7 +44,7 @@ describe('WGSL programs', () => {
     const device = await adapter.requestDevice();
     const modules = new Map<string, GPUShaderModule>();
     for (const [label, source] of [
-      ['terrain', terrainShader], ['water', waterShader], ['infrastructure', infrastructureShader], ['props', propShader], ['lines', lineShader],
+      ['terrain', terrainShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['lines', lineShader],
     ] as const) {
       const module = device.createShaderModule({ label, code: source });
       modules.set(label, module);
@@ -55,6 +62,7 @@ describe('WGSL programs', () => {
       { binding: 5, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
       { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ] });
     const layer = device.createBindGroupLayout({ entries: [
       { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
@@ -83,6 +91,16 @@ describe('WGSL programs', () => {
       vertex: { module: modules.get('water')!, entryPoint: 'waterVertex', buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }] },
       fragment: { module: modules.get('water')!, entryPoint: 'waterFragment', targets: [{ format: 'bgra8unorm' }] },
       primitive: { topology: 'triangle-list' }, depthStencil,
+    })).resolves.toBeDefined();
+    await expect(device.createRenderPipelineAsync({
+      layout: device.createPipelineLayout({ bindGroupLayouts: [common] }),
+      vertex: { module: modules.get('waterways')!, entryPoint: 'waterwayVertex', buffers: [{ arrayStride: 32, attributes: [
+        { shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x2' },
+        { shaderLocation: 2, offset: 20, format: 'float32' }, { shaderLocation: 3, offset: 24, format: 'float32' },
+        { shaderLocation: 4, offset: 28, format: 'float32' },
+      ] }] },
+      fragment: { module: modules.get('waterways')!, entryPoint: 'waterwayFragment', targets: [{ format: 'bgra8unorm' }] },
+      primitive: { topology: 'triangle-list', cullMode: 'none' }, depthStencil,
     })).resolves.toBeDefined();
     await expect(device.createRenderPipelineAsync({
       layout: device.createPipelineLayout({ bindGroupLayouts: [common, layer] }),

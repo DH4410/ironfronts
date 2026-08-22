@@ -18,6 +18,7 @@ struct Uniforms {
 @group(0) @binding(5) var materialSampler: sampler;
 @group(0) @binding(6) var coastTexture: texture_2d<f32>;
 @group(0) @binding(7) var roadTexture: texture_2d<f32>;
+@group(0) @binding(8) var waterwayTexture: texture_2d<f32>;
 
 fn wrappedUv(uv: vec2f) -> vec2f {
   return vec2f(fract(uv.x + 1.0), clamp(uv.y, 0.0, 0.999999));
@@ -79,6 +80,10 @@ fn landAt(uvInput: vec2f) -> f32 {
 
 fn roadAt(uvInput: vec2f) -> vec4f {
   return textureSampleLevel(roadTexture, materialSampler, wrappedUv(uvInput), 0.0);
+}
+
+fn waterwayAt(uvInput: vec2f) -> f32 {
+  return textureSampleLevel(waterwayTexture, materialSampler, wrappedUv(uvInput), 0.0).r;
 }
 
 fn terrainNormal(uv: vec2f) -> vec3f {
@@ -300,7 +305,7 @@ fn waterVertex(input: WaterVertexInput, @builtin(instance_index) instanceIndex: 
 
 @fragment
 fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
-  if (landAt(input.mapUv) >= 0.5) { discard; }
+  if (landAt(input.mapUv) >= 0.5 || waterwayAt(input.mapUv) > 0.08) { discard; }
   let time = uniforms.sunTime.w;
   let waveA = sin(input.worldPosition.x * 0.018 + input.worldPosition.z * 0.011 + time * 0.58);
   let waveB = cos(input.worldPosition.x * -0.009 + input.worldPosition.z * 0.024 - time * 0.43);
@@ -320,6 +325,62 @@ fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
   color += vec3f(1.0, 0.86, 0.61) * sun * (0.34 + ripple * 0.05);
   let fog = smoothstep(4000.0, 12000.0, distance(uniforms.camera.xyz, input.worldPosition));
   return vec4f(mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.8), 0.97);
+}
+`;
+
+export const waterwayShader = commonWgsl + /* wgsl */ `
+struct WaterwayInput {
+  @location(0) position: vec3f,
+  @location(1) waterUv: vec2f,
+  @location(2) edgeFactor: f32,
+  @location(3) kind: f32,
+  @location(4) waterwayId: f32,
+};
+
+struct WaterwayOutput {
+  @builtin(position) position: vec4f,
+  @location(0) worldPosition: vec3f,
+  @location(1) waterUv: vec2f,
+  @location(2) edgeFactor: f32,
+  @location(3) @interpolate(flat) kind: f32,
+  @location(4) visibility: f32,
+};
+
+@vertex
+fn waterwayVertex(input: WaterwayInput, @builtin(instance_index) instanceIndex: u32) -> WaterwayOutput {
+  let copyOffset = f32(i32(instanceIndex) - 1) * uniforms.map.x;
+  let worldPosition = input.position + vec3f(copyOffset, 0.0, 0.0);
+  var output: WaterwayOutput;
+  output.position = uniforms.viewProjection * vec4f(worldPosition, 1.0);
+  output.worldPosition = worldPosition;
+  output.waterUv = input.waterUv;
+  output.edgeFactor = input.edgeFactor;
+  output.kind = input.kind;
+  output.visibility = 1.0 - smoothstep(7600.0, 9200.0, distance(uniforms.camera.xyz, worldPosition));
+  return output;
+}
+
+@fragment
+fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
+  if (input.visibility < 0.02) { discard; }
+  let canal = input.kind > 0.5;
+  let grain = fract(sin(dot(floor(input.worldPosition.xz * 0.72), vec2f(12.9898, 78.233))) * 43758.5453);
+  let broad = sin(input.worldPosition.x * 0.041 + input.worldPosition.z * 0.029) * 0.5 + 0.5;
+  let riverDeep = vec3f(0.035, 0.225, 0.285);
+  let riverShallow = vec3f(0.14, 0.48, 0.50);
+  let oceanDeep = vec3f(0.022, 0.145, 0.235);
+  let oceanShallow = vec3f(0.10, 0.39, 0.46);
+  var color = select(mix(riverDeep, riverShallow, input.edgeFactor * 0.76),
+    mix(oceanDeep, oceanShallow, input.edgeFactor * 0.58), canal);
+  color *= 0.94 + grain * 0.045 + broad * 0.035;
+  let normal = normalize(vec3f((broad - 0.5) * 0.035, 1.0, (grain - 0.5) * 0.025));
+  let viewDirection = normalize(uniforms.camera.xyz - input.worldPosition);
+  let fresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 4.2);
+  let sun = pow(max(dot(reflect(-normalize(uniforms.sunTime.xyz), normal), viewDirection), 0.0), 128.0);
+  color = mix(color, vec3f(0.39, 0.59, 0.62), fresnel * 0.42);
+  color += vec3f(1.0, 0.84, 0.58) * sun * 0.28;
+  let fog = smoothstep(4000.0, 12000.0, distance(uniforms.camera.xyz, input.worldPosition));
+  return vec4f(mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.80), input.visibility * 0.985);
 }
 `;
 

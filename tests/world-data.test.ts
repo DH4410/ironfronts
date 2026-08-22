@@ -10,6 +10,7 @@ interface Manifest {
   infrastructureChunks: {
     roads: Array<{ firstIndex: number; indexCount: number }>;
     hiddenConnections: Array<{ firstIndex: number; indexCount: number }>;
+    waterways: Array<{ firstIndex: number; indexCount: number }>;
   };
   counts: Record<string, number>;
   provinces: Array<{ id: number; name: string; terrain: string; infrastructureLevel: number }>;
@@ -27,18 +28,20 @@ function viewU32(bytes: Buffer): Uint32Array {
   return new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
 }
 
-describe('generated v5 world package', () => {
-  it('preserves the canonical world and exposes only simplified layers', async () => {
+describe('generated v6 world package', () => {
+  it('preserves the canonical world and exposes simplified roads plus supplied waterways', async () => {
     const data = await manifest();
-    expect(data.version).toBe(5);
+    expect(data.version).toBe(6);
     expect(data.world).toEqual(expect.objectContaining({ width: 13_562, height: 7_000, wrapX: true }));
     expect(data.provinces).toHaveLength(3_303);
     expect(new Set(data.provinces.map((province) => province.id)).size).toBe(3_303);
     expect(data.provinces[0]).toEqual(expect.objectContaining({ id: 0, name: 'Las Palmas', terrain: 'Plains' }));
-    expect(Object.keys(data.fields).sort()).toEqual(['coast', 'height', 'provinceIds', 'roads', 'surface']);
+    expect(Object.keys(data.fields).sort()).toEqual(['coast', 'height', 'provinceIds', 'roads', 'surface', 'waterways']);
     for (const obsolete of ['riverVertices', 'riverIndices', 'bridgeVertices', 'bridgeIndices', 'tunnelVertices', 'tunnelIndices', 'engineeringVertices', 'engineeringIndices']) {
       expect(data.buffers[obsolete]).toBeUndefined();
     }
+    expect(data.buffers.waterwayVertices).toEqual(expect.objectContaining({ stride: 8 }));
+    expect(data.buffers.waterwayIndices).toEqual(expect.objectContaining({ stride: 1 }));
     expect(data.provinces.every((province) => province.infrastructureLevel === 1)).toBe(true);
     expect(data.counts).toEqual(expect.objectContaining({
       level1Provinces: 3_303, level2Provinces: 0, level3Provinces: 0,
@@ -47,6 +50,44 @@ describe('generated v5 world package', () => {
       hiddenConnectorRoutes: data.counts.hiddenRoutes,
       hiddenGradeRoutes: 0,
     }));
+  });
+
+  it('reconstructs the authoritative river graph and both static ocean-water canals', async () => {
+    const data = await manifest();
+    const [vertexBytes, indexBytes, maskBytes, nodeBytes, reportBytes] = await Promise.all([
+      readFile('public/world/waterway-vertices.f32'), readFile('public/world/waterway-indices.u32'),
+      readFile('public/world/waterways.r8'),
+      readFile('material/movement/network_nodes.json', 'utf8'), readFile('public/world/world-generation-report.json', 'utf8'),
+    ]);
+    const vertices = viewF32(vertexBytes), indices = viewU32(indexBytes);
+    const source = JSON.parse(nodeBytes) as { nodes: Array<{ kind: string; location_name: string }> };
+    const report = JSON.parse(reportBytes);
+    const riverNames = new Set(report.waterways.riverSystems);
+    const sourceRiverPoints = source.nodes.filter((node) => node.kind === 'sea_point' && riverNames.has(node.location_name));
+    const sourceCanalPoints = source.nodes.filter((node) => node.kind === 'sea_point' && ['Kiel Canal', 'Suez Channel'].includes(node.location_name));
+    expect(report.version).toBe('world-generation-v6');
+    expect(report.waterways.staticSurface).toBe(true);
+    expect(report.waterways.riverSystems).toHaveLength(24);
+    expect(sourceRiverPoints).toHaveLength(520);
+    expect(sourceCanalPoints).toHaveLength(8);
+    expect(data.counts).toEqual(expect.objectContaining({
+      riverSystems: 24, riverSourcePoints: 520, riverSegments: 527, riverMouthLinks: 29,
+      canalSystems: 2, canalSourcePoints: 8, canalSegments: 10,
+    }));
+    expect(vertices.length).toBe(data.buffers.waterwayVertices.count * 8);
+    expect(indices.length).toBe(data.buffers.waterwayIndices.count);
+    expect(maskBytes.byteLength).toBe(data.fields.waterways.width * data.fields.waterways.height);
+    expect(maskBytes.some((value) => value > 0)).toBe(true);
+    expect(vertices.every(Number.isFinite)).toBe(true);
+    for (let vertex = 0; vertex < data.buffers.waterwayVertices.count; vertex += 113) {
+      const offset = vertex * 8;
+      expect(vertices[offset + 1]).toBeGreaterThanOrEqual(0.4);
+      expect(vertices[offset + 1]).toBeLessThanOrEqual(50.5);
+      expect([0, 1]).toContain(vertices[offset + 6]);
+    }
+    for (let index = 0; index < indices.length; index += 127) expect(indices[index]).toBeLessThan(data.buffers.waterwayVertices.count);
+    expect(data.infrastructureChunks.waterways).toHaveLength(512);
+    expect(data.infrastructureChunks.waterways.reduce((sum, range) => sum + range.indexCount, 0)).toBe(indices.length);
   });
 
   it('emits finite capped topography without terrain-class spikes', async () => {
@@ -167,7 +208,7 @@ describe('generated v5 world package', () => {
     expect(data.counts.steepEmittedRoutes).toBeGreaterThan(0);
   });
 
-  it('removes all obsolete v4 files from generated output', async () => {
+  it('removes all obsolete procedural-hydrology and structure files from generated output', async () => {
     for (const name of ['rivers.rgba8', 'river-vertices.f32', 'bridge-vertices.f32', 'tunnel-vertices.f32', 'infrastructure-engineering.rgba8', 'engineering-vertices.f32']) {
       await expect(access(`public/world/${name}`)).rejects.toThrow();
     }

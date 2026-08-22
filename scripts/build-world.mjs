@@ -6,6 +6,7 @@ import { buildInfrastructure } from './build-infrastructure.mjs';
 import { FIELD_HEIGHT, FIELD_WIDTH, ID_HEIGHT, ID_WIDTH, SEED, WORLD_HEIGHT, WORLD_WIDTH } from './world/config.mjs';
 import { blurField, clamp, distanceToValue, smoothstep, wrap } from './world/raster.mjs';
 import { generateTopography } from './world/topography.mjs';
+import { buildWaterways } from './world/waterways.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MATERIAL = path.join(ROOT, 'material');
@@ -335,13 +336,22 @@ async function main() {
   console.log('Packing borders, movement graph, forests, and cities…');
   const borders = buildBorders(borderData);
   const connections = buildConnections(connectionData);
+  console.log('Compiling supplied rivers and ocean-water canals...');
+  const waterways = buildWaterways({
+    networkData, connectionData, provinceIds, idWidth: ID_WIDTH, idHeight: ID_HEIGHT, heights,
+    heightWidth: FIELD_WIDTH, heightHeight: FIELD_HEIGHT, worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
+  });
   console.log('Compiling direct province-center roads and city placement...');
   const infrastructure = buildInfrastructure({
     borderData, connectionData, networkData, provinces: metadata.provinces, heights, landField,
     fieldWidth: FIELD_WIDTH, fieldHeight: FIELD_HEIGHT, roadFieldWidth: ID_WIDTH, roadFieldHeight: ID_HEIGHT,
     worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
   });
-  const { trees, buildings } = buildInstances(metadata.provinces, geometryById, provinceIds, areaCounts, infrastructure.roadClearance, infrastructure.cityPlans);
+  const placementClearance = infrastructure.roadClearance.slice();
+  for (let index = 0; index < placementClearance.length; index += 1) {
+    placementClearance[index] = Math.max(placementClearance[index], waterways.clearance[index]);
+  }
+  const { trees, buildings } = buildInstances(metadata.provinces, geometryById, provinceIds, areaCounts, placementClearance, infrastructure.cityPlans);
 
   const provinceRecords = metadata.provinces.map((province) => ({
     id: province.province_id,
@@ -359,13 +369,14 @@ async function main() {
   for (const height of heights) maxHeight = Math.max(maxHeight, height);
 
   const worldGenerationReport = {
-    version: 'world-generation-v5',
+    version: 'world-generation-v6',
     topography: topographyReport,
+    waterways: waterways.report,
     roads: infrastructure.roadReport,
   };
 
   const manifest = {
-    version: 5,
+    version: 6,
     source: { mapId: mapMetadata.map_id, mapVersion: mapMetadata.map_version },
     generatedSeed: SEED,
     world: { width: WORLD_WIDTH, height: WORLD_HEIGHT, overlapX: 250, wrapX: true },
@@ -373,6 +384,7 @@ async function main() {
       height: { url: 'height.f32', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'r32float' },
       surface: { url: 'surface.rgba8', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'rgba8uint' },
       roads: { url: 'roads.rgba8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rgba8unorm' },
+      waterways: { url: 'waterways.r8', width: ID_WIDTH, height: ID_HEIGHT, format: 'r8unorm' },
       coast: { url: 'coast.r8', width: ID_WIDTH, height: ID_HEIGHT, format: 'r8unorm' },
       provinceIds: { url: 'province-ids.u16', width: ID_WIDTH, height: ID_HEIGHT, format: 'r16uint' },
     },
@@ -383,6 +395,8 @@ async function main() {
       roadIndices: { url: 'road-indices.u32', count: infrastructure.roadIndices.length, stride: 1 },
       hiddenConnectionVertices: { url: 'hidden-connection-vertices.f32', count: infrastructure.hiddenConnectionVertices.length / 13, stride: 13 },
       hiddenConnectionIndices: { url: 'hidden-connection-indices.u32', count: infrastructure.hiddenConnectionIndices.length, stride: 1 },
+      waterwayVertices: { url: 'waterway-vertices.f32', count: waterways.vertices.length / 8, stride: 8 },
+      waterwayIndices: { url: 'waterway-indices.u32', count: waterways.indices.length, stride: 1 },
       corridorMetrics: { url: 'corridor-metrics.f32', count: infrastructure.corridorMetrics.length / 6, stride: 6, lazy: true },
       corridorFlags: { url: 'corridor-flags.u32', count: infrastructure.corridorFlags.length / 4, stride: 4, lazy: true },
       connectionCorridorOffsets: { url: 'connection-corridor-offsets.u32', count: infrastructure.connectionCorridorOffsets.length, stride: 1, lazy: true },
@@ -394,15 +408,16 @@ async function main() {
       signs: { url: 'signs.f32', count: infrastructure.signs.length / 8, stride: 8 },
     },
     terrain: { chunksX: 32, chunksY: 16, gridResolution: 49, maxHeight },
-    infrastructureChunks: infrastructure.chunkRanges,
+    infrastructureChunks: { ...infrastructure.chunkRanges, waterways: waterways.chunkRanges },
     reports: { generation: { url: 'world-generation-report.json', version: worldGenerationReport.version } },
-    showcases: infrastructure.showcases,
+    showcases: { ...infrastructure.showcases, ...waterways.showcases },
     counts: {
       provinces: provinceRecords.length,
       borders: borders.length / 8,
       trees: trees.length / 8,
       buildings: buildings.length / 8,
       connections: connections.length / 8,
+      ...waterways.stats,
       ...infrastructure.stats,
       lamps: infrastructure.lamps.length / 8,
       barriers: infrastructure.barriers.length / 8,
@@ -416,6 +431,7 @@ async function main() {
     writeTyped('height.f32', heights),
     writeTyped('surface.rgba8', surface),
     writeTyped('roads.rgba8', infrastructure.roadField),
+    writeTyped('waterways.r8', waterways.mask),
     writeTyped('coast.r8', coastMask),
     writeTyped('borders.f32', borders),
     writeTyped('connections.f32', connections),
@@ -423,6 +439,8 @@ async function main() {
     writeTyped('road-indices.u32', infrastructure.roadIndices),
     writeTyped('hidden-connection-vertices.f32', infrastructure.hiddenConnectionVertices),
     writeTyped('hidden-connection-indices.u32', infrastructure.hiddenConnectionIndices),
+    writeTyped('waterway-vertices.f32', waterways.vertices),
+    writeTyped('waterway-indices.u32', waterways.indices),
     writeTyped('corridor-metrics.f32', infrastructure.corridorMetrics),
     writeTyped('corridor-flags.u32', infrastructure.corridorFlags),
     writeTyped('connection-corridor-offsets.u32', infrastructure.connectionCorridorOffsets),
@@ -441,6 +459,7 @@ async function main() {
     .update(Buffer.from(heights.buffer))
     .update(Buffer.from(surface.buffer))
     .update(Buffer.from(infrastructure.roadField.buffer))
+    .update(Buffer.from(waterways.mask.buffer))
     .update(Buffer.from(coastMask.buffer))
     .update(Buffer.from(borders.buffer))
     .update(Buffer.from(connections.buffer))
@@ -448,6 +467,8 @@ async function main() {
     .update(Buffer.from(infrastructure.roadIndices.buffer))
     .update(Buffer.from(infrastructure.hiddenConnectionVertices.buffer))
     .update(Buffer.from(infrastructure.hiddenConnectionIndices.buffer))
+    .update(Buffer.from(waterways.vertices.buffer))
+    .update(Buffer.from(waterways.indices.buffer))
     .update(Buffer.from(infrastructure.corridorMetrics.buffer))
     .update(Buffer.from(infrastructure.corridorFlags.buffer))
     .update(Buffer.from(infrastructure.connectionCorridorOffsets.buffer))
@@ -456,7 +477,7 @@ async function main() {
     .update(Buffer.from(buildings.buffer))
     .digest('hex');
   await writeFile(path.join(OUTPUT, 'build.json'), `${JSON.stringify({ digest }, null, 2)}\n`);
-  console.log(`World assets ready: ${provinceRecords.length} provinces, ${infrastructure.stats.logicalRoutes} logical roads (${infrastructure.stats.emittedRoutes} visible, ${infrastructure.stats.hiddenRoutes} hidden), ${trees.length / 8} trees, ${buildings.length / 8} buildings.`);
+  console.log(`World assets ready: ${provinceRecords.length} provinces, ${waterways.stats.riverSystems} river systems, ${waterways.stats.canalSystems} canals, ${infrastructure.stats.logicalRoutes} logical roads (${infrastructure.stats.emittedRoutes} visible, ${infrastructure.stats.hiddenRoutes} hidden), ${trees.length / 8} trees, ${buildings.length / 8} buildings.`);
   console.log(`Digest ${digest}`);
 }
 
