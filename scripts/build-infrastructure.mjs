@@ -75,7 +75,8 @@ function suppressIllegalCrossings(routes, logicalRouteCount, worldWidth) {
   const cellsX = Math.ceil(worldWidth / cellSize);
   const cells = new Map();
   const ordered = routes.slice(0, logicalRouteCount).filter((route) => !route.suppressed)
-    .sort((a, b) => b.corridorRole - a.corridorRole || b.infrastructureLevel - a.infrastructureLevel
+    .sort((a, b) => Number(a.gradeOverride) - Number(b.gradeOverride)
+      || b.corridorRole - a.corridorRole || b.infrastructureLevel - a.infrastructureLevel
       || b.importance - a.importance || a.id - b.id);
   const connected = (a, b) => a.start === b.start || a.start === b.end || a.end === b.start || a.end === b.end;
   const cross = (ax, az, bx, bz, cx, cz, dx, dz) => {
@@ -139,11 +140,21 @@ export function buildInfrastructure({
   const cityPlans = buildCityPlans(assembled.routes, assembled.nodes, provinces);
 
   const hiddenRoads = [];
+  const gradeWarnings = [];
   for (const route of assembled.routes) {
     route.profile = route.points.map((point) => sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, point.x, point.z));
     const result = auditRoute(route, context);
     route.maximumObservedGrade = result.maximumGrade;
     if (result.visible) continue;
+    if (result.reason === 'grade') {
+      // Grade is now a visual warning, not a reason to erase the road. Dense
+      // terrain sampling keeps these steep trails seated just like the
+      // floating diagnostic connector, while retaining normal dirt styling.
+      route.gradeOverride = true;
+      gradeWarnings.push({ corridorId: route.id, x: result.x, z: result.z,
+        endpoints: [route.start, route.end], affectedConnections: route.segmentIds, maximumGrade: result.maximumGrade });
+      continue;
+    }
     route.suppressed = true;
     route.hiddenReason = result.reason;
     if (route.id < logicalRouteCount) hiddenRoads.push({ corridorId: route.id, reason: result.reason, x: result.x, z: result.z,
@@ -188,6 +199,7 @@ export function buildInfrastructure({
     roadReport: { version: 'world-generation-v5', logicalCorridors: logicalRouteCount,
       emittedCorridors: assembled.routes.slice(0, logicalRouteCount).filter((route) => !route.suppressed).length,
       hiddenCorridors: hiddenRoads.length, hiddenByReason, hiddenRoads,
+      gradeWarnings: gradeWarnings.map((warning) => ({ ...warning, emitted: !assembled.routes[warning.corridorId].suppressed })),
       unmappedLandSegments: assembled.unmappedLandSegments, sharedSegments: 0, sharedLength: 0 },
     stats: {
       landSegments: assembled.landSegmentCount, logicalRoutes: logicalRouteCount,
@@ -195,6 +207,8 @@ export function buildInfrastructure({
       hiddenRoutes: hiddenRoads.length, hiddenWaterRoutes: hiddenByReason.water ?? 0, hiddenGradeRoutes: hiddenByReason.grade ?? 0,
       hiddenCrossingRoutes: hiddenByReason.crossing ?? 0,
       hiddenConnectorRoutes: hiddenRoads.length,
+      steepRoadRoutes: gradeWarnings.length,
+      steepEmittedRoutes: gradeWarnings.filter((warning) => !assembled.routes[warning.corridorId].suppressed).length,
       unmappedLandSegments: assembled.unmappedLandSegments.length,
       localStreets: 0,
       localRoutes: classCounts[0], regionalRoutes: classCounts[1], majorRoutes: classCounts[2], sharedGateways: 0,

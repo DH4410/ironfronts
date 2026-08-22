@@ -45,6 +45,7 @@ describe('generated v5 world package', () => {
       localStreets: 0, regionalRoutes: 0, majorRoutes: 0,
       sharedGateways: 0, physicalSharedSegments: 0, physicalSharedLength: 0,
       hiddenConnectorRoutes: data.counts.hiddenRoutes,
+      hiddenGradeRoutes: 0,
     }));
   });
 
@@ -105,7 +106,7 @@ describe('generated v5 world package', () => {
       expect(surface[(pz * width + px) * 4 + 3]).toBeGreaterThan(0);
       const lift = y - sampleHeight(x, z);
       expect(lift).toBeGreaterThanOrEqual(0.079);
-      expect(lift).toBeLessThanOrEqual(0.121);
+      expect(lift).toBeLessThanOrEqual(0.161);
     }
     expect(data.infrastructureChunks.roads).toHaveLength(512);
     expect(data.infrastructureChunks.roads.reduce((sum, range) => sum + range.indexCount, 0)).toBe(indices.length);
@@ -162,6 +163,8 @@ describe('generated v5 world package', () => {
     expect(unmapped.size).toBe(data.counts.unmappedLandSegments);
     expect(report.roads.sharedSegments).toBe(0);
     expect(report.roads.sharedLength).toBe(0);
+    expect(report.roads.gradeWarnings.length).toBe(data.counts.steepRoadRoutes);
+    expect(data.counts.steepEmittedRoutes).toBeGreaterThan(0);
   });
 
   it('removes all obsolete v4 files from generated output', async () => {

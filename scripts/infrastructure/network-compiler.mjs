@@ -75,7 +75,8 @@ export function buildCorridorMetrics(routes, worldWidth) {
       }
     }
     metrics.set([length, ascent, descent, maximumGrade, curvature / Math.max(1, route.points.length - 2), 1], route.id * 6);
-    flags.set([route.infrastructureLevel, route.corridorRole, route.surfaceMaterial ?? 0, 1 | (sharedLength > 0 ? 2 : 0)], route.id * 4);
+    flags.set([route.infrastructureLevel, route.corridorRole, route.surfaceMaterial ?? 0,
+      1 | (sharedLength > 0 ? 2 : 0) | (route.gradeOverride ? 64 : 0)], route.id * 4);
   }
   return { corridorMetrics: metrics, corridorFlags: flags };
 }

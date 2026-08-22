@@ -51,12 +51,17 @@ const validation = await page.evaluate(async () => {
     maximumSlopeStep: report.topography.maximumSlopeStep,
     capViolations: report.topography.capViolations,
     hiddenRoads: report.roads.hiddenCorridors,
+    hiddenGradeRoads: counts.hiddenGradeRoutes,
+    steepRoads: counts.steepRoadRoutes,
+    steepEmittedRoads: counts.steepEmittedRoutes,
   };
 });
 if (validation.oceanRoadSamples !== 0) errors.push(`validation: ${validation.oceanRoadSamples} road samples enter ocean/lakes`);
 if (validation.maximumHeight > 50.5) errors.push(`validation: maximum elevation ${validation.maximumHeight.toFixed(3)} exceeds 50.5`);
 if (validation.maximumSlopeStep > 2.01) errors.push(`validation: terrain step ${validation.maximumSlopeStep.toFixed(3)} exceeds 2.01`);
 if (validation.capViolations !== 0) errors.push(`validation: ${validation.capViolations} terrain samples exceed their local cap`);
+if (validation.hiddenGradeRoads !== 0) errors.push(`validation: ${validation.hiddenGradeRoads} roads remain hidden only because of incline`);
+if (validation.steepEmittedRoads <= 0) errors.push('validation: no incline-warning roads were emitted');
 await page.screenshot({ path: path.join(outputDirectory, 'overview.png') });
 
 if (!status.unsupported) {

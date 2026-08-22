@@ -46,7 +46,7 @@ export function buildMeshes(routes, heights, landField, width, height, worldWidt
     if (route.suppressed || route.points.length < 2) continue;
     const widthWorld = roadWidth(route);
     const surface = route.surfaceMaterial ?? (route.infrastructureLevel === 1 ? 0 : route.infrastructureLevel === 2 ? 1 : route.infrastructureLevel);
-    const lift = route.infrastructureLevel === 1 ? 0.08 : 0.10;
+    const lift = route.gradeOverride ? 0.14 : route.infrastructureLevel === 1 ? 0.08 : 0.10;
     const cumulative = [0];
     for (let index = 1; index < route.points.length; index += 1) cumulative.push(cumulative[index - 1] + Math.hypot(
       unwrapNear(route.points[index].x, route.points[index - 1].x, worldWidth) - route.points[index - 1].x,
