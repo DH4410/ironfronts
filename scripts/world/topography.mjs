@@ -1,8 +1,7 @@
 import { FIELD_HEIGHT, FIELD_WIDTH, SEED, WORLD_HEIGHT, WORLD_WIDTH } from './config.mjs';
 import { blurField, clamp, smoothstep, wrap } from './raster.mjs';
-import { assembleProvinceRoutes } from '../infrastructure/network.mjs';
-
-const MAX_GRADES = [0.18, 0.14, 0.10, 0.08, 0.06];
+import { ROAD_MAX_GRADE } from '../infrastructure/common.mjs';
+import { assembleProvinceRoutes } from '../infrastructure/province-routes.mjs';
 
 function hash2(x, y, seed = SEED) {
   let value = Math.imul(x ^ seed, 0x45d9f3b) ^ Math.imul(y + seed, 0x27d4eb2d);
@@ -98,7 +97,7 @@ function cleanAndProject(heights, caps, limits, landField, passes = 10) {
   }
 }
 
-function conditionMovementCorridors(heights, caps, limits, landField, terrainField, provinceField, borderData, connectionData, networkData, provinces) {
+function conditionMovementPaths(heights, caps, limits, landField, terrainField, provinceField, borderData, connectionData, networkData, provinces) {
   const assembled = assembleProvinceRoutes(borderData, connectionData, networkData, provinces, WORLD_WIDTH);
   const baseline = heights.slice();
   const accumulated = new Float32Array(heights.length);
@@ -112,7 +111,7 @@ function conditionMovementCorridors(heights, caps, limits, landField, terrainFie
     const weights = new Float32Array(heights.length);
     let violations = 0;
     for (const route of assembled.routes) {
-      const maximumGrade = MAX_GRADES[clamp(route.infrastructureLevel - 1, 0, 4)];
+      const maximumGrade = ROAD_MAX_GRADE;
       for (let segment = 0; segment + 1 < route.points.length; segment += 1) {
         const a = route.points[segment], b = route.points[segment + 1];
         let dx = b.x - a.x;
@@ -186,7 +185,7 @@ function conditionMovementCorridors(heights, caps, limits, landField, terrainFie
     if (landField[index]) heights[index] = baseline[index] + (heights[index] - baseline[index]) * 0.35;
   }
   // The conditioning budget clamp can reintroduce a sharp edge where many
-  // corridor envelopes overlap. Reconcile those edges while staying inside
+  // movement-path envelopes overlap. Reconcile those edges while staying inside
   // the same immutable per-cell budgets.
   for (let pass = 0; pass < 256; pass += 1) {
     let violations = 0;
@@ -292,7 +291,7 @@ export function generateTopography({ landField, terrainField, provinceField, coa
     }
   }
   cleanAndProject(heights, caps, limits, landField, 12);
-  const conditioning = conditionMovementCorridors(heights, caps, limits, landField, terrainField, provinceField, borderData, connectionData, networkData, provinces);
+  const conditioning = conditionMovementPaths(heights, caps, limits, landField, terrainField, provinceField, borderData, connectionData, networkData, provinces);
   let maximumHeight = 0, maximumSlopeStep = 0, capViolations = 0;
   const classMaxima = [0, 0, 0, 0, 0], classMinima = [Infinity, Infinity, Infinity, Infinity, Infinity];
   const classSums = [0, 0, 0, 0, 0], classCounts = [0, 0, 0, 0, 0], classSlopeSteps = [0, 0, 0, 0, 0];

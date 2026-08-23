@@ -1,13 +1,13 @@
 import { clamp, sampleHeight, unwrapNear, wrap } from '../infrastructure/common.mjs';
 
-export const RIVER_NAMES = new Set([
+const RIVER_NAMES = new Set([
   'Colorado River', 'Congo River', 'Donau', 'Ganga River', 'Hooghly River', 'Indus River',
   'Krishna River', 'Lena', 'Meghna River', 'Mekong River', 'Mississippi River', 'Nile', 'Ob River',
   'Padma River', 'Rhein', 'Rio Amazonas', 'Snake River', 'St. Lawrence', 'Tocantina River',
   'Volga', 'Yangtze River', 'Yellow River', 'Yukon River', 'Yunisei',
 ]);
 
-export const CANAL_NAMES = new Set(['Kiel Canal', 'Suez Channel']);
+const CANAL_NAMES = new Set(['Kiel Canal', 'Suez Channel']);
 
 // The terrain grid is intentionally much coarser than roads and waterways.
 // Sub-unit sampling keeps the solved channel, its clip mask, and its rendered
@@ -252,9 +252,9 @@ export function buildWaterways({
   const mask = new Uint8Array(idWidth * idHeight);
   const chunkFor = (x, z) => clamp(Math.floor(z / worldHeight * chunksY), 0, chunksY - 1) * chunksX
     + clamp(Math.floor(wrap(x, worldWidth) / worldWidth * chunksX), 0, chunksX - 1);
-  const addVertex = (position, uv, edgeFactor, kind, id) => {
-    const vertex = vertices.length / 8;
-    vertices.push(...position, ...uv, edgeFactor, kind, id);
+  const addVertex = (position, uv, edgeFactor, kind) => {
+    const vertex = vertices.length / 7;
+    vertices.push(...position, ...uv, edgeFactor, kind);
     return vertex;
   };
   let totalLength = 0;
@@ -263,8 +263,7 @@ export function buildWaterways({
   let minimumWidth = Infinity;
   let maximumWidth = -Infinity;
 
-  for (let edgeId = 0; edgeId < edges.length; edgeId += 1) {
-    const edge = edges[edgeId];
+  for (const edge of edges) {
     const a = nodes[edge.node_a];
     const b = nodes[edge.node_b];
     const bx = unwrapNear(b.x, a.x, worldWidth);
@@ -303,9 +302,9 @@ export function buildWaterways({
       const right = x - section.nx * section.right;
       const rightZ = z - section.nz * section.right;
       rings.push([
-        addVertex([left, y, leftZ], [length * t / 24, 0], 1, edge.kind, edgeId),
-        addVertex([x, y + 0.015, z], [length * t / 24, 0.5], 0, edge.kind, edgeId),
-        addVertex([right, y, rightZ], [length * t / 24, 1], 1, edge.kind, edgeId),
+        addVertex([left, y, leftZ], [length * t / 24, 0], 1, edge.kind),
+        addVertex([x, y + 0.015, z], [length * t / 24, 0.5], 0, edge.kind),
+        addVertex([right, y, rightZ], [length * t / 24, 1], 1, edge.kind),
       ]);
       markCorridor(clearance, idWidth, idHeight, worldWidth, worldHeight, x, z, section, 2.5);
       markCorridor(mask, idWidth, idHeight, worldWidth, worldHeight, x, z, section, 0);
@@ -332,12 +331,12 @@ export function buildWaterways({
     const surface = nodeSurfaces.get(nodeId);
     const kind = nodeEdges.some((edge) => edge.kind === 1) ? 1 : 0;
     const firstIndex = indices.length;
-    const center = addVertex([node.x, surface.y + 0.02, node.y], [0, 0.5], 0, kind, nodeId);
+    const center = addVertex([node.x, surface.y + 0.02, node.y], [0, 0.5], 0, kind);
     const ring = [];
     for (let step = 0; step < 12; step += 1) {
       const angle = step / 12 * Math.PI * 2;
       ring.push(addVertex([node.x + Math.cos(angle) * surface.radius, surface.y, node.y + Math.sin(angle) * surface.radius],
-        [0, step / 12], 1, kind, nodeId));
+        [0, step / 12], 1, kind));
     }
     for (let step = 0; step < 12; step += 1) indices.push(center, ring[step], ring[(step + 1) % 12]);
     batches.push({ chunk: chunkFor(node.x, node.y), firstIndex, indexCount: indices.length - firstIndex });

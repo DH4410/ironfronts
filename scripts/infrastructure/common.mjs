@@ -1,11 +1,6 @@
-export const TAU = Math.PI * 2;
-export const ROUTING_CACHE_VERSION = 'direct-province-roads-v5.2';
-export const LEVEL_WIDTHS = [1.5, 2.2, 3.4, 4.8, 8.4];
-export const ROLE_WIDTH_SCALE = [0.8, 1.0, 1.2];
-export const MAX_GRADES = [0.18, 0.14, 0.10, 0.08, 0.06];
-export const ROLE_LOCAL = 0;
-export const ROLE_CONNECTOR = 1;
-export const ROLE_TRUNK = 2;
+export const ROUTING_CACHE_VERSION = 'direct-dirt-roads-v6';
+export const ROAD_WIDTH = 1.2;
+export const ROAD_MAX_GRADE = 0.18;
 
 export const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 export const wrap = (value, size) => ((value % size) + size) % size;
@@ -40,10 +35,4 @@ export function sampleHeight(field, width, height, worldWidth, worldHeight, x, z
   const top = field[z0 * width + x0] * (1 - tx) + field[z0 * width + x1] * tx;
   const bottom = field[z1 * width + x0] * (1 - tx) + field[z1 * width + x1] * tx;
   return top * (1 - tz) + bottom * tz;
-}
-
-export function routeRoadWidth(route) {
-  const levelIndex = clamp(route.infrastructureLevel - 1, 0, 4);
-  return route.plaza ? 3.1 : route.localStreet ? Math.max(1.25, LEVEL_WIDTHS[levelIndex] * 0.62)
-    : LEVEL_WIDTHS[levelIndex] * ROLE_WIDTH_SCALE[route.corridorRole];
 }

@@ -15,13 +15,19 @@ export interface BinaryBufferDescriptor {
 export interface ProvinceRecord {
   id: number;
   name: string;
-  center: [number, number];
-  terrainId: number;
   terrain: string;
-  visualBiome: string;
-  population: number;
-  coastal: boolean;
-  infrastructureLevel: number;
+}
+
+export interface ProvinceDetails {
+  version: number;
+  provinces: Array<{
+    id: number;
+    center: [number, number];
+    terrainId: number;
+    visualBiome: string;
+    population: number;
+    coastal: boolean;
+  }>;
 }
 
 export interface WorldManifest {
@@ -47,10 +53,6 @@ export interface WorldManifest {
     waterwayVertices: BinaryBufferDescriptor;
     waterwayIndices: BinaryBufferDescriptor;
     waterwayNetworkLines: BinaryBufferDescriptor;
-    corridorMetrics: BinaryBufferDescriptor;
-    corridorFlags: BinaryBufferDescriptor;
-    connectionCorridorOffsets: BinaryBufferDescriptor;
-    connectionCorridorIds: BinaryBufferDescriptor;
     trees: BinaryBufferDescriptor;
     buildings: BinaryBufferDescriptor;
     lamps: BinaryBufferDescriptor;
@@ -71,6 +73,7 @@ export interface WorldManifest {
     waterways: Array<{ firstIndex: number; indexCount: number }>;
   };
   reports: { generation: { url: string; version: string } };
+  sidecars: { provinceDetails: { url: string; version: number } };
   showcases: {
     urban: [number, number]; mountain: [number, number]; steepRoad: [number, number];
     dirtRoad: [number, number]; hiddenConnection: [number, number];
@@ -97,7 +100,6 @@ export interface FrameStats {
   trees: number;
   buildings: number;
   borderEdges: number;
-  roads: number;
   emittedRoads: number;
   hiddenRoads: number;
   riverSystems: number;
@@ -105,7 +107,6 @@ export interface FrameStats {
   canalSegments: number;
   targetElevation: number;
   targetProvince: number | null;
-  debugView: number;
 }
 
 export type ProgressReporter = (stage: string, progress: number) => void;

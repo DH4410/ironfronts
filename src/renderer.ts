@@ -1,12 +1,12 @@
-import { mat4, vec3 } from 'gl-matrix';
+import { vec3 } from 'gl-matrix';
 import { StrategyCamera } from './camera';
 import { createMaterialTexture } from './material-texture';
+import { createRendererLayouts, createRendererPipelines } from './renderer-pipelines';
 import {
   createBarrierMesh, createBuildingMesh, createLampMesh, createShadowMesh, createSignMesh, createTerrainMesh,
   createTreeMesh, uploadIndexedMesh,
 } from './scene-meshes';
 import type { Mesh } from './scene-meshes';
-import { infrastructureShader, lineShader, propShader, terrainShader, waterShader, waterwayShader } from './shaders';
 import type { FrameStats, HoverInfo, ProgressReporter, ProvinceRecord, WorldManifest } from './types';
 
 interface InstanceLayer {
@@ -153,7 +153,7 @@ export class WorldRenderer {
     );
     this.roadTexture = this.uploadTexture(
       'strategic road field', this.manifest.fields.roads.width, this.manifest.fields.roads.height,
-      'rgba8unorm', new Uint8Array(roadFieldBuffer), this.manifest.fields.roads.width * 4,
+      'rg8unorm', new Uint8Array(roadFieldBuffer), this.manifest.fields.roads.width * 2,
     );
     this.waterwayTexture = this.uploadTexture(
       'authored waterway mask', this.manifest.fields.waterways.width, this.manifest.fields.waterways.height,
@@ -282,150 +282,24 @@ export class WorldRenderer {
   }
 
   private createLayouts(): void {
-    this.commonLayout = this.device.createBindGroupLayout({
-      label: 'common world layout',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
-        { binding: 1, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
-        { binding: 2, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, texture: { sampleType: 'uint' } },
-        { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'uint' } },
-        { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
-        { binding: 5, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
-        { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-        { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-        { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
-      ],
-    });
-    this.instanceLayout = this.device.createBindGroupLayout({
-      label: 'instance layer layout',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
-        { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
-      ],
-    });
-    this.lineLayout = this.device.createBindGroupLayout({
-      label: 'line layer layout',
-      entries: [
-        { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
-        { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
-      ],
-    });
+    const layouts = createRendererLayouts(this.device);
+    this.commonLayout = layouts.common;
+    this.instanceLayout = layouts.instances;
+    this.lineLayout = layouts.lines;
   }
 
   private createPipelines(): void {
-    const depthStencil: GPUDepthStencilState = { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' };
-    const terrainModule = this.device.createShaderModule({ label: 'terrain shader', code: terrainShader });
-    const waterModule = this.device.createShaderModule({ label: 'water shader', code: waterShader });
-    const waterwayModule = this.device.createShaderModule({ label: 'static waterway shader', code: waterwayShader });
-    const infrastructureModule = this.device.createShaderModule({ label: 'terrain-draped road shader', code: infrastructureShader });
-    const propModule = this.device.createShaderModule({ label: 'prop shader', code: propShader });
-    const lineModule = this.device.createShaderModule({ label: 'line shader', code: lineShader });
-
-    this.terrainPipeline = this.device.createRenderPipeline({
-      label: 'terrain pipeline',
-      layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.commonLayout] }),
-      vertex: {
-        module: terrainModule,
-        entryPoint: 'terrainVertex',
-        buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
-      },
-      fragment: { module: terrainModule, entryPoint: 'terrainFragment', targets: [{ format: this.format }] },
-      primitive: { topology: 'triangle-list', cullMode: 'none' },
-      depthStencil,
+    const pipelines = createRendererPipelines(this.device, this.format, {
+      common: this.commonLayout,
+      instances: this.instanceLayout,
+      lines: this.lineLayout,
     });
-
-    this.waterPipeline = this.device.createRenderPipeline({
-      label: 'water pipeline',
-      layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.commonLayout] }),
-      vertex: {
-        module: waterModule,
-        entryPoint: 'waterVertex',
-        buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }],
-      },
-      fragment: { module: waterModule, entryPoint: 'waterFragment', targets: [{ format: this.format }] },
-      primitive: { topology: 'triangle-list', cullMode: 'none' },
-      depthStencil,
-    });
-
-    this.waterwayPipeline = this.device.createRenderPipeline({
-      label: 'static waterway pipeline',
-      layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.commonLayout] }),
-      vertex: {
-        module: waterwayModule,
-        entryPoint: 'waterwayVertex',
-        buffers: [{
-          arrayStride: 32,
-          attributes: [
-            { shaderLocation: 0, offset: 0, format: 'float32x3' },
-            { shaderLocation: 1, offset: 12, format: 'float32x2' },
-            { shaderLocation: 2, offset: 20, format: 'float32' },
-            { shaderLocation: 3, offset: 24, format: 'float32' },
-            { shaderLocation: 4, offset: 28, format: 'float32' },
-          ],
-        }],
-      },
-      fragment: { module: waterwayModule, entryPoint: 'waterwayFragment', targets: [{ format: this.format, blend: alphaBlend }] },
-      primitive: { topology: 'triangle-list', cullMode: 'none' },
-      depthStencil,
-    });
-
-    this.infrastructurePipeline = this.device.createRenderPipeline({
-      label: 'terrain-draped roads pipeline',
-      layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.commonLayout] }),
-      vertex: {
-        module: infrastructureModule,
-        entryPoint: 'infrastructureVertex',
-        buffers: [{
-          arrayStride: 52,
-          attributes: [
-            { shaderLocation: 0, offset: 0, format: 'float32x3' },
-            { shaderLocation: 1, offset: 12, format: 'float32x3' },
-            { shaderLocation: 2, offset: 24, format: 'float32x2' },
-            { shaderLocation: 3, offset: 32, format: 'float32' },
-            { shaderLocation: 4, offset: 36, format: 'float32' },
-            { shaderLocation: 5, offset: 40, format: 'float32' },
-            { shaderLocation: 6, offset: 44, format: 'float32' },
-            { shaderLocation: 7, offset: 48, format: 'float32' },
-          ],
-        }],
-      },
-      fragment: { module: infrastructureModule, entryPoint: 'infrastructureFragment', targets: [{ format: this.format, blend: alphaBlend }] },
-      primitive: { topology: 'triangle-list', cullMode: 'none' },
-      depthStencil,
-    });
-
-    this.propPipeline = this.device.createRenderPipeline({
-      label: 'world props pipeline',
-      layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.commonLayout, this.instanceLayout] }),
-      vertex: {
-        module: propModule,
-        entryPoint: 'propVertex',
-        buffers: [{
-          arrayStride: 28,
-          attributes: [
-            { shaderLocation: 0, offset: 0, format: 'float32x3' },
-            { shaderLocation: 1, offset: 12, format: 'float32x3' },
-            { shaderLocation: 2, offset: 24, format: 'float32' },
-          ],
-        }],
-      },
-      fragment: {
-        module: propModule,
-        entryPoint: 'propFragment',
-        targets: [{ format: this.format, blend: alphaBlend }],
-      },
-      primitive: { topology: 'triangle-list', cullMode: 'back' },
-      depthStencil,
-    });
-
-    this.linePipeline = this.device.createRenderPipeline({
-      label: 'map lines pipeline',
-      layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.commonLayout, this.lineLayout] }),
-      vertex: { module: lineModule, entryPoint: 'lineVertex' },
-      fragment: { module: lineModule, entryPoint: 'lineFragment', targets: [{ format: this.format, blend: alphaBlend }] },
-      primitive: { topology: 'triangle-list', cullMode: 'none' },
-      depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less-equal' },
-    });
+    this.terrainPipeline = pipelines.terrain;
+    this.waterPipeline = pipelines.water;
+    this.waterwayPipeline = pipelines.waterways;
+    this.infrastructurePipeline = pipelines.infrastructure;
+    this.propPipeline = pipelines.props;
+    this.linePipeline = pipelines.lines;
   }
 
   private uploadTexture(label: string, width: number, height: number, format: GPUTextureFormat, bytes: Uint8Array, bytesPerRow: number): GPUTexture {
@@ -703,9 +577,8 @@ export class WorldRenderer {
       trees: this.trees.count,
       buildings: this.buildings.count,
       borderEdges: this.borders.count,
-      roads: this.manifest.counts.logicalRoutes,
-      emittedRoads: this.manifest.counts.emittedRoutes,
-      hiddenRoads: this.manifest.counts.hiddenRoutes,
+      emittedRoads: this.manifest.counts.emittedRoads,
+      hiddenRoads: this.manifest.counts.hiddenRoads,
       riverSystems: this.manifest.counts.riverSystems,
       riverSegments: this.manifest.counts.riverSegments,
       canalSegments: this.manifest.counts.canalSegments,
@@ -714,15 +587,9 @@ export class WorldRenderer {
         const encoded = this.sampleProvince(this.camera.target[0], this.camera.target[2]);
         return encoded ? encoded - 1 : null;
       })(),
-      debugView: this.debugView,
     });
   }
 }
-
-const alphaBlend: GPUBlendState = {
-  color: { srcFactor: 'src-alpha', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-  alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha', operation: 'add' },
-};
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url);

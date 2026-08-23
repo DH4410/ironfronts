@@ -46,24 +46,20 @@ const validation = await page.evaluate(async () => {
   const report = await fetch('/world/world-generation-report.json').then((response) => response.json());
   const counts = manifest.counts;
   return {
-    oceanRoadSamples: counts.oceanRoadSamples,
     maximumHeight: report.topography.maximumHeight,
     maximumSlopeStep: report.topography.maximumSlopeStep,
     capViolations: report.topography.capViolations,
-    hiddenRoads: report.roads.hiddenCorridors,
-    hiddenGradeRoads: counts.hiddenGradeRoutes,
-    steepRoads: counts.steepRoadRoutes,
-    steepEmittedRoads: counts.steepEmittedRoutes,
+    hiddenRoads: report.roads.hiddenRoadCount,
+    steepRoads: counts.steepRoads,
+    steepEmittedRoads: counts.steepEmittedRoads,
     riverSystems: counts.riverSystems,
     riverSegments: counts.riverSegments,
     canalSystems: counts.canalSystems,
   };
 });
-if (validation.oceanRoadSamples !== 0) errors.push(`validation: ${validation.oceanRoadSamples} road samples enter ocean/lakes`);
 if (validation.maximumHeight > 50.5) errors.push(`validation: maximum elevation ${validation.maximumHeight.toFixed(3)} exceeds 50.5`);
 if (validation.maximumSlopeStep > 2.01) errors.push(`validation: terrain step ${validation.maximumSlopeStep.toFixed(3)} exceeds 2.01`);
 if (validation.capViolations !== 0) errors.push(`validation: ${validation.capViolations} terrain samples exceed their local cap`);
-if (validation.hiddenGradeRoads !== 0) errors.push(`validation: ${validation.hiddenGradeRoads} roads remain hidden only because of incline`);
 if (validation.steepEmittedRoads <= 0) errors.push('validation: no incline-warning roads were emitted');
 if (validation.riverSystems !== 24 || validation.riverSegments !== 527) errors.push('validation: authoritative river graph is incomplete');
 if (validation.canalSystems !== 2) errors.push('validation: Kiel and Suez canal surfaces are incomplete');
@@ -111,19 +107,19 @@ if (!status.unsupported) {
   await captureShowcase('suezCanal', 'waterways-suez-canal.png', 320);
   await page.evaluate(async () => {
     await window.__ironfrontsRenderer?.setWaterwayNetworkVisible(true);
-    window.__ironfrontsRenderer?.setDebugView(9);
+    window.__ironfrontsRenderer?.setDebugView(6);
   });
   await captureShowcase('river', 'diagnostics-river-network.png', 520);
   await page.evaluate(() => window.__ironfrontsRenderer?.setWaterwayNetworkVisible(false));
   await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(5));
   await page.waitForTimeout(300);
-  await page.screenshot({ path: path.join(outputDirectory, 'roads-levels.png') });
-  await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(6));
+  await page.screenshot({ path: path.join(outputDirectory, 'terrain-slope.png') });
+  await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(8));
   await page.waitForTimeout(300);
-  await page.screenshot({ path: path.join(outputDirectory, 'roads-roles.png') });
-  await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(7));
+  await page.screenshot({ path: path.join(outputDirectory, 'roads-footprint.png') });
+  await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(9));
   await page.waitForTimeout(300);
-  await page.screenshot({ path: path.join(outputDirectory, 'roads-surfaces.png') });
+  await page.screenshot({ path: path.join(outputDirectory, 'navigation-composite.png') });
 }
 
 const report = { ...status, headless, validation, errors };
