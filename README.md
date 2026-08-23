@@ -11,7 +11,7 @@ npm install
 npm run dev
 ```
 
-`npm run dev` first bakes manifest v6 into `public/world/`, then starts Vite. Use `npm run build` for a production build and `npm test` for generated-data plus Dawn-backed shader validation.
+`npm run dev` first bakes manifest v7 into `public/world/`, then starts Vite. Use `npm run build` for a production build and `npm test` for generated-data plus Dawn-backed shader validation.
 
 With the dev server running, `npm run visual-check` launches Chrome through Playwright and writes world, mountain, city, lake-road, and diagnostic captures plus `artifacts/visual-report.json`. On Windows it defaults to a short-lived headed browser because Chrome headless does not reliably expose the hardware WebGPU adapter. Set `IRONFRONTS_BROWSER` to select another Chromium executable or `IRONFRONTS_HEADLESS=true` when a CI GPU adapter is available.
 
@@ -21,7 +21,8 @@ With the dev server running, `npm run visual-check` launches Chrome through Play
 - Mouse wheel: zoom
 - Right drag: rotate and tilt
 - WASD or arrow keys: pan
-- F3: diagnostics and renderer debug views
+- F3: world inspector with terrain, infrastructure, waterway, coastline, and navigation views
+- [ / ] while F3 is open: cycle diagnostic views
 
 ## Generation pipeline
 

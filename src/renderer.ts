@@ -58,6 +58,7 @@ export class WorldRenderer {
   private signs!: InstanceLayer;
   private borders!: InstanceLayer;
   private connections?: InstanceLayer;
+  private waterwayNetwork?: InstanceLayer;
   private heightTexture!: GPUTexture;
   private surfaceTexture!: GPUTexture;
   private provinceTexture!: GPUTexture;
@@ -76,6 +77,12 @@ export class WorldRenderer {
   private debugView = 0;
   private showWireframe = false;
   private showConnections = false;
+  private showWaterwayNetwork = false;
+  private showBorders = true;
+  private showProps = true;
+  private showRoads = true;
+  private showHiddenConnections = true;
+  private showWaterways = true;
   private pointer = { x: 0, y: 0, inside: false };
   private hoveredId = 0;
   private pickCountdown = 0;
@@ -239,6 +246,16 @@ export class WorldRenderer {
     this.showWireframe = enabled;
   }
 
+  setBordersVisible(enabled: boolean): void { this.showBorders = enabled; }
+
+  setPropsVisible(enabled: boolean): void { this.showProps = enabled; }
+
+  setRoadsVisible(enabled: boolean): void { this.showRoads = enabled; }
+
+  setHiddenConnectionsVisible(enabled: boolean): void { this.showHiddenConnections = enabled; }
+
+  setWaterwaysVisible(enabled: boolean): void { this.showWaterways = enabled; }
+
   focus(x: number, z: number, distance = 520, yaw = -0.48, pitch = 0.82): void {
     this.camera.target[0] = wrap(x, this.manifest.world.width);
     this.camera.target[2] = clamp(z, 0, this.manifest.world.height);
@@ -253,6 +270,15 @@ export class WorldRenderer {
     if (!enabled || this.connections) return;
     const data = await fetchBinary(`/world/${this.manifest.buffers.connections.url}`);
     this.connections = this.createInstanceLayer('movement connections', data, this.manifest.buffers.connections.count, 1, this.lineLayout);
+  }
+
+  async setWaterwayNetworkVisible(enabled: boolean): Promise<void> {
+    this.showWaterwayNetwork = enabled;
+    if (!enabled || this.waterwayNetwork) return;
+    const data = await fetchBinary(`/world/${this.manifest.buffers.waterwayNetworkLines.url}`);
+    this.waterwayNetwork = this.createInstanceLayer(
+      'authoritative waterway network', data, this.manifest.buffers.waterwayNetworkLines.count, 2, this.lineLayout,
+    );
   }
 
   private createLayouts(): void {
@@ -527,34 +553,48 @@ export class WorldRenderer {
     pass.setIndexBuffer(this.terrainMesh.index, 'uint16');
     pass.drawIndexed(this.terrainMesh.indexCount, this.manifest.terrain.chunksX * this.manifest.terrain.chunksY * 3);
 
-    pass.setPipeline(this.waterwayPipeline);
-    pass.setVertexBuffer(0, this.waterwayMesh.vertex);
-    pass.setIndexBuffer(this.waterwayMesh.index, 'uint32');
-    this.drawChunkedInfrastructure(pass, this.waterwayMesh, this.manifest.infrastructureChunks.waterways, 9_200);
+    if (this.showWaterways) {
+      pass.setPipeline(this.waterwayPipeline);
+      pass.setVertexBuffer(0, this.waterwayMesh.vertex);
+      pass.setIndexBuffer(this.waterwayMesh.index, 'uint32');
+      this.drawChunkedInfrastructure(pass, this.waterwayMesh, this.manifest.infrastructureChunks.waterways, 9_200);
+    }
 
-    pass.setPipeline(this.infrastructurePipeline);
-    pass.setVertexBuffer(0, this.roadMesh.vertex);
-    pass.setIndexBuffer(this.roadMesh.index, 'uint32');
-    this.drawChunkedInfrastructure(pass, this.roadMesh, this.manifest.infrastructureChunks.roads);
-    pass.setVertexBuffer(0, this.hiddenConnectionMesh.vertex);
-    pass.setIndexBuffer(this.hiddenConnectionMesh.index, 'uint32');
-    this.drawChunkedInfrastructure(pass, this.hiddenConnectionMesh, this.manifest.infrastructureChunks.hiddenConnections, 8_000);
+    if (this.showRoads || this.showHiddenConnections) pass.setPipeline(this.infrastructurePipeline);
+    if (this.showRoads) {
+      pass.setVertexBuffer(0, this.roadMesh.vertex);
+      pass.setIndexBuffer(this.roadMesh.index, 'uint32');
+      this.drawChunkedInfrastructure(pass, this.roadMesh, this.manifest.infrastructureChunks.roads);
+    }
+    if (this.showHiddenConnections) {
+      pass.setVertexBuffer(0, this.hiddenConnectionMesh.vertex);
+      pass.setIndexBuffer(this.hiddenConnectionMesh.index, 'uint32');
+      this.drawChunkedInfrastructure(pass, this.hiddenConnectionMesh, this.manifest.infrastructureChunks.hiddenConnections, 8_000);
+    }
 
-    pass.setPipeline(this.propPipeline);
-    this.drawMeshInstances(pass, this.shadowMesh, this.trees);
-    this.drawMeshInstances(pass, this.shadowMesh, this.buildings);
-    this.drawMeshInstances(pass, this.treeMesh, this.trees);
-    this.drawMeshInstances(pass, this.buildingMesh, this.buildings);
-    this.drawMeshInstances(pass, this.lampMesh, this.lamps);
-    this.drawMeshInstances(pass, this.barrierMesh, this.barriers);
-    this.drawMeshInstances(pass, this.signMesh, this.signs);
+    if (this.showProps) {
+      pass.setPipeline(this.propPipeline);
+      this.drawMeshInstances(pass, this.shadowMesh, this.trees);
+      this.drawMeshInstances(pass, this.shadowMesh, this.buildings);
+      this.drawMeshInstances(pass, this.treeMesh, this.trees);
+      this.drawMeshInstances(pass, this.buildingMesh, this.buildings);
+      this.drawMeshInstances(pass, this.lampMesh, this.lamps);
+      this.drawMeshInstances(pass, this.barrierMesh, this.barriers);
+      this.drawMeshInstances(pass, this.signMesh, this.signs);
+    }
 
     pass.setPipeline(this.linePipeline);
-    pass.setBindGroup(1, this.borders.bindGroup);
-    pass.draw(6, this.borders.count * 3);
+    if (this.showBorders) {
+      pass.setBindGroup(1, this.borders.bindGroup);
+      pass.draw(6, this.borders.count * 3);
+    }
     if (this.showConnections && this.connections) {
       pass.setBindGroup(1, this.connections.bindGroup);
       pass.draw(6, this.connections.count * 3);
+    }
+    if (this.showWaterwayNetwork && this.waterwayNetwork) {
+      pass.setBindGroup(1, this.waterwayNetwork.bindGroup);
+      pass.draw(6, this.waterwayNetwork.count * 3);
     }
     pass.end();
     this.device.queue.submit([encoder.finish()]);
@@ -664,6 +704,16 @@ export class WorldRenderer {
       buildings: this.buildings.count,
       borderEdges: this.borders.count,
       roads: this.manifest.counts.logicalRoutes,
+      emittedRoads: this.manifest.counts.emittedRoutes,
+      hiddenRoads: this.manifest.counts.hiddenRoutes,
+      riverSystems: this.manifest.counts.riverSystems,
+      riverSegments: this.manifest.counts.riverSegments,
+      canalSegments: this.manifest.counts.canalSegments,
+      targetElevation: this.sampleHeight(this.camera.target[0], this.camera.target[2]),
+      targetProvince: (() => {
+        const encoded = this.sampleProvince(this.camera.target[0], this.camera.target[2]);
+        return encoded ? encoded - 1 : null;
+      })(),
       debugView: this.debugView,
     });
   }

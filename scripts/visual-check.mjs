@@ -109,6 +109,12 @@ if (!status.unsupported) {
   await captureShowcase('riverMouth', 'waterways-mouth.png', 460);
   await captureShowcase('kielCanal', 'waterways-kiel-canal.png', 240);
   await captureShowcase('suezCanal', 'waterways-suez-canal.png', 320);
+  await page.evaluate(async () => {
+    await window.__ironfrontsRenderer?.setWaterwayNetworkVisible(true);
+    window.__ironfrontsRenderer?.setDebugView(9);
+  });
+  await captureShowcase('river', 'diagnostics-river-network.png', 520);
+  await page.evaluate(() => window.__ironfrontsRenderer?.setWaterwayNetworkVisible(false));
   await page.evaluate(() => window.__ironfrontsRenderer?.setDebugView(5));
   await page.waitForTimeout(300);
   await page.screenshot({ path: path.join(outputDirectory, 'roads-levels.png') });

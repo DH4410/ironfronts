@@ -20,6 +20,9 @@ describe('WGSL programs', () => {
     expect(waterwayShader).toContain('let canal = input.kind > 0.5');
     expect(waterwayShader).toContain('oceanDeep');
     expect(terrainShader).toContain('waterwayAt(input.mapUv) > 0.45');
+    expect(terrainShader).toContain('debugMode == 9u');
+    expect(terrainShader).toContain('debugMode == 12u');
+    expect(lineShader).toContain('lineParams.mode == 2u');
   });
 
   it.each([

@@ -369,14 +369,14 @@ async function main() {
   for (const height of heights) maxHeight = Math.max(maxHeight, height);
 
   const worldGenerationReport = {
-    version: 'world-generation-v6',
+    version: 'world-generation-v7',
     topography: topographyReport,
     waterways: waterways.report,
     roads: infrastructure.roadReport,
   };
 
   const manifest = {
-    version: 6,
+    version: 7,
     source: { mapId: mapMetadata.map_id, mapVersion: mapMetadata.map_version },
     generatedSeed: SEED,
     world: { width: WORLD_WIDTH, height: WORLD_HEIGHT, overlapX: 250, wrapX: true },
@@ -397,6 +397,7 @@ async function main() {
       hiddenConnectionIndices: { url: 'hidden-connection-indices.u32', count: infrastructure.hiddenConnectionIndices.length, stride: 1 },
       waterwayVertices: { url: 'waterway-vertices.f32', count: waterways.vertices.length / 8, stride: 8 },
       waterwayIndices: { url: 'waterway-indices.u32', count: waterways.indices.length, stride: 1 },
+      waterwayNetworkLines: { url: 'waterway-network-lines.f32', count: waterways.networkLines.length / 8, stride: 8, lazy: true },
       corridorMetrics: { url: 'corridor-metrics.f32', count: infrastructure.corridorMetrics.length / 6, stride: 6, lazy: true },
       corridorFlags: { url: 'corridor-flags.u32', count: infrastructure.corridorFlags.length / 4, stride: 4, lazy: true },
       connectionCorridorOffsets: { url: 'connection-corridor-offsets.u32', count: infrastructure.connectionCorridorOffsets.length, stride: 1, lazy: true },
@@ -441,6 +442,7 @@ async function main() {
     writeTyped('hidden-connection-indices.u32', infrastructure.hiddenConnectionIndices),
     writeTyped('waterway-vertices.f32', waterways.vertices),
     writeTyped('waterway-indices.u32', waterways.indices),
+    writeTyped('waterway-network-lines.f32', waterways.networkLines),
     writeTyped('corridor-metrics.f32', infrastructure.corridorMetrics),
     writeTyped('corridor-flags.u32', infrastructure.corridorFlags),
     writeTyped('connection-corridor-offsets.u32', infrastructure.connectionCorridorOffsets),
@@ -469,6 +471,7 @@ async function main() {
     .update(Buffer.from(infrastructure.hiddenConnectionIndices.buffer))
     .update(Buffer.from(waterways.vertices.buffer))
     .update(Buffer.from(waterways.indices.buffer))
+    .update(Buffer.from(waterways.networkLines.buffer))
     .update(Buffer.from(infrastructure.corridorMetrics.buffer))
     .update(Buffer.from(infrastructure.corridorFlags.buffer))
     .update(Buffer.from(infrastructure.connectionCorridorOffsets.buffer))

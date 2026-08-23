@@ -256,6 +256,24 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     lit = mix(vec3f(0.025), rolePalette[min(roadRole, 3u)], max(roadData.r, roadData.g * 0.35));
   } else if (debugMode == 7u) {
     lit = mix(vec3f(0.025), fieldRoadColors[min(roadMaterial, 5u)], max(roadData.r, roadData.g * 0.35));
+  } else if (debugMode == 8u) {
+    let steepness = clamp((1.0 - normal.y) * 7.5, 0.0, 1.0);
+    lit = mix(vec3f(0.08, 0.31, 0.22), vec3f(0.96, 0.22, 0.08), smoothstep(0.08, 0.82, steepness));
+  } else if (debugMode == 9u) {
+    let channel = waterwayAt(input.mapUv);
+    lit = mix(vec3f(0.025, 0.035, 0.038), vec3f(0.04, 0.88, 0.98), channel);
+  } else if (debugMode == 10u) {
+    let coast = landAt(input.mapUv);
+    lit = mix(vec3f(0.74, 0.42, 0.16), vec3f(0.16, 0.62, 0.30), smoothstep(0.52, 0.96, coast));
+  } else if (debugMode == 11u) {
+    let footprint = max(roadData.r, roadData.g * 0.62);
+    lit = mix(vec3f(0.025, 0.03, 0.032), mix(vec3f(0.94, 0.62, 0.10), vec3f(0.95, 0.18, 0.08), roadData.r), footprint);
+  } else if (debugMode == 12u) {
+    let channel = waterwayAt(input.mapUv);
+    let roadSignal = max(roadData.r, roadData.g * 0.45);
+    lit = vec3f(0.15, 0.17, 0.16);
+    lit = mix(lit, vec3f(0.96, 0.61, 0.12), roadSignal);
+    lit = mix(lit, vec3f(0.02, 0.77, 0.96), channel);
   }
 
   if (uniforms.terrainInfo.w > 0.5) {
@@ -309,6 +327,13 @@ fn waterVertex(input: WaterVertexInput, @builtin(instance_index) instanceIndex: 
 @fragment
 fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
   if (landAt(input.mapUv) >= 0.5 || waterwayAt(input.mapUv) > 0.45) { discard; }
+  let debugMode = u32(uniforms.map.w + 0.5);
+  if (debugMode == 9u) { return vec4f(0.012, 0.025, 0.032, 1.0); }
+  if (debugMode == 10u) {
+    let depthDebug = waterDepthAt(input.mapUv);
+    return vec4f(mix(vec3f(0.16, 0.66, 0.82), vec3f(0.015, 0.11, 0.28), depthDebug), 1.0);
+  }
+  if (debugMode == 12u) { return vec4f(0.025, 0.12, 0.25, 1.0); }
   let time = uniforms.sunTime.w;
   let waveA = sin(input.worldPosition.x * 0.018 + input.worldPosition.z * 0.011 + time * 0.58);
   let waveB = cos(input.worldPosition.x * -0.009 + input.worldPosition.z * 0.024 - time * 0.43);
@@ -367,6 +392,13 @@ fn waterwayVertex(input: WaterwayInput, @builtin(instance_index) instanceIndex: 
 fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   if (input.visibility < 0.02) { discard; }
   let canal = input.kind > 0.5;
+  let debugMode = u32(uniforms.map.w + 0.5);
+  if (debugMode == 9u) {
+    return select(vec4f(0.02, 0.94, 1.0, 1.0), vec4f(0.98, 0.72, 0.10, 1.0), canal);
+  }
+  if (debugMode == 12u) {
+    return select(vec4f(0.02, 0.78, 0.98, 1.0), vec4f(0.77, 0.42, 0.96, 1.0), canal);
+  }
   let grain = fract(sin(dot(floor(input.worldPosition.xz * 0.72), vec2f(12.9898, 78.233))) * 43758.5453);
   let broad = sin(input.worldPosition.x * 0.041 + input.worldPosition.z * 0.029) * 0.5 + 0.5;
   let riverDeep = vec3f(0.035, 0.225, 0.285);
@@ -442,6 +474,27 @@ fn infrastructureFragment(input: InfrastructureOutput) -> @location(0) vec4f {
   let mapUv = input.worldPosition.xz / uniforms.map.xy;
   if (structure <= 7u && landAt(mapUv) < 0.52) { discard; }
   if (structure == 12u && fract(input.roadUv.x / 6.4) > 0.40) { discard; }
+  let debugMode = u32(uniforms.map.w + 0.5);
+  if (debugMode == 5u) {
+    let palette = array<vec3f, 6>(vec3f(0.02), vec3f(0.45, 0.30, 0.16), vec3f(0.69, 0.56, 0.28),
+      vec3f(0.78, 0.72, 0.50), vec3f(0.78, 0.50, 0.28), vec3f(0.92, 0.80, 0.38));
+    return vec4f(palette[min(u32(input.level + 0.5), 5u)], input.visibility);
+  }
+  if (debugMode == 6u) {
+    let palette = array<vec3f, 4>(vec3f(0.34, 0.45, 0.26), vec3f(0.34, 0.62, 0.76), vec3f(0.92, 0.64, 0.20), vec3f(0.78, 0.38, 0.68));
+    return vec4f(palette[min(u32(input.role + 0.5), 3u)], input.visibility);
+  }
+  if (debugMode == 7u) {
+    let palette = array<vec3f, 6>(vec3f(0.40, 0.29, 0.16), vec3f(0.47, 0.43, 0.35), vec3f(0.34, 0.24, 0.14),
+      vec3f(0.46, 0.47, 0.45), vec3f(0.34, 0.36, 0.36), vec3f(0.22, 0.23, 0.24));
+    return vec4f(palette[min(surface, 5u)], input.visibility);
+  }
+  if (debugMode == 11u) {
+    return vec4f(select(vec3f(0.98, 0.20, 0.07), vec3f(0.95, 0.72, 0.12), structure == 12u), input.visibility);
+  }
+  if (debugMode == 12u) {
+    return vec4f(select(vec3f(0.98, 0.61, 0.10), vec3f(0.96, 0.78, 0.22), structure == 12u), input.visibility);
+  }
   let grit = fract(sin(dot(floor(input.worldPosition.xz * 2.2), vec2f(12.9898, 78.233))) * 43758.5453);
   let broadWear = sin(input.roadUv.x * 0.78 + sin(input.roadUv.x * 0.17) * 0.7) * 0.5 + 0.5;
   var color = vec3f(0.34, 0.35, 0.34);
@@ -643,6 +696,9 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   if (lineParams.mode == 1u && line.b.x < 0.5) {
     height0 = 1.7;
     height1 = 1.7;
+  } else if (lineParams.mode == 2u) {
+    height0 = line.b.x + 2.35;
+    height1 = line.b.y + 2.35;
   }
   let world0 = vec3f(line.a.x + copyOffset, height0, line.a.y);
   let world1 = vec3f(line.a.z + copyOffset, height1, line.a.w);
@@ -668,6 +724,9 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   if (lineParams.mode == 1u) {
     widthPixels = 1.1;
     color = select(vec4f(0.19, 0.64, 0.78, 0.68), vec4f(0.80, 0.67, 0.25, 0.72), line.b.x > 0.5);
+  } else if (lineParams.mode == 2u) {
+    widthPixels = 2.1 + nearFactor * 0.75;
+    color = select(vec4f(0.05, 0.91, 1.0, 0.94), vec4f(0.98, 0.71, 0.12, 0.96), line.b.z > 0.5);
   }
 
   let clip = select(clip0, clip1, endpoint == 1u);

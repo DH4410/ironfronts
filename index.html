@@ -26,7 +26,7 @@
     </div>
 
     <aside id="diagnostics" class="diagnostics" hidden>
-      <div class="diagnostics__head"><strong>RENDERER</strong><span>F3</span></div>
+      <div class="diagnostics__head"><strong>WORLD INSPECTOR</strong><span>F3</span></div>
       <pre id="diagnostics-stats"></pre>
       <label>View
         <select id="debug-view">
@@ -38,10 +38,30 @@
           <option value="5">Infrastructure levels</option>
           <option value="6">Corridor roles</option>
           <option value="7">Road surfaces</option>
+          <option value="8">Terrain slope</option>
+          <option value="9">River corridors</option>
+          <option value="10">Land and coast mask</option>
+          <option value="11">Road footprint</option>
+          <option value="12">Navigation composite</option>
         </select>
       </label>
-      <label><input id="debug-connections" type="checkbox" /> Movement graph</label>
-      <label><input id="debug-wireframe" type="checkbox" /> Terrain grid</label>
+      <p id="debug-description" class="diagnostics__description"></p>
+      <div id="debug-legend" class="diagnostics__legend"></div>
+      <div class="diagnostics__group">
+        <strong>GRAPH OVERLAYS</strong>
+        <label><input id="debug-rivers" type="checkbox" /> River and canal graph</label>
+        <label><input id="debug-connections" type="checkbox" /> Movement graph</label>
+      </div>
+      <div class="diagnostics__group diagnostics__grid">
+        <strong>LAYERS</strong>
+        <label><input id="debug-borders" type="checkbox" checked /> Borders</label>
+        <label><input id="debug-roads" type="checkbox" checked /> Roads</label>
+        <label><input id="debug-hidden" type="checkbox" checked /> Dotted links</label>
+        <label><input id="debug-waterways" type="checkbox" checked /> Waterways</label>
+        <label><input id="debug-props" type="checkbox" checked /> Cities and props</label>
+        <label><input id="debug-wireframe" type="checkbox" /> Terrain grid</label>
+      </div>
+      <p class="diagnostics__hint"><kbd>[</kbd> <kbd>]</kbd> cycle views</p>
     </aside>
 
     <div class="controls" aria-hidden="true">

@@ -46,6 +46,7 @@ export interface WorldManifest {
     hiddenConnectionIndices: BinaryBufferDescriptor;
     waterwayVertices: BinaryBufferDescriptor;
     waterwayIndices: BinaryBufferDescriptor;
+    waterwayNetworkLines: BinaryBufferDescriptor;
     corridorMetrics: BinaryBufferDescriptor;
     corridorFlags: BinaryBufferDescriptor;
     connectionCorridorOffsets: BinaryBufferDescriptor;
@@ -97,6 +98,13 @@ export interface FrameStats {
   buildings: number;
   borderEdges: number;
   roads: number;
+  emittedRoads: number;
+  hiddenRoads: number;
+  riverSystems: number;
+  riverSegments: number;
+  canalSegments: number;
+  targetElevation: number;
+  targetProvince: number | null;
   debugView: number;
 }
 

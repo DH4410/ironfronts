@@ -14,7 +14,15 @@ const diagnostics = required<HTMLElement>('diagnostics');
 const diagnosticsStats = required<HTMLElement>('diagnostics-stats');
 const debugView = required<HTMLSelectElement>('debug-view');
 const debugConnections = required<HTMLInputElement>('debug-connections');
+const debugRivers = required<HTMLInputElement>('debug-rivers');
 const debugWireframe = required<HTMLInputElement>('debug-wireframe');
+const debugBorders = required<HTMLInputElement>('debug-borders');
+const debugRoads = required<HTMLInputElement>('debug-roads');
+const debugHidden = required<HTMLInputElement>('debug-hidden');
+const debugWaterways = required<HTMLInputElement>('debug-waterways');
+const debugProps = required<HTMLInputElement>('debug-props');
+const debugDescription = required<HTMLElement>('debug-description');
+const debugLegend = required<HTMLElement>('debug-legend');
 const unsupported = required<HTMLElement>('unsupported');
 
 if (!navigator.gpu) {
@@ -30,13 +38,31 @@ async function start(): Promise<void> {
   renderer.onHover = updateTooltip;
   renderer.onStats = updateDiagnostics;
 
+  const applyDebugView = () => {
+    const mode = Number(debugView.value);
+    renderer.setDebugView(mode);
+    updateDebugHelp(mode);
+  };
   window.addEventListener('keydown', (event) => {
-    if (event.code !== 'F3') return;
+    if (event.code === 'F3') {
+      event.preventDefault();
+      diagnostics.hidden = !diagnostics.hidden;
+      return;
+    }
+    if (diagnostics.hidden || (event.code !== 'BracketLeft' && event.code !== 'BracketRight')) return;
     event.preventDefault();
-    diagnostics.hidden = !diagnostics.hidden;
+    const direction = event.code === 'BracketRight' ? 1 : -1;
+    const count = debugView.options.length;
+    debugView.selectedIndex = (debugView.selectedIndex + direction + count) % count;
+    applyDebugView();
   });
-  debugView.addEventListener('change', () => renderer.setDebugView(Number(debugView.value)));
+  debugView.addEventListener('change', applyDebugView);
   debugWireframe.addEventListener('change', () => renderer.setWireframe(debugWireframe.checked));
+  debugBorders.addEventListener('change', () => renderer.setBordersVisible(debugBorders.checked));
+  debugRoads.addEventListener('change', () => renderer.setRoadsVisible(debugRoads.checked));
+  debugHidden.addEventListener('change', () => renderer.setHiddenConnectionsVisible(debugHidden.checked));
+  debugWaterways.addEventListener('change', () => renderer.setWaterwaysVisible(debugWaterways.checked));
+  debugProps.addEventListener('change', () => renderer.setPropsVisible(debugProps.checked));
   debugConnections.addEventListener('change', async () => {
     debugConnections.disabled = true;
     try {
@@ -45,7 +71,14 @@ async function start(): Promise<void> {
       debugConnections.disabled = false;
     }
   });
-
+  debugRivers.addEventListener('change', async () => {
+    debugRivers.disabled = true;
+    try {
+      await renderer.setWaterwayNetworkVisible(debugRivers.checked);
+    } finally {
+      debugRivers.disabled = false;
+    }
+  });
   try {
     await renderer.initialize((stage, progress) => {
       const percentage = Math.round(progress * 100);
@@ -53,6 +86,7 @@ async function start(): Promise<void> {
       loadingValue.textContent = `${percentage}%`;
       loadingBar.style.width = `${percentage}%`;
     });
+    applyDebugView();
     loading.classList.add('is-done');
     window.setTimeout(() => { loading.hidden = true; }, 500);
     renderer.start();
@@ -84,12 +118,43 @@ function updateDiagnostics(stats: FrameStats): void {
     `${stats.fps.toFixed(0).padStart(3)} FPS  ${stats.frameMs.toFixed(1).padStart(5)} ms`,
     `map  ${stats.camera[0].toFixed(0).padStart(5)}, ${stats.camera[1].toFixed(0).padStart(4)}`,
     `alt  ${stats.camera[2].toFixed(0).padStart(5)}   zoom ${stats.distance.toFixed(0)}`,
+    `target    ${stats.targetProvince ?? 'water'} @ ${stats.targetElevation.toFixed(2)}`,
     `province  ${stats.hoveredProvince ?? '—'}`,
     `trees     ${stats.trees.toLocaleString()}`,
     `buildings ${stats.buildings.toLocaleString()}`,
-    `roads     ${stats.roads.toLocaleString()}`,
+    `roads     ${stats.emittedRoads.toLocaleString()} + ${stats.hiddenRoads} dotted`,
+    `rivers    ${stats.riverSystems} systems / ${stats.riverSegments} edges`,
+    `canals    ${stats.canalSegments} edges`,
     `borders   ${stats.borderEdges.toLocaleString()}`,
   ].join('\n');
+}
+
+const DEBUG_HELP: Record<number, { description: string; legend: Array<[string, string]> }> = {
+  0: { description: 'Normal rendered world.', legend: [] },
+  1: { description: 'Normalized final terrain elevation after topology conditioning.', legend: [['low', '#151b1d'], ['high', '#f2f2ee']] },
+  2: { description: 'Authored terrain classes used by topography and placement.', legend: [['plain', '#65ad52'], ['hill', '#ab943f'], ['mountain', '#94918c'], ['forest', '#1f6b33']] },
+  3: { description: 'Deterministic color per province for geometry and adjacency inspection.', legend: [['province', '#c880d4']] },
+  4: { description: 'Final heightfield normals; abrupt color changes reveal terrain discontinuities.', legend: [['normal XYZ', '#8ab9dc']] },
+  5: { description: 'Infrastructure level field. The current generated world begins entirely at level 1.', legend: [['level 1', '#734d29'], ['higher', '#ebcc61']] },
+  6: { description: 'Physical corridor role encoded in the strategic road field.', legend: [['local', '#577343'], ['connector', '#579fc2'], ['trunk', '#eaa333']] },
+  7: { description: 'Road surface material field used after detailed meshes fade.', legend: [['dirt', '#76552d'], ['paved', '#737672']] },
+  8: { description: 'Terrain steepness heatmap for finding cliffs, harsh passes, and topology artifacts.', legend: [['gentle', '#145038'], ['steep', '#f43814']] },
+  9: { description: 'Exact dense waterway corridor used to clip terrain and seat river geometry.', legend: [['river', '#05efff'], ['canal', '#f9b71a']] },
+  10: { description: 'Static land/coast classification and open-water depth.', legend: [['land', '#299e4c'], ['coast', '#bd6b29'], ['deep water', '#041c47']] },
+  11: { description: 'Full road core and verge footprint independent of nearby 3D road geometry.', legend: [['verge', '#ef9e1a'], ['core', '#f22e14']] },
+  12: { description: 'Navigation composite for comparing roads, static water, rivers, and canals.', legend: [['road', '#f59c1e'], ['river', '#05c7f9'], ['canal', '#c46bf5'], ['ocean/lake', '#062e66']] },
+};
+
+function updateDebugHelp(mode: number): void {
+  const help = DEBUG_HELP[mode] ?? DEBUG_HELP[0];
+  debugDescription.textContent = help.description;
+  debugLegend.replaceChildren(...help.legend.map(([label, color]) => {
+    const item = document.createElement('span');
+    const swatch = document.createElement('i');
+    swatch.style.setProperty('--legend', color);
+    item.append(swatch, label);
+    return item;
+  }));
 }
 
 function required<T extends HTMLElement>(id: string): T {

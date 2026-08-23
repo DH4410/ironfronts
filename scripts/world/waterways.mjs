@@ -230,6 +230,20 @@ export function buildWaterways({
     const kind = nodeEdges.some((edge) => edge.kind === 1) ? 1 : 0;
     nodeSurfaces.set(nodeId, makeNodeSurface(context, nodes[nodeId], nodeEdges, nodes, kind));
   }
+  const networkLines = [];
+  const systemIds = new Map();
+  const systemId = (name) => {
+    if (!systemIds.has(name)) systemIds.set(name, systemIds.size + 1);
+    return systemIds.get(name);
+  };
+  for (const edge of edges) {
+    const a = nodes[edge.node_a];
+    const b = nodes[edge.node_b];
+    const aSurface = nodeSurfaces.get(edge.node_a);
+    const bSurface = nodeSurfaces.get(edge.node_b);
+    const named = isRiver(a) || isCanal(a) ? nodeName(a) : nodeName(b);
+    networkLines.push(a.x, a.y, b.x, b.y, aSurface.y, bSurface.y, edge.kind, systemId(named));
+  }
 
   const vertices = [];
   const indices = [];
@@ -363,6 +377,7 @@ export function buildWaterways({
   return {
     vertices: new Float32Array(vertices),
     indices: sorted.indices,
+    networkLines: new Float32Array(networkLines),
     chunkRanges: sorted.ranges,
     clearance,
     mask,
