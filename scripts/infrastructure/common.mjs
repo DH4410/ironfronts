@@ -1,6 +1,6 @@
-export const ROUTING_CACHE_VERSION = 'direct-dirt-roads-v6';
+export const ROUTING_CACHE_VERSION = 'direct-dirt-roads-v7';
 export const ROAD_WIDTH = 1.2;
-export const ROAD_MAX_GRADE = 0.18;
+export const ROAD_MAX_GRADE = 0.24;
 
 export const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 export const wrap = (value, size) => ((value % size) + size) % size;

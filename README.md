@@ -35,7 +35,7 @@ World generation is staged and deterministic:
 5. Route and drape visible roads onto the frozen terrain; impossible physical roads are hidden and reported without changing logical connectivity.
 6. Place visual city layouts, buildings, trees, lamps, fences, and signs after road clearances are final.
 
-`scripts/build-world.mjs` orchestrates generation, `scripts/world/topography.mjs` owns the heightfield, and `scripts/build-infrastructure.mjs` coordinates direct province-center routing, audit, and mesh output. Expensive route results are cached under ignored `artifacts/road-cache/`.
+`scripts/build-world.mjs` orchestrates generation, `scripts/world/topography.mjs` owns the heightfield, and `scripts/build-infrastructure.mjs` coordinates direct province-center routing, audit, and mesh output. Mountain terrain uses a broad regional uplift plus tighter shoulder/core fields, with a 60-unit cap and a strict local slope reconciliation. Movement-path conditioning targets only segments that exceed the 24% dirt-trail grade target, so ordinary routes no longer flatten unrelated mountain terrain. Expensive route results are cached under ignored `artifacts/road-cache/`.
 
 The compact `world.json` contains only runtime-critical province hover data. Population, centers, biome tags, and source terrain IDs live in the lazy `province-details.json` sidecar. The generated `world-generation-report.json` records topography statistics and every hidden road with its reason, endpoints, ID, and affected source connections. The source `material/` directory remains untouched.
 

@@ -57,7 +57,7 @@ const validation = await page.evaluate(async () => {
     canalSystems: counts.canalSystems,
   };
 });
-if (validation.maximumHeight > 50.5) errors.push(`validation: maximum elevation ${validation.maximumHeight.toFixed(3)} exceeds 50.5`);
+if (validation.maximumHeight > 60.5) errors.push(`validation: maximum elevation ${validation.maximumHeight.toFixed(3)} exceeds 60.5`);
 if (validation.maximumSlopeStep > 2.01) errors.push(`validation: terrain step ${validation.maximumSlopeStep.toFixed(3)} exceeds 2.01`);
 if (validation.capViolations !== 0) errors.push(`validation: ${validation.capViolations} terrain samples exceed their local cap`);
 if (validation.steepEmittedRoads <= 0) errors.push('validation: no incline-warning roads were emitted');

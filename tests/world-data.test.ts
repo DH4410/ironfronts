@@ -123,7 +123,7 @@ describe('generated v10 world package', () => {
     for (let vertex = 0; vertex < data.buffers.waterwayVertices.count; vertex += 113) {
       const offset = vertex * 10;
       expect(vertices[offset + 1]).toBeGreaterThanOrEqual(0.4);
-      expect(vertices[offset + 1]).toBeLessThanOrEqual(50.5);
+      expect(vertices[offset + 1]).toBeLessThanOrEqual(60.5);
       expect([0, 1]).toContain(vertices[offset + 6]);
       expect(Math.hypot(vertices[offset + 7], vertices[offset + 8])).toBeGreaterThan(0.99);
       expect(vertices[offset + 9]).toBeGreaterThan(0);
@@ -159,21 +159,27 @@ describe('generated v10 world package', () => {
     expect(heights.every(Number.isFinite)).toBe(true);
     let maximum = 0;
     for (let index = 0; index < heights.length; index += 1) if (surface[index * 4 + 3]) maximum = Math.max(maximum, heights[index]);
-    expect(maximum).toBeLessThanOrEqual(50.5);
+    expect(maximum).toBeLessThanOrEqual(60.5);
     for (let index = 0; index < heights.length; index += 997) {
       if (surface[index * 4 + 3]) expect(heights[index]).toBeGreaterThanOrEqual(1.199);
       else expect(heights[index]).toBe(0);
     }
     expect(report.topography.capViolations).toBe(0);
     expect(report.topography.maximumSlopeStep).toBeLessThanOrEqual(2.01);
+    expect(report.topography.maximumHeight).toBeGreaterThan(53);
+    expect(report.topography.terrainClasses.mountains.mean).toBeGreaterThan(23);
+    expect(report.topography.terrainClasses.hills.mean).toBeGreaterThan(10);
+    expect(report.topography.slopeRepairs).toBeGreaterThan(0);
     expect(report.topography.conditioning.maximumAdjustment).toBeLessThanOrEqual(12.001);
+    expect(report.topography.conditioning.conditionedSegments).toBeGreaterThan(0);
+    expect(report.topography.conditioning.conditionedSegments).toBeLessThan(7_805);
     const provinceById = new Map(data.provinces.map((province) => [province.id, province]));
     for (const adjustment of report.topography.conditioning.provinceAdjustments) {
       const terrain = provinceById.get(adjustment.provinceId)?.terrain;
       const meanBudget = terrain === 'Mountain' ? 6 : terrain === 'Hills' ? 4 : 2.5;
       expect(Math.abs(adjustment.mean)).toBeLessThanOrEqual(meanBudget + 0.001);
     }
-    expect(data.terrain.maxHeight).toBeLessThanOrEqual(50.5);
+    expect(data.terrain.maxHeight).toBeLessThanOrEqual(60.5);
   });
 
   it('drapes every emitted road vertex over final dry terrain', async () => {
