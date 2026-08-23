@@ -158,11 +158,13 @@ fn sampleMaterial(layer: i32, worldPosition: vec3f, scale: f32) -> vec3f {
 
 @fragment
 fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
+  let provinceId = provinceAt(input.mapUv);
   // The waterway mask is baked from the same dense samples as the river mesh.
   // Clip coarse terrain triangles out of that corridor so they cannot bridge
-  // a narrow authored gap and progressively bury the water surface.
-  if (landAt(input.mapUv) < 0.5 || waterwayAt(input.mapUv) > 0.45) { discard; }
-  let provinceId = provinceAt(input.mapUv);
+  // a narrow authored gap and progressively bury the water surface. Static
+  // water coverage must use the exact province raster: the filtered coast
+  // texture is only a shoreline blend and closes thin visual-only rivers.
+  if (provinceId == 0u || waterwayAt(input.mapUv) > 0.45) { discard; }
 
   let surface = surfaceAt(input.mapUv);
   let terrain = surface.r;
@@ -326,7 +328,10 @@ fn waterVertex(input: WaterVertexInput, @builtin(instance_index) instanceIndex: 
 
 @fragment
 fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
-  if (landAt(input.mapUv) >= 0.5 || waterwayAt(input.mapUv) > 0.45) { discard; }
+  // Province zero is the authoritative ocean/lake/visual-channel mask. Do not
+  // use the softened coast field here: its blur intentionally feathers beach
+  // materials, but it can erase authored channels only a few texels wide.
+  if (provinceAt(input.mapUv) != 0u || waterwayAt(input.mapUv) > 0.45) { discard; }
   let debugMode = u32(uniforms.map.w + 0.5);
   if (debugMode == 9u) { return vec4f(0.012, 0.025, 0.032, 1.0); }
   if (debugMode == 10u) {

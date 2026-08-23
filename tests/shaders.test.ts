@@ -10,6 +10,13 @@ describe('WGSL programs', () => {
     expect(terrainShader).not.toContain('if (elevation < 12.0)');
   });
 
+  it('uses exact province coverage for static water without changing soft shoreline shading', () => {
+    expect(terrainShader).toContain('if (provinceId == 0u || waterwayAt(input.mapUv) > 0.45)');
+    expect(waterShader).toContain('if (provinceAt(input.mapUv) != 0u || waterwayAt(input.mapUv) > 0.45)');
+    expect(terrainShader).toContain('smoothstep(0.78, 0.995, landAt(input.mapUv))');
+    expect(waterShader).not.toContain('if (landAt(input.mapUv) >= 0.5');
+  });
+
   it('renders suppressed-road geometry as floating dotted connectors', () => {
     expect(infrastructureShader).toContain('structure == 12u && fract(input.roadUv.x / 6.4) > 0.40');
     expect(infrastructureShader).toContain('vec3f(0.96, 0.73, 0.25)');
