@@ -156,8 +156,8 @@ export class WorldRenderer {
       'rg8unorm', new Uint8Array(roadFieldBuffer), this.manifest.fields.roads.width * 2,
     );
     this.waterwayTexture = this.uploadTexture(
-      'authored waterway mask', this.manifest.fields.waterways.width, this.manifest.fields.waterways.height,
-      'r8unorm', new Uint8Array(waterwayFieldBuffer), this.manifest.fields.waterways.width,
+      'movement and visual-river field', this.manifest.fields.waterways.width, this.manifest.fields.waterways.height,
+      'rg8unorm', new Uint8Array(waterwayFieldBuffer), this.manifest.fields.waterways.width * 2,
     );
     this.coastTexture = this.uploadTexture(
       'signed-distance bank field', this.manifest.fields.coast.width, this.manifest.fields.coast.height,

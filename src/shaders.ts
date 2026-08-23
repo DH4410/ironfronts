@@ -58,12 +58,11 @@ fn sampleMaterial(layer: i32, worldPosition: vec3f, scale: f32) -> vec3f {
 @fragment
 fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let provinceId = provinceAt(input.mapUv);
-  // The waterway mask is baked from the same dense samples as the river mesh.
-  // Clip coarse terrain triangles out of that corridor so they cannot bridge
-  // a narrow authored gap and progressively bury the water surface. Static
-  // The signed-distance bank field preserves the source topology while
-  // removing nearest-neighbor stair steps from coasts and visual channels.
-  if (landAt(input.mapUv) <= 0.5 || waterwayAt(input.mapUv) > 0.45) { discard; }
+  // Movement rivers carry an explicit ribbon clip mask. Visual-only rivers
+  // remain generic water, but their second mask channel expands only narrow
+  // province-zero channels so coarse terrain cannot bridge over them.
+  let riverField = waterwayFieldAt(input.mapUv);
+  if (landAt(input.mapUv) <= 0.5 || riverField.r > 0.45 || riverField.g > 0.45) { discard; }
 
   let surface = surfaceAt(input.mapUv);
   let terrain = surface.r;
@@ -142,8 +141,10 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     let steepness = clamp((1.0 - normal.y) * 7.5, 0.0, 1.0);
     lit = mix(vec3f(0.08, 0.31, 0.22), vec3f(0.96, 0.22, 0.08), smoothstep(0.08, 0.82, steepness));
   } else if (debugMode == 6u) {
-    let channel = waterwayAt(input.mapUv);
-    lit = mix(vec3f(0.025, 0.035, 0.038), vec3f(0.04, 0.88, 0.98), channel);
+    let channels = waterwayFieldAt(input.mapUv);
+    lit = vec3f(0.025, 0.035, 0.038);
+    lit = mix(lit, vec3f(0.04, 0.88, 0.98), channels.r);
+    lit = mix(lit, vec3f(0.18, 0.48, 0.98), channels.g * (1.0 - channels.r));
   } else if (debugMode == 7u) {
     let coast = landAt(input.mapUv);
     lit = mix(vec3f(0.74, 0.42, 0.16), vec3f(0.16, 0.62, 0.30), smoothstep(0.52, 0.96, coast));
@@ -151,11 +152,12 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     let footprint = max(roadData.r, roadData.g * 0.62);
     lit = mix(vec3f(0.025, 0.03, 0.032), mix(vec3f(0.94, 0.62, 0.10), vec3f(0.95, 0.18, 0.08), roadData.r), footprint);
   } else if (debugMode == 9u) {
-    let channel = waterwayAt(input.mapUv);
+    let channels = waterwayFieldAt(input.mapUv);
     let roadSignal = max(roadData.r, roadData.g * 0.45);
     lit = vec3f(0.15, 0.17, 0.16);
     lit = mix(lit, vec3f(0.96, 0.61, 0.12), roadSignal);
-    lit = mix(lit, vec3f(0.02, 0.77, 0.96), channel);
+    lit = mix(lit, vec3f(0.02, 0.77, 0.96), channels.r);
+    lit = mix(lit, vec3f(0.18, 0.48, 0.98), channels.g * (1.0 - channels.r));
   }
 
   if (uniforms.terrainInfo.w > 0.5) {
@@ -213,14 +215,21 @@ fn waterVertex(input: WaterVertexInput, @builtin(instance_index) instanceIndex: 
 
 @fragment
 fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
-  if (landAt(input.mapUv) >= 0.5 || waterwayAt(input.mapUv) > 0.45) { discard; }
+  let riverField = waterwayFieldAt(input.mapUv);
+  if (riverField.r > 0.45) { discard; }
+  if (landAt(input.mapUv) >= 0.5 && riverField.g <= 0.45) { discard; }
+  let visualRiver = smoothstep(0.18, 0.72, riverField.g);
   let debugMode = u32(uniforms.map.w + 0.5);
-  if (debugMode == 6u) { return vec4f(0.012, 0.025, 0.032, 1.0); }
+  if (debugMode == 6u) {
+    return vec4f(mix(vec3f(0.012, 0.025, 0.032), vec3f(0.18, 0.48, 0.98), visualRiver), 1.0);
+  }
   if (debugMode == 7u) {
-    let depthDebug = waterDepthAt(input.mapUv);
+    let depthDebug = mix(waterDepthAt(input.mapUv), 0.08, visualRiver);
     return vec4f(mix(vec3f(0.16, 0.66, 0.82), vec3f(0.015, 0.11, 0.28), depthDebug), 1.0);
   }
-  if (debugMode == 9u) { return vec4f(0.025, 0.12, 0.25, 1.0); }
+  if (debugMode == 9u) {
+    return vec4f(mix(vec3f(0.025, 0.12, 0.25), vec3f(0.18, 0.48, 0.98), visualRiver), 1.0);
+  }
   let time = uniforms.sunTime.w;
   let world = input.worldPosition.xz;
   let warp = vec2f(valueNoise(world / 175.0 + vec2f(time * 0.025, -time * 0.017)),
@@ -234,14 +243,14 @@ fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
   let viewDirection = normalize(uniforms.camera.xyz - input.worldPosition);
   let fresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 4.5);
   let sun = pow(max(dot(reflect(-normalize(uniforms.sunTime.xyz), normal), viewDirection), 0.0), 112.0);
-  let depth = waterDepthAt(input.mapUv);
+  let depth = mix(waterDepthAt(input.mapUv), 0.08, visualRiver);
   let shelf = smoothstep(0.0, 0.44, depth);
   let shallow = vec3f(0.12, 0.48, 0.52);
   let deep = vec3f(0.025, 0.16, 0.255);
   var color = mix(shallow, deep, shelf);
   color = mix(color, vec3f(0.40, 0.60, 0.63), fresnel * 0.64);
   let foamBreak = valueNoise(world / 11.0 + warp * 2.4 + vec2f(time * 0.15, -time * 0.09));
-  let foam = bankAt(input.mapUv) * smoothstep(0.54, 0.82, foamBreak + waveA * 0.12);
+  let foam = bankAt(input.mapUv) * (1.0 - visualRiver * 0.80) * smoothstep(0.54, 0.82, foamBreak + waveA * 0.12);
   color = mix(color, vec3f(0.73, 0.82, 0.77), foam * 0.52);
   color += vec3f(1.0, 0.86, 0.61) * sun * (0.34 + ripple * 0.05);
   let fog = smoothstep(4000.0, 12000.0, distance(uniforms.camera.xyz, input.worldPosition));
