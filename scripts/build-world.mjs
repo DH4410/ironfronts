@@ -8,6 +8,7 @@ import { buildInstances } from './world/instances.mjs';
 import { generateTopography } from './world/topography.mjs';
 import { buildBankField } from './world/water-fields.mjs';
 import { buildWaterways } from './world/waterways.mjs';
+import { buildVisualRiverField } from './world/visual-rivers.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MATERIAL = path.join(ROOT, 'material');
@@ -232,6 +233,16 @@ async function main() {
     networkData, connectionData, provinceIds, idWidth: ID_WIDTH, idHeight: ID_HEIGHT, heights,
     heightWidth: FIELD_WIDTH, heightHeight: FIELD_HEIGHT, worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
   });
+  console.log('Expanding narrow visual-only river channels...');
+  const visualRivers = buildVisualRiverField({
+    provinceIds, movementMask: waterways.mask, networkData, connectionData, width: ID_WIDTH, height: ID_HEIGHT,
+    worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
+  });
+  const waterwayField = new Uint8Array(ID_WIDTH * ID_HEIGHT * 2);
+  for (let index = 0; index < provinceIds.length; index += 1) {
+    waterwayField[index * 2] = waterways.mask[index];
+    waterwayField[index * 2 + 1] = visualRivers.mask[index];
+  }
   console.log('Compiling direct province-center roads and city placement...');
   const infrastructure = buildInfrastructure({
     borderData, connectionData, networkData, provinces: metadata.provinces, heights, landField,
@@ -240,7 +251,7 @@ async function main() {
   });
   const placementClearance = infrastructure.roadClearance.slice();
   for (let index = 0; index < placementClearance.length; index += 1) {
-    placementClearance[index] = Math.max(placementClearance[index], waterways.clearance[index]);
+    placementClearance[index] = Math.max(placementClearance[index], waterways.clearance[index], visualRivers.clearance[index]);
   }
   const { trees, buildings } = buildInstances(metadata.provinces, geometryById, provinceIds, areaCounts, placementClearance, infrastructure.cityPlans);
 
@@ -265,15 +276,16 @@ async function main() {
   for (const height of heights) maxHeight = Math.max(maxHeight, height);
 
   const worldGenerationReport = {
-    version: 'world-generation-v9',
+    version: 'world-generation-v10',
     topography: topographyReport,
     banks: bankField.report,
     waterways: waterways.report,
+    visualRivers: visualRivers.report,
     roads: infrastructure.roadReport,
   };
 
   const manifest = {
-    version: 9,
+    version: 10,
     source: { mapId: mapMetadata.map_id, mapVersion: mapMetadata.map_version },
     generatedSeed: SEED,
     world: { width: WORLD_WIDTH, height: WORLD_HEIGHT, overlapX: 250, wrapX: true },
@@ -281,7 +293,7 @@ async function main() {
       height: { url: 'height.f32', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'r32float' },
       surface: { url: 'surface.rgba8', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'rgba8uint' },
       roads: { url: 'roads.rg8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rg8unorm' },
-      waterways: { url: 'waterways.r8', width: ID_WIDTH, height: ID_HEIGHT, format: 'r8unorm' },
+      waterways: { url: 'waterways.rg8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rg8unorm' },
       coast: { url: 'coast.rg8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rg8unorm' },
       provinceIds: { url: 'province-ids.u16', width: ID_WIDTH, height: ID_HEIGHT, format: 'r16uint' },
     },
@@ -313,6 +325,7 @@ async function main() {
       buildings: buildings.length / 8,
       connections: connections.length / 8,
       ...waterways.stats,
+      ...visualRivers.stats,
       ...infrastructure.stats,
       lamps: infrastructure.lamps.length / 8,
       barriers: infrastructure.barriers.length / 8,
@@ -326,7 +339,7 @@ async function main() {
     writeTyped('height.f32', heights),
     writeTyped('surface.rgba8', surface),
     writeTyped('roads.rg8', infrastructure.roadField),
-    writeTyped('waterways.r8', waterways.mask),
+    writeTyped('waterways.rg8', waterwayField),
     writeTyped('coast.rg8', bankField.field),
     writeTyped('borders.f32', borders),
     writeTyped('connections.f32', connections),

@@ -10,10 +10,13 @@ describe('WGSL programs', () => {
     expect(terrainShader).not.toContain('if (elevation < 12.0)');
   });
 
-  it('uses the signed-distance bank field without closing thin visual channels', () => {
-    expect(terrainShader).toContain('if (landAt(input.mapUv) <= 0.5 || waterwayAt(input.mapUv) > 0.45)');
-    expect(waterShader).toContain('if (landAt(input.mapUv) >= 0.5 || waterwayAt(input.mapUv) > 0.45)');
+  it('clips terrain around widened visual-only channels without replacing movement-river ribbons', () => {
+    expect(terrainShader).toContain('riverField.r > 0.45 || riverField.g > 0.45');
+    expect(waterShader).toContain('if (riverField.r > 0.45)');
+    expect(waterShader).toContain('landAt(input.mapUv) >= 0.5 && riverField.g <= 0.45');
     expect(terrainShader).toContain('bankAt(input.mapUv)');
+    expect(waterShader).toContain('mix(waterDepthAt(input.mapUv), 0.08, visualRiver)');
+    expect(waterShader).toContain('(1.0 - visualRiver * 0.80)');
     expect(waterShader).not.toContain('if (provinceAt(input.mapUv)');
   });
 
@@ -30,7 +33,8 @@ describe('WGSL programs', () => {
     expect(waterwayShader).toContain('brokenStreak');
     expect(waterwayShader).toContain('let canal = input.kind > 0.5');
     expect(waterwayShader).toContain('oceanDeep');
-    expect(terrainShader).toContain('waterwayAt(input.mapUv) > 0.45');
+    expect(terrainShader).toContain('riverField.r > 0.45');
+    expect(terrainShader).toContain('riverField.g > 0.45');
     expect(terrainShader).toContain('debugMode == 6u');
     expect(terrainShader).toContain('debugMode == 9u');
     expect(lineShader).toContain('lineParams.mode == 2u');

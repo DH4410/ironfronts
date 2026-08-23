@@ -29,10 +29,10 @@ function viewU32(bytes: Buffer): Uint32Array {
   return new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
 }
 
-describe('generated v9 world package', () => {
+describe('generated v10 world package', () => {
   it('preserves the canonical world and exposes simplified roads plus supplied waterways', async () => {
     const data = await manifest();
-    expect(data.version).toBe(9);
+    expect(data.version).toBe(10);
     expect(data.world).toEqual(expect.objectContaining({ width: 13_562, height: 7_000, wrapX: true }));
     expect(data.provinces).toHaveLength(3_303);
     expect(new Set(data.provinces.map((province) => province.id)).size).toBe(3_303);
@@ -65,7 +65,7 @@ describe('generated v9 world package', () => {
     const [vertexBytes, indexBytes, networkBytes, maskBytes, provinceIdBytes, nodeBytes, reportBytes] = await Promise.all([
       readFile('public/world/waterway-vertices.f32'), readFile('public/world/waterway-indices.u32'),
       readFile('public/world/waterway-network-lines.f32'),
-      readFile('public/world/waterways.r8'),
+      readFile('public/world/waterways.rg8'),
       readFile('public/world/province-ids.u16'),
       readFile('material/movement/network_nodes.json', 'utf8'), readFile('public/world/world-generation-report.json', 'utf8'),
     ]);
@@ -76,7 +76,7 @@ describe('generated v9 world package', () => {
     const riverNames = new Set(report.waterways.riverSystems);
     const sourceRiverPoints = source.nodes.filter((node) => node.kind === 'sea_point' && riverNames.has(node.location_name));
     const sourceCanalPoints = source.nodes.filter((node) => node.kind === 'sea_point' && ['Kiel Canal', 'Suez Channel'].includes(node.location_name));
-    expect(report.version).toBe('world-generation-v9');
+    expect(report.version).toBe('world-generation-v10');
     expect(report.waterways.animatedSurface).toBe(true);
     expect(report.waterways.animation).toBe('tangent-advection-domain-warp');
     expect(report.waterways.minimumRiverWidth).toBeGreaterThanOrEqual(11);
@@ -99,8 +99,25 @@ describe('generated v9 world package', () => {
       expect(network[offset + 5]).toBeGreaterThanOrEqual(0.4);
       expect([0, 1]).toContain(network[offset + 6]);
     }
-    expect(maskBytes.byteLength).toBe(data.fields.waterways.width * data.fields.waterways.height);
-    expect(maskBytes.some((value) => value > 0)).toBe(true);
+    expect(data.fields.waterways.format).toBe('rg8unorm');
+    expect(maskBytes.byteLength).toBe(data.fields.waterways.width * data.fields.waterways.height * 2);
+    expect(maskBytes.some((value, index) => index % 2 === 0 && value > 0)).toBe(true);
+    expect(maskBytes.some((value, index) => index % 2 === 1 && value > 0)).toBe(true);
+    expect(report.visualRivers.minimumRenderedWidth).toBeGreaterThanOrEqual(7.5);
+    expect(report.visualRivers.minimumRenderedWidth).toBeLessThan(report.waterways.minimumRiverWidth);
+    expect(report.visualRivers.centerPixels).toBeGreaterThan(0);
+    expect(report.visualRivers.widenedLandPixels).toBeGreaterThan(0);
+    expect(data.counts.visualRiverComponents).toBeGreaterThan(0);
+    let widenedVisualLandPixels = 0;
+    let movementVisualOverlap = 0;
+    for (let pixel = 0; pixel < provinceIds.length; pixel += 1) {
+      const movement = maskBytes[pixel * 2] / 255;
+      const visual = maskBytes[pixel * 2 + 1] / 255;
+      if (visual > 0.45 && provinceIds[pixel] !== 0) widenedVisualLandPixels += 1;
+      if (movement > 0.45 && visual > 0.45) movementVisualOverlap += 1;
+    }
+    expect(widenedVisualLandPixels).toBeGreaterThan(0);
+    expect(movementVisualOverlap).toBe(0);
     expect(vertices.every(Number.isFinite)).toBe(true);
     let centerVertices = 0;
     for (let vertex = 0; vertex < data.buffers.waterwayVertices.count; vertex += 113) {
@@ -123,7 +140,7 @@ describe('generated v9 world package', () => {
       // Mouth overlap samples deliberately stop clipping the base ocean once
       // both authored banks have opened. Every sample over land must still
       // carry the terrain-removal mask.
-      if (provinceIds[pixel] !== 0) expect(maskBytes[pixel]).toBe(255);
+      if (provinceIds[pixel] !== 0) expect(maskBytes[pixel * 2]).toBe(255);
     }
     expect(centerVertices).toBeGreaterThan(10_000);
     for (let index = 0; index < indices.length; index += 127) expect(indices[index]).toBeLessThan(data.buffers.waterwayVertices.count);

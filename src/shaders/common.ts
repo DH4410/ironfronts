@@ -72,7 +72,9 @@ fn bankFieldAt(uvInput: vec2f) -> vec2f { return textureSampleLevel(coastTexture
 fn landAt(uvInput: vec2f) -> f32 { return bankFieldAt(uvInput).r; }
 fn bankAt(uvInput: vec2f) -> f32 { return bankFieldAt(uvInput).g; }
 fn roadAt(uvInput: vec2f) -> vec2f { return textureSampleLevel(roadTexture, materialSampler, wrappedUv(uvInput), 0.0).rg; }
-fn waterwayAt(uvInput: vec2f) -> f32 { return textureSampleLevel(waterwayTexture, materialSampler, wrappedUv(uvInput), 0.0).r; }
+fn waterwayFieldAt(uvInput: vec2f) -> vec2f { return textureSampleLevel(waterwayTexture, materialSampler, wrappedUv(uvInput), 0.0).rg; }
+fn waterwayAt(uvInput: vec2f) -> f32 { return waterwayFieldAt(uvInput).r; }
+fn visualRiverAt(uvInput: vec2f) -> f32 { return waterwayFieldAt(uvInput).g; }
 
 fn terrainNormal(uv: vec2f) -> vec3f {
   let dimensions = vec2f(textureDimensions(heightTexture));
