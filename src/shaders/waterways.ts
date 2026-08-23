@@ -6,6 +6,8 @@ struct WaterwayInput {
   @location(1) waterUv: vec2f,
   @location(2) edgeFactor: f32,
   @location(3) kind: f32,
+  @location(4) flow: vec2f,
+  @location(5) speed: f32,
 };
 
 struct WaterwayOutput {
@@ -15,6 +17,8 @@ struct WaterwayOutput {
   @location(2) edgeFactor: f32,
   @location(3) @interpolate(flat) kind: f32,
   @location(4) visibility: f32,
+  @location(5) flow: vec2f,
+  @location(6) speed: f32,
 };
 
 @vertex
@@ -27,6 +31,8 @@ fn waterwayVertex(input: WaterwayInput, @builtin(instance_index) instanceIndex: 
   output.waterUv = input.waterUv;
   output.edgeFactor = input.edgeFactor;
   output.kind = input.kind;
+  output.flow = input.flow;
+  output.speed = input.speed;
   output.visibility = 1.0 - smoothstep(7600.0, 9200.0, distance(uniforms.camera.xyz, worldPosition));
   return output;
 }
@@ -34,6 +40,11 @@ fn waterwayVertex(input: WaterwayInput, @builtin(instance_index) instanceIndex: 
 @fragment
 fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   if (input.visibility < 0.02) { discard; }
+  let mapUv = input.worldPosition.xz / uniforms.map.xy;
+  // Once an authored channel has entered broad static water, the ocean/lake
+  // pass owns the surface. This removes distant source-graph tails while the
+  // near-bank overlap still hides any seam at the mouth.
+  if (landAt(mapUv) < 0.5 && bankAt(mapUv) < 0.035) { discard; }
   let canal = input.kind > 0.5;
   let debugMode = u32(uniforms.map.w + 0.5);
   if (debugMode == 6u) {
@@ -42,16 +53,31 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   if (debugMode == 9u) {
     return select(vec4f(0.02, 0.78, 0.98, 1.0), vec4f(0.77, 0.42, 0.96, 1.0), canal);
   }
-  let grain = fract(sin(dot(floor(input.worldPosition.xz * 0.72), vec2f(12.9898, 78.233))) * 43758.5453);
-  let broad = sin(input.worldPosition.x * 0.041 + input.worldPosition.z * 0.029) * 0.5 + 0.5;
+  let time = uniforms.sunTime.w;
+  let flow = normalize(input.flow + vec2f(0.00001, 0.0));
+  let across = vec2f(-flow.y, flow.x);
+  let alongCoordinate = dot(input.worldPosition.xz, flow);
+  let acrossCoordinate = dot(input.worldPosition.xz, across);
+  let bankSlowdown = mix(1.0, 0.36, smoothstep(0.42, 1.0, input.edgeFactor));
+  let advectedTime = time * input.speed * bankSlowdown;
+  let largeWarp = valueNoise(vec2f(alongCoordinate * 0.021 - advectedTime * 0.19, acrossCoordinate * 0.052 + advectedTime * 0.027)) - 0.5;
+  let crossWarp = valueNoise(vec2f(alongCoordinate * 0.047 - advectedTime * 0.41, acrossCoordinate * 0.093 - largeWarp * 1.8));
+  let fineWarp = valueNoise(vec2f(alongCoordinate * 0.112 - advectedTime * 0.88 + largeWarp, acrossCoordinate * 0.17 + crossWarp * 0.9));
+  let brokenStreak = smoothstep(0.57, 0.88, crossWarp * 0.67 + fineWarp * 0.46 + largeWarp * 0.18);
+  let grain = valueNoise(input.worldPosition.xz * 0.31 + vec2f(-advectedTime * flow.x, -advectedTime * flow.y));
+  let broad = clamp(largeWarp + 0.5, 0.0, 1.0);
   let riverDeep = vec3f(0.035, 0.225, 0.285);
   let riverShallow = vec3f(0.14, 0.48, 0.50);
   let oceanDeep = vec3f(0.022, 0.145, 0.235);
   let oceanShallow = vec3f(0.10, 0.39, 0.46);
   var color = select(mix(riverDeep, riverShallow, input.edgeFactor * 0.76),
     mix(oceanDeep, oceanShallow, input.edgeFactor * 0.58), canal);
-  color *= 0.94 + grain * 0.045 + broad * 0.035;
-  let normal = normalize(vec3f((broad - 0.5) * 0.035, 1.0, (grain - 0.5) * 0.025));
+  color *= 0.93 + grain * 0.035 + broad * 0.045;
+  color = mix(color, select(vec3f(0.24, 0.53, 0.54), vec3f(0.20, 0.43, 0.49), canal), brokenStreak * select(0.18, 0.08, canal));
+  let normalAlong = (crossWarp - 0.5) * select(0.11, 0.045, canal);
+  let normalAcross = (fineWarp - 0.5) * select(0.075, 0.035, canal);
+  let normal = normalize(vec3f(flow.x * normalAlong + across.x * normalAcross, 1.0,
+    flow.y * normalAlong + across.y * normalAcross));
   let viewDirection = normalize(uniforms.camera.xyz - input.worldPosition);
   let fresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 4.2);
   let sun = pow(max(dot(reflect(-normalize(uniforms.sunTime.xyz), normal), viewDirection), 0.0), 128.0);

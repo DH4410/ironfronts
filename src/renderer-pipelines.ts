@@ -24,8 +24,8 @@ export function createRendererLayouts(device: GPUDevice): RendererLayouts {
       { binding: 2, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, texture: { sampleType: 'uint' } },
       { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'uint' } },
       { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
-      { binding: 5, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
-      { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 5, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      { binding: 6, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ],
@@ -75,9 +75,10 @@ export function createRendererPipelines(
   });
   const waterways = device.createRenderPipeline({
     label: 'static waterway pipeline', layout: commonLayout,
-    vertex: { module: waterwayModule, entryPoint: 'waterwayVertex', buffers: [{ arrayStride: 28, attributes: [
+    vertex: { module: waterwayModule, entryPoint: 'waterwayVertex', buffers: [{ arrayStride: 40, attributes: [
       { shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x2' },
       { shaderLocation: 2, offset: 20, format: 'float32' }, { shaderLocation: 3, offset: 24, format: 'float32' },
+      { shaderLocation: 4, offset: 28, format: 'float32x2' }, { shaderLocation: 5, offset: 36, format: 'float32' },
     ] }] },
     fragment: { module: waterwayModule, entryPoint: 'waterwayFragment', targets: [{ format, blend: alphaBlend }] },
     primitive: { topology: 'triangle-list', cullMode: 'none' }, depthStencil,

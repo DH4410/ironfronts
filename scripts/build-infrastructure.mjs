@@ -192,7 +192,7 @@ export function buildInfrastructure({
     roadClearance: roadRaster.clearance,
     cityPlans,
     roadReport: {
-      version: 'world-generation-v8',
+      version: 'direct-roads-v1',
       logicalRoads: assembled.routes.length,
       emittedRoads: visibleRoads.length,
       hiddenRoadCount: hiddenRoads.length,

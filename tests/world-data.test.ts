@@ -4,7 +4,7 @@ import { access, readFile } from 'node:fs/promises';
 interface Manifest {
   version: number;
   world: { width: number; height: number; wrapX: boolean };
-  fields: Record<string, { width: number; height: number }>;
+  fields: Record<string, { url: string; width: number; height: number; format: string }>;
   buffers: Record<string, { count: number; stride: number }>;
   terrain: { maxHeight: number };
   infrastructureChunks: {
@@ -29,21 +29,25 @@ function viewU32(bytes: Buffer): Uint32Array {
   return new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
 }
 
-describe('generated v8 world package', () => {
+describe('generated v9 world package', () => {
   it('preserves the canonical world and exposes simplified roads plus supplied waterways', async () => {
     const data = await manifest();
-    expect(data.version).toBe(8);
+    expect(data.version).toBe(9);
     expect(data.world).toEqual(expect.objectContaining({ width: 13_562, height: 7_000, wrapX: true }));
     expect(data.provinces).toHaveLength(3_303);
     expect(new Set(data.provinces.map((province) => province.id)).size).toBe(3_303);
     expect(data.provinces[0]).toEqual(expect.objectContaining({ id: 0, name: 'Las Palmas', terrain: 'Plains' }));
     expect(Object.keys(data.fields).sort()).toEqual(['coast', 'height', 'provinceIds', 'roads', 'surface', 'waterways']);
+    expect(data.fields.coast.format).toBe('rg8unorm');
+    const bankBytes = await readFile(`public/world/${data.fields.coast.url}`);
+    expect(bankBytes.byteLength).toBe(data.fields.coast.width * data.fields.coast.height * 2);
+    expect(bankBytes.some((value, index) => index % 2 === 1 && value > 0 && value < 255)).toBe(true);
     for (const obsolete of ['riverVertices', 'riverIndices', 'bridgeVertices', 'bridgeIndices', 'tunnelVertices', 'tunnelIndices', 'engineeringVertices', 'engineeringIndices']) {
       expect(data.buffers[obsolete]).toBeUndefined();
     }
     expect(data.buffers.roadVertices).toEqual(expect.objectContaining({ stride: 9 }));
     expect(data.buffers.hiddenConnectionVertices).toEqual(expect.objectContaining({ stride: 9 }));
-    expect(data.buffers.waterwayVertices).toEqual(expect.objectContaining({ stride: 7 }));
+    expect(data.buffers.waterwayVertices).toEqual(expect.objectContaining({ stride: 10 }));
     expect(data.buffers.waterwayIndices).toEqual(expect.objectContaining({ stride: 1 }));
     expect(data.provinces.every((province) => Object.keys(province).sort().join(',') === 'id,name,terrain')).toBe(true);
     const details = JSON.parse(await readFile(`public/world/${data.sidecars.provinceDetails.url}`, 'utf8'));
@@ -58,20 +62,25 @@ describe('generated v8 world package', () => {
 
   it('reconstructs the authoritative river graph and both static ocean-water canals', async () => {
     const data = await manifest();
-    const [vertexBytes, indexBytes, networkBytes, maskBytes, nodeBytes, reportBytes] = await Promise.all([
+    const [vertexBytes, indexBytes, networkBytes, maskBytes, provinceIdBytes, nodeBytes, reportBytes] = await Promise.all([
       readFile('public/world/waterway-vertices.f32'), readFile('public/world/waterway-indices.u32'),
       readFile('public/world/waterway-network-lines.f32'),
       readFile('public/world/waterways.r8'),
+      readFile('public/world/province-ids.u16'),
       readFile('material/movement/network_nodes.json', 'utf8'), readFile('public/world/world-generation-report.json', 'utf8'),
     ]);
     const vertices = viewF32(vertexBytes), indices = viewU32(indexBytes), network = viewF32(networkBytes);
+    const provinceIds = new Uint16Array(provinceIdBytes.buffer, provinceIdBytes.byteOffset, provinceIdBytes.byteLength / 2);
     const source = JSON.parse(nodeBytes) as { nodes: Array<{ kind: string; location_name: string }> };
     const report = JSON.parse(reportBytes);
     const riverNames = new Set(report.waterways.riverSystems);
     const sourceRiverPoints = source.nodes.filter((node) => node.kind === 'sea_point' && riverNames.has(node.location_name));
     const sourceCanalPoints = source.nodes.filter((node) => node.kind === 'sea_point' && ['Kiel Canal', 'Suez Channel'].includes(node.location_name));
-    expect(report.version).toBe('world-generation-v8');
-    expect(report.waterways.staticSurface).toBe(true);
+    expect(report.version).toBe('world-generation-v9');
+    expect(report.waterways.animatedSurface).toBe(true);
+    expect(report.waterways.animation).toBe('tangent-advection-domain-warp');
+    expect(report.waterways.minimumRiverWidth).toBeGreaterThanOrEqual(11);
+    expect(report.waterways.canalSurface).toBe('static-water province-zero channel');
     expect(report.waterways.riverSystems).toHaveLength(24);
     expect(sourceRiverPoints).toHaveLength(520);
     expect(sourceCanalPoints).toHaveLength(8);
@@ -79,7 +88,7 @@ describe('generated v8 world package', () => {
       riverSystems: 24, riverSourcePoints: 520, riverSegments: 527, riverMouthLinks: 29,
       canalSystems: 2, canalSourcePoints: 8, canalSegments: 10,
     }));
-    expect(vertices.length).toBe(data.buffers.waterwayVertices.count * 7);
+    expect(vertices.length).toBe(data.buffers.waterwayVertices.count * 10);
     expect(indices.length).toBe(data.buffers.waterwayIndices.count);
     expect(network.length).toBe(data.buffers.waterwayNetworkLines.count * 8);
     expect(data.buffers.waterwayNetworkLines.count).toBe(537);
@@ -95,20 +104,26 @@ describe('generated v8 world package', () => {
     expect(vertices.every(Number.isFinite)).toBe(true);
     let centerVertices = 0;
     for (let vertex = 0; vertex < data.buffers.waterwayVertices.count; vertex += 113) {
-      const offset = vertex * 7;
+      const offset = vertex * 10;
       expect(vertices[offset + 1]).toBeGreaterThanOrEqual(0.4);
       expect(vertices[offset + 1]).toBeLessThanOrEqual(50.5);
       expect([0, 1]).toContain(vertices[offset + 6]);
+      expect(Math.hypot(vertices[offset + 7], vertices[offset + 8])).toBeGreaterThan(0.99);
+      expect(vertices[offset + 9]).toBeGreaterThan(0);
     }
     for (let vertex = 0; vertex < data.buffers.waterwayVertices.count; vertex += 1) {
-      const offset = vertex * 7;
+      const offset = vertex * 10;
       if (vertices[offset + 5] > 0.01) continue;
       centerVertices += 1;
       const px = Math.min(data.fields.waterways.width - 1, Math.max(0,
         Math.floor(((vertices[offset] % data.world.width) + data.world.width) % data.world.width / data.world.width * data.fields.waterways.width)));
       const pz = Math.min(data.fields.waterways.height - 1, Math.max(0,
         Math.floor(vertices[offset + 2] / data.world.height * data.fields.waterways.height)));
-      expect(maskBytes[pz * data.fields.waterways.width + px]).toBe(255);
+      const pixel = pz * data.fields.waterways.width + px;
+      // Mouth overlap samples deliberately stop clipping the base ocean once
+      // both authored banks have opened. Every sample over land must still
+      // carry the terrain-removal mask.
+      if (provinceIds[pixel] !== 0) expect(maskBytes[pixel]).toBe(255);
     }
     expect(centerVertices).toBeGreaterThan(10_000);
     for (let index = 0; index < indices.length; index += 127) expect(indices[index]).toBeLessThan(data.buffers.waterwayVertices.count);
@@ -226,7 +241,7 @@ describe('generated v8 world package', () => {
       'rivers.rgba8', 'river-vertices.f32', 'bridge-vertices.f32', 'tunnel-vertices.f32',
       'infrastructure-engineering.rgba8', 'engineering-vertices.f32', 'roads.rgba8',
       'corridor-metrics.f32', 'corridor-flags.u32', 'connection-corridor-offsets.u32',
-      'connection-corridor-ids.u32', 'build.json',
+      'connection-corridor-ids.u32', 'build.json', 'coast.r8',
     ]) {
       await expect(access(`public/world/${name}`)).rejects.toThrow();
     }

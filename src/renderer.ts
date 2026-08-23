@@ -160,8 +160,8 @@ export class WorldRenderer {
       'r8unorm', new Uint8Array(waterwayFieldBuffer), this.manifest.fields.waterways.width,
     );
     this.coastTexture = this.uploadTexture(
-      'filtered coast mask', this.manifest.fields.coast.width, this.manifest.fields.coast.height,
-      'r8unorm', new Uint8Array(coastBuffer), this.manifest.fields.coast.width,
+      'signed-distance bank field', this.manifest.fields.coast.width, this.manifest.fields.coast.height,
+      'rg8unorm', new Uint8Array(coastBuffer), this.manifest.fields.coast.width * 2,
     );
     this.provinceTexture = this.uploadTexture(
       'province ids', this.manifest.fields.provinceIds.width, this.manifest.fields.provinceIds.height,

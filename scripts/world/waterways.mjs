@@ -12,8 +12,10 @@ const CANAL_NAMES = new Set(['Kiel Canal', 'Suez Channel']);
 // The terrain grid is intentionally much coarser than roads and waterways.
 // Sub-unit sampling keeps the solved channel, its clip mask, and its rendered
 // surface locked together through narrow valleys and mountain shoulders.
-const SAMPLE_SPACING = 0.75;
+const SAMPLE_SPACING = 0.6;
 const OPEN_WATER_HEIGHT = 0.42;
+const MINIMUM_RIVER_HALF_WIDTH = 5.5;
+const MINIMUM_CANAL_HALF_WIDTH = 5.0;
 
 function nodeName(node) {
   return node?.location_name ?? '';
@@ -117,13 +119,13 @@ function crossSection(context, x, z, dx, dz, kind) {
   // A river narrower than roughly two high-resolution mask texels can vanish
   // under oblique projection. Keep a strategy-readable minimum while bank
   // scans still allow major channels to widen naturally.
-  const minimum = kind === 1 ? 4.2 : 4.0;
-  const maximum = kind === 1 ? 6.5 : 8.5;
+  const minimum = kind === 1 ? MINIMUM_CANAL_HALF_WIDTH : MINIMUM_RIVER_HALF_WIDTH;
+  const maximum = kind === 1 ? 7.5 : 10.5;
   const left = clamp((leftBank?.distance ?? minimum) + 0.55, minimum, maximum);
   const right = clamp((rightBank?.distance ?? minimum) + 0.55, minimum, maximum);
   const bankHeights = [leftBank?.height, rightBank?.height].filter(Number.isFinite);
   const waterHeight = bankHeights.length ? Math.max(0.58, Math.min(...bankHeights) - 0.18) : 0.72;
-  return { nx, nz, left, right, waterHeight };
+  return { nx, nz, left, right, waterHeight, banked: Boolean(leftBank && rightBank) };
 }
 
 function makeNodeSurface(context, node, incidentEdges, nodes, kind) {
@@ -252,9 +254,9 @@ export function buildWaterways({
   const mask = new Uint8Array(idWidth * idHeight);
   const chunkFor = (x, z) => clamp(Math.floor(z / worldHeight * chunksY), 0, chunksY - 1) * chunksX
     + clamp(Math.floor(wrap(x, worldWidth) / worldWidth * chunksX), 0, chunksX - 1);
-  const addVertex = (position, uv, edgeFactor, kind) => {
-    const vertex = vertices.length / 7;
-    vertices.push(...position, ...uv, edgeFactor, kind);
+  const addVertex = (position, uv, edgeFactor, kind, flow, speed) => {
+    const vertex = vertices.length / 10;
+    vertices.push(...position, ...uv, edgeFactor, kind, ...flow, speed);
     return vertex;
   };
   let totalLength = 0;
@@ -264,13 +266,17 @@ export function buildWaterways({
   let maximumWidth = -Infinity;
 
   for (const edge of edges) {
+    // Canal passages are already authored as province-zero channels. Let the
+    // ocean/lake pass render them with identical water and keep these edges
+    // in the diagnostic graph; an explicit ribbon creates offshore caps.
+    if (edge.kind === 1) continue;
     const a = nodes[edge.node_a];
     const b = nodes[edge.node_b];
     const bx = unwrapNear(b.x, a.x, worldWidth);
     const dx = bx - a.x;
     const dz = b.y - a.y;
     const length = Math.hypot(dx, dz);
-    const segments = Math.max(1, Math.ceil(length / SAMPLE_SPACING));
+    let segments = Math.max(1, Math.ceil(length / SAMPLE_SPACING));
     const aSurface = nodeSurfaces.get(edge.node_a);
     const bSurface = nodeSurfaces.get(edge.node_b);
     const rings = [];
@@ -282,6 +288,43 @@ export function buildWaterways({
       const z = a.y + dz * t;
       const section = crossSection(context, x, z, dx, dz, edge.kind);
       samples.push({ x, z, t, section });
+    }
+    // Source mouth links terminate at broad sea nodes far offshore. Render the
+    // authored channel only until its banks open, plus a short submerged
+    // overlap, so rivers and canals dissolve into open water without a long
+    // rectangular strip across the ocean.
+    const aNamed = isRiver(a) || isCanal(a);
+    const bNamed = isRiver(b) || isCanal(b);
+    const overlapSamples = Math.ceil(12 / SAMPLE_SPACING);
+    if (aNamed && !bNamed) {
+      let sawBanks = false;
+      for (let index = 0; index < samples.length; index += 1) {
+        if (samples[index].section.banked) sawBanks = true;
+        else if (sawBanks) {
+          samples.splice(Math.min(samples.length, index + overlapSamples + 1));
+          break;
+        }
+      }
+    } else if (!aNamed && bNamed) {
+      let sawBanks = false;
+      for (let index = samples.length - 1; index >= 0; index -= 1) {
+        if (samples[index].section.banked) sawBanks = true;
+        else if (sawBanks) {
+          samples.splice(0, Math.max(0, index - overlapSamples));
+          break;
+        }
+      }
+    }
+    segments = samples.length - 1;
+    // Bank scans follow the exact source topology but can change by a texel at
+    // a time. Smooth only the width signal; the supplied centerline and all
+    // endpoints remain untouched.
+    for (let pass = 0; pass < 5; pass += 1) {
+      const widths = samples.map((sample) => [sample.section.left, sample.section.right]);
+      for (let index = 1; index + 1 < samples.length; index += 1) {
+        samples[index].section.left = (widths[index - 1][0] + widths[index][0] * 2 + widths[index + 1][0]) * 0.25;
+        samples[index].section.right = (widths[index - 1][1] + widths[index][1] * 2 + widths[index + 1][1]) * 0.25;
+      }
     }
     let profile = samples.map((sample) => sample.section.waterHeight);
     profile[0] = aSurface.y;
@@ -297,17 +340,30 @@ export function buildWaterways({
     for (let index = 0; index < samples.length; index += 1) {
       const { x, z, t, section } = samples[index];
       const y = profile[index];
+      const directionLength = Math.max(0.001, Math.hypot(dx, dz));
+      const downhillSign = aSurface.y >= bSurface.y ? 1 : -1;
+      const flow = [dx / directionLength * downhillSign, dz / directionLength * downhillSign];
+      const width = section.left + section.right;
+      const gradient = Math.abs(aSurface.y - bSurface.y) / Math.max(1, length);
+      const variation = 0.86 + 0.18 * Math.sin(edge.segment_id * 0.731 + t * 13.7)
+        + 0.08 * Math.sin(edge.segment_id * 0.193 - t * 31.1);
+      const speed = (edge.kind === 1 ? 0.34 : clamp(0.48 + gradient * 14 + 3.5 / width, 0.48, 1.35)) * variation;
       const left = x + section.nx * section.left;
       const leftZ = z + section.nz * section.left;
       const right = x - section.nx * section.right;
       const rightZ = z - section.nz * section.right;
       rings.push([
-        addVertex([left, y, leftZ], [length * t / 24, 0], 1, edge.kind),
-        addVertex([x, y + 0.015, z], [length * t / 24, 0.5], 0, edge.kind),
-        addVertex([right, y, rightZ], [length * t / 24, 1], 1, edge.kind),
+        addVertex([left, y, leftZ], [length * t / 24, 0], 1, edge.kind, flow, speed * 0.32),
+        addVertex([x, y + 0.015, z], [length * t / 24, 0.5], 0, edge.kind, flow, speed),
+        addVertex([right, y, rightZ], [length * t / 24, 1], 1, edge.kind, flow, speed * 0.32),
       ]);
-      markCorridor(clearance, idWidth, idHeight, worldWidth, worldHeight, x, z, section, 2.5);
-      markCorridor(mask, idWidth, idHeight, worldWidth, worldHeight, x, z, section, 0);
+      const openWaterTail = pointId(provinceIds, idWidth, idHeight, worldWidth, worldHeight, x, z) === 0 && !section.banked;
+      if (!openWaterTail) {
+        markCorridor(clearance, idWidth, idHeight, worldWidth, worldHeight, x, z, section, 2.5);
+        // A small conservative overlap prevents terrain fragments from peeking
+        // through the edge of an obliquely viewed ribbon.
+        markCorridor(mask, idWidth, idHeight, worldWidth, worldHeight, x, z, section, 0.45);
+      }
       minimumHeight = Math.min(minimumHeight, y);
       maximumHeight = Math.max(maximumHeight, y);
       minimumWidth = Math.min(minimumWidth, section.left + section.right);
@@ -319,7 +375,8 @@ export function buildWaterways({
       const next = rings[index + 1];
       indices.push(current[0], next[0], next[1], current[0], next[1], current[1]);
       indices.push(current[1], next[1], next[2], current[1], next[2], current[2]);
-      batches.push({ chunk: chunkFor((a.x + dx * ((index + 0.5) / segments)), a.y + dz * ((index + 0.5) / segments)), firstIndex, indexCount: 12 });
+      batches.push({ chunk: chunkFor((samples[index].x + samples[index + 1].x) * 0.5,
+        (samples[index].z + samples[index + 1].z) * 0.5), firstIndex, indexCount: 12 });
     }
   }
 
@@ -330,13 +387,18 @@ export function buildWaterways({
     if (!isRiver(node) && !isCanal(node)) continue;
     const surface = nodeSurfaces.get(nodeId);
     const kind = nodeEdges.some((edge) => edge.kind === 1) ? 1 : 0;
+    if (kind === 1) continue;
     const firstIndex = indices.length;
-    const center = addVertex([node.x, surface.y + 0.02, node.y], [0, 0.5], 0, kind);
+    const firstEdge = nodeEdges[0];
+    const other = nodes[firstEdge.node_a === nodeId ? firstEdge.node_b : firstEdge.node_a];
+    const flowLength = Math.max(0.001, Math.hypot(unwrapNear(other.x, node.x, worldWidth) - node.x, other.y - node.y));
+    const flow = [(unwrapNear(other.x, node.x, worldWidth) - node.x) / flowLength, (other.y - node.y) / flowLength];
+    const center = addVertex([node.x, surface.y + 0.02, node.y], [0, 0.5], 0, kind, flow, kind === 1 ? 0.3 : 0.58);
     const ring = [];
     for (let step = 0; step < 12; step += 1) {
       const angle = step / 12 * Math.PI * 2;
       ring.push(addVertex([node.x + Math.cos(angle) * surface.radius, surface.y, node.y + Math.sin(angle) * surface.radius],
-        [0, step / 12], 1, kind));
+        [0, step / 12], 1, kind, flow, kind === 1 ? 0.18 : 0.24));
     }
     for (let step = 0; step < 12; step += 1) indices.push(center, ring[step], ring[(step + 1) % 12]);
     batches.push({ chunk: chunkFor(node.x, node.y), firstIndex, indexCount: indices.length - firstIndex });
@@ -358,7 +420,8 @@ export function buildWaterways({
   const suezNode = canalNodes.find((node) => nodeName(node) === 'Suez Channel');
   const report = {
     source: 'material/movement network sea_point graph',
-    staticSurface: true,
+    animatedSurface: true,
+    animation: 'tangent-advection-domain-warp',
     sampleSpacing: SAMPLE_SPACING,
     terrainClipMask: true,
     riverSystems: [...new Set(riverNodes.map(nodeName))].sort(),
@@ -368,8 +431,11 @@ export function buildWaterways({
     canalSystems: [...new Set(canalNodes.map(nodeName))].sort(),
     canalSourcePoints: canalNodes.length,
     canalSegments: canalEdges.length,
+    canalSurface: 'static-water province-zero channel',
     totalLength,
     widthRange: [minimumWidth, maximumWidth],
+    minimumRiverWidth: MINIMUM_RIVER_HALF_WIDTH * 2,
+    minimumCanalWidth: MINIMUM_CANAL_HALF_WIDTH * 2,
     heightRange: [minimumHeight, maximumHeight],
     buildMilliseconds: performance.now() - started,
   };

@@ -68,7 +68,9 @@ fn waterDepthAt(uvInput: vec2f) -> f32 {
   return mix(top, bottom, blend.y) / 255.0;
 }
 
-fn landAt(uvInput: vec2f) -> f32 { return textureSampleLevel(coastTexture, materialSampler, wrappedUv(uvInput), 0.0).r; }
+fn bankFieldAt(uvInput: vec2f) -> vec2f { return textureSampleLevel(coastTexture, materialSampler, wrappedUv(uvInput), 0.0).rg; }
+fn landAt(uvInput: vec2f) -> f32 { return bankFieldAt(uvInput).r; }
+fn bankAt(uvInput: vec2f) -> f32 { return bankFieldAt(uvInput).g; }
 fn roadAt(uvInput: vec2f) -> vec2f { return textureSampleLevel(roadTexture, materialSampler, wrappedUv(uvInput), 0.0).rg; }
 fn waterwayAt(uvInput: vec2f) -> f32 { return textureSampleLevel(waterwayTexture, materialSampler, wrappedUv(uvInput), 0.0).r; }
 
@@ -87,5 +89,20 @@ fn terrainNormal(uv: vec2f) -> vec3f {
 fn hashColor(id: u32) -> vec3f {
   let n = f32((id * 1664525u + 1013904223u) & 1023u) / 1023.0;
   return 0.32 + 0.56 * vec3f(fract(n * 1.71), fract(n * 2.37 + 0.21), fract(n * 3.13 + 0.47));
+}
+
+fn noiseHash(point: vec2f) -> f32 {
+  return fract(sin(dot(point, vec2f(127.1, 311.7))) * 43758.5453123);
+}
+
+fn valueNoise(point: vec2f) -> f32 {
+  let cell = floor(point);
+  let local = fract(point);
+  let blend = local * local * (3.0 - 2.0 * local);
+  let a = noiseHash(cell);
+  let b = noiseHash(cell + vec2f(1.0, 0.0));
+  let c = noiseHash(cell + vec2f(0.0, 1.0));
+  let d = noiseHash(cell + vec2f(1.0, 1.0));
+  return mix(mix(a, b, blend.x), mix(c, d, blend.x), blend.y);
 }
 `;

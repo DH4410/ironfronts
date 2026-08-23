@@ -61,9 +61,9 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   // The waterway mask is baked from the same dense samples as the river mesh.
   // Clip coarse terrain triangles out of that corridor so they cannot bridge
   // a narrow authored gap and progressively bury the water surface. Static
-  // water coverage must use the exact province raster: the filtered coast
-  // texture is only a shoreline blend and closes thin visual-only rivers.
-  if (provinceId == 0u || waterwayAt(input.mapUv) > 0.45) { discard; }
+  // The signed-distance bank field preserves the source topology while
+  // removing nearest-neighbor stair steps from coasts and visual channels.
+  if (landAt(input.mapUv) <= 0.5 || waterwayAt(input.mapUv) > 0.45) { discard; }
 
   let surface = surfaceAt(input.mapUv);
   let terrain = surface.r;
@@ -101,7 +101,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   // Beaches follow the actual land/water boundary. Low inland terrain is not
   // coastal and must retain its biome material (the old elevation-only test
   // turned most of Africa and Iberia into sand).
-  let shoreline = 1.0 - smoothstep(0.78, 0.995, landAt(input.mapUv));
+  let shoreline = bankAt(input.mapUv) * smoothstep(0.50, 0.72, landAt(input.mapUv));
   let beachElevation = 1.0 - smoothstep(5.0, 10.0, elevation);
   baseColor = mix(baseColor, sampleMaterial(7, input.worldPosition, 52.0), shoreline * beachElevation * 0.92);
 
@@ -194,10 +194,15 @@ fn waterVertex(input: WaterVertexInput, @builtin(instance_index) instanceIndex: 
   let copyOffset = f32(i32(copyIndex) - 1) * uniforms.map.x;
   let xz = vec2f(uv.x * uniforms.map.x + copyOffset, uv.y * uniforms.map.y);
   let time = uniforms.sunTime.w;
-  let shorelineDamping = smoothstep(0.008, 0.19, waterDepthAt(uv));
-  let waveHeight = (sin(dot(xz, vec2f(0.018, 0.011)) + time * 0.58) * 0.48
-    + sin(dot(xz, vec2f(-0.009, 0.024)) - time * 0.43) * 0.31
-    + cos(dot(xz, vec2f(0.041, -0.016)) + time * 0.82) * 0.12) * (0.16 + shorelineDamping * 0.84);
+  let openWater = 1.0 - bankAt(uv);
+  let windWarp = valueNoise(xz / 920.0 + vec2f(time * 0.006, -time * 0.004)) - 0.5;
+  let directionA = normalize(vec2f(0.88 + windWarp * 0.42, 0.47 - windWarp * 0.28));
+  let directionB = normalize(vec2f(-0.31 + windWarp * 0.22, 0.95));
+  let packet = 0.68 + valueNoise(xz / 310.0 - vec2f(time * 0.018, time * 0.011)) * 0.42;
+  let waveHeight = (sin(dot(xz, directionA) * 0.014 + time * (0.47 + windWarp * 0.08)) * 0.42
+    + sin(dot(xz, directionB) * 0.026 - time * 0.39 + windWarp * 2.1) * 0.24
+    + sin(dot(xz, normalize(directionA + directionB * 0.37)) * 0.061 + time * 0.83) * 0.08)
+    * packet * mix(0.09, 1.0, openWater);
   let worldPosition = vec3f(uv.x * uniforms.map.x + copyOffset, 0.35 + waveHeight, uv.y * uniforms.map.y);
   var output: WaterVertexOutput;
   output.position = uniforms.viewProjection * vec4f(worldPosition, 1.0);
@@ -208,10 +213,7 @@ fn waterVertex(input: WaterVertexInput, @builtin(instance_index) instanceIndex: 
 
 @fragment
 fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
-  // Province zero is the authoritative ocean/lake/visual-channel mask. Do not
-  // use the softened coast field here: its blur intentionally feathers beach
-  // materials, but it can erase authored channels only a few texels wide.
-  if (provinceAt(input.mapUv) != 0u || waterwayAt(input.mapUv) > 0.45) { discard; }
+  if (landAt(input.mapUv) >= 0.5 || waterwayAt(input.mapUv) > 0.45) { discard; }
   let debugMode = u32(uniforms.map.w + 0.5);
   if (debugMode == 6u) { return vec4f(0.012, 0.025, 0.032, 1.0); }
   if (debugMode == 7u) {
@@ -220,10 +222,15 @@ fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
   }
   if (debugMode == 9u) { return vec4f(0.025, 0.12, 0.25, 1.0); }
   let time = uniforms.sunTime.w;
-  let waveA = sin(input.worldPosition.x * 0.018 + input.worldPosition.z * 0.011 + time * 0.58);
-  let waveB = cos(input.worldPosition.x * -0.009 + input.worldPosition.z * 0.024 - time * 0.43);
-  let ripple = sin(input.worldPosition.x * 0.071 - input.worldPosition.z * 0.052 + time * 1.17);
-  let normal = normalize(vec3f((waveA + waveB * 0.6 + ripple * 0.16) * 0.105, 1.0, (waveA * 0.55 - waveB + ripple * 0.12) * 0.09));
+  let world = input.worldPosition.xz;
+  let warp = vec2f(valueNoise(world / 175.0 + vec2f(time * 0.025, -time * 0.017)),
+    valueNoise(world / 243.0 + vec2f(-time * 0.013, time * 0.021))) - 0.5;
+  let waveA = sin(dot(world + warp * 36.0, normalize(vec2f(0.86, 0.51))) * 0.019 + time * 0.53);
+  let waveB = sin(dot(world - warp * 24.0, normalize(vec2f(-0.28, 0.96))) * 0.034 - time * 0.41);
+  let rippleNoise = valueNoise(world / 19.0 + warp * 1.7 + vec2f(time * 0.11, -time * 0.07));
+  let ripple = rippleNoise * 2.0 - 1.0;
+  let normal = normalize(vec3f((waveA * 0.78 + waveB * 0.41 + ripple * 0.22) * 0.105, 1.0,
+    (waveA * 0.38 - waveB * 0.82 + ripple * 0.19) * 0.09));
   let viewDirection = normalize(uniforms.camera.xyz - input.worldPosition);
   let fresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 4.5);
   let sun = pow(max(dot(reflect(-normalize(uniforms.sunTime.xyz), normal), viewDirection), 0.0), 112.0);
@@ -233,7 +240,8 @@ fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
   let deep = vec3f(0.025, 0.16, 0.255);
   var color = mix(shallow, deep, shelf);
   color = mix(color, vec3f(0.40, 0.60, 0.63), fresnel * 0.64);
-  let foam = (1.0 - smoothstep(0.025, 0.14, depth)) * smoothstep(0.18, 0.88, waveA * 0.5 + 0.5 + ripple * 0.12);
+  let foamBreak = valueNoise(world / 11.0 + warp * 2.4 + vec2f(time * 0.15, -time * 0.09));
+  let foam = bankAt(input.mapUv) * smoothstep(0.54, 0.82, foamBreak + waveA * 0.12);
   color = mix(color, vec3f(0.73, 0.82, 0.77), foam * 0.52);
   color += vec3f(1.0, 0.86, 0.61) * sun * (0.34 + ripple * 0.05);
   let fog = smoothstep(4000.0, 12000.0, distance(uniforms.camera.xyz, input.worldPosition));

@@ -6,6 +6,7 @@ import { FIELD_HEIGHT, FIELD_WIDTH, ID_HEIGHT, ID_WIDTH, SEED, WORLD_HEIGHT, WOR
 import { blurField, clamp, distanceToValue, wrap } from './world/raster.mjs';
 import { buildInstances } from './world/instances.mjs';
 import { generateTopography } from './world/topography.mjs';
+import { buildBankField } from './world/water-fields.mjs';
 import { buildWaterways } from './world/waterways.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -166,11 +167,7 @@ async function main() {
     geometryById.set(province.province_id, province);
     for (const component of province.components) fillPolygon(provinceIds, component, province.province_id + 1);
   }
-  const coastSource = new Float32Array(provinceIds.length);
-  for (let index = 0; index < provinceIds.length; index += 1) coastSource[index] = provinceIds[index] === 0 ? 0 : 1;
-  const coastBlendHighResolution = blurField(coastSource, ID_WIDTH, ID_HEIGHT, 2, 2);
-  const coastMask = new Uint8Array(provinceIds.length);
-  for (let index = 0; index < coastMask.length; index += 1) coastMask[index] = Math.round(clamp(coastBlendHighResolution[index], 0, 1) * 255);
+  const bankField = buildBankField(provinceIds, ID_WIDTH, ID_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT);
 
   const metadataById = new Map(metadata.provinces.map((province) => [province.province_id, province]));
   const maximumProvinceId = Math.max(...metadata.provinces.map((province) => province.province_id));
@@ -268,14 +265,15 @@ async function main() {
   for (const height of heights) maxHeight = Math.max(maxHeight, height);
 
   const worldGenerationReport = {
-    version: 'world-generation-v8',
+    version: 'world-generation-v9',
     topography: topographyReport,
+    banks: bankField.report,
     waterways: waterways.report,
     roads: infrastructure.roadReport,
   };
 
   const manifest = {
-    version: 8,
+    version: 9,
     source: { mapId: mapMetadata.map_id, mapVersion: mapMetadata.map_version },
     generatedSeed: SEED,
     world: { width: WORLD_WIDTH, height: WORLD_HEIGHT, overlapX: 250, wrapX: true },
@@ -284,7 +282,7 @@ async function main() {
       surface: { url: 'surface.rgba8', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'rgba8uint' },
       roads: { url: 'roads.rg8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rg8unorm' },
       waterways: { url: 'waterways.r8', width: ID_WIDTH, height: ID_HEIGHT, format: 'r8unorm' },
-      coast: { url: 'coast.r8', width: ID_WIDTH, height: ID_HEIGHT, format: 'r8unorm' },
+      coast: { url: 'coast.rg8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rg8unorm' },
       provinceIds: { url: 'province-ids.u16', width: ID_WIDTH, height: ID_HEIGHT, format: 'r16uint' },
     },
     buffers: {
@@ -294,7 +292,7 @@ async function main() {
       roadIndices: { url: 'road-indices.u32', count: infrastructure.roadIndices.length, stride: 1 },
       hiddenConnectionVertices: { url: 'hidden-connection-vertices.f32', count: infrastructure.hiddenConnectionVertices.length / 9, stride: 9 },
       hiddenConnectionIndices: { url: 'hidden-connection-indices.u32', count: infrastructure.hiddenConnectionIndices.length, stride: 1 },
-      waterwayVertices: { url: 'waterway-vertices.f32', count: waterways.vertices.length / 7, stride: 7 },
+      waterwayVertices: { url: 'waterway-vertices.f32', count: waterways.vertices.length / 10, stride: 10 },
       waterwayIndices: { url: 'waterway-indices.u32', count: waterways.indices.length, stride: 1 },
       waterwayNetworkLines: { url: 'waterway-network-lines.f32', count: waterways.networkLines.length / 8, stride: 8, lazy: true },
       trees: { url: 'trees.f32', count: trees.length / 8, stride: 8 },
@@ -329,7 +327,7 @@ async function main() {
     writeTyped('surface.rgba8', surface),
     writeTyped('roads.rg8', infrastructure.roadField),
     writeTyped('waterways.r8', waterways.mask),
-    writeTyped('coast.r8', coastMask),
+    writeTyped('coast.rg8', bankField.field),
     writeTyped('borders.f32', borders),
     writeTyped('connections.f32', connections),
     writeTyped('road-vertices.f32', infrastructure.roadVertices),
