@@ -9,6 +9,7 @@
   </head>
   <body>
     <canvas id="world" aria-label="Interactive 3D world map"></canvas>
+    <div id="country-labels" class="country-labels" aria-hidden="true"></div>
 
     <header class="brand" aria-label="Ironfronts renderer">
       <span class="brand__eyebrow">WORLD RENDERER</span>
@@ -51,6 +52,7 @@
       </div>
       <div class="diagnostics__group diagnostics__grid">
         <strong>LAYERS</strong>
+        <label><input id="debug-countries" type="checkbox" checked /> Countries</label>
         <label><input id="debug-borders" type="checkbox" checked /> Borders</label>
         <label><input id="debug-roads" type="checkbox" checked /> Roads</label>
         <label><input id="debug-hidden" type="checkbox" checked /> Dotted links</label>
@@ -65,6 +67,7 @@
       <span><kbd>Drag</kbd> pan</span>
       <span><kbd>Wheel</kbd> zoom</span>
       <span><kbd>Right drag</kbd> orbit</span>
+      <span><kbd>C</kbd> countries</span>
       <span><kbd>F3</kbd> diagnostics</span>
     </div>
 

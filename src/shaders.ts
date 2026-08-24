@@ -104,6 +104,17 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let beachElevation = 1.0 - smoothstep(5.0, 10.0, elevation);
   baseColor = mix(baseColor, sampleMaterial(7, input.worldPosition, 52.0), shoreline * beachElevation * 0.92);
 
+  if (uniforms.interaction.z > 0.5 && uniforms.map.w < 0.5) {
+    let owner = ownerAt(provinceId);
+    if (owner > 0u) {
+      let politicalColor = countryColorAt(owner);
+      let terrainLuminance = dot(baseColor, vec3f(0.24, 0.68, 0.08));
+      let coloredSurface = mix(baseColor, politicalColor * (0.58 + terrainLuminance * 0.72), 0.72);
+      let overlayStrength = mix(0.26, 0.38, smoothstep(1300.0, 6200.0, uniforms.interaction.y));
+      baseColor = mix(baseColor, coloredSurface, overlayStrength);
+    }
+  }
+
 
   let roadData = roadAt(input.mapUv);
   let roadDistance = distance(uniforms.camera.xyz, input.worldPosition);
@@ -530,11 +541,25 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   var widthPixels = 0.72 + nearFactor * 0.8;
   var color = vec4f(0.055, 0.085, 0.077, 0.15 + nearFactor * 0.40);
   if (line.b.z < 0.5) { color.a *= 0.46; }
-  if (hovered) {
-    widthPixels = 2.8;
-    color = vec4f(0.96, 0.78, 0.35, 0.96);
-  }
-  if (lineParams.mode == 1u) {
+  if (lineParams.mode == 0u) {
+    let provinceBordersVisible = (lineParams.enabled & 1u) != 0u;
+    let countryBordersVisible = (lineParams.enabled & 2u) != 0u;
+    let provinceA = u32(line.b.x + 0.5);
+    let provinceB = u32(line.b.y + 0.5);
+    let ownerA = ownerAt(provinceA);
+    let ownerB = ownerAt(provinceB);
+    let countryBoundary = ownerA != ownerB;
+    if (countryBoundary && countryBordersVisible) {
+      widthPixels = 2.65 - nearFactor * 0.58;
+      color = vec4f(0.052, 0.067, 0.059, select(0.48, 0.72, line.b.z > 0.5));
+    } else if (!provinceBordersVisible) {
+      color.a = 0.0;
+    }
+    if (hovered && (provinceBordersVisible || countryBordersVisible)) {
+      widthPixels = max(widthPixels, 2.8);
+      color = vec4f(0.96, 0.78, 0.35, 0.96);
+    }
+  } else if (lineParams.mode == 1u) {
     widthPixels = 1.1;
     color = select(vec4f(0.19, 0.64, 0.78, 0.68), vec4f(0.80, 0.67, 0.25, 0.72), line.b.x > 0.5);
   } else if (lineParams.mode == 2u) {
@@ -552,6 +577,7 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
 
 @fragment
 fn lineFragment(input: LineOutput) -> @location(0) vec4f {
+  if (input.color.a < 0.002) { discard; }
   return input.color;
 }
 `;

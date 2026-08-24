@@ -55,6 +55,7 @@ const validation = await page.evaluate(async () => {
     riverSystems: counts.riverSystems,
     riverSegments: counts.riverSegments,
     canalSystems: counts.canalSystems,
+    countries: counts.countries,
   };
 });
 if (validation.maximumHeight > 60.5) errors.push(`validation: maximum elevation ${validation.maximumHeight.toFixed(3)} exceeds 60.5`);
@@ -63,9 +64,22 @@ if (validation.capViolations !== 0) errors.push(`validation: ${validation.capVio
 if (validation.steepEmittedRoads <= 0) errors.push('validation: no incline-warning roads were emitted');
 if (validation.riverSystems !== 24 || validation.riverSegments !== 527) errors.push('validation: authoritative river graph is incomplete');
 if (validation.canalSystems !== 2) errors.push('validation: Kiel and Suez canal surfaces are incomplete');
+if (validation.countries !== 200) errors.push(`validation: expected 200 countries, found ${validation.countries}`);
 await page.screenshot({ path: path.join(outputDirectory, 'overview.png') });
 
 if (!status.unsupported) {
+  validation.visibleCountryLabels = await page.locator('.country-label:not([hidden])').count();
+  if (validation.visibleCountryLabels <= 0) errors.push('validation: no country labels are visible at world zoom');
+  await page.keyboard.press('KeyC');
+  await page.waitForTimeout(120);
+  validation.countryToggleHidesLabels = await page.locator('#country-labels').evaluate((element) => element.hasAttribute('hidden'));
+  if (!validation.countryToggleHidesLabels) errors.push('validation: country overlay toggle did not hide labels');
+  await page.keyboard.press('KeyC');
+  await page.evaluate(() => {
+    const renderer = window.__ironfrontsRenderer;
+    renderer?.setProvinceOwner(0, 1);
+    renderer?.setProvinceOwner(0, 24);
+  });
   // Start with a close landscape pass before deterministic showcase captures.
   await page.mouse.move(900, 625);
   await page.mouse.wheel(0, -3_700);

@@ -21,8 +21,37 @@ body { user-select: none; }
 
 #world:active { cursor: grabbing; }
 
+.country-labels {
+  position: fixed;
+  z-index: 1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.country-labels[hidden] { display: none; }
+
+.country-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: rgba(247, 244, 224, .96);
+  font-family: "Segoe UI Variable", "Segoe UI", Arial, sans-serif;
+  font-weight: 750;
+  letter-spacing: .075em;
+  line-height: 1.05;
+  white-space: nowrap;
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-stroke: .65px rgba(10, 18, 17, .92);
+  paint-order: stroke fill;
+  text-shadow: 0 1px 2px rgba(3, 10, 10, .9), 0 0 5px rgba(3, 10, 10, .52);
+  transform-origin: center;
+  transition: opacity .12s linear;
+}
+
 .brand {
   position: fixed;
+  z-index: 2;
   left: 28px;
   top: 24px;
   display: flex;
@@ -37,6 +66,7 @@ body { user-select: none; }
 
 .loading {
   position: fixed;
+  z-index: 3;
   left: 50%;
   bottom: 56px;
   width: min(420px, calc(100vw - 48px));
@@ -60,6 +90,7 @@ body { user-select: none; }
   background: rgba(19, 30, 29, .88);
   box-shadow: 0 8px 30px rgba(4, 12, 12, .28);
   backdrop-filter: blur(8px);
+  border-left: 3px solid var(--country-color, rgba(241, 226, 190, .42));
   pointer-events: none;
 }
 
@@ -69,6 +100,7 @@ body { user-select: none; }
 
 .diagnostics {
   position: fixed;
+  z-index: 3;
   top: 20px;
   right: 20px;
   width: 310px;
@@ -101,6 +133,7 @@ body { user-select: none; }
 
 .controls {
   position: fixed;
+  z-index: 2;
   right: 22px;
   bottom: 18px;
   display: flex;

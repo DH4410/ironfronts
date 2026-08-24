@@ -48,6 +48,14 @@ describe('WGSL programs', () => {
     expect(propShader).toContain('clamp(record.b.w, 0.0, 1.0)');
   });
 
+  it('derives political tint and country borders from mutable province ownership', () => {
+    expect(terrainShader).toContain('let owner = ownerAt(provinceId)');
+    expect(terrainShader).toContain('let overlayStrength = mix(0.26, 0.38');
+    expect(lineShader).toContain('let ownerA = ownerAt(provinceA)');
+    expect(lineShader).toContain('let countryBoundary = ownerA != ownerB');
+    expect(lineShader).toContain('(lineParams.enabled & 2u) != 0u');
+  });
+
   it.each([
     ['terrain', terrainShader, ['terrainVertex'], ['terrainFragment']],
     ['water', waterShader, ['waterVertex'], ['waterFragment']],
@@ -91,6 +99,8 @@ describe('WGSL programs', () => {
       { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
+      { binding: 10, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+      { binding: 11, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
     ] });
     const layer = device.createBindGroupLayout({ entries: [
       { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },

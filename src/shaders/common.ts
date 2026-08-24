@@ -20,6 +20,8 @@ struct Uniforms {
 @group(0) @binding(7) var roadTexture: texture_2d<f32>;
 @group(0) @binding(8) var waterwayTexture: texture_2d<f32>;
 @group(0) @binding(9) var treeMaterialTexture: texture_2d_array<f32>;
+@group(0) @binding(10) var<storage, read> provinceOwners: array<u32>;
+@group(0) @binding(11) var<storage, read> countryColors: array<vec4f>;
 
 fn wrappedUv(uv: vec2f) -> vec2f {
   return vec2f(fract(uv.x + 1.0), clamp(uv.y, 0.0, 0.999999));
@@ -45,6 +47,14 @@ fn provinceAt(uvInput: vec2f) -> u32 {
   let dimensions = textureDimensions(provinceTexture);
   let coordinate = vec2i(min(i32(dimensions.x) - 1, i32(uv.x * f32(dimensions.x))), min(i32(dimensions.y) - 1, i32(uv.y * f32(dimensions.y))));
   return textureLoad(provinceTexture, coordinate, 0).r;
+}
+
+fn ownerAt(provinceId: u32) -> u32 {
+  return provinceOwners[min(provinceId, arrayLength(&provinceOwners) - 1u)];
+}
+
+fn countryColorAt(countryId: u32) -> vec3f {
+  return countryColors[min(countryId, arrayLength(&countryColors) - 1u)].rgb;
 }
 
 fn surfaceAt(uvInput: vec2f) -> vec4u {

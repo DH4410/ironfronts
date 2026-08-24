@@ -18,6 +18,13 @@ export interface ProvinceRecord {
   terrain: string;
 }
 
+export interface CountryRecord {
+  id: number;
+  name: string;
+  color: string;
+  capitalProvinceId: number;
+}
+
 export interface ProvinceDetails {
   version: number;
   provinces: Array<{
@@ -74,6 +81,12 @@ export interface WorldManifest {
   };
   reports: { generation: { url: string; version: string } };
   sidecars: { provinceDetails: { url: string; version: number } };
+  politics: {
+    owners: BinaryBufferDescriptor;
+    adjacency: BinaryBufferDescriptor;
+    labelData: BinaryBufferDescriptor;
+    countries: CountryRecord[];
+  };
   showcases: {
     urban: [number, number]; mountain: [number, number]; steepRoad: [number, number];
     dirtRoad: [number, number]; hiddenConnection: [number, number];
@@ -89,6 +102,8 @@ export interface HoverInfo {
   id: number;
   name: string;
   terrain: string;
+  country: string;
+  countryColor: string;
 }
 
 export interface FrameStats {

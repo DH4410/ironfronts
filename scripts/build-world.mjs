@@ -145,7 +145,8 @@ function buildConnections(connectionData) {
 }
 
 async function main() {
-  const [geometry, metadata, markers, borderData, connectionData, networkData, mapMetadata] = await Promise.all([
+  const [geometry, metadata, markers, borderData, connectionData, networkData, mapMetadata,
+    countryData, ownershipData, provinceAdjacencyData] = await Promise.all([
     readJson('geometry/province_polygons_decoded.json'),
     readJson('metadata/provinces.json'),
     readJson('geometry/terrain_marker_positions.json'),
@@ -153,6 +154,9 @@ async function main() {
     readJson('movement/connection_segments.json'),
     readJson('movement/network_nodes.json'),
     readJson('metadata/map_metadata.json'),
+    readJson('metadata/countries.json'),
+    readJson('metadata/initial_ownership.json'),
+    readJson('topology/province_adjacency.json'),
   ]);
 
   if (geometry.provinces.length !== 3_303 || metadata.provinces.length !== 3_303) {
@@ -176,6 +180,32 @@ async function main() {
   const maximumProvinceId = Math.max(...metadata.provinces.map((province) => province.province_id));
   const areaCounts = new Uint32Array(maximumProvinceId + 2);
   for (const encodedId of provinceIds) areaCounts[encodedId] += 1;
+  const provinceOwners = new Uint32Array(maximumProvinceId + 2);
+  for (const ownership of ownershipData.ownership) {
+    provinceOwners[ownership.province_id + 1] = ownership.initial_owner_id;
+  }
+  const provinceLabelData = new Float32Array((maximumProvinceId + 2) * 3);
+  for (const province of metadata.provinces) {
+    const encodedId = province.province_id + 1;
+    provinceLabelData[encodedId * 3] = province.center_x;
+    provinceLabelData[encodedId * 3 + 1] = province.center_y;
+    provinceLabelData[encodedId * 3 + 2] = areaCounts[encodedId];
+  }
+  const provinceAdjacency = new Uint32Array(provinceAdjacencyData.adjacencies.length * 2);
+  for (let index = 0; index < provinceAdjacencyData.adjacencies.length; index += 1) {
+    const adjacency = provinceAdjacencyData.adjacencies[index];
+    provinceAdjacency[index * 2] = adjacency.province_a_id + 1;
+    provinceAdjacency[index * 2 + 1] = adjacency.province_b_id + 1;
+  }
+  const countries = countryData.countries.map((country) => ({
+    id: country.country_id,
+    name: country.nation_name,
+    color: country.primary_color_hex,
+    capitalProvinceId: country.capital_province_id,
+  }));
+  if (metadata.provinces.some((province) => provinceOwners[province.province_id + 1] === 0)) {
+    throw new Error('Every province must have an initial country owner');
+  }
 
   console.log(`Building ${FIELD_WIDTH}x${FIELD_HEIGHT} terrain fields…`);
   const surface = new Uint8Array(FIELD_WIDTH * FIELD_HEIGHT * 4);
@@ -342,9 +372,16 @@ async function main() {
     infrastructureChunks: { ...infrastructure.chunkRanges, waterways: waterways.chunkRanges },
     reports: { generation: { url: 'world-generation-report.json', version: worldGenerationReport.version } },
     sidecars: { provinceDetails: { url: 'province-details.json', version: provinceDetails.version } },
+    politics: {
+      owners: { url: 'province-owners.u32', count: provinceOwners.length, stride: 1 },
+      adjacency: { url: 'province-adjacency.u32', count: provinceAdjacency.length / 2, stride: 2 },
+      labelData: { url: 'province-label-data.f32', count: provinceLabelData.length / 3, stride: 3 },
+      countries,
+    },
     showcases: { ...infrastructure.showcases, ...waterways.showcases },
     counts: {
       provinces: provinceRecords.length,
+      countries: countries.length,
       borders: borders.length / 8,
       trees: trees.length / 8,
       buildings: buildings.length / 8,
@@ -361,6 +398,9 @@ async function main() {
 
   await Promise.all([
     writeTyped('province-ids.u16', provinceIds),
+    writeTyped('province-owners.u32', provinceOwners),
+    writeTyped('province-adjacency.u32', provinceAdjacency),
+    writeTyped('province-label-data.f32', provinceLabelData),
     writeTyped('height.f32', heights),
     writeTyped('surface.rgba8', surface),
     writeTyped('roads.rg8', infrastructure.roadField),

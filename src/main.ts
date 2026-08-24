@@ -3,6 +3,7 @@ import { WorldRenderer } from './renderer';
 import type { FrameStats, HoverInfo } from './types';
 
 const canvas = required<HTMLCanvasElement>('world');
+const countryLabels = required<HTMLElement>('country-labels');
 const loading = required<HTMLElement>('loading');
 const loadingStage = required<HTMLElement>('loading-stage');
 const loadingValue = required<HTMLElement>('loading-value');
@@ -17,6 +18,7 @@ const debugConnections = required<HTMLInputElement>('debug-connections');
 const debugRivers = required<HTMLInputElement>('debug-rivers');
 const debugWireframe = required<HTMLInputElement>('debug-wireframe');
 const debugBorders = required<HTMLInputElement>('debug-borders');
+const debugCountries = required<HTMLInputElement>('debug-countries');
 const debugRoads = required<HTMLInputElement>('debug-roads');
 const debugHidden = required<HTMLInputElement>('debug-hidden');
 const debugWaterways = required<HTMLInputElement>('debug-waterways');
@@ -33,7 +35,7 @@ if (!navigator.gpu) {
 }
 
 async function start(): Promise<void> {
-  const renderer = new WorldRenderer(canvas);
+  const renderer = new WorldRenderer(canvas, countryLabels);
   if (import.meta.env.DEV) (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
   renderer.onHover = updateTooltip;
   renderer.onStats = updateDiagnostics;
@@ -44,6 +46,12 @@ async function start(): Promise<void> {
     updateDebugHelp(mode);
   };
   window.addEventListener('keydown', (event) => {
+    if (event.code === 'KeyC' && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLSelectElement)) {
+      event.preventDefault();
+      debugCountries.checked = !debugCountries.checked;
+      renderer.setCountryOverlayVisible(debugCountries.checked);
+      return;
+    }
     if (event.code === 'F3') {
       event.preventDefault();
       diagnostics.hidden = !diagnostics.hidden;
@@ -58,6 +66,7 @@ async function start(): Promise<void> {
   });
   debugView.addEventListener('change', applyDebugView);
   debugWireframe.addEventListener('change', () => renderer.setWireframe(debugWireframe.checked));
+  debugCountries.addEventListener('change', () => renderer.setCountryOverlayVisible(debugCountries.checked));
   debugBorders.addEventListener('change', () => renderer.setBordersVisible(debugBorders.checked));
   debugRoads.addEventListener('change', () => renderer.setRoadsVisible(debugRoads.checked));
   debugHidden.addEventListener('change', () => renderer.setHiddenConnectionsVisible(debugHidden.checked));
@@ -107,7 +116,8 @@ function updateTooltip(info: HoverInfo | null, x: number, y: number): void {
     return;
   }
   tooltipName.textContent = info.name;
-  tooltipTerrain.textContent = info.terrain;
+  tooltipTerrain.textContent = `${info.country} · ${info.terrain}`;
+  tooltip.style.setProperty('--country-color', info.countryColor);
   tooltip.style.left = `${x}px`;
   tooltip.style.top = `${y}px`;
   tooltip.hidden = false;

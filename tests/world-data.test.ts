@@ -14,6 +14,12 @@ interface Manifest {
   };
   counts: Record<string, number>;
   sidecars: { provinceDetails: { url: string; version: number } };
+  politics: {
+    owners: { url: string; count: number; stride: number };
+    adjacency: { url: string; count: number; stride: number };
+    labelData: { url: string; count: number; stride: number };
+    countries: Array<{ id: number; name: string; color: string; capitalProvinceId: number }>;
+  };
   provinces: Array<{ id: number; name: string; terrain: string }>;
 }
 
@@ -237,6 +243,42 @@ describe('generated v10 world package', () => {
     expect(data.infrastructureChunks.hiddenConnections.reduce((sum, range) => sum + range.indexCount, 0)).toBe(indices.length);
   });
 
+  it('packages complete mutable country ownership and label topology', async () => {
+    const data = await manifest();
+    const [ownerBytes, adjacencyBytes, labelBytes] = await Promise.all([
+      readFile(`public/world/${data.politics.owners.url}`),
+      readFile(`public/world/${data.politics.adjacency.url}`),
+      readFile(`public/world/${data.politics.labelData.url}`),
+    ]);
+    const owners = viewU32(ownerBytes);
+    const adjacency = viewU32(adjacencyBytes);
+    const labels = viewF32(labelBytes);
+    expect(data.politics.countries).toHaveLength(200);
+    expect(new Set(data.politics.countries.map((country) => country.id)).size).toBe(200);
+    expect(data.politics.countries.every((country) => /^#[0-9A-F]{6}$/i.test(country.color))).toBe(true);
+    expect(owners.length).toBe(data.politics.owners.count);
+    expect(adjacency.length).toBe(data.politics.adjacency.count * 2);
+    expect(labels.length).toBe(data.politics.labelData.count * 3);
+    expect(data.politics.owners.stride).toBe(1);
+    expect(data.politics.adjacency.stride).toBe(2);
+    expect(data.politics.labelData.stride).toBe(3);
+    const countryIds = new Set(data.politics.countries.map((country) => country.id));
+    const representedOwners = new Set<number>();
+    for (const province of data.provinces) {
+      const encodedId = province.id + 1;
+      expect(countryIds.has(owners[encodedId])).toBe(true);
+      expect(labels[encodedId * 3]).toBeGreaterThanOrEqual(0);
+      expect(labels[encodedId * 3 + 1]).toBeGreaterThanOrEqual(0);
+      expect(labels[encodedId * 3 + 2]).toBeGreaterThan(0);
+      representedOwners.add(owners[encodedId]);
+    }
+    expect(representedOwners.size).toBe(200);
+    for (let edge = 0; edge < adjacency.length; edge += 2) {
+      expect(owners[adjacency[edge]]).toBeGreaterThan(0);
+      expect(owners[adjacency[edge + 1]]).toBeGreaterThan(0);
+    }
+  });
+
   it('distributes five tree silhouettes while keeping plains sparse and light green', async () => {
     const data = await manifest();
     const bytes = await readFile('public/world/trees.f32');
@@ -247,23 +289,26 @@ describe('generated v10 world package', () => {
     const palettes = new Set<number>();
     const countsByTerrain = new Map<string, number>();
     const provinceById = new Map(data.provinces.map((province) => [province.id, province]));
+    let invalidVariant = false;
+    let invalidPalette = false;
+    let darkPlainTrees = 0;
     for (let tree = 0; tree < data.buffers.trees.count; tree += 1) {
       const offset = tree * 8;
       const variant = trees[offset + 3];
       const encodedProvince = trees[offset + 6];
       const palette = trees[offset + 7];
-      expect(Number.isInteger(variant)).toBe(true);
-      expect(variant).toBeGreaterThanOrEqual(0);
-      expect(variant).toBeLessThanOrEqual(4);
-      expect([0, 1]).toContain(palette);
+      if (!Number.isInteger(variant) || variant < 0 || variant > 4) invalidVariant = true;
+      if (palette !== 0 && palette !== 1) invalidPalette = true;
       variants.add(variant);
       palettes.add(palette);
       const terrain = provinceById.get(encodedProvince - 1)?.terrain;
-      expect(terrain).toBeDefined();
       if (!terrain) throw new Error(`Tree references unknown province ${encodedProvince - 1}`);
       countsByTerrain.set(terrain, (countsByTerrain.get(terrain) ?? 0) + 1);
-      if (terrain === 'Plains') expect(palette).toBe(0);
+      if (terrain === 'Plains' && palette !== 0) darkPlainTrees += 1;
     }
+    expect(invalidVariant).toBe(false);
+    expect(invalidPalette).toBe(false);
+    expect(darkPlainTrees).toBe(0);
     expect([...variants].sort()).toEqual([0, 1, 2, 3, 4]);
     expect([...palettes].sort()).toEqual([0, 1]);
     const plainTrees = countsByTerrain.get('Plains') ?? 0;
