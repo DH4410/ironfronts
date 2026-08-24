@@ -23,7 +23,8 @@ export interface RenderWorkload {
   triangles: number;
   instances: number;
   labels: number;
-  visibleChunks: { roads: number; hiddenLinks: number; waterways: number };
+  visibleChunks: { terrain: number; trees: number; buildings: number; roadFurniture: number; roads: number; hiddenLinks: number; waterways: number };
+  lodInstances: { terrain: number[]; trees: number[]; buildings: number[] };
   trianglesByCategory: Record<RenderCategory, number>;
 }
 
@@ -103,7 +104,8 @@ export function createEmptyRenderWorkload(labels = 0): RenderWorkload {
     triangles: 0,
     instances: 0,
     labels,
-    visibleChunks: { roads: 0, hiddenLinks: 0, waterways: 0 },
+    visibleChunks: { terrain: 0, trees: 0, buildings: 0, roadFurniture: 0, roads: 0, hiddenLinks: 0, waterways: 0 },
+    lodInstances: { terrain: [0, 0, 0, 0], trees: [0, 0, 0], buildings: [0, 0, 0] },
     trianglesByCategory: {
       terrain: 0,
       water: 0,
@@ -142,6 +144,11 @@ function cloneWorkload(workload: RenderWorkload): RenderWorkload {
   return {
     ...workload,
     visibleChunks: { ...workload.visibleChunks },
+    lodInstances: {
+      terrain: [...workload.lodInstances.terrain],
+      trees: [...workload.lodInstances.trees],
+      buildings: [...workload.lodInstances.buildings],
+    },
     trianglesByCategory: { ...workload.trianglesByCategory },
   };
 }

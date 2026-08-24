@@ -8,17 +8,24 @@ import {
 } from './performance-monitor';
 import { createRendererLayouts, createRendererPipelines } from './renderer-pipelines';
 import {
-  createBarrierMesh, createBuildingMesh, createLampMesh, createShadowMesh, createSignMesh, createTerrainMesh,
-  createTreeMesh, uploadIndexedMesh,
+  createBarrierMesh, createBuildingArchetypeMesh, createLampMesh, createShadowMesh, createSignMesh, createTerrainMesh,
+  createTreeFamilyMesh, uploadIndexedMesh,
 } from './scene-meshes';
 import type { Mesh } from './scene-meshes';
-import type { CountryRecord, FrameStats, HoverInfo, ProgressReporter, ProvinceRecord, WorldManifest } from './types';
+import type { CountryRecord, FrameStats, HoverInfo, ProgressReporter, PropChunkRange, ProvinceRecord, WorldManifest } from './types';
 
 interface InstanceLayer {
   buffer: GPUBuffer;
   params: GPUBuffer;
   bindGroup: GPUBindGroup;
   count: number;
+  views?: Map<string, {
+    buffer: GPUBuffer;
+    bindGroup: GPUBindGroup;
+    revision: number;
+    draws: Array<{ mesh: Mesh; firstInstance: number; instanceCount: number; lod: number }>;
+    visibleChunks: number;
+  }>;
 }
 
 interface PerformanceLayerVisibility {
@@ -56,13 +63,13 @@ export class WorldRenderer {
   private infrastructurePipeline!: GPURenderPipeline;
   private propPipeline!: GPURenderPipeline;
   private linePipeline!: GPURenderPipeline;
-  private terrainMesh!: Mesh;
-  private waterMesh!: Mesh;
+  private terrainMeshes!: Mesh[];
+  private waterMeshes!: Mesh[];
   private roadMesh!: Mesh;
   private hiddenConnectionMesh!: Mesh;
   private waterwayMesh!: Mesh;
-  private treeMesh!: Mesh;
-  private buildingMesh!: Mesh;
+  private treeMeshes!: Mesh[][];
+  private buildingMeshes!: Mesh[][];
   private shadowMesh!: Mesh;
   private lampMesh!: Mesh;
   private barrierMesh!: Mesh;
@@ -77,6 +84,7 @@ export class WorldRenderer {
   private waterwayNetwork?: InstanceLayer;
   private heightTexture!: GPUTexture;
   private surfaceTexture!: GPUTexture;
+  private farAlbedoTexture!: GPUTexture;
   private provinceTexture!: GPUTexture;
   private coastTexture!: GPUTexture;
   private roadTexture!: GPUTexture;
@@ -85,6 +93,9 @@ export class WorldRenderer {
   private treeMaterialTexture!: GPUTexture;
   private provinceOwnerBuffer!: GPUBuffer;
   private countryColorBuffer!: GPUBuffer;
+  private visibleTerrainBuffer!: GPUBuffer;
+  private terrainLodDraws: Array<{ firstInstance: number; instanceCount: number; lod: number }> = [];
+  private lastTerrainVisibilityRevision = -1;
   private heightData!: Float32Array;
   private provinceData!: Uint16Array;
   private provinceOwners!: Uint32Array;
@@ -125,7 +136,10 @@ export class WorldRenderer {
   };
   private pointer = { x: 0, y: 0, inside: false };
   private hoveredId = 0;
-  private pickCountdown = 0;
+  private pickingDirty = false;
+  private lastPickedCameraRevision = -1;
+  private lastPickTime = -Infinity;
+  private readonly pickPoint = vec3.create();
   private resizeObserver?: ResizeObserver;
 
   constructor(canvas: HTMLCanvasElement, countryLabelContainer?: HTMLElement) {
@@ -176,12 +190,13 @@ export class WorldRenderer {
     this.createLayouts();
 
     report('Loading terrain fields', 0.2);
-    const [heightBuffer, surfaceBuffer, roadFieldBuffer, waterwayFieldBuffer, coastBuffer, provinceBuffer, roadVertexBuffer, roadIndexBuffer,
+    const [heightBuffer, surfaceBuffer, farAlbedoBuffer, roadFieldBuffer, waterwayFieldBuffer, coastBuffer, provinceBuffer, roadVertexBuffer, roadIndexBuffer,
       hiddenConnectionVertexBuffer, hiddenConnectionIndexBuffer, waterwayVertexBuffer, waterwayIndexBuffer,
       borderBuffer, treeBuffer, buildingBuffer, lampBuffer, barrierBuffer, signBuffer,
       provinceOwnerData, provinceAdjacencyData, provinceLabelData] = await Promise.all([
       fetchBinary(`/world/${this.manifest.fields.height.url}`),
       fetchBinary(`/world/${this.manifest.fields.surface.url}`),
+      fetchBinary(`/world/${this.manifest.fields.farAlbedo.url}`),
       fetchBinary(`/world/${this.manifest.fields.roads.url}`),
       fetchBinary(`/world/${this.manifest.fields.waterways.url}`),
       fetchBinary(`/world/${this.manifest.fields.coast.url}`),
@@ -216,6 +231,10 @@ export class WorldRenderer {
       'terrain surface', this.manifest.fields.surface.width, this.manifest.fields.surface.height,
       'rgba8uint', new Uint8Array(surfaceBuffer), this.manifest.fields.surface.width * 4,
     );
+    this.farAlbedoTexture = this.uploadTexture(
+      'far terrain albedo', this.manifest.fields.farAlbedo.width, this.manifest.fields.farAlbedo.height,
+      'rgba8unorm', new Uint8Array(farAlbedoBuffer), this.manifest.fields.farAlbedo.width * 4,
+    );
     this.roadTexture = this.uploadTexture(
       'strategic road field', this.manifest.fields.roads.width, this.manifest.fields.roads.height,
       'rg8unorm', new Uint8Array(roadFieldBuffer), this.manifest.fields.roads.width * 2,
@@ -245,6 +264,11 @@ export class WorldRenderer {
     });
     this.provinceOwnerBuffer = this.createStorageBuffer('province country owners', this.provinceOwners);
     this.countryColorBuffer = this.createStorageBuffer('country display colors', countryColors);
+    this.visibleTerrainBuffer = this.device.createBuffer({
+      label: 'visible terrain chunks',
+      size: this.manifest.terrain.chunksX * this.manifest.terrain.chunksY * 3 * 4,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
     this.commonBindGroup = this.device.createBindGroup({
       label: 'world resources',
       layout: this.commonLayout,
@@ -261,31 +285,36 @@ export class WorldRenderer {
         { binding: 9, resource: this.treeMaterialTexture.createView({ dimension: '2d-array' }) },
         { binding: 10, resource: { buffer: this.provinceOwnerBuffer } },
         { binding: 11, resource: { buffer: this.countryColorBuffer } },
+        { binding: 12, resource: { buffer: this.visibleTerrainBuffer } },
+        { binding: 13, resource: this.farAlbedoTexture.createView() },
       ],
     });
 
     report('Compiling WebGPU pipelines', 0.62);
     this.createPipelines();
-    this.terrainMesh = createTerrainMesh(this.device, this.manifest.terrain.gridResolution);
-    this.waterMesh = createTerrainMesh(this.device, 33);
+    this.terrainMeshes = [this.manifest.terrain.gridResolution, 33, 17, 9]
+      .map((resolution) => createTerrainMesh(this.device, resolution, true));
+    this.waterMeshes = [33, 25, 17, 9].map((resolution) => createTerrainMesh(this.device, resolution));
     this.roadMesh = uploadIndexedMesh(this.device, 'terrain roads', roadVertexBuffer, roadIndexBuffer, this.manifest.buffers.roadIndices.count);
     this.hiddenConnectionMesh = uploadIndexedMesh(this.device, 'floating hidden connections', hiddenConnectionVertexBuffer,
       hiddenConnectionIndexBuffer, this.manifest.buffers.hiddenConnectionIndices.count);
     this.waterwayMesh = uploadIndexedMesh(this.device, 'supplied rivers and canals', waterwayVertexBuffer,
       waterwayIndexBuffer, this.manifest.buffers.waterwayIndices.count);
-    this.treeMesh = createTreeMesh(this.device);
-    this.buildingMesh = createBuildingMesh(this.device);
+    this.treeMeshes = (['broadleaf', 'conifer'] as const).map((family) =>
+      [0, 1, 2].map((lod) => createTreeFamilyMesh(this.device, family, lod as 0 | 1 | 2)));
+    this.buildingMeshes = Array.from({ length: 5 }, (_, archetype) =>
+      [0, 1, 2].map((lod) => createBuildingArchetypeMesh(this.device, archetype, lod as 0 | 1 | 2)));
     this.shadowMesh = createShadowMesh(this.device);
     this.lampMesh = createLampMesh(this.device);
     this.barrierMesh = createBarrierMesh(this.device);
     this.signMesh = createSignMesh(this.device);
 
     report('Uploading world geometry', 0.78);
-    this.trees = this.createInstanceLayer('trees', treeBuffer, this.manifest.buffers.trees.count, 0, this.instanceLayout);
-    this.buildings = this.createInstanceLayer('buildings', buildingBuffer, this.manifest.buffers.buildings.count, 1, this.instanceLayout);
-    this.lamps = this.createInstanceLayer('road lamps', lampBuffer, this.manifest.buffers.lamps.count, 2, this.instanceLayout);
-    this.barriers = this.createInstanceLayer('road barriers', barrierBuffer, this.manifest.buffers.barriers.count, 3, this.instanceLayout);
-    this.signs = this.createInstanceLayer('road signs', signBuffer, this.manifest.buffers.signs.count, 4, this.instanceLayout);
+    this.trees = this.createInstanceLayer('trees', treeBuffer, this.manifest.buffers.trees.count, 0, this.instanceLayout, true);
+    this.buildings = this.createInstanceLayer('buildings', buildingBuffer, this.manifest.buffers.buildings.count, 1, this.instanceLayout, true);
+    this.lamps = this.createInstanceLayer('road lamps', lampBuffer, this.manifest.buffers.lamps.count, 2, this.instanceLayout, true);
+    this.barriers = this.createInstanceLayer('road barriers', barrierBuffer, this.manifest.buffers.barriers.count, 3, this.instanceLayout, true);
+    this.signs = this.createInstanceLayer('road signs', signBuffer, this.manifest.buffers.signs.count, 4, this.instanceLayout, true);
     this.borders = this.createInstanceLayer('borders', borderBuffer, this.manifest.buffers.borders.count, 0, this.lineLayout);
     this.updateBorderVisibility();
     if (this.countryLabelContainer) {
@@ -460,7 +489,9 @@ export class WorldRenderer {
     this.device.queue.writeBuffer(this.borders.params, 8, new Uint32Array([flags]));
   }
 
-  private createInstanceLayer(label: string, data: ArrayBuffer, count: number, kind: number, layout: GPUBindGroupLayout): InstanceLayer {
+  private createInstanceLayer(
+    label: string, data: ArrayBuffer, count: number, kind: number, layout: GPUBindGroupLayout, mappedInstances = false,
+  ): InstanceLayer {
     const buffer = this.device.createBuffer({
       label: `${label} records`,
       size: align4(data.byteLength),
@@ -469,12 +500,25 @@ export class WorldRenderer {
     this.device.queue.writeBuffer(buffer, 0, data);
     const params = this.device.createBuffer({ label: `${label} params`, size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.device.queue.writeBuffer(params, 0, new Uint32Array([count, kind, 1, 0]));
+    const entries: GPUBindGroupEntry[] = [{ binding: 0, resource: { buffer } }, { binding: 1, resource: { buffer: params } }];
+    let views: InstanceLayer['views'];
+    if (mappedInstances) {
+      const identityBuffer = this.device.createBuffer({
+        label: `${label} identity instances`, size: Math.max(4, count * 3 * 4),
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      const identity = new Uint32Array(count * 3);
+      for (let index = 0; index < identity.length; index += 1) identity[index] = index;
+      this.device.queue.writeBuffer(identityBuffer, 0, identity);
+      entries.push({ binding: 2, resource: { buffer: identityBuffer } });
+      views = new Map();
+    }
     const bindGroup = this.device.createBindGroup({
       label: `${label} bind group`,
       layout,
-      entries: [{ binding: 0, resource: { buffer } }, { binding: 1, resource: { buffer: params } }],
+      entries,
     });
-    return { buffer, params, bindGroup, count };
+    return { buffer, params, bindGroup, count, views };
   }
 
   private attachInteraction(): void {
@@ -482,9 +526,11 @@ export class WorldRenderer {
       this.pointer.x = event.clientX;
       this.pointer.y = event.clientY;
       this.pointer.inside = true;
+      this.pickingDirty = true;
     });
     this.canvas.addEventListener('pointerleave', () => {
       this.pointer.inside = false;
+      this.pickingDirty = false;
       this.updateHover(0);
     });
   }
@@ -518,6 +564,7 @@ export class WorldRenderer {
     let phaseStarted = performance.now();
     this.camera.update(deltaMs / 1000);
     this.resize();
+    this.updateVisibleTerrainChunks();
     const cameraMs = performance.now() - phaseStarted;
 
     phaseStarted = performance.now();
@@ -531,16 +578,20 @@ export class WorldRenderer {
       this.canvas.clientWidth,
       this.canvas.clientHeight,
       (x, z) => this.sampleHeight(x, z),
+      this.camera.revision,
     ) ?? 0;
     const labelsMs = performance.now() - phaseStarted;
 
     let pickRaycastMs = 0;
     let hoverUiMs = 0;
-    if (this.pointer.inside && this.pickCountdown-- <= 0) {
-      this.pickCountdown = 2;
+    if (this.pointer.inside && this.lastPickedCameraRevision !== this.camera.revision) this.pickingDirty = true;
+    if (this.pointer.inside && this.pickingDirty && time - this.lastPickTime >= 32) {
       const picking = this.pickProvince(this.pointer.x, this.pointer.y);
       pickRaycastMs = picking.raycastMs;
       hoverUiMs = picking.hoverUiMs;
+      this.pickingDirty = false;
+      this.lastPickTime = time;
+      this.lastPickedCameraRevision = this.camera.revision;
     }
 
     phaseStarted = performance.now();
@@ -604,21 +655,28 @@ export class WorldRenderer {
     const pass = encoder.beginRenderPass(passDescriptor);
 
     pass.setBindGroup(0, this.commonBindGroup);
-    const terrainInstances = this.manifest.terrain.chunksX * this.manifest.terrain.chunksY * 3;
+    this.frameWorkload.visibleChunks.terrain = this.terrainLodDraws.reduce((sum, draw) => sum + draw.instanceCount, 0);
+    for (const draw of this.terrainLodDraws) this.frameWorkload.lodInstances.terrain[draw.lod] += draw.instanceCount;
     if (this.performanceLayers.ocean) {
       pass.setPipeline(this.waterPipeline);
-      pass.setVertexBuffer(0, this.waterMesh.vertex);
-      pass.setIndexBuffer(this.waterMesh.index, 'uint16');
-      pass.drawIndexed(this.waterMesh.indexCount, terrainInstances);
-      this.recordIndexedDraw('water', this.waterMesh.indexCount, terrainInstances);
+      for (const draw of this.terrainLodDraws) {
+        const mesh = this.waterMeshes[draw.lod];
+        pass.setVertexBuffer(0, mesh.vertex);
+        pass.setIndexBuffer(mesh.index, 'uint16');
+        pass.drawIndexed(mesh.indexCount, draw.instanceCount, 0, 0, draw.firstInstance);
+        this.recordIndexedDraw('water', mesh.indexCount, draw.instanceCount);
+      }
     }
 
     if (this.performanceLayers.terrain) {
       pass.setPipeline(this.terrainPipeline);
-      pass.setVertexBuffer(0, this.terrainMesh.vertex);
-      pass.setIndexBuffer(this.terrainMesh.index, 'uint16');
-      pass.drawIndexed(this.terrainMesh.indexCount, terrainInstances);
-      this.recordIndexedDraw('terrain', this.terrainMesh.indexCount, terrainInstances);
+      for (const draw of this.terrainLodDraws) {
+        const mesh = this.terrainMeshes[draw.lod];
+        pass.setVertexBuffer(0, mesh.vertex);
+        pass.setIndexBuffer(mesh.index, 'uint16');
+        pass.drawIndexed(mesh.indexCount, draw.instanceCount, 0, 0, draw.firstInstance);
+        this.recordIndexedDraw('terrain', mesh.indexCount, draw.instanceCount);
+      }
     }
 
     if (this.showWaterways) {
@@ -642,34 +700,45 @@ export class WorldRenderer {
 
     if (this.showProps) {
       pass.setPipeline(this.propPipeline);
-      if (this.performanceLayers.treeShadows) this.drawMeshInstances(pass, this.shadowMesh, this.trees, 'treeShadows');
-      if (this.performanceLayers.buildingShadows) this.drawMeshInstances(pass, this.shadowMesh, this.buildings, 'buildingShadows');
-      if (this.performanceLayers.trees) this.drawMeshInstances(pass, this.treeMesh, this.trees, 'trees');
-      if (this.performanceLayers.buildings) this.drawMeshInstances(pass, this.buildingMesh, this.buildings, 'buildings');
+      if (this.performanceLayers.treeShadows) {
+        this.drawPropChunks(pass, this.trees, this.manifest.propChunks.trees, [[this.shadowMesh]], 'treeShadows', 1_150, [1_150, 1_150]);
+      }
+      if (this.performanceLayers.buildingShadows) {
+        this.drawPropChunks(pass, this.buildings, this.manifest.propChunks.buildings, [[this.shadowMesh]], 'buildingShadows', 1_050, [1_050, 1_050]);
+      }
+      if (this.performanceLayers.trees) {
+        this.drawPropChunks(pass, this.trees, this.manifest.propChunks.trees, this.treeMeshes, 'trees', 3_200, [900, 1_850]);
+      }
+      if (this.performanceLayers.buildings) {
+        this.drawPropChunks(pass, this.buildings, this.manifest.propChunks.buildings, this.buildingMeshes, 'buildings', 2_600, [850, 1_650]);
+      }
       if (this.performanceLayers.roadFurniture) {
-        this.drawMeshInstances(pass, this.lampMesh, this.lamps, 'roadFurniture');
-        this.drawMeshInstances(pass, this.barrierMesh, this.barriers, 'roadFurniture');
-        this.drawMeshInstances(pass, this.signMesh, this.signs, 'roadFurniture');
+        this.drawPropChunks(pass, this.lamps, this.manifest.propChunks.lamps, [[this.lampMesh]], 'roadFurniture', 1_900, [1_900, 1_900]);
+        this.drawPropChunks(pass, this.barriers, this.manifest.propChunks.barriers, [[this.barrierMesh]], 'roadFurniture', 1_900, [1_900, 1_900]);
+        this.drawPropChunks(pass, this.signs, this.manifest.propChunks.signs, [[this.signMesh]], 'roadFurniture', 1_900, [1_900, 1_900]);
       }
     }
 
     pass.setPipeline(this.linePipeline);
     if (this.showBorders || this.showCountryOverlay) {
       pass.setBindGroup(1, this.borders.bindGroup);
-      const instances = this.borders.count * 3;
-      pass.draw(6, instances);
+      const copies = this.visibleWorldCopies();
+      const instances = this.borders.count * copies.length;
+      pass.draw(6, instances, 0, copies[0] * this.borders.count);
       this.recordTriangleDraw('borders', instances * 2, instances);
     }
     if (this.showConnections && this.connections) {
       pass.setBindGroup(1, this.connections.bindGroup);
-      const instances = this.connections.count * 3;
-      pass.draw(6, instances);
+      const copies = this.visibleWorldCopies();
+      const instances = this.connections.count * copies.length;
+      pass.draw(6, instances, 0, copies[0] * this.connections.count);
       this.recordTriangleDraw('debugLines', instances * 2, instances);
     }
     if (this.showWaterwayNetwork && this.waterwayNetwork) {
       pass.setBindGroup(1, this.waterwayNetwork.bindGroup);
-      const instances = this.waterwayNetwork.count * 3;
-      pass.draw(6, instances);
+      const copies = this.visibleWorldCopies();
+      const instances = this.waterwayNetwork.count * copies.length;
+      pass.draw(6, instances, 0, copies[0] * this.waterwayNetwork.count);
       this.recordTriangleDraw('debugLines', instances * 2, instances);
     }
     pass.end();
@@ -681,18 +750,157 @@ export class WorldRenderer {
     if (collectGpuTiming) this.readGpuTiming(gpuTimingEpoch);
   }
 
-  private drawMeshInstances(pass: GPURenderPassEncoder, mesh: Mesh, layer: InstanceLayer, category: RenderCategory): void {
-    pass.setBindGroup(1, layer.bindGroup);
-    pass.setVertexBuffer(0, mesh.vertex);
-    pass.setIndexBuffer(mesh.index, 'uint16');
-    const edgeRange = 1_800;
-    const instances = this.camera.target[0] < edgeRange || this.camera.target[0] > this.manifest.world.width - edgeRange
-      ? layer.count * 2
-      : layer.count;
-    if (this.camera.target[0] < edgeRange) pass.drawIndexed(mesh.indexCount, instances, 0, 0, 0);
-    else if (this.camera.target[0] > this.manifest.world.width - edgeRange) pass.drawIndexed(mesh.indexCount, instances, 0, 0, layer.count);
-    else pass.drawIndexed(mesh.indexCount, instances, 0, 0, layer.count);
-    this.recordIndexedDraw(category, mesh.indexCount, instances);
+  private drawPropChunks(
+    pass: GPURenderPassEncoder,
+    layer: InstanceLayer,
+    ranges: PropChunkRange[],
+    groupMeshes: Mesh[][],
+    category: RenderCategory,
+    maximumDistance: number,
+    lodDistances: [number, number],
+  ): void {
+    if (this.camera.position[1] > maximumDistance * 1.15) return;
+    if (!layer.views) throw new Error(`Missing visible-instance storage for ${category}`);
+    const viewKey = String(category);
+    let view = layer.views.get(viewKey);
+    if (!view) {
+      const buffer = this.device.createBuffer({
+        label: `${category} visible instances`, size: Math.max(4, layer.count * 3 * 4),
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      const bindGroup = this.device.createBindGroup({
+        label: `${category} visible bind group`, layout: this.instanceLayout,
+        entries: [
+          { binding: 0, resource: { buffer: layer.buffer } },
+          { binding: 1, resource: { buffer: layer.params } },
+          { binding: 2, resource: { buffer } },
+        ],
+      });
+      view = { buffer, bindGroup, revision: -1, draws: [], visibleChunks: 0 };
+      layer.views.set(viewKey, view);
+    }
+    if (view.revision !== this.camera.revision) {
+      const chunksX = this.manifest.propChunks.chunksX;
+      const chunksY = this.manifest.propChunks.chunksY;
+      const chunkWidth = this.manifest.world.width / chunksX;
+      const chunkHeight = this.manifest.world.height / chunksY;
+      const chunkRadius = Math.hypot(chunkWidth, chunkHeight) * 0.55;
+      const buckets = groupMeshes.map((meshes) => meshes.map(() => [] as number[]));
+      view.visibleChunks = 0;
+      for (const copy of this.visibleWorldCopies(maximumDistance + chunkRadius)) {
+        const copyOffset = (copy - 1) * this.manifest.world.width;
+        for (let chunkIndex = 0; chunkIndex < ranges.length; chunkIndex += 1) {
+          const range = ranges[chunkIndex];
+          if (!range?.instanceCount) continue;
+          const centerX = (chunkIndex % chunksX + 0.5) * chunkWidth + copyOffset;
+          const centerZ = (Math.floor(chunkIndex / chunksX) + 0.5) * chunkHeight;
+          const distance = Math.hypot(centerX - this.camera.position[0], centerZ - this.camera.position[2], this.camera.position[1]);
+          if (distance > maximumDistance + chunkRadius) continue;
+          if (!this.chunkIntersectsView(centerX, centerZ, chunkRadius)) continue;
+          view.visibleChunks += 1;
+          const lod = distance < lodDistances[0] ? 0 : distance < lodDistances[1] ? 1 : 2;
+          const groups = groupMeshes.length === 1 ? [range] : range.groups;
+          for (let group = 0; group < groups.length; group += 1) {
+            const groupRange = groups[group];
+            if (!groupRange?.instanceCount) continue;
+            const meshGroup = Math.min(group, groupMeshes.length - 1);
+            const meshLod = Math.min(lod, groupMeshes[meshGroup].length - 1);
+            const bucket = buckets[meshGroup][meshLod];
+            for (let index = 0; index < groupRange.instanceCount; index += 1) {
+              bucket.push(copy * layer.count + groupRange.firstInstance + index);
+            }
+          }
+        }
+      }
+      const count = buckets.flat(2).length;
+      const visibleInstances = new Uint32Array(count);
+      view.draws = [];
+      let cursor = 0;
+      for (let group = 0; group < buckets.length; group += 1) {
+        for (let lod = 0; lod < buckets[group].length; lod += 1) {
+          const bucket = buckets[group][lod];
+          if (!bucket.length) continue;
+          visibleInstances.set(bucket, cursor);
+          view.draws.push({ mesh: groupMeshes[group][lod], firstInstance: cursor, instanceCount: bucket.length, lod });
+          cursor += bucket.length;
+        }
+      }
+      if (visibleInstances.length) this.device.queue.writeBuffer(view.buffer, 0, visibleInstances);
+      view.revision = this.camera.revision;
+    }
+    if (category === 'trees') this.frameWorkload.visibleChunks.trees += view.visibleChunks;
+    else if (category === 'buildings') this.frameWorkload.visibleChunks.buildings += view.visibleChunks;
+    else if (category === 'roadFurniture') this.frameWorkload.visibleChunks.roadFurniture += view.visibleChunks;
+    pass.setBindGroup(1, view.bindGroup);
+    for (const draw of view.draws) {
+      pass.setVertexBuffer(0, draw.mesh.vertex);
+      pass.setIndexBuffer(draw.mesh.index, 'uint16');
+      pass.drawIndexed(draw.mesh.indexCount, draw.instanceCount, 0, 0, draw.firstInstance);
+      this.recordIndexedDraw(category, draw.mesh.indexCount, draw.instanceCount);
+      if (category === 'trees') this.frameWorkload.lodInstances.trees[draw.lod] += draw.instanceCount;
+      else if (category === 'buildings') this.frameWorkload.lodInstances.buildings[draw.lod] += draw.instanceCount;
+    }
+  }
+
+  private visibleWorldCopies(edgeRange = this.camera.distance * 0.72 + 420): number[] {
+    const clampedRange = Math.min(this.manifest.world.width * 0.48, edgeRange);
+    if (this.camera.target[0] < clampedRange) return [0, 1];
+    if (this.camera.target[0] > this.manifest.world.width - clampedRange) return [1, 2];
+    return [1];
+  }
+
+  private chunkIntersectsView(centerX: number, centerZ: number, radius: number): boolean {
+    const centerY = this.sampleHeight(centerX, centerZ);
+    const matrix = this.camera.viewProjection;
+    const clipX = matrix[0] * centerX + matrix[4] * centerY + matrix[8] * centerZ + matrix[12];
+    const clipY = matrix[1] * centerX + matrix[5] * centerY + matrix[9] * centerZ + matrix[13];
+    const clipW = matrix[3] * centerX + matrix[7] * centerY + matrix[11] * centerZ + matrix[15];
+    if (clipW <= 1) return false;
+    const distance = Math.hypot(
+      centerX - this.camera.position[0], centerY - this.camera.position[1], centerZ - this.camera.position[2],
+    );
+    const margin = Math.min(1.5, radius * 2.8 / Math.max(1, distance));
+    return Math.abs(clipX / clipW) <= 1 + margin && Math.abs(clipY / clipW) <= 1 + margin;
+  }
+
+  private updateVisibleTerrainChunks(): void {
+    if (this.lastTerrainVisibilityRevision === this.camera.revision) return;
+    this.lastTerrainVisibilityRevision = this.camera.revision;
+    const chunksX = this.manifest.terrain.chunksX;
+    const chunksY = this.manifest.terrain.chunksY;
+    const chunksPerWorld = chunksX * chunksY;
+    const chunkWidth = this.manifest.world.width / chunksX;
+    const chunkHeight = this.manifest.world.height / chunksY;
+    const chunkRadius = Math.hypot(chunkWidth, chunkHeight) * 0.72;
+    const lodEntries: number[][] = [[], [], [], []];
+    for (const copy of this.visibleWorldCopies(this.camera.distance * 0.9 + chunkRadius)) {
+      const copyOffset = (copy - 1) * this.manifest.world.width;
+      for (let chunkY = 0; chunkY < chunksY; chunkY += 1) {
+        for (let chunkX = 0; chunkX < chunksX; chunkX += 1) {
+          const centerX = (chunkX + 0.5) * chunkWidth + copyOffset;
+          const centerZ = (chunkY + 0.5) * chunkHeight;
+          const centerY = this.sampleHeight(centerX, centerZ);
+          const distance = Math.hypot(
+            centerX - this.camera.position[0], centerY - this.camera.position[1], centerZ - this.camera.position[2],
+          );
+          if (!this.chunkIntersectsView(centerX, centerZ, chunkRadius)) continue;
+          const lod = distance < 1_050 ? 0 : distance < 2_350 ? 1 : distance < 5_000 ? 2 : 3;
+          lodEntries[lod].push(copy * chunksPerWorld + chunkY * chunksX + chunkX);
+        }
+      }
+    }
+    const flattened = new Uint32Array(lodEntries.reduce((sum, entries) => sum + entries.length, 0));
+    this.terrainLodDraws = [];
+    let cursor = 0;
+    for (let lod = 0; lod < lodEntries.length; lod += 1) {
+      const entries = lodEntries[lod];
+      if (entries.length) {
+        flattened.set(entries, cursor);
+        this.terrainLodDraws.push({ firstInstance: cursor, instanceCount: entries.length, lod });
+        cursor += entries.length;
+      }
+    }
+    if (flattened.length) this.device.queue.writeBuffer(this.visibleTerrainBuffer, 0, flattened);
   }
 
   private drawChunkedInfrastructure(
@@ -708,22 +916,38 @@ export class WorldRenderer {
     const chunkWidth = this.manifest.world.width / chunksX;
     const chunkHeight = this.manifest.world.height / chunksY;
     const radius = clamp(this.camera.distance * 1.48 + 720, 940, maximumDistance + 300);
-    const edgeRange = 1_800;
-    for (let chunkY = 0; chunkY < chunksY; chunkY += 1) {
-      for (let chunkX = 0; chunkX < chunksX; chunkX += 1) {
-        const range = ranges[chunkY * chunksX + chunkX];
-        if (!range?.indexCount) continue;
-        let dx = (chunkX + 0.5) * chunkWidth - this.camera.target[0];
-        if (dx > this.manifest.world.width * 0.5) dx -= this.manifest.world.width;
-        if (dx < -this.manifest.world.width * 0.5) dx += this.manifest.world.width;
-        const dz = (chunkY + 0.5) * chunkHeight - this.camera.target[2];
-        if (Math.hypot(dx, dz) > radius + Math.hypot(chunkWidth, chunkHeight) * 0.6) continue;
-        const instances = this.camera.target[0] < edgeRange || this.camera.target[0] > this.manifest.world.width - edgeRange ? 2 : 1;
-        if (this.camera.target[0] < edgeRange) pass.drawIndexed(range.indexCount, instances, range.firstIndex, 0, 0);
-        else if (this.camera.target[0] > this.manifest.world.width - edgeRange) pass.drawIndexed(range.indexCount, instances, range.firstIndex, 0, 1);
-        else pass.drawIndexed(range.indexCount, instances, range.firstIndex, 0, 1);
-        this.recordIndexedDraw(category, range.indexCount, instances);
-        this.frameWorkload.visibleChunks[category] += 1;
+    const chunkRadius = Math.hypot(chunkWidth, chunkHeight) * 0.6;
+    const copies = this.visibleWorldCopies(radius + chunkRadius);
+    for (const copy of copies) {
+      const visibleRanges: Array<{ firstIndex: number; indexCount: number }> = [];
+      for (let chunkY = 0; chunkY < chunksY; chunkY += 1) {
+        for (let chunkX = 0; chunkX < chunksX; chunkX += 1) {
+          const range = ranges[chunkY * chunksX + chunkX];
+          if (!range?.indexCount) continue;
+          const centerX = (chunkX + 0.5) * chunkWidth + (copy - 1) * this.manifest.world.width;
+          const centerZ = (chunkY + 0.5) * chunkHeight;
+          if (Math.hypot(centerX - this.camera.target[0], centerZ - this.camera.target[2]) > radius + chunkRadius) continue;
+          if (!this.chunkIntersectsView(centerX, centerZ, chunkRadius)) continue;
+          visibleRanges.push(range);
+          this.frameWorkload.visibleChunks[category] += 1;
+        }
+      }
+      visibleRanges.sort((a, b) => a.firstIndex - b.firstIndex);
+      let merged: { firstIndex: number; indexCount: number } | undefined;
+      for (const range of visibleRanges) {
+        if (merged && merged.firstIndex + merged.indexCount === range.firstIndex) {
+          merged.indexCount += range.indexCount;
+          continue;
+        }
+        if (merged) {
+          pass.drawIndexed(merged.indexCount, 1, merged.firstIndex, 0, copy);
+          this.recordIndexedDraw(category, merged.indexCount, 1);
+        }
+        merged = { ...range };
+      }
+      if (merged) {
+        pass.drawIndexed(merged.indexCount, 1, merged.firstIndex, 0, copy);
+        this.recordIndexedDraw(category, merged.indexCount, 1);
       }
     }
   }
@@ -766,8 +990,8 @@ export class WorldRenderer {
     let low = Math.max(0, (topY - ray.origin[1]) / ray.direction[1]);
     let high = Math.max(0, (-2 - ray.origin[1]) / ray.direction[1]);
     if (high < low) [low, high] = [high, low];
-    let point = vec3.create();
-    for (let iteration = 0; iteration < 15; iteration += 1) {
+    const point = this.pickPoint;
+    for (let iteration = 0; iteration < 8; iteration += 1) {
       const distance = (low + high) * 0.5;
       vec3.scaleAndAdd(point, ray.origin, ray.direction, distance);
       const height = this.sampleHeight(point[0], point[2]);

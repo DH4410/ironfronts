@@ -20,11 +20,21 @@ export class StrategyCamera {
   worldHeight = 7_000;
   viewportWidth = 1;
   viewportHeight = 1;
+  revision = 0;
 
   private keys = new Set<string>();
   private dragMode: 'pan' | 'orbit' | null = null;
   private lastPointer = [0, 0];
   private canvas?: HTMLCanvasElement;
+  private canvasRect = { left: 0, top: 0, width: 1, height: 1 };
+  private readonly move = vec3.create();
+  private readonly rayNear = vec4.create();
+  private readonly rayFar = vec4.create();
+  private readonly rayOrigin = vec3.create();
+  private readonly rayDirection = vec3.create();
+  private readonly ray = { origin: this.rayOrigin, direction: this.rayDirection };
+  private readonly groundPointScratch = vec3.create();
+  private matrixState = [Number.NaN, Number.NaN, Number.NaN, Number.NaN, Number.NaN, Number.NaN, Number.NaN];
 
   constructor() {
     vec3.set(this.target, this.worldWidth * 0.5, 0, this.worldHeight * 0.5);
@@ -47,6 +57,9 @@ export class StrategyCamera {
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
+    window.addEventListener('resize', this.refreshCanvasRect);
+    window.addEventListener('scroll', this.refreshCanvasRect, true);
+    this.refreshCanvasRect();
   }
 
   detach(): void {
@@ -57,47 +70,64 @@ export class StrategyCamera {
     this.canvas.removeEventListener('wheel', this.onWheel);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
+    window.removeEventListener('resize', this.refreshCanvasRect);
+    window.removeEventListener('scroll', this.refreshCanvasRect, true);
     this.canvas = undefined;
   }
 
   resize(width: number, height: number): void {
-    this.viewportWidth = Math.max(1, width);
-    this.viewportHeight = Math.max(1, height);
+    const nextWidth = Math.max(1, width);
+    const nextHeight = Math.max(1, height);
+    if (nextWidth === this.viewportWidth && nextHeight === this.viewportHeight) return;
+    this.viewportWidth = nextWidth;
+    this.viewportHeight = nextHeight;
+    this.refreshCanvasRect();
+    this.recalculateMatrices();
   }
 
   update(deltaSeconds: number): void {
-    const move = vec3.create();
-    if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) move[2] -= 1;
-    if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) move[2] += 1;
-    if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) move[0] -= 1;
-    if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) move[0] += 1;
-    if (vec3.squaredLength(move) > 0) {
-      vec3.normalize(move, move);
+    vec3.set(this.move, 0, 0, 0);
+    if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) this.move[2] -= 1;
+    if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) this.move[2] += 1;
+    if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) this.move[0] -= 1;
+    if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) this.move[0] += 1;
+    if (vec3.squaredLength(this.move) > 0) {
+      vec3.normalize(this.move, this.move);
       const speed = clamp(this.distance * 0.48, 140, 2_900) * deltaSeconds;
-      this.pan(move[0] * speed, move[2] * speed);
+      this.pan(this.move[0] * speed, this.move[2] * speed);
     }
     this.normalizeTarget();
     this.recalculateMatrices();
   }
 
   screenRay(clientX: number, clientY: number): { origin: vec3; direction: vec3 } {
-    const rect = this.canvas?.getBoundingClientRect() ?? { left: 0, top: 0, width: this.viewportWidth, height: this.viewportHeight };
+    const rect = this.canvasRect;
     const x = ((clientX - rect.left) / rect.width) * 2 - 1;
     const y = 1 - ((clientY - rect.top) / rect.height) * 2;
-    const near = vec4.fromValues(x, y, 0, 1);
-    const far = vec4.fromValues(x, y, 1, 1);
-    vec4.transformMat4(near, near, this.inverseViewProjection);
-    vec4.transformMat4(far, far, this.inverseViewProjection);
-    vec4.scale(near, near, 1 / near[3]);
-    vec4.scale(far, far, 1 / far[3]);
-    const origin = vec3.fromValues(near[0], near[1], near[2]);
-    const direction = vec3.fromValues(far[0] - near[0], far[1] - near[1], far[2] - near[2]);
-    vec3.normalize(direction, direction);
-    return { origin, direction };
+    vec4.set(this.rayNear, x, y, 0, 1);
+    vec4.set(this.rayFar, x, y, 1, 1);
+    vec4.transformMat4(this.rayNear, this.rayNear, this.inverseViewProjection);
+    vec4.transformMat4(this.rayFar, this.rayFar, this.inverseViewProjection);
+    vec4.scale(this.rayNear, this.rayNear, 1 / this.rayNear[3]);
+    vec4.scale(this.rayFar, this.rayFar, 1 / this.rayFar[3]);
+    vec3.set(this.rayOrigin, this.rayNear[0], this.rayNear[1], this.rayNear[2]);
+    vec3.set(
+      this.rayDirection,
+      this.rayFar[0] - this.rayNear[0],
+      this.rayFar[1] - this.rayNear[1],
+      this.rayFar[2] - this.rayNear[2],
+    );
+    vec3.normalize(this.rayDirection, this.rayDirection);
+    return this.ray;
   }
 
   private recalculateMatrices(): void {
     this.distance = Math.max(this.distance, this.minimumAltitude / Math.max(0.12, Math.sin(this.pitch)));
+    const nextState = [
+      this.target[0], this.target[2], this.distance, this.yaw, this.pitch, this.viewportWidth, this.viewportHeight,
+    ];
+    if (nextState.every((value, index) => Math.abs(value - this.matrixState[index]) < 0.00001)) return;
+    this.matrixState = nextState;
     const horizontal = Math.cos(this.pitch) * this.distance;
     this.position[0] = this.target[0] + Math.sin(this.yaw) * horizontal;
     this.position[1] = Math.sin(this.pitch) * this.distance;
@@ -106,7 +136,15 @@ export class StrategyCamera {
     mat4.lookAt(this.view, this.position, this.target, UP);
     mat4.multiply(this.viewProjection, this.projection, this.view);
     mat4.invert(this.inverseViewProjection, this.viewProjection);
+    this.revision += 1;
   }
+
+  private refreshCanvasRect = (): void => {
+    const rect = this.canvas?.getBoundingClientRect();
+    this.canvasRect = rect
+      ? { left: rect.left, top: rect.top, width: Math.max(1, rect.width), height: Math.max(1, rect.height) }
+      : { left: 0, top: 0, width: this.viewportWidth, height: this.viewportHeight };
+  };
 
   private pan(rightAmount: number, forwardAmount: number): void {
     const rightX = Math.cos(this.yaw);
@@ -150,13 +188,15 @@ export class StrategyCamera {
   private onWheel = (event: WheelEvent): void => {
     event.preventDefault();
     const before = this.groundPoint(event.clientX, event.clientY);
+    const beforeX = before?.[0];
+    const beforeZ = before?.[2];
     const factor = Math.exp(event.deltaY * 0.00115);
     this.distance = clamp(this.distance * factor, this.minDistance, this.maxDistance);
     this.recalculateMatrices();
     const after = this.groundPoint(event.clientX, event.clientY);
-    if (before && after) {
-      this.target[0] += before[0] - after[0];
-      this.target[2] += before[2] - after[2];
+    if (beforeX !== undefined && beforeZ !== undefined && after) {
+      this.target[0] += beforeX - after[0];
+      this.target[2] += beforeZ - after[2];
       this.normalizeTarget();
       this.recalculateMatrices();
     }
@@ -167,9 +207,8 @@ export class StrategyCamera {
     if (Math.abs(ray.direction[1]) < 0.0001) return null;
     const distance = -ray.origin[1] / ray.direction[1];
     if (distance < 0) return null;
-    const point = vec3.create();
-    vec3.scaleAndAdd(point, ray.origin, ray.direction, distance);
-    return point;
+    vec3.scaleAndAdd(this.groundPointScratch, ray.origin, ray.direction, distance);
+    return this.groundPointScratch;
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {

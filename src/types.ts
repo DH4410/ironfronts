@@ -45,6 +45,7 @@ export interface WorldManifest {
   fields: {
     height: BinaryField;
     surface: BinaryField;
+    farAlbedo: BinaryField;
     roads: BinaryField;
     waterways: BinaryField;
     coast: BinaryField;
@@ -79,6 +80,15 @@ export interface WorldManifest {
     hiddenConnections: Array<{ firstIndex: number; indexCount: number }>;
     waterways: Array<{ firstIndex: number; indexCount: number }>;
   };
+  propChunks: {
+    chunksX: number;
+    chunksY: number;
+    trees: PropChunkRange[];
+    buildings: PropChunkRange[];
+    lamps: PropChunkRange[];
+    barriers: PropChunkRange[];
+    signs: PropChunkRange[];
+  };
   reports: { generation: { url: string; version: string } };
   sidecars: { provinceDetails: { url: string; version: number } };
   politics: {
@@ -96,6 +106,12 @@ export interface WorldManifest {
   };
   counts: Record<string, number>;
   provinces: ProvinceRecord[];
+}
+
+export interface PropChunkRange {
+  firstInstance: number;
+  instanceCount: number;
+  groups: Array<{ firstInstance: number; instanceCount: number }>;
 }
 
 export interface HoverInfo {

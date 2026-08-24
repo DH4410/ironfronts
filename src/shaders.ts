@@ -6,6 +6,7 @@ export { waterwayShader } from './shaders/waterways';
 export const terrainShader = commonWgsl + /* wgsl */ `
 struct TerrainVertexInput {
   @location(0) grid: vec2f,
+  @location(1) skirt: f32,
 };
 
 struct TerrainVertexOutput {
@@ -20,8 +21,9 @@ fn terrainVertex(input: TerrainVertexInput, @builtin(instance_index) instanceInd
   let chunksX = u32(uniforms.terrainInfo.x);
   let chunksY = u32(uniforms.terrainInfo.y);
   let chunksPerWorld = chunksX * chunksY;
-  let copyIndex = instanceIndex / chunksPerWorld;
-  let chunkIndex = instanceIndex % chunksPerWorld;
+  let visibleChunk = visibleTerrainChunks[instanceIndex];
+  let copyIndex = visibleChunk / chunksPerWorld;
+  let chunkIndex = visibleChunk % chunksPerWorld;
   let chunkX = chunkIndex % chunksX;
   let chunkY = chunkIndex / chunksX;
   let mapUv = vec2f(
@@ -31,7 +33,7 @@ fn terrainVertex(input: TerrainVertexInput, @builtin(instance_index) instanceInd
   let copyOffset = f32(i32(copyIndex) - 1) * uniforms.map.x;
   let worldPosition = vec3f(
     mapUv.x * uniforms.map.x + copyOffset,
-    heightAt(mapUv),
+    heightAt(mapUv) - input.skirt * 36.0,
     mapUv.y * uniforms.map.y
   );
   var output: TerrainVertexOutput;
@@ -72,37 +74,45 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let slope = 1.0 - normal.y;
   let elevation = input.worldPosition.y;
 
-  var baseColor = sampleMaterial(0, input.worldPosition, 92.0);
-  if (biome == 1u || biome == 7u) {
+  // Preserve the authored terrain materials throughout close and regional
+  // play. Only true world-overview zooms approach the compact far lookup, and
+  // the wide blend band avoids a visible material/color switch.
+  let farBaseColor = textureSampleLevel(farAlbedoTexture, materialSampler, wrappedUv(input.mapUv), 0.0).rgb;
+  var baseColor = farBaseColor;
+  if (uniforms.interaction.y < 8000.0) {
+    baseColor = sampleMaterial(0, input.worldPosition, 92.0);
+    if (biome == 1u || biome == 7u) {
     baseColor = sampleMaterial(2, input.worldPosition, 76.0);
-  } else if (biome == 2u && terrain != 3u) {
+    } else if (biome == 2u && terrain != 3u) {
     baseColor = mix(sampleMaterial(0, input.worldPosition, 90.0), sampleMaterial(1, input.worldPosition, 74.0), 0.48);
-  } else if (biome == 6u || biome == 8u) {
+    } else if (biome == 6u || biome == 8u) {
     baseColor = mix(sampleMaterial(5, input.worldPosition, 86.0), sampleMaterial(4, input.worldPosition, 68.0), slope * 2.0);
-  }
+    }
 
-  if (terrain == 1u) {
+    if (terrain == 1u) {
     baseColor = mix(baseColor, sampleMaterial(4, input.worldPosition, 65.0), clamp(slope * 3.4 + 0.12, 0.0, 0.7));
-  } else if (terrain == 2u) {
+    } else if (terrain == 2u) {
     let rock = sampleMaterial(4, input.worldPosition, 58.0);
     let snow = sampleMaterial(5, input.worldPosition, 80.0);
     let snowAmount = smoothstep(120.0, 205.0, elevation) * smoothstep(0.58, 0.92, normal.y);
     baseColor = mix(rock, snow, snowAmount);
-  } else if (terrain == 3u) {
+    } else if (terrain == 3u) {
     baseColor = sampleMaterial(3, input.worldPosition, 70.0);
     let forestDistance = distance(uniforms.camera.xyz, input.worldPosition);
     let canopySignal = vec3f(0.115, 0.31, 0.14) * (0.86 + variation * 0.24);
     baseColor = mix(baseColor, canopySignal, smoothstep(1750.0, 3150.0, forestDistance) * 0.78);
-  } else if (terrain == 4u) {
+    } else if (terrain == 4u) {
     baseColor = mix(sampleMaterial(6, input.worldPosition, 54.0), sampleMaterial(1, input.worldPosition, 68.0), 0.22);
   }
 
   // Beaches follow the actual land/water boundary. Low inland terrain is not
   // coastal and must retain its biome material (the old elevation-only test
   // turned most of Africa and Iberia into sand).
-  let shoreline = bankAt(input.mapUv) * smoothstep(0.50, 0.72, landAt(input.mapUv));
-  let beachElevation = 1.0 - smoothstep(5.0, 10.0, elevation);
-  baseColor = mix(baseColor, sampleMaterial(7, input.worldPosition, 52.0), shoreline * beachElevation * 0.92);
+    let shoreline = bankAt(input.mapUv) * smoothstep(0.50, 0.72, landAt(input.mapUv));
+    let beachElevation = 1.0 - smoothstep(5.0, 10.0, elevation);
+    baseColor = mix(baseColor, sampleMaterial(7, input.worldPosition, 52.0), shoreline * beachElevation * 0.92);
+    baseColor = mix(baseColor, farBaseColor, smoothstep(6500.0, 8000.0, uniforms.interaction.y));
+  }
 
   if (uniforms.interaction.z > 0.5 && uniforms.map.w < 0.5) {
     let owner = ownerAt(provinceId);
@@ -186,6 +196,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
 export const waterShader = commonWgsl + /* wgsl */ `
 struct WaterVertexInput {
   @location(0) grid: vec2f,
+  @location(1) skirt: f32,
 };
 
 struct WaterVertexOutput {
@@ -199,8 +210,9 @@ fn waterVertex(input: WaterVertexInput, @builtin(instance_index) instanceIndex: 
   let chunksX = u32(uniforms.terrainInfo.x);
   let chunksY = u32(uniforms.terrainInfo.y);
   let chunksPerWorld = chunksX * chunksY;
-  let copyIndex = instanceIndex / chunksPerWorld;
-  let chunkIndex = instanceIndex % chunksPerWorld;
+  let visibleChunk = visibleTerrainChunks[instanceIndex];
+  let copyIndex = visibleChunk / chunksPerWorld;
+  let chunkIndex = visibleChunk % chunksPerWorld;
   let chunkX = chunkIndex % chunksX;
   let chunkY = chunkIndex / chunksX;
   let uv = vec2f((f32(chunkX) + input.grid.x) / f32(chunksX), (f32(chunkY) + input.grid.y) / f32(chunksY));
@@ -274,6 +286,7 @@ struct InstanceRecord { a: vec4f, b: vec4f };
 struct InstanceParams { count: u32, kind: u32, enabled: u32, padding: u32 };
 @group(1) @binding(0) var<storage, read> instances: array<InstanceRecord>;
 @group(1) @binding(1) var<uniform> instanceParams: InstanceParams;
+@group(1) @binding(2) var<storage, read> visibleInstances: array<u32>;
 
 struct PropVertexInput {
   @location(0) position: vec3f,
@@ -382,8 +395,9 @@ fn treeMaterialUv(position: vec3f, normal: vec3f, bark: bool) -> vec2f {
 @vertex
 fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u32) -> PropVertexOutput {
   let count = instanceParams.count;
-  let copyIndex = instanceIndex / count;
-  let record = instances[instanceIndex % count];
+  let visibleInstance = visibleInstances[instanceIndex];
+  let copyIndex = visibleInstance / count;
+  let record = instances[visibleInstance % count];
   let copyOffset = f32(i32(copyIndex) - 1) * uniforms.map.x;
   let mapUv = vec2f(record.a.x / uniforms.map.x, record.a.y / uniforms.map.y);
   let ground = heightAt(mapUv);

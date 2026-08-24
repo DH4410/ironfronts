@@ -144,6 +144,66 @@ function buildConnections(connectionData) {
   return new Float32Array(records);
 }
 
+function buildFarAlbedo(surface, width, height) {
+  const outputWidth = 512;
+  const outputHeight = Math.max(1, Math.round(outputWidth * height / width));
+  const output = new Uint8Array(outputWidth * outputHeight * 4);
+  const terrainColors = [
+    [91, 126, 72], [113, 111, 74], [116, 116, 112], [45, 91, 52], [108, 99, 88],
+  ];
+  const biomeColors = new Map([
+    [1, [174, 150, 91]], [2, [111, 126, 73]], [3, [60, 92, 61]], [4, [55, 103, 57]],
+    [5, [104, 135, 77]], [6, [121, 126, 111]], [7, [191, 164, 101]], [8, [189, 199, 194]],
+  ]);
+  for (let y = 0; y < outputHeight; y += 1) {
+    const sourceY = Math.min(height - 1, Math.floor((y + 0.5) / outputHeight * height));
+    for (let x = 0; x < outputWidth; x += 1) {
+      const sourceX = Math.min(width - 1, Math.floor((x + 0.5) / outputWidth * width));
+      const sourceOffset = (sourceY * width + sourceX) * 4;
+      const targetOffset = (y * outputWidth + x) * 4;
+      const terrain = surface[sourceOffset];
+      const biome = surface[sourceOffset + 1];
+      const variation = surface[sourceOffset + 2] / 255;
+      const base = biomeColors.get(biome) ?? terrainColors[Math.min(terrain, terrainColors.length - 1)] ?? [62, 112, 124];
+      const shade = 0.9 + variation * 0.18;
+      output[targetOffset] = Math.round(base[0] * shade);
+      output[targetOffset + 1] = Math.round(base[1] * shade);
+      output[targetOffset + 2] = Math.round(base[2] * shade);
+      output[targetOffset + 3] = 255;
+    }
+  }
+  return { data: output, width: outputWidth, height: outputHeight };
+}
+
+function chunkInstanceRecords(source, groupForRecord = () => 0, groupCount = 1) {
+  const stride = 8;
+  const chunksX = 32;
+  const chunksY = 16;
+  const buckets = Array.from({ length: chunksX * chunksY }, () =>
+    Array.from({ length: groupCount }, () => []));
+  for (let offset = 0; offset < source.length; offset += stride) {
+    const chunkX = clamp(Math.floor(source[offset] / WORLD_WIDTH * chunksX), 0, chunksX - 1);
+    const chunkY = clamp(Math.floor(source[offset + 1] / WORLD_HEIGHT * chunksY), 0, chunksY - 1);
+    const group = clamp(groupForRecord(source, offset), 0, groupCount - 1);
+    buckets[chunkY * chunksX + chunkX][group].push(...source.subarray(offset, offset + stride));
+  }
+  const records = [];
+  const ranges = [];
+  let firstInstance = 0;
+  for (const chunkGroups of buckets) {
+    const chunkFirst = firstInstance;
+    const groups = [];
+    for (const groupRecords of chunkGroups) {
+      const instanceCount = groupRecords.length / stride;
+      groups.push({ firstInstance, instanceCount });
+      records.push(...groupRecords);
+      firstInstance += instanceCount;
+    }
+    ranges.push({ firstInstance: chunkFirst, instanceCount: firstInstance - chunkFirst, groups });
+  }
+  return { data: new Float32Array(records), ranges };
+}
+
 async function main() {
   const [geometry, metadata, markers, borderData, connectionData, networkData, mapMetadata,
     countryData, ownershipData, provinceAdjacencyData] = await Promise.all([
@@ -235,7 +295,6 @@ async function main() {
       reliefField[index] = [12, 46, 126, 30, 10][terrain];
     }
   }
-
   const coastBlend = blurField(landField.slice(), FIELD_WIDTH, FIELD_HEIGHT, 5, 3);
   const landDistance = distanceToValue(landField, FIELD_WIDTH, FIELD_HEIGHT, 0);
   const oceanDistance = distanceToValue(landField, FIELD_WIDTH, FIELD_HEIGHT, 1);
@@ -258,6 +317,7 @@ async function main() {
   }
 
   console.log('Packing borders, movement graph, forests, and cities…');
+  const farAlbedo = buildFarAlbedo(surface, FIELD_WIDTH, FIELD_HEIGHT);
   const borders = buildBorders(borderData);
   const connections = buildConnections(connectionData);
 
@@ -308,7 +368,14 @@ async function main() {
   for (let index = 0; index < placementClearance.length; index += 1) {
     placementClearance[index] = Math.max(placementClearance[index], waterways.clearance[index], visualRivers.clearance[index]);
   }
-  const { trees, buildings } = buildInstances(metadata.provinces, geometryById, provinceIds, areaCounts, placementClearance, infrastructure.cityPlans);
+  const generatedInstances = buildInstances(metadata.provinces, geometryById, provinceIds, areaCounts, placementClearance, infrastructure.cityPlans);
+  const treeChunks = chunkInstanceRecords(generatedInstances.trees, (data, offset) => data[offset + 3] === 2 ? 1 : 0, 2);
+  const buildingChunks = chunkInstanceRecords(generatedInstances.buildings, (data, offset) => Math.round(data[offset + 7]), 5);
+  const lampChunks = chunkInstanceRecords(infrastructure.lamps);
+  const barrierChunks = chunkInstanceRecords(infrastructure.barriers);
+  const signChunks = chunkInstanceRecords(infrastructure.signs);
+  const trees = treeChunks.data;
+  const buildings = buildingChunks.data;
 
   const provinceRecords = metadata.provinces.map((province) => ({
     id: province.province_id,
@@ -347,6 +414,7 @@ async function main() {
     fields: {
       height: { url: 'height.f32', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'r32float' },
       surface: { url: 'surface.rgba8', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'rgba8uint' },
+      farAlbedo: { url: 'far-albedo.rgba8', width: farAlbedo.width, height: farAlbedo.height, format: 'rgba8unorm' },
       roads: { url: 'roads.rg8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rg8unorm' },
       waterways: { url: 'waterways.rg8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rg8unorm' },
       coast: { url: 'coast.rg8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rg8unorm' },
@@ -364,12 +432,17 @@ async function main() {
       waterwayNetworkLines: { url: 'waterway-network-lines.f32', count: waterways.networkLines.length / 8, stride: 8, lazy: true },
       trees: { url: 'trees.f32', count: trees.length / 8, stride: 8 },
       buildings: { url: 'buildings.f32', count: buildings.length / 8, stride: 8 },
-      lamps: { url: 'lamps.f32', count: infrastructure.lamps.length / 8, stride: 8 },
-      barriers: { url: 'barriers.f32', count: infrastructure.barriers.length / 8, stride: 8 },
-      signs: { url: 'signs.f32', count: infrastructure.signs.length / 8, stride: 8 },
+      lamps: { url: 'lamps.f32', count: lampChunks.data.length / 8, stride: 8 },
+      barriers: { url: 'barriers.f32', count: barrierChunks.data.length / 8, stride: 8 },
+      signs: { url: 'signs.f32', count: signChunks.data.length / 8, stride: 8 },
     },
     terrain: { chunksX: 32, chunksY: 16, gridResolution: 49, maxHeight },
     infrastructureChunks: { ...infrastructure.chunkRanges, waterways: waterways.chunkRanges },
+    propChunks: {
+      chunksX: 32, chunksY: 16,
+      trees: treeChunks.ranges, buildings: buildingChunks.ranges,
+      lamps: lampChunks.ranges, barriers: barrierChunks.ranges, signs: signChunks.ranges,
+    },
     reports: { generation: { url: 'world-generation-report.json', version: worldGenerationReport.version } },
     sidecars: { provinceDetails: { url: 'province-details.json', version: provinceDetails.version } },
     politics: {
@@ -389,9 +462,9 @@ async function main() {
       ...waterways.stats,
       ...visualRivers.stats,
       ...infrastructure.stats,
-      lamps: infrastructure.lamps.length / 8,
-      barriers: infrastructure.barriers.length / 8,
-      signs: infrastructure.signs.length / 8,
+      lamps: lampChunks.data.length / 8,
+      barriers: barrierChunks.data.length / 8,
+      signs: signChunks.data.length / 8,
     },
     provinces: provinceRecords,
   };
@@ -403,6 +476,7 @@ async function main() {
     writeTyped('province-label-data.f32', provinceLabelData),
     writeTyped('height.f32', heights),
     writeTyped('surface.rgba8', surface),
+    writeTyped('far-albedo.rgba8', farAlbedo.data),
     writeTyped('roads.rg8', infrastructure.roadField),
     writeTyped('waterways.rg8', waterwayField),
     writeTyped('coast.rg8', bankField.field),
@@ -417,9 +491,9 @@ async function main() {
     writeTyped('waterway-network-lines.f32', waterways.networkLines),
     writeTyped('trees.f32', trees),
     writeTyped('buildings.f32', buildings),
-    writeTyped('lamps.f32', infrastructure.lamps),
-    writeTyped('barriers.f32', infrastructure.barriers),
-    writeTyped('signs.f32', infrastructure.signs),
+    writeTyped('lamps.f32', lampChunks.data),
+    writeTyped('barriers.f32', barrierChunks.data),
+    writeTyped('signs.f32', signChunks.data),
     writeFile(path.join(OUTPUT, 'world-generation-report.json'), `${JSON.stringify(worldGenerationReport, null, 2)}\n`),
     writeFile(path.join(OUTPUT, 'province-details.json'), `${JSON.stringify(provinceDetails)}\n`),
     writeFile(path.join(OUTPUT, 'world.json'), `${JSON.stringify(manifest)}\n`),

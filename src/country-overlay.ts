@@ -10,6 +10,12 @@ interface CountryAnchor {
   crossSpan: number;
 }
 
+interface CountryLabelState {
+  visible: boolean;
+  fontSize: string;
+  transform: string;
+}
+
 export interface CountryOwnershipChange {
   provinceId: number;
   previousCountryId: number;
@@ -43,9 +49,15 @@ export class CountryLabelLayer {
   private readonly neighbors: number[][];
   private readonly provincesByCountry = new Map<number, Set<number>>();
   private readonly anchors = new Map<number, CountryAnchor>();
+  private readonly labelStates = new Map<number, CountryLabelState>();
   private readonly visitMarks: Uint32Array;
   private visitEpoch = 0;
   private visible = true;
+  private dirty = true;
+  private lastCameraRevision = -1;
+  private lastWidth = 0;
+  private lastHeight = 0;
+  private visibleCount = 0;
 
   constructor(
     private readonly container: HTMLElement,
@@ -76,6 +88,7 @@ export class CountryLabelLayer {
       element.dataset.countryId = String(country.id);
       element.style.setProperty('--country-color', country.color);
       this.elements.set(country.id, element);
+      this.labelStates.set(country.id, { visible: false, fontSize: '', transform: '' });
       this.measuredLabelWidths.set(country.id, this.measureTextWidth(element.textContent, MEASUREMENT_SIZE));
       fragment.append(element);
     }
@@ -94,8 +107,11 @@ export class CountryLabelLayer {
   }
 
   setVisible(visible: boolean): void {
+    if (this.visible === visible) return;
     this.visible = visible;
     this.container.hidden = !visible;
+    this.dirty = true;
+    if (!visible) this.visibleCount = 0;
   }
 
   refreshOwnership(changes: CountryOwnershipChange[]): void {
@@ -113,6 +129,7 @@ export class CountryLabelLayer {
       affectedCountries.add(change.countryId);
     }
     this.rebuildCountries(affectedCountries);
+    if (affectedCountries.size) this.dirty = true;
   }
 
   update(
@@ -120,10 +137,16 @@ export class CountryLabelLayer {
     width: number,
     height: number,
     sampleHeight: (x: number, z: number) => number,
+    cameraRevision = -1,
   ): number {
     if (!this.visible || width <= 1 || height <= 1) return 0;
+    if (!this.dirty
+      && cameraRevision === this.lastCameraRevision
+      && width === this.lastWidth
+      && height === this.lastHeight) return this.visibleCount;
+
     let visibleLabels = 0;
-    for (const element of this.elements.values()) element.hidden = true;
+    const visibleCountryIds = new Set<number>();
 
     for (const anchor of this.anchors.values()) {
       const country = this.countryById.get(anchor.countryId);
@@ -175,12 +198,36 @@ export class CountryLabelLayer {
       let angle = Math.atan2(right.y - left.y, right.x - left.x);
       while (angle > Math.PI * 0.5) angle -= Math.PI;
       while (angle < -Math.PI * 0.5) angle += Math.PI;
-      element.hidden = false;
+      const state = this.labelStates.get(country.id);
+      const nextFontSize = `${fontSize}px`;
+      const nextTransform = `translate(${center.x.toFixed(1)}px, ${center.y.toFixed(1)}px) translate(-50%, -50%) rotate(${angle.toFixed(4)}rad)`;
+      if (state && !state.visible) {
+        element.hidden = false;
+        state.visible = true;
+      }
+      if (state && state.fontSize !== nextFontSize) {
+        element.style.fontSize = nextFontSize;
+        state.fontSize = nextFontSize;
+      }
+      if (state && state.transform !== nextTransform) {
+        element.style.transform = nextTransform;
+        state.transform = nextTransform;
+      }
+      visibleCountryIds.add(country.id);
       visibleLabels += 1;
-      element.style.fontSize = `${fontSize}px`;
-      element.style.transform = `translate(${center.x.toFixed(1)}px, ${center.y.toFixed(1)}px) translate(-50%, -50%) rotate(${angle.toFixed(4)}rad)`;
     }
-    return visibleLabels;
+    for (const [countryId, state] of this.labelStates) {
+      if (!state.visible || visibleCountryIds.has(countryId)) continue;
+      const element = this.elements.get(countryId);
+      if (element) element.hidden = true;
+      state.visible = false;
+    }
+    this.lastCameraRevision = cameraRevision;
+    this.lastWidth = width;
+    this.lastHeight = height;
+    this.visibleCount = visibleLabels;
+    this.dirty = false;
+    return this.visibleCount;
   }
 
   private measureTextWidth(label: string, fontSize: number): number {
@@ -200,6 +247,8 @@ export class CountryLabelLayer {
       this.anchors.delete(countryId);
       const element = this.elements.get(countryId);
       if (element) element.hidden = true;
+      const state = this.labelStates.get(countryId);
+      if (state) state.visible = false;
       return;
     }
     this.visitEpoch = (this.visitEpoch + 1) >>> 0;

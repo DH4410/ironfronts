@@ -101,10 +101,13 @@ describe('WGSL programs', () => {
       { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
       { binding: 10, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
       { binding: 11, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+      { binding: 12, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
+      { binding: 13, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ] });
     const layer = device.createBindGroupLayout({ entries: [
       { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
+      { binding: 2, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
     ] });
     const depthStencil: GPUDepthStencilState = { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' };
     await expect(device.createRenderPipelineAsync({
@@ -118,13 +121,17 @@ describe('WGSL programs', () => {
     })).resolves.toBeDefined();
     await expect(device.createRenderPipelineAsync({
       layout: device.createPipelineLayout({ bindGroupLayouts: [common] }),
-      vertex: { module: modules.get('terrain')!, entryPoint: 'terrainVertex', buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }] },
+      vertex: { module: modules.get('terrain')!, entryPoint: 'terrainVertex', buffers: [{ arrayStride: 12, attributes: [
+        { shaderLocation: 0, offset: 0, format: 'float32x2' }, { shaderLocation: 1, offset: 8, format: 'float32' },
+      ] }] },
       fragment: { module: modules.get('terrain')!, entryPoint: 'terrainFragment', targets: [{ format: 'bgra8unorm' }] },
       primitive: { topology: 'triangle-list', cullMode: 'back' }, depthStencil,
     })).resolves.toBeDefined();
     await expect(device.createRenderPipelineAsync({
       layout: device.createPipelineLayout({ bindGroupLayouts: [common] }),
-      vertex: { module: modules.get('water')!, entryPoint: 'waterVertex', buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }] },
+      vertex: { module: modules.get('water')!, entryPoint: 'waterVertex', buffers: [{ arrayStride: 12, attributes: [
+        { shaderLocation: 0, offset: 0, format: 'float32x2' }, { shaderLocation: 1, offset: 8, format: 'float32' },
+      ] }] },
       fragment: { module: modules.get('water')!, entryPoint: 'waterFragment', targets: [{ format: 'bgra8unorm' }] },
       primitive: { topology: 'triangle-list' }, depthStencil,
     })).resolves.toBeDefined();

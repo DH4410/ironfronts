@@ -20,7 +20,19 @@ interface Manifest {
     labelData: { url: string; count: number; stride: number };
     countries: Array<{ id: number; name: string; color: string; capitalProvinceId: number }>;
   };
+  propChunks: {
+    chunksX: number;
+    chunksY: number;
+    trees: PropChunkRange[];
+    buildings: PropChunkRange[];
+  };
   provinces: Array<{ id: number; name: string; terrain: string }>;
+}
+
+interface PropChunkRange {
+  firstInstance: number;
+  instanceCount: number;
+  groups: Array<{ firstInstance: number; instanceCount: number }>;
 }
 
 async function manifest(): Promise<Manifest> {
@@ -43,7 +55,8 @@ describe('generated v10 world package', () => {
     expect(data.provinces).toHaveLength(3_303);
     expect(new Set(data.provinces.map((province) => province.id)).size).toBe(3_303);
     expect(data.provinces[0]).toEqual(expect.objectContaining({ id: 0, name: 'Las Palmas', terrain: 'Plains' }));
-    expect(Object.keys(data.fields).sort()).toEqual(['coast', 'height', 'provinceIds', 'roads', 'surface', 'waterways']);
+    expect(Object.keys(data.fields).sort()).toEqual(['coast', 'farAlbedo', 'height', 'provinceIds', 'roads', 'surface', 'waterways']);
+    expect(data.fields.farAlbedo).toEqual(expect.objectContaining({ width: 512, format: 'rgba8unorm' }));
     expect(data.fields.coast.format).toBe('rg8unorm');
     const bankBytes = await readFile(`public/world/${data.fields.coast.url}`);
     expect(bankBytes.byteLength).toBe(data.fields.coast.width * data.fields.coast.height * 2);
@@ -317,6 +330,19 @@ describe('generated v10 world package', () => {
     const forestProvinceCount = data.provinces.filter((province) => province.terrain === 'Forest').length;
     expect(plainTrees).toBeGreaterThan(0);
     expect(plainTrees / plainProvinceCount).toBeLessThan((forestTrees / forestProvinceCount) * 0.25);
+    expect(data.propChunks.trees).toHaveLength(data.propChunks.chunksX * data.propChunks.chunksY);
+    expect(data.propChunks.trees.reduce((sum, range) => sum + range.instanceCount, 0)).toBe(data.buffers.trees.count);
+    expect(data.propChunks.buildings.reduce((sum, range) => sum + range.instanceCount, 0)).toBe(data.buffers.buildings.count);
+    for (const range of data.propChunks.trees) {
+      expect(range.groups).toHaveLength(2);
+      expect(range.groups.reduce((sum, group) => sum + group.instanceCount, 0)).toBe(range.instanceCount);
+      for (let index = 0; index < range.groups[0].instanceCount; index += 1) {
+        expect(trees[(range.groups[0].firstInstance + index) * 8 + 3]).not.toBe(2);
+      }
+      for (let index = 0; index < range.groups[1].instanceCount; index += 1) {
+        expect(trees[(range.groups[1].firstInstance + index) * 8 + 3]).toBe(2);
+      }
+    }
   });
 
   it('reports every direct road and every omitted physical connection without corridor metadata', async () => {

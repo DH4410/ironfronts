@@ -31,6 +31,8 @@ export function createRendererLayouts(device: GPUDevice): RendererLayouts {
       { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
       { binding: 10, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
       { binding: 11, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+      { binding: 12, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
+      { binding: 13, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ],
   });
   const instances = device.createBindGroupLayout({
@@ -38,6 +40,7 @@ export function createRendererLayouts(device: GPUDevice): RendererLayouts {
     entries: [
       { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
+      { binding: 2, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
     ],
   });
   const lines = device.createBindGroupLayout({
@@ -66,13 +69,17 @@ export function createRendererPipelines(
 
   const terrain = device.createRenderPipeline({
     label: 'terrain pipeline', layout: commonLayout,
-    vertex: { module: terrainModule, entryPoint: 'terrainVertex', buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }] },
+    vertex: { module: terrainModule, entryPoint: 'terrainVertex', buffers: [{ arrayStride: 12, attributes: [
+      { shaderLocation: 0, offset: 0, format: 'float32x2' }, { shaderLocation: 1, offset: 8, format: 'float32' },
+    ] }] },
     fragment: { module: terrainModule, entryPoint: 'terrainFragment', targets: [{ format }] },
     primitive: { topology: 'triangle-list', cullMode: 'none' }, depthStencil,
   });
   const water = device.createRenderPipeline({
     label: 'water pipeline', layout: commonLayout,
-    vertex: { module: waterModule, entryPoint: 'waterVertex', buffers: [{ arrayStride: 8, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x2' }] }] },
+    vertex: { module: waterModule, entryPoint: 'waterVertex', buffers: [{ arrayStride: 12, attributes: [
+      { shaderLocation: 0, offset: 0, format: 'float32x2' }, { shaderLocation: 1, offset: 8, format: 'float32' },
+    ] }] },
     fragment: { module: waterModule, entryPoint: 'waterFragment', targets: [{ format }] },
     primitive: { topology: 'triangle-list', cullMode: 'none' }, depthStencil,
   });
