@@ -1,35 +1,50 @@
 const MATERIAL_NAMES = ['grassland', 'dry-earth', 'desert-sand', 'forest-floor', 'exposed-rock', 'tundra-snow', 'urban-ground', 'shoreline'];
 const FALLBACK_COLORS = ['#718456', '#987e55', '#bba36b', '#43533a', '#77736b', '#a9aaa0', '#68665f', '#bea978'];
+const TREE_MATERIAL_NAMES = ['tree-leaves-light', 'tree-leaves-dark', 'tree-bark'];
+const TREE_FALLBACK_COLORS = ['#4f7d2f', '#183f2b', '#704523'];
 const clamp = (value: number, min: number, max: number): number => Math.max(min, Math.min(max, value));
 
 export async function createMaterialTexture(device: GPUDevice): Promise<GPUTexture> {
-  const size = 512;
+  return createTextureArray(device, 'terrain material array', MATERIAL_NAMES, FALLBACK_COLORS, 512);
+}
+
+export async function createTreeMaterialTexture(device: GPUDevice): Promise<GPUTexture> {
+  return createTextureArray(device, 'tree material array', TREE_MATERIAL_NAMES, TREE_FALLBACK_COLORS, 256);
+}
+
+async function createTextureArray(
+  device: GPUDevice,
+  label: string,
+  names: string[],
+  fallbackColors: string[],
+  size: number,
+): Promise<GPUTexture> {
   const mipLevelCount = Math.floor(Math.log2(size)) + 1;
   const texture = device.createTexture({
-    label: 'terrain material array',
-    size: [size, size, MATERIAL_NAMES.length],
+    label,
+    size: [size, size, names.length],
     format: 'rgba8unorm-srgb',
     mipLevelCount,
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
   });
 
-  for (let layer = 0; layer < MATERIAL_NAMES.length; layer += 1) {
+  for (let layer = 0; layer < names.length; layer += 1) {
     let source: ImageBitmap;
     try {
-      const response = await fetch(`/textures/${MATERIAL_NAMES[layer]}.png`);
+      const response = await fetch(`/textures/${names[layer]}.png`);
       if (!response.ok) throw new Error(String(response.status));
       source = await createImageBitmap(await response.blob(), { resizeWidth: size, resizeHeight: size, resizeQuality: 'high' });
     } catch {
-      source = await createFallbackMaterial(size, FALLBACK_COLORS[layer], layer);
+      source = await createFallbackMaterial(size, fallbackColors[layer], layer);
     }
     device.queue.copyExternalImageToTexture({ source }, { texture, origin: [0, 0, layer] }, [size, size]);
     source.close();
   }
-  generateMipmaps(device, texture, size, MATERIAL_NAMES.length, mipLevelCount);
+  generateMipmaps(device, texture, names.length, mipLevelCount);
   return texture;
 }
 
-function generateMipmaps(device: GPUDevice, texture: GPUTexture, size: number, layers: number, mipLevelCount: number): void {
+function generateMipmaps(device: GPUDevice, texture: GPUTexture, layers: number, mipLevelCount: number): void {
   const module = device.createShaderModule({ label: 'material mipmap shader', code: /* wgsl */ `
     @group(0) @binding(0) var sourceTexture: texture_2d<f32>;
     @group(0) @binding(1) var sourceSampler: sampler;
@@ -79,7 +94,6 @@ function generateMipmaps(device: GPUDevice, texture: GPUTexture, size: number, l
     }
   }
   device.queue.submit([encoder.finish()]);
-  void size;
 }
 
 async function createFallbackMaterial(size: number, color: string, seed: number): Promise<ImageBitmap> {
@@ -104,4 +118,3 @@ async function createFallbackMaterial(size: number, color: string, seed: number)
   context.putImageData(image, 0, 0);
   return createImageBitmap(canvas);
 }
-

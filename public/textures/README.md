@@ -16,3 +16,13 @@ Stable layer order:
 8. `shoreline.png`
 
 Replacement art should remain square, top-down diffuse albedo with neutral lighting. Source resolution may vary because the runtime normalizes every layer.
+
+## Tree prop materials
+
+The proposed lightweight tree refresh uses three 256x256 generated diffuse sources:
+
+- `tree-leaves-light.png`
+- `tree-leaves-dark.png`
+- `tree-bark.png`
+
+These are deliberately small because trees occupy little screen space. Keep them seamless, neutral-lit, and free of baked directional shadows; runtime mipmaps should handle distant views.

@@ -1,6 +1,6 @@
 import { vec3 } from 'gl-matrix';
 import { StrategyCamera } from './camera';
-import { createMaterialTexture } from './material-texture';
+import { createMaterialTexture, createTreeMaterialTexture } from './material-texture';
 import { createRendererLayouts, createRendererPipelines } from './renderer-pipelines';
 import {
   createBarrierMesh, createBuildingMesh, createLampMesh, createShadowMesh, createSignMesh, createTerrainMesh,
@@ -66,6 +66,7 @@ export class WorldRenderer {
   private roadTexture!: GPUTexture;
   private waterwayTexture!: GPUTexture;
   private materialTexture!: GPUTexture;
+  private treeMaterialTexture!: GPUTexture;
   private heightData!: Float32Array;
   private provinceData!: Uint16Array;
   private provinceById = new Map<number, ProvinceRecord>();
@@ -168,8 +169,11 @@ export class WorldRenderer {
       'r16uint', new Uint8Array(provinceBuffer), this.manifest.fields.provinceIds.width * 2,
     );
 
-    report('Preparing terrain materials', 0.49);
-    this.materialTexture = await createMaterialTexture(this.device);
+    report('Preparing terrain and tree materials', 0.49);
+    [this.materialTexture, this.treeMaterialTexture] = await Promise.all([
+      createMaterialTexture(this.device),
+      createTreeMaterialTexture(this.device),
+    ]);
     this.uniformBuffer = this.device.createBuffer({
       label: 'frame uniforms',
       size: 256,
@@ -184,10 +188,11 @@ export class WorldRenderer {
         { binding: 2, resource: this.surfaceTexture.createView() },
         { binding: 3, resource: this.provinceTexture.createView() },
         { binding: 4, resource: this.materialTexture.createView({ dimension: '2d-array' }) },
-        { binding: 5, resource: this.device.createSampler({ addressModeU: 'repeat', addressModeV: 'clamp-to-edge', magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' }) },
+        { binding: 5, resource: this.device.createSampler({ addressModeU: 'repeat', addressModeV: 'repeat', magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' }) },
         { binding: 6, resource: this.coastTexture.createView() },
         { binding: 7, resource: this.roadTexture.createView() },
         { binding: 8, resource: this.waterwayTexture.createView() },
+        { binding: 9, resource: this.treeMaterialTexture.createView({ dimension: '2d-array' }) },
       ],
     });
 

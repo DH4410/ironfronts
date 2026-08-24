@@ -17,6 +17,24 @@ function pointProvince(ids, x, y) {
   return ids[py * ID_WIDTH + px];
 }
 
+function pickTreeVariant(rng, visual, isPlain) {
+  const roll = rng();
+  if (isPlain) {
+    if (visual === 'Boreal') return roll < 0.58 ? 2 : roll < 0.80 ? 1 : 4;
+    return roll < 0.42 ? 0 : roll < 0.68 ? 1 : roll < 0.86 ? 4 : 3;
+  }
+  if (visual === 'Jungle') return roll < 0.44 ? 3 : roll < 0.70 ? 0 : roll < 0.88 ? 1 : 4;
+  if (visual === 'Boreal' || visual === 'Tundra') return roll < 0.68 ? 2 : roll < 0.84 ? 1 : roll < 0.94 ? 4 : 0;
+  return roll < 0.36 ? 0 : roll < 0.56 ? 1 : roll < 0.72 ? 2 : roll < 0.87 ? 3 : 4;
+}
+
+function pickTreePalette(rng, visual, isPlain) {
+  if (isPlain) return 0;
+  if (visual === 'Boreal' || visual === 'Tundra') return rng() < 0.76 ? 1 : 0;
+  if (visual === 'Jungle') return rng() < 0.56 ? 1 : 0;
+  return rng() < 0.48 ? 1 : 0;
+}
+
 export function buildInstances(provinces, geometryById, provinceIds, areaCounts, roadClearance, cityPlans) {
   const trees = [];
   const buildings = [];
@@ -34,11 +52,14 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
     const area = areaCounts[encodedId] ?? 0;
     const visual = province.visual_terrain_tag ?? '';
     const isForest = province.terrain_type_id === 13;
-    const supportsTrees = isForest || visual === 'Jungle' || visual === 'Boreal';
+    const isPlain = province.terrain_type_id === 10;
+    const supportsPlainTrees = isPlain && visual !== 'Desert' && visual !== 'Sand Dunes' && visual !== 'Tundra';
+    const supportsTrees = isForest || visual === 'Jungle' || visual === 'Boreal' || supportsPlainTrees;
 
     if (supportsTrees) {
-      const density = isForest ? 1 : 0.35;
-      const target = clamp(Math.round(area / 11 * density), 5, isForest ? 90 : 36);
+      const target = isPlain
+        ? clamp(Math.round(area / 95), 0, 12)
+        : clamp(Math.round(area / 11 * (isForest ? 1 : 0.35)), 5, isForest ? 90 : 36);
       let placed = 0;
       for (let attempt = 0; attempt < target * 14 && placed < target; attempt += 1) {
         const x = minX + (maxX - minX) * rng();
@@ -47,8 +68,9 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
         const roadIndex = clamp(Math.floor(y / WORLD_HEIGHT * ID_HEIGHT), 0, ID_HEIGHT - 1) * ID_WIDTH
           + wrap(Math.floor(x / WORLD_WIDTH * ID_WIDTH), ID_WIDTH);
         if (roadClearance[roadIndex] > 20) continue;
-        const treeType = visual === 'Jungle' ? 2 : visual === 'Boreal' || visual === 'Tundra' ? 1 : 0;
-        trees.push(x, y, 0.72 + rng() * 0.72, treeType, rng() * Math.PI * 2, 0.82 + rng() * 0.28, encodedId, 0);
+        const variant = pickTreeVariant(rng, visual, isPlain);
+        const palette = pickTreePalette(rng, visual, isPlain);
+        trees.push(x, y, 0.72 + rng() * 0.72, variant, rng() * Math.PI * 2, 0.82 + rng() * 0.28, encodedId, palette);
         placed += 1;
       }
     }

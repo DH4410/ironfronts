@@ -237,6 +237,43 @@ describe('generated v10 world package', () => {
     expect(data.infrastructureChunks.hiddenConnections.reduce((sum, range) => sum + range.indexCount, 0)).toBe(indices.length);
   });
 
+  it('distributes five tree silhouettes while keeping plains sparse and light green', async () => {
+    const data = await manifest();
+    const bytes = await readFile('public/world/trees.f32');
+    const trees = viewF32(bytes);
+    expect(trees.length).toBe(data.buffers.trees.count * 8);
+    expect(data.buffers.trees.stride).toBe(8);
+    const variants = new Set<number>();
+    const palettes = new Set<number>();
+    const countsByTerrain = new Map<string, number>();
+    const provinceById = new Map(data.provinces.map((province) => [province.id, province]));
+    for (let tree = 0; tree < data.buffers.trees.count; tree += 1) {
+      const offset = tree * 8;
+      const variant = trees[offset + 3];
+      const encodedProvince = trees[offset + 6];
+      const palette = trees[offset + 7];
+      expect(Number.isInteger(variant)).toBe(true);
+      expect(variant).toBeGreaterThanOrEqual(0);
+      expect(variant).toBeLessThanOrEqual(4);
+      expect([0, 1]).toContain(palette);
+      variants.add(variant);
+      palettes.add(palette);
+      const terrain = provinceById.get(encodedProvince - 1)?.terrain;
+      expect(terrain).toBeDefined();
+      if (!terrain) throw new Error(`Tree references unknown province ${encodedProvince - 1}`);
+      countsByTerrain.set(terrain, (countsByTerrain.get(terrain) ?? 0) + 1);
+      if (terrain === 'Plains') expect(palette).toBe(0);
+    }
+    expect([...variants].sort()).toEqual([0, 1, 2, 3, 4]);
+    expect([...palettes].sort()).toEqual([0, 1]);
+    const plainTrees = countsByTerrain.get('Plains') ?? 0;
+    const forestTrees = countsByTerrain.get('Forest') ?? 0;
+    const plainProvinceCount = data.provinces.filter((province) => province.terrain === 'Plains').length;
+    const forestProvinceCount = data.provinces.filter((province) => province.terrain === 'Forest').length;
+    expect(plainTrees).toBeGreaterThan(0);
+    expect(plainTrees / plainProvinceCount).toBeLessThan((forestTrees / forestProvinceCount) * 0.25);
+  });
+
   it('reports every direct road and every omitted physical connection without corridor metadata', async () => {
     const data = await manifest();
     const [sourceBytes, reportBytes] = await Promise.all([

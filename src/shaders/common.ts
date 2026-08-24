@@ -19,6 +19,7 @@ struct Uniforms {
 @group(0) @binding(6) var coastTexture: texture_2d<f32>;
 @group(0) @binding(7) var roadTexture: texture_2d<f32>;
 @group(0) @binding(8) var waterwayTexture: texture_2d<f32>;
+@group(0) @binding(9) var treeMaterialTexture: texture_2d_array<f32>;
 
 fn wrappedUv(uv: vec2f) -> vec2f {
   return vec2f(fract(uv.x + 1.0), clamp(uv.y, 0.0, 0.999999));

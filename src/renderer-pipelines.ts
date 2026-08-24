@@ -28,6 +28,7 @@ export function createRendererLayouts(device: GPUDevice): RendererLayouts {
       { binding: 6, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
     ],
   });
   const instances = device.createBindGroupLayout({

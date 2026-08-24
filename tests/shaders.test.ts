@@ -40,6 +40,14 @@ describe('WGSL programs', () => {
     expect(lineShader).toContain('lineParams.mode == 2u');
   });
 
+  it('morphs five tree silhouettes and samples compact bark and foliage materials', () => {
+    expect(propShader).toContain('fn treePartCenter(variant: u32, part: u32)');
+    expect(propShader).toContain('min(u32(record.a.w + 0.5), 4u)');
+    expect(propShader).toContain('treePartVisible(variant, part)');
+    expect(propShader).toContain('textureSampleLevel(treeMaterialTexture');
+    expect(propShader).toContain('clamp(record.b.w, 0.0, 1.0)');
+  });
+
   it.each([
     ['terrain', terrainShader, ['terrainVertex'], ['terrainFragment']],
     ['water', waterShader, ['waterVertex'], ['waterFragment']],
@@ -82,6 +90,7 @@ describe('WGSL programs', () => {
       { binding: 6, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
     ] });
     const layer = device.createBindGroupLayout({ entries: [
       { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },

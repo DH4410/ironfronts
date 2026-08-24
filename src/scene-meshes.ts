@@ -34,9 +34,11 @@ export function createTerrainMesh(device: GPUDevice, resolution: number): Mesh {
 
 export function createTreeMesh(device: GPUDevice): Mesh {
   const builder = new MeshBuilder();
-  builder.addBox(-0.55, 0, -0.55, 0.55, 4.1, 0.55, 0);
-  builder.addCone(0, 3.0, 0, 3.5, 11.5, 9, 1);
-  builder.addCone(0, 6.2, 0, 2.8, 13.3, 9, 1);
+  // One compact primitive set is morphed into five silhouettes by the prop
+  // vertex shader. Parts 1-3 are broadleaf crowns; 4-6 are conifer tiers.
+  builder.addBox(-0.5, 0, -0.5, 0.5, 1, 0.5, 0);
+  for (let part = 1; part <= 3; part += 1) builder.addFacetedSphere(part);
+  for (let part = 4; part <= 6; part += 1) builder.addCone(0, -1, 0, 1, 1, 8, part);
   return uploadMesh(device,'tree mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
 }
 

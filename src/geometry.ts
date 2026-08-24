@@ -36,6 +36,28 @@ export class MeshBuilder {
     void tipStart;
   }
 
+  addFacetedSphere(material: number): void {
+    const top = [0, 1, 0], bottom = [0, -1, 0];
+    const east = [1, 0, 0], west = [-1, 0, 0], north = [0, 0, -1], south = [0, 0, 1];
+    const faces = [
+      [top, south, east], [top, east, north], [top, north, west], [top, west, south],
+      [bottom, east, south], [bottom, south, west], [bottom, west, north], [bottom, north, east],
+    ];
+    for (const face of faces) {
+      const edgeA = face[1].map((value, axis) => value - face[0][axis]);
+      const edgeB = face[2].map((value, axis) => value - face[0][axis]);
+      const normal = [
+        edgeA[1] * edgeB[2] - edgeA[2] * edgeB[1],
+        edgeA[2] * edgeB[0] - edgeA[0] * edgeB[2],
+        edgeA[0] * edgeB[1] - edgeA[1] * edgeB[0],
+      ];
+      const length = Math.hypot(...normal);
+      const start = this.vertices.length / 7;
+      for (const position of face) this.vertices.push(...position, normal[0] / length, normal[1] / length, normal[2] / length, material);
+      this.indices.push(start, start + 1, start + 2);
+    }
+  }
+
   addGableRoof(minX: number, baseY: number, minZ: number, maxX: number, ridgeY: number, maxZ: number, material: number): void {
     const halfWidth = Math.max(0.001, (maxX - minX) * 0.5);
     const rise = ridgeY - baseY;
@@ -89,4 +111,3 @@ export class MeshBuilder {
     this.indices.push(start, start + 1, start + 2, start + 2, start + 1, start + 3);
   }
 }
-
