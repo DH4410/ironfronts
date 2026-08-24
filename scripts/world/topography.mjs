@@ -32,9 +32,10 @@ function fbm(u, v) {
   return value / normalization;
 }
 
-function terrainLimit(terrain, hillEnvelope, mountainEnvelope) {
-  const base = terrain === 1 ? 18 : terrain === 2 ? 50 : 8;
-  return clamp(Math.max(base, 8 + hillEnvelope * 10 + mountainEnvelope * 42), 8, 50);
+function terrainLimit(terrain, hillEnvelope, mountainEnvelope, regionalMountain) {
+  const base = terrain === 1 ? 18 : terrain === 2 ? 60 : 8;
+  return clamp(Math.max(base,
+    8 + hillEnvelope * 10 + mountainEnvelope * 44 + regionalMountain * 8), 8, 60);
 }
 
 function slopeLimit(hillEnvelope, mountainEnvelope) {
@@ -97,6 +98,51 @@ function cleanAndProject(heights, caps, limits, landField, passes = 10) {
   }
 }
 
+function enforceLocalSlopes(heights, limits, landField) {
+  const size = heights.length;
+  const queue = new Int32Array(size + 1);
+  const queued = new Uint8Array(size);
+  let head = 0, tail = 0, count = 0, repairs = 0;
+  const enqueue = (index) => {
+    if (!landField[index] || queued[index]) return;
+    queued[index] = 1;
+    queue[tail] = index;
+    tail = (tail + 1) % queue.length;
+    count += 1;
+  };
+  for (let index = 0; index < size; index += 1) if (landField[index]) enqueue(index);
+  while (count) {
+    const index = queue[head];
+    head = (head + 1) % queue.length;
+    count -= 1;
+    queued[index] = 0;
+    const y = Math.floor(index / FIELD_WIDTH), x = index - y * FIELD_WIDTH;
+    const neighbors = [
+      y * FIELD_WIDTH + wrap(x - 1, FIELD_WIDTH), y * FIELD_WIDTH + wrap(x + 1, FIELD_WIDTH),
+      Math.max(0, y - 1) * FIELD_WIDTH + x, Math.min(FIELD_HEIGHT - 1, y + 1) * FIELD_WIDTH + x,
+    ];
+    for (const neighbor of neighbors) {
+      if (neighbor === index || !landField[neighbor]) continue;
+      const allowed = (limits[index] + limits[neighbor]) * 0.5;
+      const difference = heights[index] - heights[neighbor];
+      if (Math.abs(difference) <= allowed + 0.0001) continue;
+      const high = difference > 0 ? index : neighbor;
+      const low = difference > 0 ? neighbor : index;
+      const nextHeight = Math.max(1.2, heights[low] + allowed);
+      if (nextHeight >= heights[high] - 0.0001) continue;
+      heights[high] = nextHeight;
+      repairs += 1;
+      const hy = Math.floor(high / FIELD_WIDTH), hx = high - hy * FIELD_WIDTH;
+      enqueue(high);
+      enqueue(hy * FIELD_WIDTH + wrap(hx - 1, FIELD_WIDTH));
+      enqueue(hy * FIELD_WIDTH + wrap(hx + 1, FIELD_WIDTH));
+      enqueue(Math.max(0, hy - 1) * FIELD_WIDTH + hx);
+      enqueue(Math.min(FIELD_HEIGHT - 1, hy + 1) * FIELD_WIDTH + hx);
+    }
+  }
+  return repairs;
+}
+
 function conditionMovementPaths(heights, caps, limits, landField, terrainField, provinceField, borderData, connectionData, networkData, provinces) {
   const assembled = assembleProvinceRoutes(borderData, connectionData, networkData, provinces, WORLD_WIDTH);
   const baseline = heights.slice();
@@ -104,6 +150,7 @@ function conditionMovementPaths(heights, caps, limits, landField, terrainField, 
   const classLowerBudgets = [4, 6, 12, 4, 4];
   const classRaiseBudgets = [4, 6, 6, 4, 4];
   const classMeanBudgets = [2.5, 4, 6, 2.5, 2.5];
+  const conditionedSegmentKeys = new Set();
   let passes = 0;
   let conditionedSamples = 0;
   for (let pass = 0; pass < 6; pass += 1) {
@@ -111,7 +158,6 @@ function conditionMovementPaths(heights, caps, limits, landField, terrainField, 
     const weights = new Float32Array(heights.length);
     let violations = 0;
     for (const route of assembled.routes) {
-      const maximumGrade = ROAD_MAX_GRADE;
       for (let segment = 0; segment + 1 < route.points.length; segment += 1) {
         const a = route.points[segment], b = route.points[segment + 1];
         let dx = b.x - a.x;
@@ -120,24 +166,41 @@ function conditionMovementPaths(heights, caps, limits, landField, terrainField, 
         const dz = b.z - a.z;
         const run = Math.max(0.001, Math.hypot(dx, dz));
         const steps = Math.max(1, Math.ceil(run / 8));
+        const stepRun = run / steps;
+        const samples = [];
         let previousHeight;
+        let maximumObservedGrade = 0;
         for (let step = 0; step <= steps; step += 1) {
           const t = step / steps;
           const x = wrap(a.x + dx * t, WORLD_WIDTH), z = a.z + dz * t;
           const px = wrap(Math.round(x / WORLD_WIDTH * FIELD_WIDTH), FIELD_WIDTH);
           const py = clamp(Math.round(z / WORLD_HEIGHT * FIELD_HEIGHT), 0, FIELD_HEIGHT - 1);
           const index = py * FIELD_WIDTH + px;
-          if (!landField[index]) continue;
+          if (!landField[index]) {
+            previousHeight = undefined;
+            continue;
+          }
           const current = heights[index];
           if (previousHeight !== undefined) {
-            const allowed = maximumGrade * (run / steps);
-            if (Math.abs(current - previousHeight) > allowed + 0.05) violations += 1;
+            maximumObservedGrade = Math.max(maximumObservedGrade,
+              Math.abs(current - previousHeight) / Math.max(0.001, stepRun));
           }
           previousHeight = current;
-          const endpointA = heights[clamp(Math.round(a.z / WORLD_HEIGHT * FIELD_HEIGHT), 0, FIELD_HEIGHT - 1) * FIELD_WIDTH
-            + wrap(Math.round(a.x / WORLD_WIDTH * FIELD_WIDTH), FIELD_WIDTH)];
-          const endpointB = heights[clamp(Math.round(b.z / WORLD_HEIGHT * FIELD_HEIGHT), 0, FIELD_HEIGHT - 1) * FIELD_WIDTH
-            + wrap(Math.round(wrap(b.x, WORLD_WIDTH) / WORLD_WIDTH * FIELD_WIDTH), FIELD_WIDTH)];
+          samples.push({ t, px, py, index });
+        }
+        const gradeExcess = maximumObservedGrade - ROAD_MAX_GRADE;
+        if (samples.length < 2 || gradeExcess <= 0.007) continue;
+        violations += 1;
+        conditionedSegmentKeys.add(`${route.start}:${route.end}:${segment}`);
+        // Mildly excessive trails should barely reshape their surroundings;
+        // only truly extreme grades approach the full legacy conditioning force.
+        const severity = clamp(gradeExcess / 0.16, 0.12, 1);
+        const endpointA = heights[clamp(Math.round(a.z / WORLD_HEIGHT * FIELD_HEIGHT), 0, FIELD_HEIGHT - 1) * FIELD_WIDTH
+          + wrap(Math.round(a.x / WORLD_WIDTH * FIELD_WIDTH), FIELD_WIDTH)];
+        const endpointB = heights[clamp(Math.round(b.z / WORLD_HEIGHT * FIELD_HEIGHT), 0, FIELD_HEIGHT - 1) * FIELD_WIDTH
+          + wrap(Math.round(wrap(b.x, WORLD_WIDTH) / WORLD_WIDTH * FIELD_WIDTH), FIELD_WIDTH)];
+        for (const samplePoint of samples) {
+          const { t, px, py, index } = samplePoint;
           const desired = endpointA * (1 - t) + endpointB * t;
           const terrain = terrainField[index] > 4 ? 0 : terrainField[index];
           const radius = terrain === 2 ? 18 : terrain === 1 ? 14 : 10;
@@ -147,20 +210,20 @@ function conditionMovementPaths(heights, caps, limits, landField, terrainField, 
             for (let ox = -radius; ox <= radius; ox += 1) {
               const distance = Math.hypot(ox, oy);
               if (distance > radius) continue;
-              const sx = wrap(px + ox, FIELD_WIDTH), sample = sy * FIELD_WIDTH + sx;
-              if (!landField[sample]) continue;
-              const influence = Math.exp(-distance * distance / (radius * radius * 0.46));
-              const classId = terrainField[sample] > 4 ? 0 : terrainField[sample];
-              const bounded = clamp(desired, baseline[sample] - classLowerBudgets[classId], baseline[sample] + classRaiseBudgets[classId]);
-              targets[sample] += bounded * influence;
-              weights[sample] += influence;
+              const sx = wrap(px + ox, FIELD_WIDTH), targetIndex = sy * FIELD_WIDTH + sx;
+              if (!landField[targetIndex]) continue;
+              const influence = Math.exp(-distance * distance / (radius * radius * 0.46)) * severity;
+              const classId = terrainField[targetIndex] > 4 ? 0 : terrainField[targetIndex];
+              const bounded = clamp(desired, baseline[targetIndex] - classLowerBudgets[classId], baseline[targetIndex] + classRaiseBudgets[classId]);
+              targets[targetIndex] += bounded * influence;
+              weights[targetIndex] += influence;
             }
           }
         }
       }
     }
     passes = pass + 1;
-    if (!violations && pass > 0) break;
+    if (!violations) break;
     for (let index = 0; index < heights.length; index += 1) {
       if (!weights[index]) continue;
       const terrain = terrainField[index] > 4 ? 0 : terrainField[index];
@@ -182,7 +245,7 @@ function conditionMovementPaths(heights, caps, limits, landField, terrainField, 
   // bounded solve. This keeps even tiny provinces inside their mean budget;
   // the following projection then restores the exact local slope guarantee.
   for (let index = 0; index < heights.length; index += 1) {
-    if (landField[index]) heights[index] = baseline[index] + (heights[index] - baseline[index]) * 0.35;
+    if (landField[index]) heights[index] = baseline[index] + (heights[index] - baseline[index]) * 0.22;
   }
   // The conditioning budget clamp can reintroduce a sharp edge where many
   // movement-path envelopes overlap. Reconcile those edges while staying inside
@@ -237,7 +300,7 @@ function conditionMovementPaths(heights, caps, limits, landField, terrainField, 
     maximum: provinceMaximum[province.province_id] ?? 0,
     mean: provinceCount[province.province_id] ? provinceSum[province.province_id] / provinceCount[province.province_id] : 0,
     meanAbsolute: provinceCount[province.province_id] ? provinceAbsoluteSum[province.province_id] / provinceCount[province.province_id] : 0 }));
-  return { passes, conditionedSamples, maximumAdjustment, provinceAdjustments };
+  return { passes, conditionedSamples, conditionedSegments: conditionedSegmentKeys.size, maximumAdjustment, provinceAdjustments };
 }
 
 export function generateTopography({ landField, terrainField, provinceField, coastBlend, landDistance, markers, borderData, connectionData, networkData, provinces }) {
@@ -248,8 +311,8 @@ export function generateTopography({ landField, terrainField, provinceField, coa
     hillMask[index] = terrainField[index] === 1 ? 1 : 0;
   }
   const mountainCore = blurField(mountainMask.slice(), FIELD_WIDTH, FIELD_HEIGHT, 5, 2);
-  const mountainShoulder = blurField(mountainMask.slice(), FIELD_WIDTH, FIELD_HEIGHT, 14, 2);
-  const mountainCluster = blurField(mountainMask.slice(), FIELD_WIDTH, FIELD_HEIGHT, 58, 2);
+  const mountainShoulder = blurField(mountainMask.slice(), FIELD_WIDTH, FIELD_HEIGHT, 18, 2);
+  const mountainCluster = blurField(mountainMask.slice(), FIELD_WIDTH, FIELD_HEIGHT, 66, 2);
   const hillShoulder = blurField(hillMask.slice(), FIELD_WIDTH, FIELD_HEIGHT, 8, 2);
   const markerField = new Float32Array(landField.length);
   for (const marker of markers.markers) {
@@ -278,19 +341,22 @@ export function generateTopography({ landField, terrainField, provinceField, coa
       const noise = fbm(u, v), macro = periodicNoise(u, v, 13, 7);
       const ridge = 1 - Math.abs(periodicNoise(u, v, 31, 16) * 2 - 1);
       const mountain = smoothstep(0.012, 0.72, mountainShoulder[index]);
+      const regionalMountain = smoothstep(0.02, 0.18, mountainCluster[index]);
       const hill = clamp(Math.max(smoothstep(0.02, 0.78, hillShoulder[index]), mountain * 0.38), 0, 1);
-      caps[index] = terrainLimit(terrainField[index], hill, mountain);
+      caps[index] = terrainLimit(terrainField[index], hill, mountain, regionalMountain);
       limits[index] = slopeLimit(hill, mountain);
       const coast = smoothstep(0.48, 0.995, coastBlend[index]);
       const continental = smoothstep(0, 18, landDistance[index]);
       const base = 1.2 + coast * (1.1 + continental * 1.8 + (macro - 0.5) * 1.4 + (noise - 0.5) * 1.2);
       const hills = hill * (2.8 + noise * 5.8);
+      const regionalUplift = regionalMountain * (1.5 + mountainCluster[index] * 4.5);
       const clusterHeight = 14 + mountainCluster[index] * 20;
-      const mountains = mountain * (12 + ridge * clusterHeight + mountainCore[index] * 8 + markerField[index] * 3);
-      heights[index] = clamp(base + hills + mountains, 1.2, caps[index]);
+      const mountains = mountain * (12 + ridge * clusterHeight + mountainCore[index] * 8 + markerField[index] * 3) * 1.12;
+      heights[index] = clamp(base + hills + regionalUplift + mountains, 1.2, caps[index]);
     }
   }
   cleanAndProject(heights, caps, limits, landField, 12);
+  const slopeRepairs = enforceLocalSlopes(heights, limits, landField);
   const conditioning = conditionMovementPaths(heights, caps, limits, landField, terrainField, provinceField, borderData, connectionData, networkData, provinces);
   let maximumHeight = 0, maximumSlopeStep = 0, capViolations = 0;
   const classMaxima = [0, 0, 0, 0, 0], classMinima = [Infinity, Infinity, Infinity, Infinity, Infinity];
@@ -321,5 +387,5 @@ export function generateTopography({ landField, terrainField, provinceField, coa
   const names = ['ordinary', 'hills', 'mountains', 'forest', 'urban'];
   const terrainClasses = Object.fromEntries(names.map((name, index) => [name, { minimum: classMinima[index],
     maximum: classMaxima[index], mean: classSums[index] / Math.max(1, classCounts[index]), maximumSlopeStep: classSlopeSteps[index] }]));
-  return { heights, caps, limits, report: { maximumHeight, maximumSlopeStep, terrainClasses, capViolations, conditioning } };
+  return { heights, caps, limits, report: { maximumHeight, maximumSlopeStep, terrainClasses, capViolations, slopeRepairs, conditioning } };
 }

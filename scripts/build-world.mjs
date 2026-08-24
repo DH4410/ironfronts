@@ -8,6 +8,8 @@ import { buildInstances } from './world/instances.mjs';
 import { generateTopography } from './world/topography.mjs';
 import { buildBankField } from './world/water-fields.mjs';
 import { buildWaterways } from './world/waterways.mjs';
+import { buildTerrainAwareWaterways } from './world/terrain-aware-waterways.mjs';
+import { seatRiverTerrain } from './world/river-terrain.mjs';
 import { buildVisualRiverField } from './world/visual-rivers.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -15,11 +17,11 @@ const MATERIAL = path.join(ROOT, 'material');
 const OUTPUT = path.join(ROOT, 'public', 'world');
 
 const terrainCodes = new Map([
-  [10, 0], // plains
-  [11, 1], // hills
-  [12, 2], // mountain
-  [13, 3], // forest
-  [14, 4], // urban
+  [10, 0],
+  [11, 1],
+  [12, 2],
+  [13, 3],
+  [14, 4],
 ]);
 
 const visualCodes = new Map([
@@ -207,7 +209,7 @@ async function main() {
   const coastBlend = blurField(landField.slice(), FIELD_WIDTH, FIELD_HEIGHT, 5, 3);
   const landDistance = distanceToValue(landField, FIELD_WIDTH, FIELD_HEIGHT, 0);
   const oceanDistance = distanceToValue(landField, FIELD_WIDTH, FIELD_HEIGHT, 1);
-  const { heights, report: topographyReport } = generateTopography({
+  const { heights, caps, limits, report: topographyReport } = generateTopography({
     landField, terrainField, provinceField, coastBlend, landDistance, markers, borderData, connectionData, networkData, provinces: metadata.provinces,
   });
   for (let y = 0; y < FIELD_HEIGHT; y += 1) {
@@ -228,21 +230,44 @@ async function main() {
   console.log('Packing borders, movement graph, forests, and cities…');
   const borders = buildBorders(borderData);
   const connections = buildConnections(connectionData);
-  console.log('Compiling supplied rivers and ocean-water canals...');
-  const waterways = buildWaterways({
+
+  // The first movement-river pass gives the visual-only detector its exact
+  // exclusion mask and provides terrain-aware river samples for valley seating.
+  console.log('Preparing terrain-aware river corridors...');
+  const preliminaryWaterways = buildWaterways({
     networkData, connectionData, provinceIds, idWidth: ID_WIDTH, idHeight: ID_HEIGHT, heights,
     heightWidth: FIELD_WIDTH, heightHeight: FIELD_HEIGHT, worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
   });
   console.log('Expanding narrow visual-only river channels...');
   const visualRivers = buildVisualRiverField({
-    provinceIds, movementMask: waterways.mask, networkData, connectionData, width: ID_WIDTH, height: ID_HEIGHT,
+    provinceIds, movementMask: preliminaryWaterways.mask, networkData, connectionData, width: ID_WIDTH, height: ID_HEIGHT,
     worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
   });
+  console.log('Seating river surfaces into surrounding terrain...');
+  const riverTerrain = seatRiverTerrain({
+    heights, caps, limits, landField, terrainField, fieldWidth: FIELD_WIDTH, fieldHeight: FIELD_HEIGHT,
+    worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, movementWaterways: preliminaryWaterways,
+    visualMask: visualRivers.mask, provinceIds, idWidth: ID_WIDTH, idHeight: ID_HEIGHT,
+  });
+  Object.assign(topographyReport, riverTerrain.summary);
+  topographyReport.riverSeating = riverTerrain.report;
+
+  console.log('Compiling terrain-aware movement and visual river surfaces...');
+  const waterways = buildTerrainAwareWaterways({
+    visualMask: visualRivers.mask,
+    networkData, connectionData, provinceIds, idWidth: ID_WIDTH, idHeight: ID_HEIGHT, heights,
+    heightWidth: FIELD_WIDTH, heightHeight: FIELD_HEIGHT, worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
+  });
+  visualRivers.report.surface = waterways.report.visualSurface.surface;
+  visualRivers.report.surfaceHeightRange = waterways.report.visualSurface.heightRange;
+  visualRivers.report.maximumSurfaceGrade = waterways.report.visualSurface.maximumLocalGrade;
+
   const waterwayField = new Uint8Array(ID_WIDTH * ID_HEIGHT * 2);
   for (let index = 0; index < provinceIds.length; index += 1) {
     waterwayField[index * 2] = waterways.mask[index];
     waterwayField[index * 2 + 1] = visualRivers.mask[index];
   }
+
   console.log('Compiling direct province-center roads and city placement...');
   const infrastructure = buildInfrastructure({
     borderData, connectionData, networkData, provinces: metadata.provinces, heights, landField,
