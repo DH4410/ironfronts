@@ -79,6 +79,15 @@ async function setAllLayers(overrides = {}) {
     renderer.setWaterwaysVisible(options.waterways ?? true);
     renderer.setBordersVisible(options.borders ?? true);
     renderer.setCountryOverlayVisible(options.countries ?? true);
+    renderer.setPerformanceLayerVisibility({
+      terrain: options.terrain ?? true,
+      ocean: options.ocean ?? true,
+      trees: options.trees ?? true,
+      buildings: options.buildings ?? true,
+      treeShadows: options.treeShadows ?? true,
+      buildingShadows: options.buildingShadows ?? true,
+      roadFurniture: options.roadFurniture ?? true,
+    });
   }, overrides);
 }
 
@@ -192,9 +201,15 @@ if (!unsupported && manifest) {
   const ablations = [
     ['layer baseline', {}],
     ['without props', { props: false }],
+    ['without trees', { trees: false, treeShadows: false }],
+    ['without buildings', { buildings: false, buildingShadows: false }],
+    ['without shadows', { treeShadows: false, buildingShadows: false }],
+    ['without road furniture', { roadFurniture: false }],
     ['without roads', { roads: false, hiddenLinks: false }],
     ['without waterways', { waterways: false }],
     ['without politics', { borders: false, countries: false }],
+    ['without terrain surface', { terrain: false }],
+    ['without ocean surface', { ocean: false }],
   ];
   for (const [name, layers] of ablations) {
     await measure(name, async () => {
@@ -222,8 +237,10 @@ const layerCosts = baseline ? scenarios
   .map((scenario) => {
     const useGpu = baseline.gpu && scenario.gpu && baseline.gpuSampleCount >= 3 && scenario.gpuSampleCount >= 3;
     const metric = useGpu ? 'GPU' : 'frame interval';
-    const baselineMs = useGpu ? baseline.gpu.average : baseline.frame.average;
-    const reducedMs = useGpu ? scenario.gpu.average : scenario.frame.average;
+    // A few GPU samples can contain queueing outliers; medians keep the
+    // ablation ranking stable without hiding frame-tail data elsewhere.
+    const baselineMs = useGpu ? baseline.gpu.median : baseline.frame.median;
+    const reducedMs = useGpu ? scenario.gpu.median : scenario.frame.median;
     return { layer: scenario.name.replace('without ', ''), metric, estimatedCostMs: baselineMs - reducedMs };
   })
   .sort((a, b) => b.estimatedCostMs - a.estimatedCostMs) : [];

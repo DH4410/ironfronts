@@ -7,12 +7,12 @@ describe('PerformanceMonitor', () => {
     const workload = createEmptyRenderWorkload(14);
     workload.drawCalls = 9;
     workload.triangles = 12_345;
-    workload.trianglesByCategory.props = 10_000;
+    workload.trianglesByCategory.trees = 10_000;
     for (let index = 1; index <= 100; index += 1) {
       monitor.record({
         frameMs: index,
         mainThreadMs: index / 2,
-        phases: { camera: 0.1, uniforms: 0.2, labels: 0.3, picking: 0.4, render: index / 3 },
+        phases: { camera: 0.1, uniforms: 0.2, labels: 0.3, pickRaycast: 0.35, hoverUi: 0.05, render: index / 3 },
       }, workload);
     }
     monitor.recordGpu(4.25);
@@ -28,7 +28,7 @@ describe('PerformanceMonitor', () => {
     expect(snapshot.gpu?.average).toBe(4.25);
     expect(snapshot.gpuSampleCount).toBe(1);
     expect(snapshot.workload.labels).toBe(14);
-    expect(snapshot.workload.trianglesByCategory.props).toBe(10_000);
+    expect(snapshot.workload.trianglesByCategory.trees).toBe(10_000);
   });
 
   it('bounds its history and resets timing without losing the latest workload', () => {
@@ -38,7 +38,7 @@ describe('PerformanceMonitor', () => {
       monitor.record({
         frameMs,
         mainThreadMs: 1,
-        phases: { camera: 0, uniforms: 0, labels: 0, picking: 0, render: 1 },
+        phases: { camera: 0, uniforms: 0, labels: 0, pickRaycast: 0, hoverUi: 0, render: 1 },
       }, workload);
     }
     expect(monitor.snapshot().frame.average).toBe(30);

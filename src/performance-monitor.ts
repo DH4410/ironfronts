@@ -10,11 +10,13 @@ export interface PerformancePhases {
   camera: number;
   uniforms: number;
   labels: number;
-  picking: number;
+  pickRaycast: number;
+  hoverUi: number;
   render: number;
 }
 
-export type RenderCategory = 'terrain' | 'water' | 'waterways' | 'roads' | 'hiddenLinks' | 'props' | 'borders' | 'debugLines';
+export type RenderCategory = 'terrain' | 'water' | 'waterways' | 'roads' | 'hiddenLinks'
+  | 'treeShadows' | 'buildingShadows' | 'trees' | 'buildings' | 'roadFurniture' | 'borders' | 'debugLines';
 
 export interface RenderWorkload {
   drawCalls: number;
@@ -79,7 +81,7 @@ export class PerformanceMonitor {
 
   snapshot(): PerformanceSnapshot {
     const phases = {} as Record<keyof PerformancePhases, PerformanceDistribution>;
-    for (const phase of ['camera', 'uniforms', 'labels', 'picking', 'render'] as const) {
+    for (const phase of ['camera', 'uniforms', 'labels', 'pickRaycast', 'hoverUi', 'render'] as const) {
       phases[phase] = distribution(this.samples.map((sample) => sample.phases[phase]));
     }
     return {
@@ -108,7 +110,11 @@ export function createEmptyRenderWorkload(labels = 0): RenderWorkload {
       waterways: 0,
       roads: 0,
       hiddenLinks: 0,
-      props: 0,
+      treeShadows: 0,
+      buildingShadows: 0,
+      trees: 0,
+      buildings: 0,
+      roadFurniture: 0,
       borders: 0,
       debugLines: 0,
     },

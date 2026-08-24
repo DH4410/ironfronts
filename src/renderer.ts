@@ -21,6 +21,16 @@ interface InstanceLayer {
   count: number;
 }
 
+interface PerformanceLayerVisibility {
+  terrain: boolean;
+  ocean: boolean;
+  trees: boolean;
+  buildings: boolean;
+  treeShadows: boolean;
+  buildingShadows: boolean;
+  roadFurniture: boolean;
+}
+
 export class WorldRenderer {
   readonly camera = new StrategyCamera();
 
@@ -104,6 +114,15 @@ export class WorldRenderer {
   private showRoads = true;
   private showHiddenConnections = true;
   private showWaterways = true;
+  private performanceLayers: PerformanceLayerVisibility = {
+    terrain: true,
+    ocean: true,
+    trees: true,
+    buildings: true,
+    treeShadows: true,
+    buildingShadows: true,
+    roadFurniture: true,
+  };
   private pointer = { x: 0, y: 0, inside: false };
   private hoveredId = 0;
   private pickCountdown = 0;
@@ -368,6 +387,10 @@ export class WorldRenderer {
     this.performanceMonitor.reset();
   }
 
+  setPerformanceLayerVisibility(layers: Partial<PerformanceLayerVisibility>): void {
+    Object.assign(this.performanceLayers, layers);
+  }
+
   async setConnectionsVisible(enabled: boolean): Promise<void> {
     this.showConnections = enabled;
     if (!enabled || this.connections) return;
@@ -511,17 +534,26 @@ export class WorldRenderer {
     ) ?? 0;
     const labelsMs = performance.now() - phaseStarted;
 
-    phaseStarted = performance.now();
+    let pickRaycastMs = 0;
+    let hoverUiMs = 0;
     if (this.pointer.inside && this.pickCountdown-- <= 0) {
       this.pickCountdown = 2;
-      this.pickProvince(this.pointer.x, this.pointer.y);
+      const picking = this.pickProvince(this.pointer.x, this.pointer.y);
+      pickRaycastMs = picking.raycastMs;
+      hoverUiMs = picking.hoverUiMs;
     }
-    const pickingMs = performance.now() - phaseStarted;
 
     phaseStarted = performance.now();
     this.render(visibleLabels);
     const renderMs = performance.now() - phaseStarted;
-    const phases: PerformancePhases = { camera: cameraMs, uniforms: uniformsMs, labels: labelsMs, picking: pickingMs, render: renderMs };
+    const phases: PerformancePhases = {
+      camera: cameraMs,
+      uniforms: uniformsMs,
+      labels: labelsMs,
+      pickRaycast: pickRaycastMs,
+      hoverUi: hoverUiMs,
+      render: renderMs,
+    };
     this.performanceMonitor.record({ frameMs, mainThreadMs: performance.now() - frameStarted, phases }, this.frameWorkload);
     this.updateStats();
     this.frameHandle = requestAnimationFrame(this.frame);
@@ -572,18 +604,22 @@ export class WorldRenderer {
     const pass = encoder.beginRenderPass(passDescriptor);
 
     pass.setBindGroup(0, this.commonBindGroup);
-    pass.setPipeline(this.waterPipeline);
-    pass.setVertexBuffer(0, this.waterMesh.vertex);
-    pass.setIndexBuffer(this.waterMesh.index, 'uint16');
     const terrainInstances = this.manifest.terrain.chunksX * this.manifest.terrain.chunksY * 3;
-    pass.drawIndexed(this.waterMesh.indexCount, terrainInstances);
-    this.recordIndexedDraw('water', this.waterMesh.indexCount, terrainInstances);
+    if (this.performanceLayers.ocean) {
+      pass.setPipeline(this.waterPipeline);
+      pass.setVertexBuffer(0, this.waterMesh.vertex);
+      pass.setIndexBuffer(this.waterMesh.index, 'uint16');
+      pass.drawIndexed(this.waterMesh.indexCount, terrainInstances);
+      this.recordIndexedDraw('water', this.waterMesh.indexCount, terrainInstances);
+    }
 
-    pass.setPipeline(this.terrainPipeline);
-    pass.setVertexBuffer(0, this.terrainMesh.vertex);
-    pass.setIndexBuffer(this.terrainMesh.index, 'uint16');
-    pass.drawIndexed(this.terrainMesh.indexCount, terrainInstances);
-    this.recordIndexedDraw('terrain', this.terrainMesh.indexCount, terrainInstances);
+    if (this.performanceLayers.terrain) {
+      pass.setPipeline(this.terrainPipeline);
+      pass.setVertexBuffer(0, this.terrainMesh.vertex);
+      pass.setIndexBuffer(this.terrainMesh.index, 'uint16');
+      pass.drawIndexed(this.terrainMesh.indexCount, terrainInstances);
+      this.recordIndexedDraw('terrain', this.terrainMesh.indexCount, terrainInstances);
+    }
 
     if (this.showWaterways) {
       pass.setPipeline(this.waterwayPipeline);
@@ -606,13 +642,15 @@ export class WorldRenderer {
 
     if (this.showProps) {
       pass.setPipeline(this.propPipeline);
-      this.drawMeshInstances(pass, this.shadowMesh, this.trees, 'props');
-      this.drawMeshInstances(pass, this.shadowMesh, this.buildings, 'props');
-      this.drawMeshInstances(pass, this.treeMesh, this.trees, 'props');
-      this.drawMeshInstances(pass, this.buildingMesh, this.buildings, 'props');
-      this.drawMeshInstances(pass, this.lampMesh, this.lamps, 'props');
-      this.drawMeshInstances(pass, this.barrierMesh, this.barriers, 'props');
-      this.drawMeshInstances(pass, this.signMesh, this.signs, 'props');
+      if (this.performanceLayers.treeShadows) this.drawMeshInstances(pass, this.shadowMesh, this.trees, 'treeShadows');
+      if (this.performanceLayers.buildingShadows) this.drawMeshInstances(pass, this.shadowMesh, this.buildings, 'buildingShadows');
+      if (this.performanceLayers.trees) this.drawMeshInstances(pass, this.treeMesh, this.trees, 'trees');
+      if (this.performanceLayers.buildings) this.drawMeshInstances(pass, this.buildingMesh, this.buildings, 'buildings');
+      if (this.performanceLayers.roadFurniture) {
+        this.drawMeshInstances(pass, this.lampMesh, this.lamps, 'roadFurniture');
+        this.drawMeshInstances(pass, this.barrierMesh, this.barriers, 'roadFurniture');
+        this.drawMeshInstances(pass, this.signMesh, this.signs, 'roadFurniture');
+      }
     }
 
     pass.setPipeline(this.linePipeline);
@@ -718,11 +756,11 @@ export class WorldRenderer {
     });
   }
 
-  private pickProvince(clientX: number, clientY: number): void {
+  private pickProvince(clientX: number, clientY: number): { raycastMs: number; hoverUiMs: number } {
+    const started = performance.now();
     const ray = this.camera.screenRay(clientX, clientY);
     if (ray.direction[1] >= -0.0001) {
-      this.updateHover(0);
-      return;
+      return this.finishPicking(0, started);
     }
     const topY = this.manifest.terrain.maxHeight + 12;
     let low = Math.max(0, (topY - ray.origin[1]) / ray.direction[1]);
@@ -738,11 +776,17 @@ export class WorldRenderer {
     }
     vec3.scaleAndAdd(point, ray.origin, ray.direction, (low + high) * 0.5);
     if (point[2] < 0 || point[2] >= this.manifest.world.height) {
-      this.updateHover(0);
-      return;
+      return this.finishPicking(0, started);
     }
     const id = this.sampleProvince(point[0], point[2]);
-    this.updateHover(id);
+    return this.finishPicking(id, started);
+  }
+
+  private finishPicking(encodedId: number, started: number): { raycastMs: number; hoverUiMs: number } {
+    const raycastMs = performance.now() - started;
+    const hoverStarted = performance.now();
+    this.updateHover(encodedId);
+    return { raycastMs, hoverUiMs: performance.now() - hoverStarted };
   }
 
   private sampleHeight(worldX: number, worldZ: number): number {
