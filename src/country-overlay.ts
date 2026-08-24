@@ -8,26 +8,17 @@ interface CountryAnchor {
   axisZ: number;
   span: number;
   crossSpan: number;
-  area: number;
 }
 
-interface ScreenCandidate {
-  anchor: CountryAnchor;
-  element: HTMLSpanElement;
-  x: number;
-  y: number;
-  angle: number;
-  fontSize: number;
-  opacity: number;
-  width: number;
-  height: number;
+export interface CountryOwnershipChange {
+  provinceId: number;
+  previousCountryId: number;
+  countryId: number;
 }
 
-const LABEL_FONT_FAMILY = '"Segoe UI Variable", "Segoe UI", Arial, sans-serif';
-const LABEL_FONT_WEIGHT = 750;
-const LABEL_LETTER_SPACING = 0.075;
-const MINIMUM_LABEL_SIZE = 11;
-const MAXIMUM_LABEL_SIZE = 20;
+const LABEL_FONT_FAMILY = '"Segoe UI Variable Text", "Segoe UI", Arial, sans-serif';
+const LABEL_FONT_WEIGHT = 700;
+const LABEL_LETTER_SPACING = 0.1;
 const MEASUREMENT_SIZE = 20;
 
 export function buildCountryColorBuffer(countries: CountryRecord[]): Float32Array {
@@ -47,14 +38,18 @@ export function buildCountryColorBuffer(countries: CountryRecord[]): Float32Arra
 export class CountryLabelLayer {
   private readonly elements = new Map<number, HTMLSpanElement>();
   private readonly countryById = new Map<number, CountryRecord>();
+  private readonly measuredLabelWidths = new Map<number, number>();
   private readonly measurementContext: CanvasRenderingContext2D;
   private readonly neighbors: number[][];
-  private anchors: CountryAnchor[] = [];
+  private readonly provincesByCountry = new Map<number, Set<number>>();
+  private readonly anchors = new Map<number, CountryAnchor>();
+  private readonly visitMarks: Uint32Array;
+  private visitEpoch = 0;
   private visible = true;
 
   constructor(
     private readonly container: HTMLElement,
-    private readonly countries: CountryRecord[],
+    countries: CountryRecord[],
     private readonly owners: Uint32Array,
     adjacencyPairs: Uint32Array,
     private readonly labelData: Float32Array,
@@ -63,6 +58,7 @@ export class CountryLabelLayer {
     const measurementContext = document.createElement('canvas').getContext('2d');
     if (!measurementContext) throw new Error('Country labels require a 2D canvas context');
     this.measurementContext = measurementContext;
+    this.visitMarks = new Uint32Array(owners.length);
     this.neighbors = Array.from({ length: owners.length }, () => [] as number[]);
     for (let index = 0; index + 1 < adjacencyPairs.length; index += 2) {
       const a = adjacencyPairs[index];
@@ -80,10 +76,21 @@ export class CountryLabelLayer {
       element.dataset.countryId = String(country.id);
       element.style.setProperty('--country-color', country.color);
       this.elements.set(country.id, element);
+      this.measuredLabelWidths.set(country.id, this.measureTextWidth(element.textContent, MEASUREMENT_SIZE));
       fragment.append(element);
     }
+    for (let province = 1; province < owners.length; province += 1) {
+      const countryId = owners[province];
+      if (!countryId) continue;
+      let provinces = this.provincesByCountry.get(countryId);
+      if (!provinces) {
+        provinces = new Set<number>();
+        this.provincesByCountry.set(countryId, provinces);
+      }
+      provinces.add(province);
+    }
     container.replaceChildren(fragment);
-    this.rebuild();
+    this.rebuildCountries(this.countryById.keys());
   }
 
   setVisible(visible: boolean): void {
@@ -91,8 +98,21 @@ export class CountryLabelLayer {
     this.container.hidden = !visible;
   }
 
-  refreshOwnership(): void {
-    this.rebuild();
+  refreshOwnership(changes: CountryOwnershipChange[]): void {
+    const affectedCountries = new Set<number>();
+    for (const change of changes) {
+      if (change.previousCountryId === change.countryId) continue;
+      this.provincesByCountry.get(change.previousCountryId)?.delete(change.provinceId);
+      let provinces = this.provincesByCountry.get(change.countryId);
+      if (!provinces) {
+        provinces = new Set<number>();
+        this.provincesByCountry.set(change.countryId, provinces);
+      }
+      provinces.add(change.provinceId);
+      affectedCountries.add(change.previousCountryId);
+      affectedCountries.add(change.countryId);
+    }
+    this.rebuildCountries(affectedCountries);
   }
 
   update(
@@ -100,12 +120,12 @@ export class CountryLabelLayer {
     width: number,
     height: number,
     sampleHeight: (x: number, z: number) => number,
-  ): void {
-    if (!this.visible || width <= 1 || height <= 1) return;
-    const candidates: ScreenCandidate[] = [];
+  ): number {
+    if (!this.visible || width <= 1 || height <= 1) return 0;
+    let visibleLabels = 0;
     for (const element of this.elements.values()) element.hidden = true;
 
-    for (const anchor of this.anchors) {
+    for (const anchor of this.anchors.values()) {
       const country = this.countryById.get(anchor.countryId);
       const element = this.elements.get(anchor.countryId);
       if (!country || !element) continue;
@@ -143,52 +163,24 @@ export class CountryLabelLayer {
       );
       if (!crossStart || !crossEnd) continue;
       const screenCrossSpan = Math.hypot(crossEnd.x - crossStart.x, crossEnd.y - crossStart.y);
-      const availableWidth = screenSpan * 0.84;
-      const availableHeight = screenCrossSpan * 0.64;
-      const label = element.textContent ?? country.name.toLocaleUpperCase();
-      const measuredWidth = this.measureTextWidth(label, MEASUREMENT_SIZE);
+      // Keep a generous inset because the component bounds approximate an
+      // irregular country with province-center discs rather than its outline.
+      const availableWidth = screenSpan * 0.7;
+      const availableHeight = screenCrossSpan * 0.5;
+      const measuredWidth = this.measuredLabelWidths.get(country.id) ?? 1;
       const widthLimitedSize = MEASUREMENT_SIZE * availableWidth / Math.max(1, measuredWidth);
       const heightLimitedSize = availableHeight / 1.05;
-      const fittedSize = Math.min(MAXIMUM_LABEL_SIZE, widthLimitedSize, heightLimitedSize);
-      if (fittedSize < MINIMUM_LABEL_SIZE) continue;
+      const fontSize = Math.min(widthLimitedSize, heightLimitedSize);
+      if (!Number.isFinite(fontSize) || fontSize <= 0) continue;
       let angle = Math.atan2(right.y - left.y, right.x - left.x);
       while (angle > Math.PI * 0.5) angle -= Math.PI;
       while (angle < -Math.PI * 0.5) angle += Math.PI;
-      const fontSize = fittedSize;
-      const textWidth = this.measureTextWidth(label, fontSize);
-      const textHeight = fontSize * 1.08;
-      const opacity = 0.64 + clamp((fontSize - MINIMUM_LABEL_SIZE) / 5, 0, 1) * 0.26;
-      const cosine = Math.abs(Math.cos(angle));
-      const sine = Math.abs(Math.sin(angle));
-      candidates.push({
-        anchor,
-        element,
-        x: center.x,
-        y: center.y,
-        angle,
-        fontSize,
-        opacity,
-        width: cosine * textWidth + sine * textHeight,
-        height: sine * textWidth + cosine * textHeight,
-      });
+      element.hidden = false;
+      visibleLabels += 1;
+      element.style.fontSize = `${fontSize}px`;
+      element.style.transform = `translate(${center.x.toFixed(1)}px, ${center.y.toFixed(1)}px) translate(-50%, -50%) rotate(${angle.toFixed(4)}rad)`;
     }
-
-    candidates.sort((a, b) => b.anchor.area - a.anchor.area);
-    const occupied: Array<{ left: number; top: number; right: number; bottom: number }> = [];
-    for (const candidate of candidates) {
-      const box = {
-        left: candidate.x - candidate.width * 0.52,
-        right: candidate.x + candidate.width * 0.52,
-        top: candidate.y - candidate.height * 0.58,
-        bottom: candidate.y + candidate.height * 0.58,
-      };
-      if (occupied.some((other) => boxesOverlap(box, other))) continue;
-      occupied.push(box);
-      candidate.element.hidden = false;
-      candidate.element.style.fontSize = `${candidate.fontSize.toFixed(1)}px`;
-      candidate.element.style.opacity = candidate.opacity.toFixed(3);
-      candidate.element.style.transform = `translate(${candidate.x.toFixed(1)}px, ${candidate.y.toFixed(1)}px) translate(-50%, -50%) rotate(${candidate.angle.toFixed(4)}rad)`;
-    }
+    return visibleLabels;
   }
 
   private measureTextWidth(label: string, fontSize: number): number {
@@ -197,35 +189,51 @@ export class CountryLabelLayer {
       + Math.max(0, label.length - 1) * fontSize * LABEL_LETTER_SPACING;
   }
 
-  private rebuild(): void {
-    const visited = new Uint8Array(this.owners.length);
-    const largestByCountry = new Map<number, number[]>();
-    for (let start = 1; start < this.owners.length; start += 1) {
-      const owner = this.owners[start];
-      if (owner === 0 || visited[start]) continue;
+  private rebuildCountries(countryIds: Iterable<number>): void {
+    for (const countryId of countryIds) this.rebuildCountry(countryId);
+  }
+
+  private rebuildCountry(countryId: number): void {
+    if (!countryId) return;
+    const provinces = this.provincesByCountry.get(countryId);
+    if (!provinces?.size) {
+      this.anchors.delete(countryId);
+      const element = this.elements.get(countryId);
+      if (element) element.hidden = true;
+      return;
+    }
+    this.visitEpoch = (this.visitEpoch + 1) >>> 0;
+    if (this.visitEpoch === 0) {
+      this.visitMarks.fill(0);
+      this.visitEpoch = 1;
+    }
+    let largestComponent: number[] = [];
+    let largestArea = -Infinity;
+    for (const start of provinces) {
+      if (this.visitMarks[start] === this.visitEpoch) continue;
       const component: number[] = [];
+      let area = 0;
       const stack = [start];
-      visited[start] = 1;
+      this.visitMarks[start] = this.visitEpoch;
       while (stack.length) {
         const province = stack.pop() as number;
         component.push(province);
+        area += this.labelData[province * 3 + 2];
         for (const neighbor of this.neighbors[province]) {
-          if (!visited[neighbor] && this.owners[neighbor] === owner) {
-            visited[neighbor] = 1;
+          if (this.visitMarks[neighbor] !== this.visitEpoch && this.owners[neighbor] === countryId) {
+            this.visitMarks[neighbor] = this.visitEpoch;
             stack.push(neighbor);
           }
         }
       }
-      const previous = largestByCountry.get(owner);
-      if (!previous || componentArea(component, this.labelData) > componentArea(previous, this.labelData)) {
-        largestByCountry.set(owner, component);
+      if (area > largestArea) {
+        largestArea = area;
+        largestComponent = component;
       }
     }
-    this.anchors = [];
-    for (const [countryId, component] of largestByCountry) {
-      const anchor = this.createAnchor(countryId, component);
-      if (anchor) this.anchors.push(anchor);
-    }
+    const anchor = this.createAnchor(countryId, largestComponent);
+    if (anchor) this.anchors.set(countryId, anchor);
+    else this.anchors.delete(countryId);
   }
 
   private createAnchor(countryId: number, component: number[]): CountryAnchor | null {
@@ -296,11 +304,11 @@ export class CountryLabelLayer {
     }
     const anchorProjection = anchorPoint.x * axisX + anchorPoint.z * axisZ;
     const anchorCrossProjection = anchorPoint.x * -axisZ + anchorPoint.z * axisX;
-    const centeredSpan = Math.max(8, Math.min(anchorProjection - minimum, maximum - anchorProjection) * 2);
-    const centeredCrossSpan = Math.max(
-      8,
-      Math.min(anchorCrossProjection - crossMinimum, crossMaximum - anchorCrossProjection) * 2,
-    );
+    const centeredSpan = Math.min(anchorProjection - minimum, maximum - anchorProjection) * 2;
+    const centeredCrossSpan = Math.min(
+      anchorCrossProjection - crossMinimum,
+      crossMaximum - anchorCrossProjection,
+    ) * 2;
     return {
       countryId,
       x: wrap(anchorPoint.x, this.worldWidth),
@@ -309,7 +317,6 @@ export class CountryLabelLayer {
       axisZ,
       span: centeredSpan,
       crossSpan: centeredCrossSpan,
-      area: totalWeight,
     };
   }
 
@@ -354,12 +361,6 @@ function projectPoint(
   return { x: (ndcX * 0.5 + 0.5) * width, y: (0.5 - ndcY * 0.5) * height };
 }
 
-function componentArea(component: number[], labelData: Float32Array): number {
-  let area = 0;
-  for (const province of component) area += labelData[province * 3 + 2];
-  return area;
-}
-
 function parseHexColor(color: string): [number, number, number] {
   const match = /^#([0-9a-f]{6})$/i.exec(color);
   if (!match) return [0.45, 0.52, 0.48];
@@ -376,15 +377,4 @@ function unwrapNear(value: number, reference: number, worldWidth: number): numbe
 
 function wrap(value: number, worldWidth: number): number {
   return ((value % worldWidth) + worldWidth) % worldWidth;
-}
-
-function boxesOverlap(
-  a: { left: number; top: number; right: number; bottom: number },
-  b: { left: number; top: number; right: number; bottom: number },
-): boolean {
-  return a.left < b.right + 4 && a.right + 4 > b.left && a.top < b.bottom + 3 && a.bottom + 3 > b.top;
-}
-
-function clamp(value: number, minimum: number, maximum: number): number {
-  return Math.max(minimum, Math.min(maximum, value));
 }

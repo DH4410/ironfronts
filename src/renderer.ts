@@ -2,6 +2,10 @@ import { vec3 } from 'gl-matrix';
 import { StrategyCamera } from './camera';
 import { buildCountryColorBuffer, CountryLabelLayer } from './country-overlay';
 import { createMaterialTexture, createTreeMaterialTexture } from './material-texture';
+import {
+  createEmptyRenderWorkload, PerformanceMonitor,
+  type PerformancePhases, type PerformanceSnapshot, type RenderCategory, type RenderWorkload,
+} from './performance-monitor';
 import { createRendererLayouts, createRendererPipelines } from './renderer-pipelines';
 import {
   createBarrierMesh, createBuildingMesh, createLampMesh, createShadowMesh, createSignMesh, createTerrainMesh,
@@ -81,7 +85,15 @@ export class WorldRenderer {
   private frameHandle = 0;
   private previousTime = performance.now();
   private elapsed = 0;
-  private frameSamples: number[] = [];
+  private performanceMonitor = new PerformanceMonitor(false);
+  private frameWorkload = createEmptyRenderWorkload();
+  private statsFrameCountdown = 0;
+  private gpuQuerySet?: GPUQuerySet;
+  private gpuResolveBuffer?: GPUBuffer;
+  private gpuReadBuffer?: GPUBuffer;
+  private gpuReadPending = false;
+  private gpuQueryCountdown = 0;
+  private performanceEpoch = 0;
   private debugView = 0;
   private showWireframe = false;
   private showConnections = false;
@@ -116,7 +128,24 @@ export class WorldRenderer {
       ?? await navigator.gpu.requestAdapter()
       ?? await navigator.gpu.requestAdapter({ forceFallbackAdapter: true })) as GPUAdapter;
     if (!this.adapter) throw new Error('No compatible WebGPU adapter was found');
-    this.device = await this.adapter.requestDevice();
+    const gpuTimingSupported = this.adapter.features.has('timestamp-query');
+    this.device = await this.adapter.requestDevice({
+      requiredFeatures: gpuTimingSupported ? ['timestamp-query'] : [],
+    });
+    this.performanceMonitor = new PerformanceMonitor(gpuTimingSupported);
+    if (gpuTimingSupported) {
+      this.gpuQuerySet = this.device.createQuerySet({ type: 'timestamp', count: 2 });
+      this.gpuResolveBuffer = this.device.createBuffer({
+        label: 'GPU frame timestamp resolve',
+        size: 16,
+        usage: GPUBufferUsage.QUERY_RESOLVE | GPUBufferUsage.COPY_SRC,
+      });
+      this.gpuReadBuffer = this.device.createBuffer({
+        label: 'GPU frame timestamp readback',
+        size: 16,
+        usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+      });
+    }
     this.device.lost.then((info) => {
       console.error('WebGPU device lost', info);
       if (this.running) window.location.reload();
@@ -298,14 +327,18 @@ export class WorldRenderer {
   }
 
   setProvinceOwners(changes: Array<{ provinceId: number; countryId: number }>): void {
+    const ownershipChanges: Array<{ provinceId: number; previousCountryId: number; countryId: number }> = [];
     for (const change of changes) {
       const encodedId = change.provinceId + 1;
       if (encodedId <= 0 || encodedId >= this.provinceOwners.length) throw new Error(`Unknown province ${change.provinceId}`);
       if (!this.countryById.has(change.countryId)) throw new Error(`Unknown country ${change.countryId}`);
+      const previousCountryId = this.provinceOwners[encodedId];
+      if (previousCountryId === change.countryId) continue;
       this.provinceOwners[encodedId] = change.countryId;
       this.device.queue.writeBuffer(this.provinceOwnerBuffer, encodedId * 4, new Uint32Array([change.countryId]));
+      ownershipChanges.push({ provinceId: encodedId, previousCountryId, countryId: change.countryId });
     }
-    this.countryLabels?.refreshOwnership();
+    this.countryLabels?.refreshOwnership(ownershipChanges);
     if (this.hoveredId) this.updateHover(this.hoveredId, true);
   }
 
@@ -324,6 +357,15 @@ export class WorldRenderer {
     this.camera.yaw = yaw;
     this.camera.pitch = pitch;
     this.camera.update(0);
+  }
+
+  getPerformanceSnapshot(): PerformanceSnapshot {
+    return this.performanceMonitor.snapshot();
+  }
+
+  resetPerformanceSamples(): void {
+    this.performanceEpoch += 1;
+    this.performanceMonitor.reset();
   }
 
   async setConnectionsVisible(enabled: boolean): Promise<void> {
@@ -444,27 +486,44 @@ export class WorldRenderer {
 
   private frame = (time: number): void => {
     if (!this.running) return;
-    const deltaMs = Math.min(50, time - this.previousTime);
+    const frameStarted = performance.now();
+    const frameMs = Math.max(0, time - this.previousTime);
+    const deltaMs = Math.min(50, frameMs);
     this.previousTime = time;
     this.elapsed += deltaMs / 1000;
+
+    let phaseStarted = performance.now();
     this.camera.update(deltaMs / 1000);
     this.resize();
+    const cameraMs = performance.now() - phaseStarted;
+
+    phaseStarted = performance.now();
     this.updateUniforms();
+    const uniformsMs = performance.now() - phaseStarted;
+
+    phaseStarted = performance.now();
     this.countryLabels?.setVisible(this.showCountryOverlay && this.debugView === 0);
-    this.countryLabels?.update(
+    const visibleLabels = this.countryLabels?.update(
       this.camera.viewProjection,
       this.canvas.clientWidth,
       this.canvas.clientHeight,
       (x, z) => this.sampleHeight(x, z),
-    );
+    ) ?? 0;
+    const labelsMs = performance.now() - phaseStarted;
 
+    phaseStarted = performance.now();
     if (this.pointer.inside && this.pickCountdown-- <= 0) {
       this.pickCountdown = 2;
       this.pickProvince(this.pointer.x, this.pointer.y);
     }
+    const pickingMs = performance.now() - phaseStarted;
 
-    this.render();
-    this.updateStats(deltaMs);
+    phaseStarted = performance.now();
+    this.render(visibleLabels);
+    const renderMs = performance.now() - phaseStarted;
+    const phases: PerformancePhases = { camera: cameraMs, uniforms: uniformsMs, labels: labelsMs, picking: pickingMs, render: renderMs };
+    this.performanceMonitor.record({ frameMs, mainThreadMs: performance.now() - frameStarted, phases }, this.frameWorkload);
+    this.updateStats();
     this.frameHandle = requestAnimationFrame(this.frame);
   };
 
@@ -481,10 +540,14 @@ export class WorldRenderer {
     this.device.queue.writeBuffer(this.uniformBuffer, 0, values);
   }
 
-  private render(): void {
+  private render(visibleLabels: number): void {
     if (!this.depthTexture) return;
+    this.frameWorkload = createEmptyRenderWorkload(visibleLabels);
     const encoder = this.device.createCommandEncoder({ label: 'world frame' });
-    const pass = encoder.beginRenderPass({
+    const collectGpuTiming = Boolean(this.gpuQuerySet && this.gpuResolveBuffer && this.gpuReadBuffer)
+      && !this.gpuReadPending && this.gpuQueryCountdown++ % 4 === 0;
+    const gpuTimingEpoch = this.performanceEpoch;
+    const passDescriptor: GPURenderPassDescriptor = {
       label: 'world render pass',
       colorAttachments: [{
         view: this.context.getCurrentTexture().createView(),
@@ -498,77 +561,109 @@ export class WorldRenderer {
         depthLoadOp: 'clear',
         depthStoreOp: 'store',
       },
-    });
+    };
+    if (collectGpuTiming && this.gpuQuerySet) {
+      passDescriptor.timestampWrites = {
+        querySet: this.gpuQuerySet,
+        beginningOfPassWriteIndex: 0,
+        endOfPassWriteIndex: 1,
+      };
+    }
+    const pass = encoder.beginRenderPass(passDescriptor);
 
     pass.setBindGroup(0, this.commonBindGroup);
     pass.setPipeline(this.waterPipeline);
     pass.setVertexBuffer(0, this.waterMesh.vertex);
     pass.setIndexBuffer(this.waterMesh.index, 'uint16');
-    pass.drawIndexed(this.waterMesh.indexCount, this.manifest.terrain.chunksX * this.manifest.terrain.chunksY * 3);
+    const terrainInstances = this.manifest.terrain.chunksX * this.manifest.terrain.chunksY * 3;
+    pass.drawIndexed(this.waterMesh.indexCount, terrainInstances);
+    this.recordIndexedDraw('water', this.waterMesh.indexCount, terrainInstances);
 
     pass.setPipeline(this.terrainPipeline);
     pass.setVertexBuffer(0, this.terrainMesh.vertex);
     pass.setIndexBuffer(this.terrainMesh.index, 'uint16');
-    pass.drawIndexed(this.terrainMesh.indexCount, this.manifest.terrain.chunksX * this.manifest.terrain.chunksY * 3);
+    pass.drawIndexed(this.terrainMesh.indexCount, terrainInstances);
+    this.recordIndexedDraw('terrain', this.terrainMesh.indexCount, terrainInstances);
 
     if (this.showWaterways) {
       pass.setPipeline(this.waterwayPipeline);
       pass.setVertexBuffer(0, this.waterwayMesh.vertex);
       pass.setIndexBuffer(this.waterwayMesh.index, 'uint32');
-      this.drawChunkedInfrastructure(pass, this.waterwayMesh, this.manifest.infrastructureChunks.waterways, 9_200);
+      this.drawChunkedInfrastructure(pass, this.waterwayMesh, this.manifest.infrastructureChunks.waterways, 'waterways', 9_200);
     }
 
     if (this.showRoads || this.showHiddenConnections) pass.setPipeline(this.infrastructurePipeline);
     if (this.showRoads) {
       pass.setVertexBuffer(0, this.roadMesh.vertex);
       pass.setIndexBuffer(this.roadMesh.index, 'uint32');
-      this.drawChunkedInfrastructure(pass, this.roadMesh, this.manifest.infrastructureChunks.roads);
+      this.drawChunkedInfrastructure(pass, this.roadMesh, this.manifest.infrastructureChunks.roads, 'roads');
     }
     if (this.showHiddenConnections) {
       pass.setVertexBuffer(0, this.hiddenConnectionMesh.vertex);
       pass.setIndexBuffer(this.hiddenConnectionMesh.index, 'uint32');
-      this.drawChunkedInfrastructure(pass, this.hiddenConnectionMesh, this.manifest.infrastructureChunks.hiddenConnections, 8_000);
+      this.drawChunkedInfrastructure(pass, this.hiddenConnectionMesh, this.manifest.infrastructureChunks.hiddenConnections, 'hiddenLinks', 8_000);
     }
 
     if (this.showProps) {
       pass.setPipeline(this.propPipeline);
-      this.drawMeshInstances(pass, this.shadowMesh, this.trees);
-      this.drawMeshInstances(pass, this.shadowMesh, this.buildings);
-      this.drawMeshInstances(pass, this.treeMesh, this.trees);
-      this.drawMeshInstances(pass, this.buildingMesh, this.buildings);
-      this.drawMeshInstances(pass, this.lampMesh, this.lamps);
-      this.drawMeshInstances(pass, this.barrierMesh, this.barriers);
-      this.drawMeshInstances(pass, this.signMesh, this.signs);
+      this.drawMeshInstances(pass, this.shadowMesh, this.trees, 'props');
+      this.drawMeshInstances(pass, this.shadowMesh, this.buildings, 'props');
+      this.drawMeshInstances(pass, this.treeMesh, this.trees, 'props');
+      this.drawMeshInstances(pass, this.buildingMesh, this.buildings, 'props');
+      this.drawMeshInstances(pass, this.lampMesh, this.lamps, 'props');
+      this.drawMeshInstances(pass, this.barrierMesh, this.barriers, 'props');
+      this.drawMeshInstances(pass, this.signMesh, this.signs, 'props');
     }
 
     pass.setPipeline(this.linePipeline);
     if (this.showBorders || this.showCountryOverlay) {
       pass.setBindGroup(1, this.borders.bindGroup);
-      pass.draw(6, this.borders.count * 3);
+      const instances = this.borders.count * 3;
+      pass.draw(6, instances);
+      this.recordTriangleDraw('borders', instances * 2, instances);
     }
     if (this.showConnections && this.connections) {
       pass.setBindGroup(1, this.connections.bindGroup);
-      pass.draw(6, this.connections.count * 3);
+      const instances = this.connections.count * 3;
+      pass.draw(6, instances);
+      this.recordTriangleDraw('debugLines', instances * 2, instances);
     }
     if (this.showWaterwayNetwork && this.waterwayNetwork) {
       pass.setBindGroup(1, this.waterwayNetwork.bindGroup);
-      pass.draw(6, this.waterwayNetwork.count * 3);
+      const instances = this.waterwayNetwork.count * 3;
+      pass.draw(6, instances);
+      this.recordTriangleDraw('debugLines', instances * 2, instances);
     }
     pass.end();
+    if (collectGpuTiming && this.gpuQuerySet && this.gpuResolveBuffer && this.gpuReadBuffer) {
+      encoder.resolveQuerySet(this.gpuQuerySet, 0, 2, this.gpuResolveBuffer, 0);
+      encoder.copyBufferToBuffer(this.gpuResolveBuffer, 0, this.gpuReadBuffer, 0, 16);
+    }
     this.device.queue.submit([encoder.finish()]);
+    if (collectGpuTiming) this.readGpuTiming(gpuTimingEpoch);
   }
 
-  private drawMeshInstances(pass: GPURenderPassEncoder, mesh: Mesh, layer: InstanceLayer): void {
+  private drawMeshInstances(pass: GPURenderPassEncoder, mesh: Mesh, layer: InstanceLayer, category: RenderCategory): void {
     pass.setBindGroup(1, layer.bindGroup);
     pass.setVertexBuffer(0, mesh.vertex);
     pass.setIndexBuffer(mesh.index, 'uint16');
     const edgeRange = 1_800;
-    if (this.camera.target[0] < edgeRange) pass.drawIndexed(mesh.indexCount, layer.count * 2, 0, 0, 0);
-    else if (this.camera.target[0] > this.manifest.world.width - edgeRange) pass.drawIndexed(mesh.indexCount, layer.count * 2, 0, 0, layer.count);
-    else pass.drawIndexed(mesh.indexCount, layer.count, 0, 0, layer.count);
+    const instances = this.camera.target[0] < edgeRange || this.camera.target[0] > this.manifest.world.width - edgeRange
+      ? layer.count * 2
+      : layer.count;
+    if (this.camera.target[0] < edgeRange) pass.drawIndexed(mesh.indexCount, instances, 0, 0, 0);
+    else if (this.camera.target[0] > this.manifest.world.width - edgeRange) pass.drawIndexed(mesh.indexCount, instances, 0, 0, layer.count);
+    else pass.drawIndexed(mesh.indexCount, instances, 0, 0, layer.count);
+    this.recordIndexedDraw(category, mesh.indexCount, instances);
   }
 
-  private drawChunkedInfrastructure(pass: GPURenderPassEncoder, mesh: Mesh, ranges: Array<{ firstIndex: number; indexCount: number }>, maximumDistance = 4_000): void {
+  private drawChunkedInfrastructure(
+    pass: GPURenderPassEncoder,
+    mesh: Mesh,
+    ranges: Array<{ firstIndex: number; indexCount: number }>,
+    category: 'roads' | 'hiddenLinks' | 'waterways',
+    maximumDistance = 4_000,
+  ): void {
     if (this.camera.distance >= maximumDistance) return;
     const chunksX = this.manifest.infrastructureChunks.chunksX;
     const chunksY = this.manifest.infrastructureChunks.chunksY;
@@ -585,11 +680,42 @@ export class WorldRenderer {
         if (dx < -this.manifest.world.width * 0.5) dx += this.manifest.world.width;
         const dz = (chunkY + 0.5) * chunkHeight - this.camera.target[2];
         if (Math.hypot(dx, dz) > radius + Math.hypot(chunkWidth, chunkHeight) * 0.6) continue;
-        if (this.camera.target[0] < edgeRange) pass.drawIndexed(range.indexCount, 2, range.firstIndex, 0, 0);
-        else if (this.camera.target[0] > this.manifest.world.width - edgeRange) pass.drawIndexed(range.indexCount, 2, range.firstIndex, 0, 1);
-        else pass.drawIndexed(range.indexCount, 1, range.firstIndex, 0, 1);
+        const instances = this.camera.target[0] < edgeRange || this.camera.target[0] > this.manifest.world.width - edgeRange ? 2 : 1;
+        if (this.camera.target[0] < edgeRange) pass.drawIndexed(range.indexCount, instances, range.firstIndex, 0, 0);
+        else if (this.camera.target[0] > this.manifest.world.width - edgeRange) pass.drawIndexed(range.indexCount, instances, range.firstIndex, 0, 1);
+        else pass.drawIndexed(range.indexCount, instances, range.firstIndex, 0, 1);
+        this.recordIndexedDraw(category, range.indexCount, instances);
+        this.frameWorkload.visibleChunks[category] += 1;
       }
     }
+  }
+
+  private recordIndexedDraw(category: RenderCategory, indexCount: number, instances: number): void {
+    this.recordTriangleDraw(category, Math.floor(indexCount / 3) * instances, instances);
+  }
+
+  private recordTriangleDraw(category: RenderCategory, triangles: number, instances: number): void {
+    this.frameWorkload.drawCalls += 1;
+    this.frameWorkload.triangles += triangles;
+    this.frameWorkload.instances += instances;
+    this.frameWorkload.trianglesByCategory[category] += triangles;
+  }
+
+  private readGpuTiming(epoch: number): void {
+    if (!this.gpuReadBuffer || this.gpuReadPending) return;
+    this.gpuReadPending = true;
+    void this.gpuReadBuffer.mapAsync(GPUMapMode.READ).then(() => {
+      if (!this.gpuReadBuffer) return;
+      const timestamps = new BigUint64Array(this.gpuReadBuffer.getMappedRange());
+      const elapsedNanoseconds = timestamps[1] - timestamps[0];
+      if (epoch === this.performanceEpoch) this.performanceMonitor.recordGpu(Number(elapsedNanoseconds) / 1_000_000);
+      this.gpuReadBuffer.unmap();
+    }).catch((error) => {
+      console.warn('GPU timestamp readback failed', error);
+      if (this.gpuReadBuffer?.mapState === 'mapped') this.gpuReadBuffer.unmap();
+    }).finally(() => {
+      this.gpuReadPending = false;
+    });
   }
 
   private pickProvince(clientX: number, clientY: number): void {
@@ -655,14 +781,17 @@ export class WorldRenderer {
     };
   }
 
-  private updateStats(frameMs: number): void {
-    this.frameSamples.push(frameMs);
-    if (this.frameSamples.length < 20) return;
-    const average = this.frameSamples.reduce((sum, value) => sum + value, 0) / this.frameSamples.length;
-    this.frameSamples.length = 0;
+  private updateStats(): void {
+    if (!this.onStats) {
+      this.statsFrameCountdown = 0;
+      return;
+    }
+    if (++this.statsFrameCountdown < 20) return;
+    this.statsFrameCountdown = 0;
+    const performance = this.performanceMonitor.snapshot();
     this.onStats?.({
-      fps: 1000 / average,
-      frameMs: average,
+      fps: performance.frame.average > 0 ? 1000 / performance.frame.average : 0,
+      frameMs: performance.frame.average,
       camera: [this.camera.target[0], this.camera.target[2], this.camera.position[1]],
       distance: this.camera.distance,
       hoveredProvince: this.hoveredId ? this.hoveredId - 1 : null,
@@ -679,6 +808,7 @@ export class WorldRenderer {
         const encoded = this.sampleProvince(this.camera.target[0], this.camera.target[2]);
         return encoded ? encoded - 1 : null;
       })(),
+      performance,
     });
   }
 }

@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "pretest": "npm run build:world",
     "test": "vitest run",
-    "visual-check": "node scripts/visual-check.mjs"
+    "visual-check": "node scripts/visual-check.mjs",
+    "performance-check": "node scripts/performance-check.mjs"
   },
   "dependencies": {
     "gl-matrix": "^3.4.3"

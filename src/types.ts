@@ -122,6 +122,7 @@ export interface FrameStats {
   canalSegments: number;
   targetElevation: number;
   targetProvince: number | null;
+  performance: import('./performance-monitor').PerformanceSnapshot;
 }
 
 export type ProgressReporter = (stage: string, progress: number) => void;

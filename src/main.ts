@@ -13,6 +13,7 @@ const tooltipName = required<HTMLElement>('tooltip-name');
 const tooltipTerrain = required<HTMLElement>('tooltip-terrain');
 const diagnostics = required<HTMLElement>('diagnostics');
 const diagnosticsStats = required<HTMLElement>('diagnostics-stats');
+const diagnosticsPerformance = required<HTMLElement>('diagnostics-performance');
 const debugView = required<HTMLSelectElement>('debug-view');
 const debugConnections = required<HTMLInputElement>('debug-connections');
 const debugRivers = required<HTMLInputElement>('debug-rivers');
@@ -26,6 +27,7 @@ const debugProps = required<HTMLInputElement>('debug-props');
 const debugDescription = required<HTMLElement>('debug-description');
 const debugLegend = required<HTMLElement>('debug-legend');
 const unsupported = required<HTMLElement>('unsupported');
+const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
 if (!navigator.gpu) {
   loading.hidden = true;
@@ -36,9 +38,10 @@ if (!navigator.gpu) {
 
 async function start(): Promise<void> {
   const renderer = new WorldRenderer(canvas, countryLabels);
-  if (import.meta.env.DEV) (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
+  if (import.meta.env.DEV || new URLSearchParams(window.location.search).has('benchmark')) {
+    (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
+  }
   renderer.onHover = updateTooltip;
-  renderer.onStats = updateDiagnostics;
 
   const applyDebugView = () => {
     const mode = Number(debugView.value);
@@ -55,6 +58,7 @@ async function start(): Promise<void> {
     if (event.code === 'F3') {
       event.preventDefault();
       diagnostics.hidden = !diagnostics.hidden;
+      renderer.onStats = diagnostics.hidden ? undefined : updateDiagnostics;
       return;
     }
     if (diagnostics.hidden || (event.code !== 'BracketLeft' && event.code !== 'BracketRight')) return;
@@ -137,6 +141,44 @@ function updateDiagnostics(stats: FrameStats): void {
     `canals    ${stats.canalSegments} edges`,
     `borders   ${stats.borderEdges.toLocaleString()}`,
   ].join('\n');
+
+  const timing = stats.performance;
+  const phaseRanking = Object.entries(timing.phases)
+    .sort(([, a], [, b]) => b.average - a.average)
+    .slice(0, 3)
+    .map(([name, values]) => `${name} ${values.average.toFixed(2)}`)
+    .join('  ');
+  const geometryRanking = Object.entries(timing.workload.trianglesByCategory)
+    .filter(([, triangles]) => triangles > 0)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([name, triangles]) => `${name} ${formatCompact(triangles)}`)
+    .join('  ');
+  const browserPerformance = performance as Performance & {
+    memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number };
+  };
+  const memory = browserPerformance.memory;
+  diagnosticsPerformance.textContent = [
+    `frame  avg ${timing.frame.average.toFixed(2)}  p95 ${timing.frame.p95.toFixed(2)}  max ${timing.frame.maximum.toFixed(1)} ms`,
+    `CPU    avg ${timing.mainThread.average.toFixed(2)}  p95 ${timing.mainThread.p95.toFixed(2)} ms`,
+    timing.gpu
+      ? `GPU    avg ${timing.gpu.average.toFixed(2)}  p95 ${timing.gpu.p95.toFixed(2)} ms  n=${timing.gpuSampleCount}`
+      : `GPU    timestamp ${timing.gpuTimingSupported ? 'warming up' : 'unavailable'}`,
+    `hot CPU  ${phaseRanking || 'collecting samples'}`,
+    `draws  ${timing.workload.drawCalls}   instances ${formatCompact(timing.workload.instances)}`,
+    `tris   ${formatCompact(timing.workload.triangles)}   labels ${timing.workload.labels}`,
+    `hot geo  ${geometryRanking || 'none'}`,
+    `chunks road ${timing.workload.visibleChunks.roads}  river ${timing.workload.visibleChunks.waterways}  links ${timing.workload.visibleChunks.hiddenLinks}`,
+    memory ? `JS heap ${formatBytes(memory.usedJSHeapSize)} / ${formatBytes(memory.jsHeapSizeLimit)}` : 'JS heap unavailable',
+  ].join('\n');
+}
+
+function formatCompact(value: number): string {
+  return compactNumber.format(value);
+}
+
+function formatBytes(value: number): string {
+  return `${(value / 1_048_576).toFixed(1)} MB`;
 }
 
 const DEBUG_HELP: Record<number, { description: string; legend: Array<[string, string]> }> = {

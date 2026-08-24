@@ -15,6 +15,8 @@ npm run dev
 
 With the dev server running, `npm run visual-check` launches Chrome through Playwright and writes world, mountain, city, lake-road, and diagnostic captures plus `artifacts/visual-report.json`. On Windows it defaults to a short-lived headed browser because Chrome headless does not reliably expose the hardware WebGPU adapter. Set `IRONFRONTS_BROWSER` to select another Chromium executable or `IRONFRONTS_HEADLESS=true` when a CI GPU adapter is available.
 
+`npm run performance-check` runs a repeatable world/regional, dense-scene, pan, orbit, zoom, and layer-ablation benchmark. It writes `artifacts/performance-report.json` for tooling and `artifacts/performance-report.md` for review. Set `IRONFRONTS_BENCHMARK_MS` and `IRONFRONTS_BENCHMARK_WARMUP_MS` to adjust its measurement and warmup windows.
+
 ## Controls
 
 - Left drag: pan
