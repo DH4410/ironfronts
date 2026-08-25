@@ -10,10 +10,21 @@ interface CountryAnchor {
   crossSpan: number;
 }
 
-interface CountryLabelState {
-  visible: boolean;
-  fontSize: string;
-  transform: string;
+interface RenderedCountryLabel {
+  country: CountryRecord;
+  x: number;
+  y: number;
+  angle: number;
+  fontSize: number;
+}
+
+interface CountryLabelAtlasEntry {
+  u0: number;
+  v0: number;
+  u1: number;
+  v1: number;
+  widthAtMeasurementSize: number;
+  heightAtMeasurementSize: number;
 }
 
 export interface CountryOwnershipChange {
@@ -26,6 +37,11 @@ const LABEL_FONT_FAMILY = '"Segoe UI Variable Text", "Segoe UI", Arial, sans-ser
 const LABEL_FONT_WEIGHT = 700;
 const LABEL_LETTER_SPACING = 0.1;
 const MEASUREMENT_SIZE = 20;
+const ATLAS_FONT_SIZE = 64;
+const ATLAS_WIDTH = 2048;
+const ATLAS_PADDING = 10;
+const LABEL_INSTANCE_STRIDE = 12;
+const MAX_LABEL_CSS_FONT_SIZE = 96;
 
 export function buildCountryColorBuffer(countries: CountryRecord[]): Float32Array {
   const maximumId = Math.max(0, ...countries.map((country) => country.id));
@@ -42,14 +58,14 @@ export function buildCountryColorBuffer(countries: CountryRecord[]): Float32Arra
 }
 
 export class CountryLabelLayer {
-  private readonly elements = new Map<number, HTMLSpanElement>();
   private readonly countryById = new Map<number, CountryRecord>();
   private readonly measuredLabelWidths = new Map<number, number>();
+  private readonly atlasEntries = new Map<number, CountryLabelAtlasEntry>();
   private readonly measurementContext: CanvasRenderingContext2D;
+  readonly atlasCanvas: HTMLCanvasElement;
   private readonly neighbors: number[][];
   private readonly provincesByCountry = new Map<number, Set<number>>();
   private readonly anchors = new Map<number, CountryAnchor>();
-  private readonly labelStates = new Map<number, CountryLabelState>();
   private readonly visitMarks: Uint32Array;
   private visitEpoch = 0;
   private visible = true;
@@ -58,18 +74,26 @@ export class CountryLabelLayer {
   private lastWidth = 0;
   private lastHeight = 0;
   private visibleCount = 0;
+  private instanceData = new Float32Array(0);
+  private instanceRevision = 0;
 
   constructor(
-    private readonly container: HTMLElement,
+    private readonly canvas: HTMLCanvasElement,
     countries: CountryRecord[],
     private readonly owners: Uint32Array,
     adjacencyPairs: Uint32Array,
     private readonly labelData: Float32Array,
     private readonly worldWidth: number,
   ) {
-    const measurementContext = document.createElement('canvas').getContext('2d');
-    if (!measurementContext) throw new Error('Country labels require a 2D canvas context');
-    this.measurementContext = measurementContext;
+    // This element used to be a full-screen transparent 2D canvas. Even when
+    // its contents were cached, Chromium had to composite it over WebGPU on
+    // every frame. Keep it hidden and use a detached canvas only once to build
+    // the texture atlas consumed by the WebGPU label pipeline.
+    canvas.hidden = true;
+    this.atlasCanvas = document.createElement('canvas');
+    const context = this.atlasCanvas.getContext('2d', { alpha: true });
+    if (!context) throw new Error('Country labels require a 2D canvas context');
+    this.measurementContext = context;
     this.visitMarks = new Uint32Array(owners.length);
     this.neighbors = Array.from({ length: owners.length }, () => [] as number[]);
     for (let index = 0; index + 1 < adjacencyPairs.length; index += 2) {
@@ -79,19 +103,11 @@ export class CountryLabelLayer {
       this.neighbors[a].push(b);
       this.neighbors[b].push(a);
     }
-    const fragment = document.createDocumentFragment();
     for (const country of countries) {
       this.countryById.set(country.id, country);
-      const element = document.createElement('span');
-      element.className = 'country-label';
-      element.textContent = country.name.toLocaleUpperCase();
-      element.dataset.countryId = String(country.id);
-      element.style.setProperty('--country-color', country.color);
-      this.elements.set(country.id, element);
-      this.labelStates.set(country.id, { visible: false, fontSize: '', transform: '' });
-      this.measuredLabelWidths.set(country.id, this.measureTextWidth(element.textContent, MEASUREMENT_SIZE));
-      fragment.append(element);
+      this.measuredLabelWidths.set(country.id, this.measureTextWidth(country.name.toLocaleUpperCase(), MEASUREMENT_SIZE));
     }
+    this.buildAtlas(countries);
     for (let province = 1; province < owners.length; province += 1) {
       const countryId = owners[province];
       if (!countryId) continue;
@@ -102,17 +118,23 @@ export class CountryLabelLayer {
       }
       provinces.add(province);
     }
-    container.replaceChildren(fragment);
     this.rebuildCountries(this.countryById.keys());
   }
 
   setVisible(visible: boolean): void {
     if (this.visible === visible) return;
     this.visible = visible;
-    this.container.hidden = !visible;
     this.dirty = true;
-    if (!visible) this.visibleCount = 0;
+    if (!visible) {
+      this.visibleCount = 0;
+      this.instanceData = new Float32Array(0);
+      this.instanceRevision += 1;
+    }
   }
+
+  get renderData(): Float32Array { return this.instanceData; }
+
+  get renderRevision(): number { return this.instanceRevision; }
 
   refreshOwnership(changes: CountryOwnershipChange[]): void {
     const affectedCountries = new Set<number>();
@@ -145,13 +167,11 @@ export class CountryLabelLayer {
       && width === this.lastWidth
       && height === this.lastHeight) return this.visibleCount;
 
-    let visibleLabels = 0;
-    const visibleCountryIds = new Set<number>();
+    const renderedLabels: RenderedCountryLabel[] = [];
 
     for (const anchor of this.anchors.values()) {
       const country = this.countryById.get(anchor.countryId);
-      const element = this.elements.get(anchor.countryId);
-      if (!country || !element) continue;
+      if (!country) continue;
       const center = this.projectBestCopy(anchor.x, sampleHeight(anchor.x, anchor.z) + 7, anchor.z, viewProjection, width, height);
       if (!center) continue;
       const halfSpan = anchor.span * 0.46;
@@ -193,39 +213,19 @@ export class CountryLabelLayer {
       const measuredWidth = this.measuredLabelWidths.get(country.id) ?? 1;
       const widthLimitedSize = MEASUREMENT_SIZE * availableWidth / Math.max(1, measuredWidth);
       const heightLimitedSize = availableHeight / 1.05;
-      const fontSize = Math.min(widthLimitedSize, heightLimitedSize);
+      const maximumFontSize = MAX_LABEL_CSS_FONT_SIZE * Math.min(window.devicePixelRatio || 1, 2);
+      const fontSize = Math.min(widthLimitedSize, heightLimitedSize, maximumFontSize);
       if (!Number.isFinite(fontSize) || fontSize <= 0) continue;
       let angle = Math.atan2(right.y - left.y, right.x - left.x);
       while (angle > Math.PI * 0.5) angle -= Math.PI;
       while (angle < -Math.PI * 0.5) angle += Math.PI;
-      const state = this.labelStates.get(country.id);
-      const nextFontSize = `${fontSize}px`;
-      const nextTransform = `translate(${center.x.toFixed(1)}px, ${center.y.toFixed(1)}px) translate(-50%, -50%) rotate(${angle.toFixed(4)}rad)`;
-      if (state && !state.visible) {
-        element.hidden = false;
-        state.visible = true;
-      }
-      if (state && state.fontSize !== nextFontSize) {
-        element.style.fontSize = nextFontSize;
-        state.fontSize = nextFontSize;
-      }
-      if (state && state.transform !== nextTransform) {
-        element.style.transform = nextTransform;
-        state.transform = nextTransform;
-      }
-      visibleCountryIds.add(country.id);
-      visibleLabels += 1;
+      renderedLabels.push({ country, x: center.x, y: center.y, angle, fontSize });
     }
-    for (const [countryId, state] of this.labelStates) {
-      if (!state.visible || visibleCountryIds.has(countryId)) continue;
-      const element = this.elements.get(countryId);
-      if (element) element.hidden = true;
-      state.visible = false;
-    }
+    this.buildInstances(renderedLabels);
     this.lastCameraRevision = cameraRevision;
     this.lastWidth = width;
     this.lastHeight = height;
-    this.visibleCount = visibleLabels;
+    this.visibleCount = renderedLabels.length;
     this.dirty = false;
     return this.visibleCount;
   }
@@ -234,6 +234,77 @@ export class CountryLabelLayer {
     this.measurementContext.font = `${LABEL_FONT_WEIGHT} ${fontSize}px ${LABEL_FONT_FAMILY}`;
     return this.measurementContext.measureText(label).width
       + Math.max(0, label.length - 1) * fontSize * LABEL_LETTER_SPACING;
+  }
+
+  private buildAtlas(countries: CountryRecord[]): void {
+    const placements: Array<{ country: CountryRecord; x: number; y: number; width: number; height: number }> = [];
+    this.measurementContext.font = `${LABEL_FONT_WEIGHT} ${ATLAS_FONT_SIZE}px ${LABEL_FONT_FAMILY}`;
+    (this.measurementContext as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${ATLAS_FONT_SIZE * LABEL_LETTER_SPACING}px`;
+    let x = ATLAS_PADDING;
+    let y = ATLAS_PADDING;
+    let rowHeight = 0;
+    for (const country of countries) {
+      const text = country.name.toLocaleUpperCase();
+      const textWidth = Math.ceil(this.measureTextWidth(text, ATLAS_FONT_SIZE));
+      const width = textWidth + ATLAS_PADDING * 2;
+      const height = Math.ceil(ATLAS_FONT_SIZE * 1.45) + ATLAS_PADDING * 2;
+      if (x + width + ATLAS_PADDING > ATLAS_WIDTH) {
+        x = ATLAS_PADDING;
+        y += rowHeight;
+        rowHeight = 0;
+      }
+      placements.push({ country, x, y, width, height });
+      x += width;
+      rowHeight = Math.max(rowHeight, height);
+    }
+    this.atlasCanvas.width = ATLAS_WIDTH;
+    this.atlasCanvas.height = nextPowerOfTwo(Math.max(1, y + rowHeight + ATLAS_PADDING));
+    const context = this.atlasCanvas.getContext('2d', { alpha: true });
+    if (!context) throw new Error('Country label atlas context was lost');
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.lineJoin = 'round';
+    context.miterLimit = 2;
+    context.font = `${LABEL_FONT_WEIGHT} ${ATLAS_FONT_SIZE}px ${LABEL_FONT_FAMILY}`;
+    (context as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = `${ATLAS_FONT_SIZE * LABEL_LETTER_SPACING}px`;
+    context.lineWidth = ATLAS_FONT_SIZE * 0.09;
+    context.fillStyle = 'rgba(249, 242, 211, 0.95)';
+    context.strokeStyle = 'rgba(8, 15, 14, 0.9)';
+    for (const placement of placements) {
+      const centerX = placement.x + placement.width * 0.5;
+      const centerY = placement.y + placement.height * 0.5;
+      const text = placement.country.name.toLocaleUpperCase();
+      context.strokeText(text, centerX, centerY);
+      context.fillText(text, centerX, centerY);
+      this.atlasEntries.set(placement.country.id, {
+        u0: placement.x / this.atlasCanvas.width,
+        v0: placement.y / this.atlasCanvas.height,
+        u1: (placement.x + placement.width) / this.atlasCanvas.width,
+        v1: (placement.y + placement.height) / this.atlasCanvas.height,
+        widthAtMeasurementSize: placement.width * MEASUREMENT_SIZE / ATLAS_FONT_SIZE,
+        heightAtMeasurementSize: placement.height * MEASUREMENT_SIZE / ATLAS_FONT_SIZE,
+      });
+    }
+  }
+
+  private buildInstances(labels: RenderedCountryLabel[]): void {
+    const data = new Float32Array(labels.length * LABEL_INSTANCE_STRIDE);
+    let cursor = 0;
+    for (const label of labels) {
+      const atlas = this.atlasEntries.get(label.country.id);
+      if (!atlas) continue;
+      const scale = label.fontSize / MEASUREMENT_SIZE;
+      data.set([
+        label.x, label.y,
+        atlas.widthAtMeasurementSize * scale,
+        atlas.heightAtMeasurementSize * scale,
+        Math.cos(label.angle), Math.sin(label.angle), atlas.u0, atlas.v0,
+        atlas.u1, atlas.v1, 0, 0,
+      ], cursor);
+      cursor += LABEL_INSTANCE_STRIDE;
+    }
+    this.instanceData = cursor === data.length ? data : data.slice(0, cursor);
+    this.instanceRevision += 1;
   }
 
   private rebuildCountries(countryIds: Iterable<number>): void {
@@ -245,10 +316,6 @@ export class CountryLabelLayer {
     const provinces = this.provincesByCountry.get(countryId);
     if (!provinces?.size) {
       this.anchors.delete(countryId);
-      const element = this.elements.get(countryId);
-      if (element) element.hidden = true;
-      const state = this.labelStates.get(countryId);
-      if (state) state.visible = false;
       return;
     }
     this.visitEpoch = (this.visitEpoch + 1) >>> 0;
@@ -426,4 +493,8 @@ function unwrapNear(value: number, reference: number, worldWidth: number): numbe
 
 function wrap(value: number, worldWidth: number): number {
   return ((value % worldWidth) + worldWidth) % worldWidth;
+}
+
+function nextPowerOfTwo(value: number): number {
+  return 2 ** Math.ceil(Math.log2(Math.max(1, value)));
 }

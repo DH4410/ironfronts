@@ -81,6 +81,11 @@ export interface WorldManifest {
     hiddenConnections: Array<{ firstIndex: number; indexCount: number }>;
     waterways: Array<{ firstIndex: number; indexCount: number }>;
   };
+  borderChunks: {
+    chunksX: number;
+    chunksY: number;
+    ranges: Array<{ firstInstance: number; instanceCount: number }>;
+  };
   propChunks: {
     chunksX: number;
     chunksY: number;

@@ -59,7 +59,6 @@ fn sampleMaterial(layer: i32, worldPosition: vec3f, scale: f32) -> vec3f {
 
 @fragment
 fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
-  let provinceId = provinceAt(input.mapUv);
   // Movement rivers carry an explicit ribbon clip mask. Visual-only rivers
   // remain generic water, but their second mask channel expands only narrow
   // province-zero channels so coarse terrain cannot bridge over them.
@@ -121,11 +120,10 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   }
 
   if (uniforms.interaction.z > 0.5 && uniforms.map.w < 0.5) {
-    let owner = ownerAt(provinceId);
-    if (owner > 0u) {
-      let politicalColor = countryColorAt(owner);
+    let politicalColor = politicalColorAt(input.mapUv);
+    if (politicalColor.a > 0.5) {
       let terrainLuminance = dot(baseColor, vec3f(0.24, 0.68, 0.08));
-      let coloredSurface = mix(baseColor, politicalColor * (0.58 + terrainLuminance * 0.72), 0.72);
+      let coloredSurface = mix(baseColor, politicalColor.rgb * (0.58 + terrainLuminance * 0.72), 0.72);
       let overlayStrength = mix(0.26, 0.38, smoothstep(1300.0, 6200.0, uniforms.interaction.y));
       baseColor = mix(baseColor, coloredSurface, overlayStrength);
     }
@@ -162,7 +160,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     );
     lit = palette[min(terrain, 4u)];
   } else if (debugMode == 3u) {
-    lit = hashColor(provinceId);
+    lit = hashColor(provinceAt(input.mapUv));
   } else if (debugMode == 4u) {
     lit = normal * 0.5 + 0.5;
   } else if (debugMode == 5u) {
@@ -526,11 +524,18 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   let copyOffset = f32(i32(copyIndex) - 1) * uniforms.map.x;
   let uv0 = vec2f(line.a.x / uniforms.map.x, line.a.y / uniforms.map.y);
   let uv1 = vec2f(line.a.z / uniforms.map.x, line.a.w / uniforms.map.y);
-  var height0 = heightAt(uv0) + 1.8;
-  var height1 = heightAt(uv1) + 1.8;
-  if (lineParams.mode == 1u && line.b.x < 0.5) {
-    height0 = 1.7;
-    height1 = 1.7;
+  var height0 = 0.0;
+  var height1 = 0.0;
+  if (lineParams.mode == 0u) {
+    height0 = abs(line.b.z) + 0.8;
+    height1 = line.b.w + 1.8;
+  } else if (lineParams.mode == 1u) {
+    height0 = heightAt(uv0) + 1.8;
+    height1 = heightAt(uv1) + 1.8;
+    if (line.b.x < 0.5) {
+      height0 = 1.7;
+      height1 = 1.7;
+    }
   } else if (lineParams.mode == 2u) {
     height0 = line.b.x + 2.35;
     height1 = line.b.y + 2.35;
@@ -551,18 +556,14 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   let nearFactor = 1.0 - smoothstep(700.0, 8200.0, uniforms.interaction.y);
   var widthPixels = 0.72 + nearFactor * 0.8;
   var color = vec4f(0.055, 0.085, 0.077, 0.15 + nearFactor * 0.40);
-  if (line.b.z < 0.5) { color.a *= 0.46; }
+  if (line.b.y < 0.5) { color.a *= 0.46; }
   if (lineParams.mode == 0u) {
     let provinceBordersVisible = (lineParams.enabled & 1u) != 0u;
     let countryBordersVisible = (lineParams.enabled & 2u) != 0u;
-    let provinceA = u32(line.b.x + 0.5);
-    let provinceB = u32(line.b.y + 0.5);
-    let ownerA = ownerAt(provinceA);
-    let ownerB = ownerAt(provinceB);
-    let countryBoundary = ownerA != ownerB;
+    let countryBoundary = line.b.z < 0.0;
     if (countryBoundary && countryBordersVisible) {
       widthPixels = 2.65 - nearFactor * 0.58;
-      color = vec4f(0.052, 0.067, 0.059, select(0.48, 0.72, line.b.z > 0.5));
+      color = vec4f(0.052, 0.067, 0.059, select(0.48, 0.72, line.b.y > 0.5));
     } else if (!provinceBordersVisible) {
       color.a = 0.0;
     }
@@ -590,5 +591,48 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
 fn lineFragment(input: LineOutput) -> @location(0) vec4f {
   if (input.color.a < 0.002) { discard; }
   return input.color;
+}
+`;
+
+export const countryLabelShader = commonWgsl + /* wgsl */ `
+struct CountryLabelRecord { a: vec4f, b: vec4f, c: vec4f };
+@group(1) @binding(0) var<storage, read> countryLabels: array<CountryLabelRecord>;
+@group(1) @binding(1) var countryLabelAtlas: texture_2d<f32>;
+@group(1) @binding(2) var countryLabelSampler: sampler;
+
+struct CountryLabelOutput {
+  @builtin(position) position: vec4f,
+  @location(0) uv: vec2f,
+};
+
+@vertex
+fn countryLabelVertex(
+  @builtin(vertex_index) vertexIndex: u32,
+  @builtin(instance_index) instanceIndex: u32,
+) -> CountryLabelOutput {
+  let label = countryLabels[instanceIndex];
+  let corners = array<vec2f, 6>(
+    vec2f(-0.5, -0.5), vec2f(0.5, -0.5), vec2f(-0.5, 0.5),
+    vec2f(-0.5, 0.5), vec2f(0.5, -0.5), vec2f(0.5, 0.5),
+  );
+  let corner = corners[vertexIndex];
+  let local = corner * label.a.zw;
+  let rotated = vec2f(
+    local.x * label.b.x - local.y * label.b.y,
+    local.x * label.b.y + local.y * label.b.x,
+  );
+  let screen = label.a.xy + rotated;
+  let ndc = vec2f(screen.x * uniforms.viewport.z * 2.0 - 1.0, 1.0 - screen.y * uniforms.viewport.w * 2.0);
+  var output: CountryLabelOutput;
+  output.position = vec4f(ndc, 0.0, 1.0);
+  output.uv = mix(label.b.zw, label.c.xy, corner + vec2f(0.5));
+  return output;
+}
+
+@fragment
+fn countryLabelFragment(input: CountryLabelOutput) -> @location(0) vec4f {
+  let color = textureSample(countryLabelAtlas, countryLabelSampler, input.uv);
+  if (color.a < 0.01) { discard; }
+  return color;
 }
 `;

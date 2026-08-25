@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { WgslReflect } from 'wgsl_reflect/wgsl_reflect.module.js';
 import { create, globals } from 'webgpu';
-import { infrastructureShader, lineShader, propShader, terrainShader, waterShader, waterwayShader } from '../src/shaders';
+import { countryLabelShader, infrastructureShader, lineShader, propShader, terrainShader, waterShader, waterwayShader } from '../src/shaders';
 
 describe('WGSL programs', () => {
   it('limits beach material to the actual shoreline mask', () => {
@@ -59,10 +59,11 @@ describe('WGSL programs', () => {
   });
 
   it('derives political tint and country borders from mutable province ownership', () => {
-    expect(terrainShader).toContain('let owner = ownerAt(provinceId)');
+    expect(terrainShader).toContain('let politicalColor = politicalColorAt(input.mapUv)');
+    expect(terrainShader).not.toContain('let provinceId = provinceAt(input.mapUv)');
     expect(terrainShader).toContain('let overlayStrength = mix(0.26, 0.38');
-    expect(lineShader).toContain('let ownerA = ownerAt(provinceA)');
-    expect(lineShader).toContain('let countryBoundary = ownerA != ownerB');
+    expect(lineShader).toContain('let countryBoundary = line.b.z < 0.0');
+    expect(lineShader).toContain('height0 = abs(line.b.z) + 0.8');
     expect(lineShader).toContain('(lineParams.enabled & 2u) != 0u');
   });
 
@@ -73,6 +74,7 @@ describe('WGSL programs', () => {
     ['infrastructure', infrastructureShader, ['infrastructureVertex'], ['infrastructureFragment']],
     ['props', propShader, ['propVertex'], ['propFragment']],
     ['lines', lineShader, ['lineVertex'], ['lineFragment']],
+    ['country labels', countryLabelShader, ['countryLabelVertex'], ['countryLabelFragment']],
   ])('parses the %s shader and exposes its render entry points', (_name, source, vertexNames, fragmentNames) => {
     const reflection = new WgslReflect(source);
     expect(reflection.entry.vertex.map((entry) => entry.name)).toEqual(vertexNames);
@@ -89,7 +91,7 @@ describe('WGSL programs', () => {
     const device = await adapter.requestDevice();
     const modules = new Map<string, GPUShaderModule>();
     for (const [label, source] of [
-      ['terrain', terrainShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['lines', lineShader],
+      ['terrain', terrainShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['lines', lineShader], ['country labels', countryLabelShader],
     ] as const) {
       const module = device.createShaderModule({ label, code: source });
       modules.set(label, module);
@@ -109,8 +111,7 @@ describe('WGSL programs', () => {
       { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
-      { binding: 10, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
-      { binding: 11, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+      { binding: 10, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 12, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       { binding: 13, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ] });
@@ -118,6 +119,11 @@ describe('WGSL programs', () => {
       { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
       { binding: 2, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
+    ] });
+    const labelLayer = device.createBindGroupLayout({ entries: [
+      { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
+      { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
     ] });
     const depthStencil: GPUDepthStencilState = { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' };
     await expect(device.createRenderPipelineAsync({
@@ -168,6 +174,13 @@ describe('WGSL programs', () => {
       vertex: { module: modules.get('lines')!, entryPoint: 'lineVertex' },
       fragment: { module: modules.get('lines')!, entryPoint: 'lineFragment', targets: [{ format: 'bgra8unorm' }] },
       primitive: { topology: 'triangle-list' }, depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'less-equal' },
+    })).resolves.toBeDefined();
+    await expect(device.createRenderPipelineAsync({
+      layout: device.createPipelineLayout({ bindGroupLayouts: [common, labelLayer] }),
+      vertex: { module: modules.get('country labels')!, entryPoint: 'countryLabelVertex' },
+      fragment: { module: modules.get('country labels')!, entryPoint: 'countryLabelFragment', targets: [{ format: 'bgra8unorm' }] },
+      primitive: { topology: 'triangle-list' },
+      depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'always' },
     })).resolves.toBeDefined();
     device.destroy();
   });

@@ -16,14 +16,14 @@ export interface PerformancePhases {
 }
 
 export type RenderCategory = 'terrain' | 'water' | 'waterways' | 'roads' | 'hiddenLinks'
-  | 'trees' | 'buildings' | 'roadFurniture' | 'borders' | 'debugLines';
+  | 'trees' | 'buildings' | 'roadFurniture' | 'borders' | 'debugLines' | 'labels';
 
 export interface RenderWorkload {
   drawCalls: number;
   triangles: number;
   instances: number;
   labels: number;
-  visibleChunks: { terrain: number; trees: number; buildings: number; roadFurniture: number; roads: number; hiddenLinks: number; waterways: number };
+  visibleChunks: { terrain: number; trees: number; buildings: number; roadFurniture: number; roads: number; hiddenLinks: number; waterways: number; borders: number };
   lodInstances: { terrain: number[]; trees: number[]; buildings: number[] };
   trianglesByCategory: Record<RenderCategory, number>;
 }
@@ -104,7 +104,7 @@ export function createEmptyRenderWorkload(labels = 0): RenderWorkload {
     triangles: 0,
     instances: 0,
     labels,
-    visibleChunks: { terrain: 0, trees: 0, buildings: 0, roadFurniture: 0, roads: 0, hiddenLinks: 0, waterways: 0 },
+    visibleChunks: { terrain: 0, trees: 0, buildings: 0, roadFurniture: 0, roads: 0, hiddenLinks: 0, waterways: 0, borders: 0 },
     lodInstances: { terrain: [0, 0, 0, 0], trees: [0, 0, 0], buildings: [0, 0, 0] },
     trianglesByCategory: {
       terrain: 0,
@@ -117,6 +117,7 @@ export function createEmptyRenderWorkload(labels = 0): RenderWorkload {
       roadFurniture: 0,
       borders: 0,
       debugLines: 0,
+      labels: 0,
     },
   };
 }

@@ -68,11 +68,13 @@ if (validation.countries !== 200) errors.push(`validation: expected 200 countrie
 await page.screenshot({ path: path.join(outputDirectory, 'overview.png') });
 
 if (!status.unsupported) {
-  validation.visibleCountryLabels = await page.locator('.country-label:not([hidden])').count();
+  validation.visibleCountryLabels = await page.evaluate(() =>
+    window.__ironfrontsRenderer?.getPerformanceSnapshot().workload.labels ?? 0);
   if (validation.visibleCountryLabels <= 0) errors.push('validation: no country labels are visible at world zoom');
   await page.keyboard.press('KeyC');
   await page.waitForTimeout(120);
-  validation.countryToggleHidesLabels = await page.locator('#country-labels').evaluate((element) => element.hasAttribute('hidden'));
+  validation.countryToggleHidesLabels = await page.evaluate(() =>
+    (window.__ironfrontsRenderer?.getPerformanceSnapshot().workload.labels ?? -1) === 0);
   if (!validation.countryToggleHidesLabels) errors.push('validation: country overlay toggle did not hide labels');
   await page.keyboard.press('KeyC');
   await page.evaluate(() => {

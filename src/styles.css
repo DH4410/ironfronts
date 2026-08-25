@@ -25,32 +25,13 @@ body { user-select: none; }
   position: fixed;
   z-index: 1;
   inset: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   pointer-events: none;
 }
 
 .country-labels[hidden] { display: none; }
-
-.country-label {
-  position: absolute;
-  left: 0;
-  top: 0;
-  color: rgba(249, 242, 211, .95);
-  font-family: "Segoe UI Variable Text", "Segoe UI", Arial, sans-serif;
-  font-weight: 700;
-  font-feature-settings: "kern" 1, "case" 1;
-  letter-spacing: .1em;
-  line-height: 1.05;
-  white-space: nowrap;
-  opacity: .92;
-  -webkit-font-smoothing: antialiased;
-  -webkit-text-stroke: .045em rgba(8, 15, 14, .9);
-  paint-order: stroke fill;
-  text-rendering: geometricPrecision;
-  text-shadow: 0 .055em .12em rgba(2, 8, 8, .92), 0 0 .2em rgba(2, 8, 8, .48);
-  transform-origin: center;
-  transition: opacity .12s linear;
-}
 
 .brand {
   position: fixed;

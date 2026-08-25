@@ -12,6 +12,7 @@ import { buildTerrainAwareWaterways } from './world/terrain-aware-waterways.mjs'
 import { seatRiverTerrain } from './world/river-terrain.mjs';
 import { buildVisualRiverField } from './world/visual-rivers.mjs';
 import { buildBakedTerrainAlbedo, buildNavigationField, buildTerrainNormals } from './world/terrain-precompute.mjs';
+import { sampleHeight } from './infrastructure/common.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MATERIAL = path.join(ROOT, 'material');
@@ -123,19 +124,53 @@ function writeTyped(relativePath, typedArray) {
   return writeFile(path.join(OUTPUT, relativePath), bytes);
 }
 
-function buildBorders(borderData) {
+function buildBorders(borderData, heights) {
   const records = [];
   for (const segment of borderData.segments) {
     const neighbor = segment.neighbor_province_id;
     if (neighbor !== null && segment.province_id > neighbor) continue;
-    const kind = segment.boundary_kind === 'coastline' ? 0 : 1;
     for (let index = 0; index + 1 < segment.coordinates.length; index += 1) {
       const [x1, y1] = segment.coordinates[index];
       const [x2, y2] = segment.coordinates[index + 1];
-      records.push(x1, y1, x2, y2, segment.province_id + 1, neighbor === null ? 0 : neighbor + 1, kind, 0);
+      const height1 = sampleHeight(heights, FIELD_WIDTH, FIELD_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, x1, y1);
+      const height2 = sampleHeight(heights, FIELD_WIDTH, FIELD_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, x2, y2);
+      // The first height stores a +1 sentinel so its sign can be toggled at
+      // runtime to cache whether this segment is currently a country border.
+      records.push(x1, y1, x2, y2, segment.province_id + 1, neighbor === null ? 0 : neighbor + 1, height1 + 1, height2);
     }
   }
   return new Float32Array(records);
+}
+
+function chunkLineRecords(source) {
+  const stride = 8;
+  const chunksX = 32;
+  const chunksY = 16;
+  const buckets = Array.from({ length: chunksX * chunksY }, () => []);
+  for (let offset = 0; offset < source.length; offset += stride) {
+    const x1 = source[offset];
+    let x2 = source[offset + 2];
+    if (x2 - x1 > WORLD_WIDTH * 0.5) x2 -= WORLD_WIDTH;
+    else if (x2 - x1 < -WORLD_WIDTH * 0.5) x2 += WORLD_WIDTH;
+    const centerX = wrap((x1 + x2) * 0.5, WORLD_WIDTH);
+    const centerY = clamp((source[offset + 1] + source[offset + 3]) * 0.5, 0, WORLD_HEIGHT - 0.001);
+    const chunkX = Math.min(chunksX - 1, Math.floor(centerX / WORLD_WIDTH * chunksX));
+    const chunkY = Math.min(chunksY - 1, Math.floor(centerY / WORLD_HEIGHT * chunksY));
+    const bucket = buckets[chunkY * chunksX + chunkX];
+    for (let component = 0; component < stride; component += 1) bucket.push(source[offset + component]);
+  }
+  const data = new Float32Array(source.length);
+  const ranges = [];
+  let firstInstance = 0;
+  let cursor = 0;
+  for (const bucket of buckets) {
+    data.set(bucket, cursor);
+    const instanceCount = bucket.length / stride;
+    ranges.push({ firstInstance, instanceCount });
+    firstInstance += instanceCount;
+    cursor += bucket.length;
+  }
+  return { data, chunksX, chunksY, ranges };
 }
 
 function buildConnections(connectionData) {
@@ -287,8 +322,7 @@ async function main() {
     }
   }
 
-  console.log('Packing borders, movement graph, forests, and cities…');
-  const borders = buildBorders(borderData);
+  console.log('Packing movement graph, forests, and cities…');
   const connections = buildConnections(connectionData);
 
   // The first movement-river pass gives the visual-only detector its exact
@@ -346,6 +380,8 @@ async function main() {
   const signChunks = chunkInstanceRecords(infrastructure.signs);
   const trees = treeChunks.data;
   const buildings = buildingChunks.data;
+  const borderChunks = chunkLineRecords(buildBorders(borderData, heights));
+  const borders = borderChunks.data;
   console.log('Precomputing terrain normals, navigation channels, material albedo, and prop occlusion...');
   const terrainNormals = buildTerrainNormals({
     heights, width: FIELD_WIDTH, height: FIELD_HEIGHT, worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
@@ -379,7 +415,7 @@ async function main() {
   for (const height of heights) maxHeight = Math.max(maxHeight, height);
 
   const worldGenerationReport = {
-    version: 'world-generation-v11',
+    version: 'world-generation-v12',
     topography: topographyReport,
     banks: bankField.report,
     waterways: waterways.report,
@@ -388,7 +424,7 @@ async function main() {
   };
 
   const manifest = {
-    version: 11,
+    version: 12,
     source: { mapId: mapMetadata.map_id, mapVersion: mapMetadata.map_version },
     generatedSeed: SEED,
     world: { width: WORLD_WIDTH, height: WORLD_HEIGHT, overlapX: 250, wrapX: true },
@@ -422,6 +458,11 @@ async function main() {
     },
     terrain: { chunksX: 32, chunksY: 16, gridResolution: 49, maxHeight },
     infrastructureChunks: { ...infrastructure.chunkRanges, waterways: waterways.chunkRanges },
+    borderChunks: {
+      chunksX: borderChunks.chunksX,
+      chunksY: borderChunks.chunksY,
+      ranges: borderChunks.ranges,
+    },
     propChunks: {
       chunksX: 32, chunksY: 16,
       trees: treeChunks.ranges, buildings: buildingChunks.ranges,

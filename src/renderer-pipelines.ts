@@ -1,9 +1,10 @@
-import { infrastructureShader, lineShader, propShader, terrainShader, waterShader, waterwayShader } from './shaders';
+import { countryLabelShader, infrastructureShader, lineShader, propShader, terrainShader, waterShader, waterwayShader } from './shaders';
 
 export interface RendererLayouts {
   common: GPUBindGroupLayout;
   instances: GPUBindGroupLayout;
   lines: GPUBindGroupLayout;
+  countryLabels: GPUBindGroupLayout;
 }
 
 export interface RendererPipelines {
@@ -13,6 +14,7 @@ export interface RendererPipelines {
   infrastructure: GPURenderPipeline;
   props: GPURenderPipeline;
   lines: GPURenderPipeline;
+  countryLabels: GPURenderPipeline;
 }
 
 export function createRendererLayouts(device: GPUDevice): RendererLayouts {
@@ -29,8 +31,7 @@ export function createRendererLayouts(device: GPUDevice): RendererLayouts {
       { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
-      { binding: 10, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
-      { binding: 11, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+      { binding: 10, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 12, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       { binding: 13, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ],
@@ -50,7 +51,15 @@ export function createRendererLayouts(device: GPUDevice): RendererLayouts {
       { binding: 1, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
     ],
   });
-  return { common, instances, lines };
+  const countryLabels = device.createBindGroupLayout({
+    label: 'country label layout',
+    entries: [
+      { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
+      { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+    ],
+  });
+  return { common, instances, lines, countryLabels };
 }
 
 export function createRendererPipelines(
@@ -65,6 +74,7 @@ export function createRendererPipelines(
   const infrastructureModule = device.createShaderModule({ label: 'terrain-draped road shader', code: infrastructureShader });
   const propModule = device.createShaderModule({ label: 'prop shader', code: propShader });
   const lineModule = device.createShaderModule({ label: 'line shader', code: lineShader });
+  const countryLabelModule = device.createShaderModule({ label: 'country label shader', code: countryLabelShader });
   const commonLayout = device.createPipelineLayout({ bindGroupLayouts: [layouts.common] });
 
   const terrain = device.createRenderPipeline({
@@ -118,7 +128,15 @@ export function createRendererPipelines(
     primitive: { topology: 'triangle-list', cullMode: 'none' },
     depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less-equal' },
   });
-  return { terrain, water, waterways, infrastructure, props, lines };
+  const countryLabels = device.createRenderPipeline({
+    label: 'country label pipeline',
+    layout: device.createPipelineLayout({ bindGroupLayouts: [layouts.common, layouts.countryLabels] }),
+    vertex: { module: countryLabelModule, entryPoint: 'countryLabelVertex' },
+    fragment: { module: countryLabelModule, entryPoint: 'countryLabelFragment', targets: [{ format, blend: alphaBlend }] },
+    primitive: { topology: 'triangle-list', cullMode: 'none' },
+    depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
+  });
+  return { terrain, water, waterways, infrastructure, props, lines, countryLabels };
 }
 
 const alphaBlend: GPUBlendState = {

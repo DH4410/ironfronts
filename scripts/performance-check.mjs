@@ -85,6 +85,9 @@ async function setAllLayers(overrides = {}) {
       trees: options.trees ?? true,
       buildings: options.buildings ?? true,
       roadFurniture: options.roadFurniture ?? true,
+      countryTint: options.countryTint ?? true,
+      countryBorders: options.countryBorders ?? true,
+      countryLabels: options.countryLabels ?? true,
     });
   }, overrides);
 }
@@ -204,7 +207,10 @@ if (!unsupported && manifest) {
     ['without road furniture', { roadFurniture: false }],
     ['without roads', { roads: false, hiddenLinks: false }],
     ['without waterways', { waterways: false }],
-    ['without politics', { borders: false, countries: false }],
+    ['without country labels', { countryLabels: false }],
+    ['without country borders', { countryBorders: false }],
+    ['without country tint', { countryTint: false }],
+    ['without politics', { countries: false }],
     ['without terrain surface', { terrain: false }],
     ['without ocean surface', { ocean: false }],
   ];
@@ -215,11 +221,24 @@ if (!unsupported && manifest) {
       await page.dispatchEvent('#world', 'pointerleave');
     }, idle);
   }
+  for (const [name, layers] of [
+    ['overview layer baseline', {}],
+    ['overview without country labels', { countryLabels: false }],
+    ['overview without country borders', { countryBorders: false }],
+    ['overview without country tint', { countryTint: false }],
+    ['overview without politics', { countries: false }],
+  ]) {
+    await measure(name, async () => {
+      await setAllLayers(layers);
+      await focus([manifest.world.width * 0.5, manifest.world.height * 0.5], manifest.world.width * 0.66, 0, 0.78);
+      await page.dispatchEvent('#world', 'pointerleave');
+    }, idle);
+  }
   await setAllLayers();
 }
 
 const worstScenarios = [...scenarios]
-  .filter((scenario) => !scenario.name.startsWith('without ') && scenario.name !== 'layer baseline')
+  .filter((scenario) => !scenario.name.includes('without ') && !scenario.name.includes('layer baseline'))
   .sort((a, b) => b.frame.p95 - a.frame.p95)
   .map((scenario) => ({ name: scenario.name, averageFrameMs: scenario.frame.average, p95FrameMs: scenario.frame.p95, averageGpuMs: scenario.gpu?.average ?? null }));
 const cpuHotspots = scenarios.flatMap((scenario) => Object.entries(scenario.phases).map(([phase, timing]) => ({
@@ -228,9 +247,12 @@ const cpuHotspots = scenarios.flatMap((scenario) => Object.entries(scenario.phas
   averageMs: timing.average,
   p95Ms: timing.p95,
 }))).sort((a, b) => b.p95Ms - a.p95Ms).slice(0, 8);
-const baseline = scenarios.find((scenario) => scenario.name === 'layer baseline');
-const layerCosts = baseline ? scenarios
-  .filter((scenario) => scenario.name.startsWith('without '))
+const layerCosts = estimateLayerCosts('layer baseline', 'without ');
+const overviewLayerCosts = estimateLayerCosts('overview layer baseline', 'overview without ');
+function estimateLayerCosts(baselineName, scenarioPrefix) {
+  const baseline = scenarios.find((scenario) => scenario.name === baselineName);
+  return baseline ? scenarios
+  .filter((scenario) => scenario.name.startsWith(scenarioPrefix))
   .map((scenario) => {
     const useGpu = baseline.gpu && scenario.gpu && baseline.gpuSampleCount >= 3 && scenario.gpuSampleCount >= 3;
     const metric = useGpu ? 'GPU' : 'frame interval';
@@ -238,9 +260,10 @@ const layerCosts = baseline ? scenarios
     // ablation ranking stable without hiding frame-tail data elsewhere.
     const baselineMs = useGpu ? baseline.gpu.median : baseline.frame.median;
     const reducedMs = useGpu ? scenario.gpu.median : scenario.frame.median;
-    return { layer: scenario.name.replace('without ', ''), metric, estimatedCostMs: baselineMs - reducedMs };
+    return { layer: scenario.name.replace(scenarioPrefix, ''), metric, estimatedCostMs: baselineMs - reducedMs };
   })
   .sort((a, b) => b.estimatedCostMs - a.estimatedCostMs) : [];
+}
 const report = {
   generatedAt: new Date().toISOString(),
   url: targetUrl.href,
@@ -248,7 +271,7 @@ const report = {
   scenarioDuration,
   warmupDuration,
   system,
-  summary: { worstScenarios, cpuHotspots, layerCosts },
+  summary: { worstScenarios, cpuHotspots, layerCosts, overviewLayerCosts },
   scenarios,
   errors,
 };
@@ -269,6 +292,8 @@ function renderConsoleSummary(report) {
   }
   lines.push('', 'Estimated layer cost:');
   for (const layer of report.summary.layerCosts) lines.push(`${layer.layer.padEnd(12)} ${layer.estimatedCostMs.toFixed(2)} ms (${layer.metric})`);
+  lines.push('', 'Overview country-layer cost:');
+  for (const layer of report.summary.overviewLayerCosts) lines.push(`${layer.layer.padEnd(15)} ${layer.estimatedCostMs.toFixed(2)} ms (${layer.metric})`);
   if (report.errors.length) lines.push('', ...report.errors);
   return lines.join('\n');
 }
@@ -300,6 +325,12 @@ function renderMarkdown(report) {
     '| Layer | Estimated cost | Metric |',
     '| --- | ---: | --- |',
     ...report.summary.layerCosts.map((item) => `| ${item.layer} | ${item.estimatedCostMs.toFixed(2)} ms | ${item.metric} |`),
+    '',
+    '## Overview country-layer cost',
+    '',
+    '| Layer | Estimated cost | Metric |',
+    '| --- | ---: | --- |',
+    ...report.summary.overviewLayerCosts.map((item) => `| ${item.layer} | ${item.estimatedCostMs.toFixed(2)} ms | ${item.metric} |`),
     '',
     '## All scenarios',
     '',

@@ -3,7 +3,7 @@ import { WorldRenderer } from './renderer';
 import type { FrameStats, HoverInfo } from './types';
 
 const canvas = required<HTMLCanvasElement>('world');
-const countryLabels = required<HTMLElement>('country-labels');
+const countryLabels = required<HTMLCanvasElement>('country-labels');
 const loading = required<HTMLElement>('loading');
 const loadingStage = required<HTMLElement>('loading-stage');
 const loadingValue = required<HTMLElement>('loading-value');
@@ -169,7 +169,7 @@ function updateDiagnostics(stats: FrameStats): void {
     `tris   ${formatCompact(timing.workload.triangles)}   labels ${timing.workload.labels}`,
     `hot geo  ${geometryRanking || 'none'}`,
     `chunks terrain ${timing.workload.visibleChunks.terrain}  trees ${timing.workload.visibleChunks.trees}  buildings ${timing.workload.visibleChunks.buildings}`,
-    `chunks road ${timing.workload.visibleChunks.roads}  river ${timing.workload.visibleChunks.waterways}  links ${timing.workload.visibleChunks.hiddenLinks}`,
+    `chunks road ${timing.workload.visibleChunks.roads}  river ${timing.workload.visibleChunks.waterways}  border ${timing.workload.visibleChunks.borders}  links ${timing.workload.visibleChunks.hiddenLinks}`,
     `LOD terrain ${timing.workload.lodInstances.terrain.join('/')}  trees ${timing.workload.lodInstances.trees.join('/')}  buildings ${timing.workload.lodInstances.buildings.join('/')}`,
     memory ? `JS heap ${formatBytes(memory.usedJSHeapSize)} / ${formatBytes(memory.jsHeapSizeLimit)}` : 'JS heap unavailable',
   ].join('\n');

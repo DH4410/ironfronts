@@ -5,12 +5,17 @@ interface Manifest {
   version: number;
   world: { width: number; height: number; wrapX: boolean };
   fields: Record<string, { url: string; width: number; height: number; format: string; mipLevelCount?: number }>;
-  buffers: Record<string, { count: number; stride: number }>;
+  buffers: Record<string, { url: string; count: number; stride: number }>;
   terrain: { maxHeight: number };
   infrastructureChunks: {
     roads: Array<{ firstIndex: number; indexCount: number }>;
     hiddenConnections: Array<{ firstIndex: number; indexCount: number }>;
     waterways: Array<{ firstIndex: number; indexCount: number }>;
+  };
+  borderChunks: {
+    chunksX: number;
+    chunksY: number;
+    ranges: Array<{ firstInstance: number; instanceCount: number }>;
   };
   counts: Record<string, number>;
   sidecars: { provinceDetails: { url: string; version: number } };
@@ -47,10 +52,10 @@ function viewU32(bytes: Buffer): Uint32Array {
   return new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
 }
 
-describe('generated v11 world package', () => {
+describe('generated v12 world package', () => {
   it('preserves the canonical world and exposes simplified roads plus supplied waterways', async () => {
     const data = await manifest();
-    expect(data.version).toBe(11);
+    expect(data.version).toBe(12);
     expect(data.world).toEqual(expect.objectContaining({ width: 13_562, height: 7_000, wrapX: true }));
     expect(data.provinces).toHaveLength(3_303);
     expect(new Set(data.provinces.map((province) => province.id)).size).toBe(3_303);
@@ -86,6 +91,15 @@ describe('generated v11 world package', () => {
     expect(data.buffers.hiddenConnectionVertices).toEqual(expect.objectContaining({ stride: 9 }));
     expect(data.buffers.waterwayVertices).toEqual(expect.objectContaining({ stride: 10 }));
     expect(data.buffers.waterwayIndices).toEqual(expect.objectContaining({ stride: 1 }));
+    expect(data.borderChunks.ranges).toHaveLength(data.borderChunks.chunksX * data.borderChunks.chunksY);
+    expect(data.borderChunks.ranges.reduce((sum, range) => sum + range.instanceCount, 0)).toBe(data.buffers.borders.count);
+    const borderBytes = await readFile(`public/world/${data.buffers.borders.url}`);
+    const borders = viewF32(borderBytes);
+    expect(borders.length).toBe(data.buffers.borders.count * data.buffers.borders.stride);
+    for (let border = 0; border < data.buffers.borders.count; border += 251) {
+      expect(borders[border * 8 + 6]).toBeGreaterThanOrEqual(1);
+      expect(borders[border * 8 + 7]).toBeGreaterThanOrEqual(0);
+    }
     expect(data.provinces.every((province) => Object.keys(province).sort().join(',') === 'id,name,terrain')).toBe(true);
     const details = JSON.parse(await readFile(`public/world/${data.sidecars.provinceDetails.url}`, 'utf8'));
     expect(data.sidecars.provinceDetails.version).toBe(1);
@@ -113,7 +127,7 @@ describe('generated v11 world package', () => {
     const riverNames = new Set(report.waterways.riverSystems);
     const sourceRiverPoints = source.nodes.filter((node) => node.kind === 'sea_point' && riverNames.has(node.location_name));
     const sourceCanalPoints = source.nodes.filter((node) => node.kind === 'sea_point' && ['Kiel Canal', 'Suez Channel'].includes(node.location_name));
-    expect(report.version).toBe('world-generation-v11');
+    expect(report.version).toBe('world-generation-v12');
     expect(report.waterways.animatedSurface).toBe(true);
     expect(report.waterways.animation).toBe('tangent-advection-domain-warp');
     expect(report.waterways.minimumRiverWidth).toBeGreaterThanOrEqual(11);
