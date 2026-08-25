@@ -55,7 +55,7 @@ fn infrastructureFragment(input: InfrastructureOutput) -> @location(0) vec4f {
   let light = 0.48 + normal.y * 0.16 + diffuse * 0.58;
   let fog = smoothstep(3500.0, 11000.0, distance(uniforms.camera.xyz, input.worldPosition));
   let worldFog = horizontalWorldFog(input.worldPosition.x);
-  color = mix(mix(color * light, vec3f(0.58, 0.69, 0.72), fog * 0.78), worldFogColor(), worldFog);
+  color = mix(mix(color * light, vec3f(0.58, 0.69, 0.72), fog * 0.39), worldFogColor(), worldFog);
   return vec4f(color, input.visibility * (1.0 - worldFog));
 }
 `;

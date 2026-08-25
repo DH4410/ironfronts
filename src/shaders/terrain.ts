@@ -1,5 +1,9 @@
 import { commonWgsl } from './common';
 
+export const POLITICAL_OVERVIEW_START_ALTITUDE = 3_000;
+export const POLITICAL_OVERVIEW_FULL_ALTITUDE = 6_500;
+export const POLITICAL_OVERVIEW_MAX_STRENGTH = 0.82;
+
 export const terrainShader = commonWgsl + /* wgsl */ `
 struct TerrainVertexInput {
   @location(0) grid: vec2f,
@@ -109,8 +113,13 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     let politicalColor = politicalColorAt(input.mapUv);
     if (politicalColor.a > 0.5) {
       let terrainLuminance = dot(baseColor, vec3f(0.24, 0.68, 0.08));
-      let coloredSurface = mix(baseColor, politicalColor.rgb * (0.58 + terrainLuminance * 0.72), 0.72);
-      let overlayStrength = mix(0.26, 0.38, smoothstep(1300.0, 6200.0, uniforms.interaction.y));
+      let coloredSurface = politicalColor.rgb * (0.62 + terrainLuminance * 0.70);
+      let overview = smoothstep(
+        ${POLITICAL_OVERVIEW_START_ALTITUDE.toFixed(1)},
+        ${POLITICAL_OVERVIEW_FULL_ALTITUDE.toFixed(1)},
+        uniforms.camera.y
+      );
+      let overlayStrength = overview * ${POLITICAL_OVERVIEW_MAX_STRENGTH.toFixed(2)};
       baseColor = mix(baseColor, coloredSurface, overlayStrength);
     }
   }
@@ -179,7 +188,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let distanceToCamera = distance(uniforms.camera.xyz, input.worldPosition);
   let fog = smoothstep(3600.0, 11500.0, distanceToCamera);
   let fogColor = vec3f(0.58, 0.69, 0.72);
-  let distanceFogged = mix(lit, fogColor, fog * 0.78);
+  let distanceFogged = mix(lit, fogColor, fog * 0.39);
   return vec4f(mix(distanceFogged, worldFogColor(), horizontalWorldFog(input.worldPosition.x)), 1.0);
 }
 `;

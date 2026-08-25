@@ -16,6 +16,7 @@ import { seatRiverTerrain } from './world/river-terrain.mjs';
 import { buildVisualRiverField } from './world/visual-rivers.mjs';
 import { buildBakedTerrainAlbedo, buildNavigationField, buildTerrainNormals } from './world/terrain-precompute.mjs';
 import { fillProvincePolygon, readMaterialJson } from './world/source-data.mjs';
+import { buildPoliticalPalette } from './world/political-palette.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MATERIAL = path.join(ROOT, 'material');
@@ -95,10 +96,11 @@ async function main() {
     provinceAdjacency[index * 2] = adjacency.province_a_id + 1;
     provinceAdjacency[index * 2 + 1] = adjacency.province_b_id + 1;
   }
+  const politicalPalette = buildPoliticalPalette(countryData.countries, provinceOwners, provinceAdjacency, SEED);
   const countries = countryData.countries.map((country) => ({
     id: country.country_id,
     name: country.nation_name,
-    color: country.primary_color_hex,
+    ...politicalPalette.get(country.country_id),
     capitalProvinceId: country.capital_province_id,
   }));
   if (metadata.provinces.some((province) => provinceOwners[province.province_id + 1] === 0)) {

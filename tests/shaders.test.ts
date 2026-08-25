@@ -64,7 +64,9 @@ describe('WGSL programs', () => {
   it('derives political tint and country borders from mutable province ownership', () => {
     expect(terrainShader).toContain('let politicalColor = politicalColorAt(input.mapUv)');
     expect(terrainShader).not.toContain('let provinceId = provinceAt(input.mapUv)');
-    expect(terrainShader).toContain('let overlayStrength = mix(0.26, 0.38');
+    expect(terrainShader).toContain('smoothstep(\n        3000.0,\n        6500.0,\n        uniforms.camera.y');
+    expect(terrainShader).toContain('let overlayStrength = overview * 0.82');
+    expect(terrainShader).toContain('fog * 0.39');
     expect(lineShader).toContain('let countryBoundary = line.b.z < 0.0');
     expect(lineShader).toContain('height0 = abs(line.b.z) + 0.8');
     expect(lineShader).toContain('(lineParams.enabled & 2u) != 0u');

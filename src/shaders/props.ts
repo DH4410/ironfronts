@@ -216,7 +216,7 @@ fn propFragment(input: PropVertexOutput) -> @location(0) vec4f {
   let distanceToCamera = distance(uniforms.camera.xyz, input.worldPosition);
   let fog = smoothstep(3100.0, 9200.0, distanceToCamera);
   let worldFog = horizontalWorldFog(input.worldPosition.x);
-  let color = mix(mix(albedo * light, vec3f(0.58, 0.69, 0.72), fog * 0.78), worldFogColor(), worldFog);
+  let color = mix(mix(albedo * light, vec3f(0.58, 0.69, 0.72), fog * 0.39), worldFogColor(), worldFog);
   return vec4f(color, input.visibility * input.opacity * (1.0 - worldFog));
 }
 `;

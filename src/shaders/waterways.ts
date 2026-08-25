@@ -87,7 +87,7 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   color += vec3f(1.0, 0.84, 0.58) * sun * 0.28;
   let fog = smoothstep(4000.0, 12000.0, distance(uniforms.camera.xyz, input.worldPosition));
   let worldFog = horizontalWorldFog(input.worldPosition.x);
-  let foggedColor = mix(mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.80), worldFogColor(), worldFog);
+  let foggedColor = mix(mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.40), worldFogColor(), worldFog);
   return vec4f(foggedColor, input.visibility * 0.985 * (1.0 - worldFog));
 }
 `;

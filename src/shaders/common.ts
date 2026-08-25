@@ -156,7 +156,7 @@ fn oceanSurfaceColor(worldPosition: vec3f, depth: f32, shoreline: f32, visualRiv
 
 fn applyOceanDistanceFog(color: vec3f, worldPosition: vec3f) -> vec3f {
   let fog = smoothstep(4000.0, 12000.0, distance(uniforms.camera.xyz, worldPosition));
-  return mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.80);
+  return mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.40);
 }
 
 fn worldFogColor() -> vec3f {

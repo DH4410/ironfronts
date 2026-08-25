@@ -23,7 +23,9 @@ interface Manifest {
     owners: { url: string; count: number; stride: number };
     adjacency: { url: string; count: number; stride: number };
     labelData: { url: string; count: number; stride: number };
-    countries: Array<{ id: number; name: string; color: string; capitalProvinceId: number }>;
+    countries: Array<{
+      id: number; name: string; color: string; colorFamily: number; capitalProvinceId: number;
+    }>;
   };
   propChunks: {
     chunksX: number;
@@ -301,6 +303,8 @@ describe('generated v12 world package', () => {
     expect(data.politics.countries).toHaveLength(200);
     expect(new Set(data.politics.countries.map((country) => country.id)).size).toBe(200);
     expect(data.politics.countries.every((country) => /^#[0-9A-F]{6}$/i.test(country.color))).toBe(true);
+    expect(new Set(data.politics.countries.map((country) => country.color)).size).toBe(200);
+    expect(data.politics.countries.every((country) => country.colorFamily >= 0 && country.colorFamily < 6)).toBe(true);
     expect(owners.length).toBe(data.politics.owners.count);
     expect(adjacency.length).toBe(data.politics.adjacency.count * 2);
     expect(labels.length).toBe(data.politics.labelData.count * 3);
@@ -321,6 +325,11 @@ describe('generated v12 world package', () => {
     for (let edge = 0; edge < adjacency.length; edge += 2) {
       expect(owners[adjacency[edge]]).toBeGreaterThan(0);
       expect(owners[adjacency[edge + 1]]).toBeGreaterThan(0);
+      const countryA = data.politics.countries.find((country) => country.id === owners[adjacency[edge]]);
+      const countryB = data.politics.countries.find((country) => country.id === owners[adjacency[edge + 1]]);
+      if (countryA && countryB && countryA.id !== countryB.id) {
+        expect(countryA.colorFamily).not.toBe(countryB.colorFamily);
+      }
     }
   });
 

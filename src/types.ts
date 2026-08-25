@@ -23,6 +23,7 @@ export interface CountryRecord {
   id: number;
   name: string;
   color: string;
+  colorFamily: number;
   capitalProvinceId: number;
 }
 
