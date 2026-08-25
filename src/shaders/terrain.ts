@@ -2,6 +2,7 @@ import { commonWgsl } from './common';
 
 export const POLITICAL_OVERVIEW_START_ALTITUDE = 3_000;
 export const POLITICAL_OVERVIEW_FULL_ALTITUDE = 6_500;
+export const POLITICAL_CLOSE_TINT_STRENGTH = 0.3;
 export const POLITICAL_OVERVIEW_MAX_STRENGTH = 0.82;
 
 export const terrainShader = commonWgsl + /* wgsl */ `
@@ -119,7 +120,11 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
         ${POLITICAL_OVERVIEW_FULL_ALTITUDE.toFixed(1)},
         uniforms.camera.y
       );
-      let overlayStrength = overview * ${POLITICAL_OVERVIEW_MAX_STRENGTH.toFixed(2)};
+      let overlayStrength = mix(
+        ${POLITICAL_CLOSE_TINT_STRENGTH.toFixed(2)},
+        ${POLITICAL_OVERVIEW_MAX_STRENGTH.toFixed(2)},
+        overview
+      );
       baseColor = mix(baseColor, coloredSurface, overlayStrength);
     }
   }
