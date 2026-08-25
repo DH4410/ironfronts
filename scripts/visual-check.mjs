@@ -106,7 +106,35 @@ if (!status.unsupported) {
     await page.waitForTimeout(900);
     await page.screenshot({ path: path.join(outputDirectory, filename) });
   };
+  const captureCamera = async (point, filename, distance, yaw, pitch) => {
+    await page.evaluate(({ point, distance, yaw, pitch }) => {
+      window.__ironfrontsRenderer?.focus(point[0], point[1], distance, yaw, pitch);
+    }, { point, distance, yaw, pitch });
+    await page.waitForTimeout(900);
+    await page.screenshot({ path: path.join(outputDirectory, filename) });
+  };
+
   await page.keyboard.press('F3');
+  // Camera/chunk regressions: both horizontal seams must render their adjacent
+  // world at the shallowest pitch, and a camera placed directly over a chunk
+  // corner must not cull a chunk merely because its center is behind the near
+  // plane.
+  const world = await page.evaluate(async () => {
+    const manifest = await fetch('/world/world.json').then((response) => response.json());
+    return {
+      width: manifest.world.width,
+      height: manifest.world.height,
+      chunksX: manifest.terrain.chunksX,
+      chunksY: manifest.terrain.chunksY,
+    };
+  });
+  await captureCamera([24, world.height * 0.5], 'camera-seam-west-tilted.png', 1_800, 1.18, 0.43);
+  await captureCamera([world.width - 24, world.height * 0.5], 'camera-seam-east-tilted.png', 1_800, -1.18, 0.43);
+  const chunkCorner = [world.width * 17 / world.chunksX, world.height * 9 / world.chunksY];
+  await captureCamera(chunkCorner, 'camera-max-zoom-chunk-corner-a.png', 180, -0.78, 1.23);
+  await captureCamera(chunkCorner, 'camera-max-zoom-chunk-corner-b.png', 180, 2.36, 1.23);
+  validation.cameraRegressionCaptures = 4;
+
   await captureShowcase('urban', 'roads-urban.png', 410);
   await captureShowcase('mountain', 'roads-mountain.png', 480);
   await captureShowcase('steepRoad', 'roads-steep.png', 360);

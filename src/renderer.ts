@@ -13,6 +13,7 @@ import {
 } from './scene-meshes';
 import type { Mesh } from './scene-meshes';
 import type { BinaryField, CountryRecord, FrameStats, HoverInfo, ProgressReporter, PropChunkRange, ProvinceRecord, WorldManifest } from './types';
+import { extractFrustumPlanes, sphereIntersectsFrustum, WORLD_COPY_INDICES } from './visibility';
 
 interface InstanceLayer {
   buffer: GPUBuffer;
@@ -106,6 +107,8 @@ export class WorldRenderer {
   private visibleTerrainBuffer!: GPUBuffer;
   private terrainLodDraws: Array<{ firstInstance: number; instanceCount: number; lod: number }> = [];
   private lastTerrainVisibilityRevision = -1;
+  private readonly frustumPlanes = new Float32Array(24);
+  private frustumPlanesRevision = -1;
   private heightData!: Float32Array;
   private provinceData!: Uint16Array;
   private provinceOwners!: Uint32Array;
@@ -920,16 +923,14 @@ export class WorldRenderer {
     }
     if (this.showConnections && this.connections) {
       pass.setBindGroup(1, this.connections.bindGroup);
-      const copies = this.visibleWorldCopies();
-      const instances = this.connections.count * copies.length;
-      pass.draw(6, instances, 0, copies[0] * this.connections.count);
+      const instances = this.connections.count * WORLD_COPY_INDICES.length;
+      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.connections.count);
       this.recordTriangleDraw('debugLines', instances * 2, instances);
     }
     if (this.showWaterwayNetwork && this.waterwayNetwork) {
       pass.setBindGroup(1, this.waterwayNetwork.bindGroup);
-      const copies = this.visibleWorldCopies();
-      const instances = this.waterwayNetwork.count * copies.length;
-      pass.draw(6, instances, 0, copies[0] * this.waterwayNetwork.count);
+      const instances = this.waterwayNetwork.count * WORLD_COPY_INDICES.length;
+      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.waterwayNetwork.count);
       this.recordTriangleDraw('debugLines', instances * 2, instances);
     }
     if (visibleLabels > 0 && this.countryLabelBindGroup) {
@@ -984,7 +985,7 @@ export class WorldRenderer {
       const chunkRadius = Math.hypot(chunkWidth, chunkHeight) * 0.55;
       const buckets = groupMeshes.map((meshes) => meshes.map(() => [] as number[]));
       view.visibleChunks = 0;
-      for (const copy of this.visibleWorldCopies(maximumDistance + chunkRadius)) {
+      for (const copy of WORLD_COPY_INDICES) {
         const copyOffset = (copy - 1) * this.manifest.world.width;
         for (let chunkIndex = 0; chunkIndex < ranges.length; chunkIndex += 1) {
           const range = ranges[chunkIndex];
@@ -1039,25 +1040,12 @@ export class WorldRenderer {
     }
   }
 
-  private visibleWorldCopies(edgeRange = this.camera.distance * 0.72 + 420): number[] {
-    const clampedRange = Math.min(this.manifest.world.width * 0.48, edgeRange);
-    if (this.camera.target[0] < clampedRange) return [0, 1];
-    if (this.camera.target[0] > this.manifest.world.width - clampedRange) return [1, 2];
-    return [1];
-  }
-
   private chunkIntersectsView(centerX: number, centerZ: number, radius: number): boolean {
-    const centerY = this.sampleHeight(centerX, centerZ);
-    const matrix = this.camera.viewProjection;
-    const clipX = matrix[0] * centerX + matrix[4] * centerY + matrix[8] * centerZ + matrix[12];
-    const clipY = matrix[1] * centerX + matrix[5] * centerY + matrix[9] * centerZ + matrix[13];
-    const clipW = matrix[3] * centerX + matrix[7] * centerY + matrix[11] * centerZ + matrix[15];
-    if (clipW <= 1) return false;
-    const distance = Math.hypot(
-      centerX - this.camera.position[0], centerY - this.camera.position[1], centerZ - this.camera.position[2],
-    );
-    const margin = Math.min(1.5, radius * 2.8 / Math.max(1, distance));
-    return Math.abs(clipX / clipW) <= 1 + margin && Math.abs(clipY / clipW) <= 1 + margin;
+    if (this.frustumPlanesRevision !== this.camera.revision) {
+      extractFrustumPlanes(this.camera.viewProjection, this.frustumPlanes);
+      this.frustumPlanesRevision = this.camera.revision;
+    }
+    return sphereIntersectsFrustum(this.frustumPlanes, centerX, this.sampleHeight(centerX, centerZ), centerZ, radius);
   }
 
   private updateVisibleTerrainChunks(): void {
@@ -1070,7 +1058,7 @@ export class WorldRenderer {
     const chunkHeight = this.manifest.world.height / chunksY;
     const chunkRadius = Math.hypot(chunkWidth, chunkHeight) * 0.72;
     const lodEntries: number[][] = [[], [], [], []];
-    for (const copy of this.visibleWorldCopies(this.camera.distance * 0.9 + chunkRadius)) {
+    for (const copy of WORLD_COPY_INDICES) {
       const copyOffset = (copy - 1) * this.manifest.world.width;
       for (let chunkY = 0; chunkY < chunksY; chunkY += 1) {
         for (let chunkX = 0; chunkX < chunksX; chunkX += 1) {
@@ -1114,8 +1102,7 @@ export class WorldRenderer {
     const chunkHeight = this.manifest.world.height / chunksY;
     const radius = clamp(this.camera.distance * 1.48 + 720, 940, maximumDistance + 300);
     const chunkRadius = Math.hypot(chunkWidth, chunkHeight) * 0.6;
-    const copies = this.visibleWorldCopies(radius + chunkRadius);
-    for (const copy of copies) {
+    for (const copy of WORLD_COPY_INDICES) {
       const visibleRanges: Array<{ firstIndex: number; indexCount: number }> = [];
       for (let chunkY = 0; chunkY < chunksY; chunkY += 1) {
         for (let chunkX = 0; chunkX < chunksX; chunkX += 1) {
@@ -1160,7 +1147,7 @@ export class WorldRenderer {
     const chunkWidth = this.manifest.world.width / chunksX;
     const chunkHeight = this.manifest.world.height / chunksY;
     const chunkRadius = Math.hypot(chunkWidth, chunkHeight) * 0.62;
-    for (const copy of this.visibleWorldCopies(this.camera.distance * 0.9 + chunkRadius)) {
+    for (const copy of WORLD_COPY_INDICES) {
       const copyOffset = (copy - 1) * this.manifest.world.width;
       const visibleRanges: Array<{ firstInstance: number; instanceCount: number }> = [];
       for (let chunkIndex = 0; chunkIndex < ranges.length; chunkIndex += 1) {
