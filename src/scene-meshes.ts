@@ -111,12 +111,6 @@ export function createSignMesh(device: GPUDevice): Mesh {
   return uploadMesh(device,'road sign mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
 }
 
-export function createShadowMesh(device: GPUDevice): Mesh {
-  const builder = new MeshBuilder();
-  builder.addPlane(9);
-  return uploadMesh(device,'contact shadow mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
-}
-
 function uploadMesh(device: GPUDevice, label: string, vertices: Float32Array, indices: Uint16Array): Mesh {
   const vertex = device.createBuffer({ label: `${label} vertices`, size: align4(vertices.byteLength), usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
   const index = device.createBuffer({ label: `${label} indices`, size: align4(indices.byteLength), usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });

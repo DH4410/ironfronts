@@ -11,10 +11,12 @@ import { buildWaterways } from './world/waterways.mjs';
 import { buildTerrainAwareWaterways } from './world/terrain-aware-waterways.mjs';
 import { seatRiverTerrain } from './world/river-terrain.mjs';
 import { buildVisualRiverField } from './world/visual-rivers.mjs';
+import { buildBakedTerrainAlbedo, buildNavigationField, buildTerrainNormals } from './world/terrain-precompute.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MATERIAL = path.join(ROOT, 'material');
 const OUTPUT = path.join(ROOT, 'public', 'world');
+const TEXTURES = path.join(ROOT, 'public', 'textures');
 
 const terrainCodes = new Map([
   [10, 0],
@@ -142,37 +144,6 @@ function buildConnections(connectionData) {
     records.push(edge.x1, edge.y1, edge.x2, edge.y2, edge.medium === 'land' ? 1 : 0, 0, 0, 0);
   }
   return new Float32Array(records);
-}
-
-function buildFarAlbedo(surface, width, height) {
-  const outputWidth = 512;
-  const outputHeight = Math.max(1, Math.round(outputWidth * height / width));
-  const output = new Uint8Array(outputWidth * outputHeight * 4);
-  const terrainColors = [
-    [91, 126, 72], [113, 111, 74], [116, 116, 112], [45, 91, 52], [108, 99, 88],
-  ];
-  const biomeColors = new Map([
-    [1, [174, 150, 91]], [2, [111, 126, 73]], [3, [60, 92, 61]], [4, [55, 103, 57]],
-    [5, [104, 135, 77]], [6, [121, 126, 111]], [7, [191, 164, 101]], [8, [189, 199, 194]],
-  ]);
-  for (let y = 0; y < outputHeight; y += 1) {
-    const sourceY = Math.min(height - 1, Math.floor((y + 0.5) / outputHeight * height));
-    for (let x = 0; x < outputWidth; x += 1) {
-      const sourceX = Math.min(width - 1, Math.floor((x + 0.5) / outputWidth * width));
-      const sourceOffset = (sourceY * width + sourceX) * 4;
-      const targetOffset = (y * outputWidth + x) * 4;
-      const terrain = surface[sourceOffset];
-      const biome = surface[sourceOffset + 1];
-      const variation = surface[sourceOffset + 2] / 255;
-      const base = biomeColors.get(biome) ?? terrainColors[Math.min(terrain, terrainColors.length - 1)] ?? [62, 112, 124];
-      const shade = 0.9 + variation * 0.18;
-      output[targetOffset] = Math.round(base[0] * shade);
-      output[targetOffset + 1] = Math.round(base[1] * shade);
-      output[targetOffset + 2] = Math.round(base[2] * shade);
-      output[targetOffset + 3] = 255;
-    }
-  }
-  return { data: output, width: outputWidth, height: outputHeight };
 }
 
 function chunkInstanceRecords(source, groupForRecord = () => 0, groupCount = 1) {
@@ -317,7 +288,6 @@ async function main() {
   }
 
   console.log('Packing borders, movement graph, forests, and cities…');
-  const farAlbedo = buildFarAlbedo(surface, FIELD_WIDTH, FIELD_HEIGHT);
   const borders = buildBorders(borderData);
   const connections = buildConnections(connectionData);
 
@@ -376,6 +346,17 @@ async function main() {
   const signChunks = chunkInstanceRecords(infrastructure.signs);
   const trees = treeChunks.data;
   const buildings = buildingChunks.data;
+  console.log('Precomputing terrain normals, navigation channels, material albedo, and prop occlusion...');
+  const terrainNormals = buildTerrainNormals({
+    heights, width: FIELD_WIDTH, height: FIELD_HEIGHT, worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
+  });
+  const navigationField = buildNavigationField(infrastructure.roadField, waterwayField);
+  const terrainAlbedo = await buildBakedTerrainAlbedo({
+    textureDirectory: TEXTURES, heights, surface,
+    coastField: bankField.field, coastWidth: ID_WIDTH, coastHeight: ID_HEIGHT,
+    width: FIELD_WIDTH, height: FIELD_HEIGHT, worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
+    trees, buildings,
+  });
 
   const provinceRecords = metadata.provinces.map((province) => ({
     id: province.province_id,
@@ -398,7 +379,7 @@ async function main() {
   for (const height of heights) maxHeight = Math.max(maxHeight, height);
 
   const worldGenerationReport = {
-    version: 'world-generation-v10',
+    version: 'world-generation-v11',
     topography: topographyReport,
     banks: bankField.report,
     waterways: waterways.report,
@@ -407,16 +388,19 @@ async function main() {
   };
 
   const manifest = {
-    version: 10,
+    version: 11,
     source: { mapId: mapMetadata.map_id, mapVersion: mapMetadata.map_version },
     generatedSeed: SEED,
     world: { width: WORLD_WIDTH, height: WORLD_HEIGHT, overlapX: 250, wrapX: true },
     fields: {
       height: { url: 'height.f32', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'r32float' },
       surface: { url: 'surface.rgba8', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'rgba8uint' },
-      farAlbedo: { url: 'far-albedo.rgba8', width: farAlbedo.width, height: farAlbedo.height, format: 'rgba8unorm' },
-      roads: { url: 'roads.rg8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rg8unorm' },
-      waterways: { url: 'waterways.rg8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rg8unorm' },
+      terrainNormal: { url: 'terrain-normal.rg8', width: FIELD_WIDTH, height: FIELD_HEIGHT, format: 'rg8snorm' },
+      terrainAlbedo: {
+        url: 'terrain-albedo.rgba8', width: FIELD_WIDTH, height: FIELD_HEIGHT,
+        format: 'rgba8unorm-srgb', mipLevelCount: terrainAlbedo.mipLevelCount,
+      },
+      navigation: { url: 'navigation.rgba8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rgba8unorm' },
       coast: { url: 'coast.rg8', width: ID_WIDTH, height: ID_HEIGHT, format: 'rg8unorm' },
       provinceIds: { url: 'province-ids.u16', width: ID_WIDTH, height: ID_HEIGHT, format: 'r16uint' },
     },
@@ -476,9 +460,9 @@ async function main() {
     writeTyped('province-label-data.f32', provinceLabelData),
     writeTyped('height.f32', heights),
     writeTyped('surface.rgba8', surface),
-    writeTyped('far-albedo.rgba8', farAlbedo.data),
-    writeTyped('roads.rg8', infrastructure.roadField),
-    writeTyped('waterways.rg8', waterwayField),
+    writeTyped('terrain-normal.rg8', terrainNormals),
+    writeTyped('terrain-albedo.rgba8', terrainAlbedo.data),
+    writeTyped('navigation.rgba8', navigationField),
     writeTyped('coast.rg8', bankField.field),
     writeTyped('borders.f32', borders),
     writeTyped('connections.f32', connections),

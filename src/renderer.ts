@@ -8,11 +8,11 @@ import {
 } from './performance-monitor';
 import { createRendererLayouts, createRendererPipelines } from './renderer-pipelines';
 import {
-  createBarrierMesh, createBuildingArchetypeMesh, createLampMesh, createShadowMesh, createSignMesh, createTerrainMesh,
+  createBarrierMesh, createBuildingArchetypeMesh, createLampMesh, createSignMesh, createTerrainMesh,
   createTreeFamilyMesh, uploadIndexedMesh,
 } from './scene-meshes';
 import type { Mesh } from './scene-meshes';
-import type { CountryRecord, FrameStats, HoverInfo, ProgressReporter, PropChunkRange, ProvinceRecord, WorldManifest } from './types';
+import type { BinaryField, CountryRecord, FrameStats, HoverInfo, ProgressReporter, PropChunkRange, ProvinceRecord, WorldManifest } from './types';
 
 interface InstanceLayer {
   buffer: GPUBuffer;
@@ -33,8 +33,6 @@ interface PerformanceLayerVisibility {
   ocean: boolean;
   trees: boolean;
   buildings: boolean;
-  treeShadows: boolean;
-  buildingShadows: boolean;
   roadFurniture: boolean;
 }
 
@@ -70,7 +68,6 @@ export class WorldRenderer {
   private waterwayMesh!: Mesh;
   private treeMeshes!: Mesh[][];
   private buildingMeshes!: Mesh[][];
-  private shadowMesh!: Mesh;
   private lampMesh!: Mesh;
   private barrierMesh!: Mesh;
   private signMesh!: Mesh;
@@ -84,11 +81,11 @@ export class WorldRenderer {
   private waterwayNetwork?: InstanceLayer;
   private heightTexture!: GPUTexture;
   private surfaceTexture!: GPUTexture;
-  private farAlbedoTexture!: GPUTexture;
+  private terrainAlbedoTexture!: GPUTexture;
   private provinceTexture!: GPUTexture;
   private coastTexture!: GPUTexture;
-  private roadTexture!: GPUTexture;
-  private waterwayTexture!: GPUTexture;
+  private navigationTexture!: GPUTexture;
+  private terrainNormalTexture!: GPUTexture;
   private materialTexture!: GPUTexture;
   private treeMaterialTexture!: GPUTexture;
   private provinceOwnerBuffer!: GPUBuffer;
@@ -130,8 +127,6 @@ export class WorldRenderer {
     ocean: true,
     trees: true,
     buildings: true,
-    treeShadows: true,
-    buildingShadows: true,
     roadFurniture: true,
   };
   private pointer = { x: 0, y: 0, inside: false };
@@ -190,15 +185,15 @@ export class WorldRenderer {
     this.createLayouts();
 
     report('Loading terrain fields', 0.2);
-    const [heightBuffer, surfaceBuffer, farAlbedoBuffer, roadFieldBuffer, waterwayFieldBuffer, coastBuffer, provinceBuffer, roadVertexBuffer, roadIndexBuffer,
+    const [heightBuffer, surfaceBuffer, terrainNormalBuffer, terrainAlbedoBuffer, navigationBuffer, coastBuffer, provinceBuffer, roadVertexBuffer, roadIndexBuffer,
       hiddenConnectionVertexBuffer, hiddenConnectionIndexBuffer, waterwayVertexBuffer, waterwayIndexBuffer,
       borderBuffer, treeBuffer, buildingBuffer, lampBuffer, barrierBuffer, signBuffer,
       provinceOwnerData, provinceAdjacencyData, provinceLabelData] = await Promise.all([
       fetchBinary(`/world/${this.manifest.fields.height.url}`),
       fetchBinary(`/world/${this.manifest.fields.surface.url}`),
-      fetchBinary(`/world/${this.manifest.fields.farAlbedo.url}`),
-      fetchBinary(`/world/${this.manifest.fields.roads.url}`),
-      fetchBinary(`/world/${this.manifest.fields.waterways.url}`),
+      fetchBinary(`/world/${this.manifest.fields.terrainNormal.url}`),
+      fetchBinary(`/world/${this.manifest.fields.terrainAlbedo.url}`),
+      fetchBinary(`/world/${this.manifest.fields.navigation.url}`),
       fetchBinary(`/world/${this.manifest.fields.coast.url}`),
       fetchBinary(`/world/${this.manifest.fields.provinceIds.url}`),
       fetchBinary(`/world/${this.manifest.buffers.roadVertices.url}`),
@@ -231,17 +226,16 @@ export class WorldRenderer {
       'terrain surface', this.manifest.fields.surface.width, this.manifest.fields.surface.height,
       'rgba8uint', new Uint8Array(surfaceBuffer), this.manifest.fields.surface.width * 4,
     );
-    this.farAlbedoTexture = this.uploadTexture(
-      'far terrain albedo', this.manifest.fields.farAlbedo.width, this.manifest.fields.farAlbedo.height,
-      'rgba8unorm', new Uint8Array(farAlbedoBuffer), this.manifest.fields.farAlbedo.width * 4,
+    this.terrainNormalTexture = this.uploadTexture(
+      'precomputed terrain normals', this.manifest.fields.terrainNormal.width, this.manifest.fields.terrainNormal.height,
+      'rg8snorm', new Uint8Array(terrainNormalBuffer), this.manifest.fields.terrainNormal.width * 2,
     );
-    this.roadTexture = this.uploadTexture(
-      'strategic road field', this.manifest.fields.roads.width, this.manifest.fields.roads.height,
-      'rg8unorm', new Uint8Array(roadFieldBuffer), this.manifest.fields.roads.width * 2,
+    this.terrainAlbedoTexture = this.uploadMipmappedTexture(
+      'baked terrain albedo and occlusion', this.manifest.fields.terrainAlbedo, new Uint8Array(terrainAlbedoBuffer),
     );
-    this.waterwayTexture = this.uploadTexture(
-      'movement and visual-river field', this.manifest.fields.waterways.width, this.manifest.fields.waterways.height,
-      'rg8unorm', new Uint8Array(waterwayFieldBuffer), this.manifest.fields.waterways.width * 2,
+    this.navigationTexture = this.uploadTexture(
+      'packed roads and waterways', this.manifest.fields.navigation.width, this.manifest.fields.navigation.height,
+      'rgba8unorm', new Uint8Array(navigationBuffer), this.manifest.fields.navigation.width * 4,
     );
     this.coastTexture = this.uploadTexture(
       'signed-distance bank field', this.manifest.fields.coast.width, this.manifest.fields.coast.height,
@@ -280,13 +274,13 @@ export class WorldRenderer {
         { binding: 4, resource: this.materialTexture.createView({ dimension: '2d-array' }) },
         { binding: 5, resource: this.device.createSampler({ addressModeU: 'repeat', addressModeV: 'repeat', magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' }) },
         { binding: 6, resource: this.coastTexture.createView() },
-        { binding: 7, resource: this.roadTexture.createView() },
-        { binding: 8, resource: this.waterwayTexture.createView() },
+        { binding: 7, resource: this.navigationTexture.createView() },
+        { binding: 8, resource: this.terrainNormalTexture.createView() },
         { binding: 9, resource: this.treeMaterialTexture.createView({ dimension: '2d-array' }) },
         { binding: 10, resource: { buffer: this.provinceOwnerBuffer } },
         { binding: 11, resource: { buffer: this.countryColorBuffer } },
         { binding: 12, resource: { buffer: this.visibleTerrainBuffer } },
-        { binding: 13, resource: this.farAlbedoTexture.createView() },
+        { binding: 13, resource: this.terrainAlbedoTexture.createView() },
       ],
     });
 
@@ -304,7 +298,6 @@ export class WorldRenderer {
       [0, 1, 2].map((lod) => createTreeFamilyMesh(this.device, family, lod as 0 | 1 | 2)));
     this.buildingMeshes = Array.from({ length: 5 }, (_, archetype) =>
       [0, 1, 2].map((lod) => createBuildingArchetypeMesh(this.device, archetype, lod as 0 | 1 | 2)));
-    this.shadowMesh = createShadowMesh(this.device);
     this.lampMesh = createLampMesh(this.device);
     this.barrierMesh = createBarrierMesh(this.device);
     this.signMesh = createSignMesh(this.device);
@@ -470,6 +463,34 @@ export class WorldRenderer {
       { offset: bytes.byteOffset, bytesPerRow, rowsPerImage: height },
       [width, height],
     );
+    return texture;
+  }
+
+  private uploadMipmappedTexture(label: string, field: BinaryField, bytes: Uint8Array): GPUTexture {
+    const mipLevelCount = field.mipLevelCount ?? 1;
+    const texture = this.device.createTexture({
+      label,
+      size: [field.width, field.height],
+      format: field.format as GPUTextureFormat,
+      mipLevelCount,
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    let width = field.width;
+    let height = field.height;
+    let offset = 0;
+    for (let mipLevel = 0; mipLevel < mipLevelCount; mipLevel += 1) {
+      const byteLength = width * height * 4;
+      this.device.queue.writeTexture(
+        { texture, mipLevel },
+        bytes.buffer as ArrayBuffer,
+        { offset: bytes.byteOffset + offset, bytesPerRow: width * 4, rowsPerImage: height },
+        [width, height],
+      );
+      offset += byteLength;
+      width = Math.max(1, Math.floor(width / 2));
+      height = Math.max(1, Math.floor(height / 2));
+    }
+    if (offset !== bytes.byteLength) throw new Error(`${label} mip data size mismatch: used ${offset}, received ${bytes.byteLength}`);
     return texture;
   }
 
@@ -700,12 +721,6 @@ export class WorldRenderer {
 
     if (this.showProps) {
       pass.setPipeline(this.propPipeline);
-      if (this.performanceLayers.treeShadows) {
-        this.drawPropChunks(pass, this.trees, this.manifest.propChunks.trees, [[this.shadowMesh]], 'treeShadows', 1_150, [1_150, 1_150]);
-      }
-      if (this.performanceLayers.buildingShadows) {
-        this.drawPropChunks(pass, this.buildings, this.manifest.propChunks.buildings, [[this.shadowMesh]], 'buildingShadows', 1_050, [1_050, 1_050]);
-      }
       if (this.performanceLayers.trees) {
         this.drawPropChunks(pass, this.trees, this.manifest.propChunks.trees, this.treeMeshes, 'trees', 3_200, [900, 1_850]);
       }

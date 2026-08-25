@@ -16,7 +16,7 @@ export interface PerformancePhases {
 }
 
 export type RenderCategory = 'terrain' | 'water' | 'waterways' | 'roads' | 'hiddenLinks'
-  | 'treeShadows' | 'buildingShadows' | 'trees' | 'buildings' | 'roadFurniture' | 'borders' | 'debugLines';
+  | 'trees' | 'buildings' | 'roadFurniture' | 'borders' | 'debugLines';
 
 export interface RenderWorkload {
   drawCalls: number;
@@ -112,8 +112,6 @@ export function createEmptyRenderWorkload(labels = 0): RenderWorkload {
       waterways: 0,
       roads: 0,
       hiddenLinks: 0,
-      treeShadows: 0,
-      buildingShadows: 0,
       trees: 0,
       buildings: 0,
       roadFurniture: 0,

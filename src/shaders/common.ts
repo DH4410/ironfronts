@@ -17,13 +17,13 @@ struct Uniforms {
 @group(0) @binding(4) var materialTexture: texture_2d_array<f32>;
 @group(0) @binding(5) var materialSampler: sampler;
 @group(0) @binding(6) var coastTexture: texture_2d<f32>;
-@group(0) @binding(7) var roadTexture: texture_2d<f32>;
-@group(0) @binding(8) var waterwayTexture: texture_2d<f32>;
+@group(0) @binding(7) var navigationTexture: texture_2d<f32>;
+@group(0) @binding(8) var terrainNormalTexture: texture_2d<f32>;
 @group(0) @binding(9) var treeMaterialTexture: texture_2d_array<f32>;
 @group(0) @binding(10) var<storage, read> provinceOwners: array<u32>;
 @group(0) @binding(11) var<storage, read> countryColors: array<vec4f>;
 @group(0) @binding(12) var<storage, read> visibleTerrainChunks: array<u32>;
-@group(0) @binding(13) var farAlbedoTexture: texture_2d<f32>;
+@group(0) @binding(13) var terrainAlbedoTexture: texture_2d<f32>;
 
 fn wrappedUv(uv: vec2f) -> vec2f {
   return vec2f(fract(uv.x + 1.0), clamp(uv.y, 0.0, 0.999999));
@@ -84,21 +84,16 @@ fn waterDepthAt(uvInput: vec2f) -> f32 {
 fn bankFieldAt(uvInput: vec2f) -> vec2f { return textureSampleLevel(coastTexture, materialSampler, wrappedUv(uvInput), 0.0).rg; }
 fn landAt(uvInput: vec2f) -> f32 { return bankFieldAt(uvInput).r; }
 fn bankAt(uvInput: vec2f) -> f32 { return bankFieldAt(uvInput).g; }
-fn roadAt(uvInput: vec2f) -> vec2f { return textureSampleLevel(roadTexture, materialSampler, wrappedUv(uvInput), 0.0).rg; }
-fn waterwayFieldAt(uvInput: vec2f) -> vec2f { return textureSampleLevel(waterwayTexture, materialSampler, wrappedUv(uvInput), 0.0).rg; }
+fn navigationAt(uvInput: vec2f) -> vec4f { return textureSampleLevel(navigationTexture, materialSampler, wrappedUv(uvInput), 0.0); }
+fn roadAt(uvInput: vec2f) -> vec2f { return navigationAt(uvInput).rg; }
+fn waterwayFieldAt(uvInput: vec2f) -> vec2f { return navigationAt(uvInput).ba; }
 fn waterwayAt(uvInput: vec2f) -> f32 { return waterwayFieldAt(uvInput).r; }
 fn visualRiverAt(uvInput: vec2f) -> f32 { return waterwayFieldAt(uvInput).g; }
 
 fn terrainNormal(uv: vec2f) -> vec3f {
-  let dimensions = vec2f(textureDimensions(heightTexture));
-  let texel = 1.0 / dimensions;
-  let left = heightAt(uv - vec2f(texel.x, 0.0));
-  let right = heightAt(uv + vec2f(texel.x, 0.0));
-  let up = heightAt(uv - vec2f(0.0, texel.y));
-  let down = heightAt(uv + vec2f(0.0, texel.y));
-  let stepX = uniforms.map.x / dimensions.x;
-  let stepZ = uniforms.map.y / dimensions.y;
-  return normalize(vec3f((left - right) / (stepX * 2.0), 1.0, (up - down) / (stepZ * 2.0)));
+  let encoded = textureSampleLevel(terrainNormalTexture, materialSampler, wrappedUv(uv), 0.0).rg;
+  let normalY = sqrt(max(0.0, 1.0 - dot(encoded, encoded)));
+  return normalize(vec3f(encoded.x, normalY, encoded.y));
 }
 
 fn hashColor(id: u32) -> vec3f {

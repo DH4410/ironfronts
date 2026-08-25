@@ -63,8 +63,11 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   // Movement rivers carry an explicit ribbon clip mask. Visual-only rivers
   // remain generic water, but their second mask channel expands only narrow
   // province-zero channels so coarse terrain cannot bridge over them.
-  let riverField = waterwayFieldAt(input.mapUv);
-  if (landAt(input.mapUv) <= 0.5 || riverField.r > 0.45 || riverField.g > 0.45) { discard; }
+  let bankField = bankFieldAt(input.mapUv);
+  if (bankField.r <= 0.5) { discard; }
+  let navigation = navigationAt(input.mapUv);
+  let riverField = navigation.ba;
+  if (riverField.r > 0.45 || riverField.g > 0.45) { discard; }
 
   let surface = surfaceAt(input.mapUv);
   let terrain = surface.r;
@@ -74,12 +77,13 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let slope = 1.0 - normal.y;
   let elevation = input.worldPosition.y;
 
-  // Preserve the authored terrain materials throughout close and regional
-  // play. Only true world-overview zooms approach the compact far lookup, and
-  // the wide blend band avoids a visible material/color switch.
-  let farBaseColor = textureSampleLevel(farAlbedoTexture, materialSampler, wrappedUv(input.mapUv), 0.0).rgb;
-  var baseColor = farBaseColor;
-  if (uniforms.interaction.y < 8000.0) {
+  // The generated world albedo evaluates the same biome/slope/beach rules as
+  // this detailed path. Close zoom keeps the original tiled materials; medium
+  // and far zooms blend into the faithful precomputed result rather than a
+  // simplified palette.
+  let bakedSurface = textureSample(terrainAlbedoTexture, materialSampler, wrappedUv(input.mapUv));
+  var baseColor = bakedSurface.rgb;
+  if (uniforms.interaction.y < 4500.0) {
     baseColor = sampleMaterial(0, input.worldPosition, 92.0);
     if (biome == 1u || biome == 7u) {
     baseColor = sampleMaterial(2, input.worldPosition, 76.0);
@@ -98,9 +102,6 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     baseColor = mix(rock, snow, snowAmount);
     } else if (terrain == 3u) {
     baseColor = sampleMaterial(3, input.worldPosition, 70.0);
-    let forestDistance = distance(uniforms.camera.xyz, input.worldPosition);
-    let canopySignal = vec3f(0.115, 0.31, 0.14) * (0.86 + variation * 0.24);
-    baseColor = mix(baseColor, canopySignal, smoothstep(1750.0, 3150.0, forestDistance) * 0.78);
     } else if (terrain == 4u) {
     baseColor = mix(sampleMaterial(6, input.worldPosition, 54.0), sampleMaterial(1, input.worldPosition, 68.0), 0.22);
   }
@@ -108,10 +109,15 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   // Beaches follow the actual land/water boundary. Low inland terrain is not
   // coastal and must retain its biome material (the old elevation-only test
   // turned most of Africa and Iberia into sand).
-    let shoreline = bankAt(input.mapUv) * smoothstep(0.50, 0.72, landAt(input.mapUv));
+    let shoreline = bankField.g * smoothstep(0.50, 0.72, bankField.r);
     let beachElevation = 1.0 - smoothstep(5.0, 10.0, elevation);
     baseColor = mix(baseColor, sampleMaterial(7, input.worldPosition, 52.0), shoreline * beachElevation * 0.92);
-    baseColor = mix(baseColor, farBaseColor, smoothstep(6500.0, 8000.0, uniforms.interaction.y));
+    baseColor = mix(baseColor, bakedSurface.rgb, smoothstep(3000.0, 4500.0, uniforms.interaction.y));
+  }
+  if (terrain == 3u) {
+    let forestDistance = distance(uniforms.camera.xyz, input.worldPosition);
+    let canopySignal = vec3f(0.115, 0.31, 0.14) * (0.86 + variation * 0.24);
+    baseColor = mix(baseColor, canopySignal, smoothstep(1750.0, 3150.0, forestDistance) * 0.78);
   }
 
   if (uniforms.interaction.z > 0.5 && uniforms.map.w < 0.5) {
@@ -126,7 +132,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   }
 
 
-  let roadData = roadAt(input.mapUv);
+  let roadData = navigation.rg;
   let roadDistance = distance(uniforms.camera.xyz, input.worldPosition);
   let rangeVisibility = 1.0 - smoothstep(4000.0, 4800.0, roadDistance);
   let strategicBlend = mix(0.22, 1.0, smoothstep(1500.0, 3300.0, roadDistance));
@@ -136,6 +142,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let roadColor = vec3f(0.29, 0.235, 0.15) * aggregate;
   baseColor = mix(baseColor, mix(baseColor, roadColor, 0.48), roadShoulder);
   baseColor = mix(baseColor, roadColor, roadCore * 0.66);
+  baseColor *= bakedSurface.a;
 
   baseColor *= 0.92 + variation * 0.14;
   let sunDirection = normalize(uniforms.sunTime.xyz);
@@ -162,7 +169,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     let steepness = clamp((1.0 - normal.y) * 7.5, 0.0, 1.0);
     lit = mix(vec3f(0.08, 0.31, 0.22), vec3f(0.96, 0.22, 0.08), smoothstep(0.08, 0.82, steepness));
   } else if (debugMode == 6u) {
-    let channels = waterwayFieldAt(input.mapUv);
+    let channels = navigation.ba;
     lit = vec3f(0.025, 0.035, 0.038);
     lit = mix(lit, vec3f(0.04, 0.88, 0.98), channels.r);
     lit = mix(lit, vec3f(0.18, 0.48, 0.98), channels.g * (1.0 - channels.r));
@@ -173,7 +180,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     let footprint = max(roadData.r, roadData.g * 0.62);
     lit = mix(vec3f(0.025, 0.03, 0.032), mix(vec3f(0.94, 0.62, 0.10), vec3f(0.95, 0.18, 0.08), roadData.r), footprint);
   } else if (debugMode == 9u) {
-    let channels = waterwayFieldAt(input.mapUv);
+    let channels = navigation.ba;
     let roadSignal = max(roadData.r, roadData.g * 0.45);
     lit = vec3f(0.15, 0.17, 0.16);
     lit = mix(lit, vec3f(0.96, 0.61, 0.12), roadSignal);
@@ -409,17 +416,7 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
   var materialUv = vec2f(0.0);
   var treeMaterialLayer = -1.0;
 
-  if (input.materialPart > 8.5) {
-    angle = select(record.b.y, record.b.x, instanceParams.kind == 0u);
-    if (instanceParams.kind == 0u) {
-      local = vec3f(local.x * record.a.z * 4.1, 0.32, local.z * record.a.z * 4.1);
-    } else {
-      local = vec3f(local.x * record.a.z * 0.94, 0.32, local.z * record.b.x * 0.94);
-    }
-    color = vec3f(0.035, 0.047, 0.042);
-    transformedNormal = vec3f(0.0, 1.0, 0.0);
-    opacity = 0.20;
-  } else if (instanceParams.kind == 0u) {
+  if (instanceParams.kind == 0u) {
     let variant = min(u32(record.a.w + 0.5), 4u);
     let part = u32(input.materialPart + 0.5);
     let partScale = treePartScale(variant, part);

@@ -84,8 +84,6 @@ async function setAllLayers(overrides = {}) {
       ocean: options.ocean ?? true,
       trees: options.trees ?? true,
       buildings: options.buildings ?? true,
-      treeShadows: options.treeShadows ?? true,
-      buildingShadows: options.buildingShadows ?? true,
       roadFurniture: options.roadFurniture ?? true,
     });
   }, overrides);
@@ -201,9 +199,8 @@ if (!unsupported && manifest) {
   const ablations = [
     ['layer baseline', {}],
     ['without props', { props: false }],
-    ['without trees', { trees: false, treeShadows: false }],
-    ['without buildings', { buildings: false, buildingShadows: false }],
-    ['without shadows', { treeShadows: false, buildingShadows: false }],
+    ['without trees', { trees: false }],
+    ['without buildings', { buildings: false }],
     ['without road furniture', { roadFurniture: false }],
     ['without roads', { roads: false, hiddenLinks: false }],
     ['without waterways', { waterways: false }],

@@ -4,7 +4,7 @@ import { access, readFile } from 'node:fs/promises';
 interface Manifest {
   version: number;
   world: { width: number; height: number; wrapX: boolean };
-  fields: Record<string, { url: string; width: number; height: number; format: string }>;
+  fields: Record<string, { url: string; width: number; height: number; format: string; mipLevelCount?: number }>;
   buffers: Record<string, { count: number; stride: number }>;
   terrain: { maxHeight: number };
   infrastructureChunks: {
@@ -47,16 +47,34 @@ function viewU32(bytes: Buffer): Uint32Array {
   return new Uint32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
 }
 
-describe('generated v10 world package', () => {
+describe('generated v11 world package', () => {
   it('preserves the canonical world and exposes simplified roads plus supplied waterways', async () => {
     const data = await manifest();
-    expect(data.version).toBe(10);
+    expect(data.version).toBe(11);
     expect(data.world).toEqual(expect.objectContaining({ width: 13_562, height: 7_000, wrapX: true }));
     expect(data.provinces).toHaveLength(3_303);
     expect(new Set(data.provinces.map((province) => province.id)).size).toBe(3_303);
     expect(data.provinces[0]).toEqual(expect.objectContaining({ id: 0, name: 'Las Palmas', terrain: 'Plains' }));
-    expect(Object.keys(data.fields).sort()).toEqual(['coast', 'farAlbedo', 'height', 'provinceIds', 'roads', 'surface', 'waterways']);
-    expect(data.fields.farAlbedo).toEqual(expect.objectContaining({ width: 512, format: 'rgba8unorm' }));
+    expect(Object.keys(data.fields).sort()).toEqual(['coast', 'height', 'navigation', 'provinceIds', 'surface', 'terrainAlbedo', 'terrainNormal']);
+    expect(data.fields.terrainNormal).toEqual(expect.objectContaining({ width: 2048, format: 'rg8snorm' }));
+    expect(data.fields.terrainAlbedo).toEqual(expect.objectContaining({ width: 2048, format: 'rgba8unorm-srgb' }));
+    expect(data.fields.terrainAlbedo.mipLevelCount).toBeGreaterThan(1);
+    const [normalBytes, albedoBytes, navigationBytes] = await Promise.all([
+      readFile(`public/world/${data.fields.terrainNormal.url}`),
+      readFile(`public/world/${data.fields.terrainAlbedo.url}`),
+      readFile(`public/world/${data.fields.navigation.url}`),
+    ]);
+    expect(normalBytes.byteLength).toBe(data.fields.terrainNormal.width * data.fields.terrainNormal.height * 2);
+    let mipWidth = data.fields.terrainAlbedo.width, mipHeight = data.fields.terrainAlbedo.height, albedoByteLength = 0;
+    for (let level = 0; level < data.fields.terrainAlbedo.mipLevelCount!; level += 1) {
+      albedoByteLength += mipWidth * mipHeight * 4;
+      mipWidth = Math.max(1, Math.floor(mipWidth / 2));
+      mipHeight = Math.max(1, Math.floor(mipHeight / 2));
+    }
+    expect(albedoBytes.byteLength).toBe(albedoByteLength);
+    expect(albedoBytes.some((value, index) => index % 4 === 3 && value > 0 && value < 255)).toBe(true);
+    expect(data.fields.navigation.format).toBe('rgba8unorm');
+    expect(navigationBytes.byteLength).toBe(data.fields.navigation.width * data.fields.navigation.height * 4);
     expect(data.fields.coast.format).toBe('rg8unorm');
     const bankBytes = await readFile(`public/world/${data.fields.coast.url}`);
     expect(bankBytes.byteLength).toBe(data.fields.coast.width * data.fields.coast.height * 2);
@@ -84,7 +102,7 @@ describe('generated v10 world package', () => {
     const [vertexBytes, indexBytes, networkBytes, maskBytes, provinceIdBytes, nodeBytes, reportBytes] = await Promise.all([
       readFile('public/world/waterway-vertices.f32'), readFile('public/world/waterway-indices.u32'),
       readFile('public/world/waterway-network-lines.f32'),
-      readFile('public/world/waterways.rg8'),
+      readFile('public/world/navigation.rgba8'),
       readFile('public/world/province-ids.u16'),
       readFile('material/movement/network_nodes.json', 'utf8'), readFile('public/world/world-generation-report.json', 'utf8'),
     ]);
@@ -95,7 +113,7 @@ describe('generated v10 world package', () => {
     const riverNames = new Set(report.waterways.riverSystems);
     const sourceRiverPoints = source.nodes.filter((node) => node.kind === 'sea_point' && riverNames.has(node.location_name));
     const sourceCanalPoints = source.nodes.filter((node) => node.kind === 'sea_point' && ['Kiel Canal', 'Suez Channel'].includes(node.location_name));
-    expect(report.version).toBe('world-generation-v10');
+    expect(report.version).toBe('world-generation-v11');
     expect(report.waterways.animatedSurface).toBe(true);
     expect(report.waterways.animation).toBe('tangent-advection-domain-warp');
     expect(report.waterways.minimumRiverWidth).toBeGreaterThanOrEqual(11);
@@ -118,10 +136,10 @@ describe('generated v10 world package', () => {
       expect(network[offset + 5]).toBeGreaterThanOrEqual(0.4);
       expect([0, 1]).toContain(network[offset + 6]);
     }
-    expect(data.fields.waterways.format).toBe('rg8unorm');
-    expect(maskBytes.byteLength).toBe(data.fields.waterways.width * data.fields.waterways.height * 2);
-    expect(maskBytes.some((value, index) => index % 2 === 0 && value > 0)).toBe(true);
-    expect(maskBytes.some((value, index) => index % 2 === 1 && value > 0)).toBe(true);
+    expect(data.fields.navigation.format).toBe('rgba8unorm');
+    expect(maskBytes.byteLength).toBe(data.fields.navigation.width * data.fields.navigation.height * 4);
+    expect(maskBytes.some((value, index) => index % 4 === 2 && value > 0)).toBe(true);
+    expect(maskBytes.some((value, index) => index % 4 === 3 && value > 0)).toBe(true);
     expect(report.visualRivers.minimumRenderedWidth).toBeGreaterThanOrEqual(7.5);
     expect(report.visualRivers.minimumRenderedWidth).toBeLessThan(report.waterways.minimumRiverWidth);
     expect(report.visualRivers.centerPixels).toBeGreaterThan(0);
@@ -130,8 +148,8 @@ describe('generated v10 world package', () => {
     let widenedVisualLandPixels = 0;
     let movementVisualOverlap = 0;
     for (let pixel = 0; pixel < provinceIds.length; pixel += 1) {
-      const movement = maskBytes[pixel * 2] / 255;
-      const visual = maskBytes[pixel * 2 + 1] / 255;
+      const movement = maskBytes[pixel * 4 + 2] / 255;
+      const visual = maskBytes[pixel * 4 + 3] / 255;
       if (visual > 0.45 && provinceIds[pixel] !== 0) widenedVisualLandPixels += 1;
       if (movement > 0.45 && visual > 0.45) movementVisualOverlap += 1;
     }
@@ -151,15 +169,15 @@ describe('generated v10 world package', () => {
       const offset = vertex * 10;
       if (vertices[offset + 5] > 0.01) continue;
       centerVertices += 1;
-      const px = Math.min(data.fields.waterways.width - 1, Math.max(0,
-        Math.floor(((vertices[offset] % data.world.width) + data.world.width) % data.world.width / data.world.width * data.fields.waterways.width)));
-      const pz = Math.min(data.fields.waterways.height - 1, Math.max(0,
-        Math.floor(vertices[offset + 2] / data.world.height * data.fields.waterways.height)));
-      const pixel = pz * data.fields.waterways.width + px;
+      const px = Math.min(data.fields.navigation.width - 1, Math.max(0,
+        Math.floor(((vertices[offset] % data.world.width) + data.world.width) % data.world.width / data.world.width * data.fields.navigation.width)));
+      const pz = Math.min(data.fields.navigation.height - 1, Math.max(0,
+        Math.floor(vertices[offset + 2] / data.world.height * data.fields.navigation.height)));
+      const pixel = pz * data.fields.navigation.width + px;
       // Mouth overlap samples deliberately stop clipping the base ocean once
       // both authored banks have opened. Every sample over land must still
       // carry the terrain-removal mask.
-      if (provinceIds[pixel] !== 0) expect(maskBytes[pixel * 2]).toBe(255);
+      if (provinceIds[pixel] !== 0) expect(maskBytes[pixel * 4 + 2]).toBe(255);
     }
     expect(centerVertices).toBeGreaterThan(10_000);
     for (let index = 0; index < indices.length; index += 127) expect(indices[index]).toBeLessThan(data.buffers.waterwayVertices.count);
@@ -373,6 +391,7 @@ describe('generated v10 world package', () => {
       'infrastructure-engineering.rgba8', 'engineering-vertices.f32', 'roads.rgba8',
       'corridor-metrics.f32', 'corridor-flags.u32', 'connection-corridor-offsets.u32',
       'connection-corridor-ids.u32', 'build.json', 'coast.r8',
+      'far-albedo.rgba8', 'roads.rg8', 'waterways.rg8',
     ]) {
       await expect(access(`public/world/${name}`)).rejects.toThrow();
     }

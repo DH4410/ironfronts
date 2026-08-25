@@ -5,8 +5,9 @@ import { infrastructureShader, lineShader, propShader, terrainShader, waterShade
 
 describe('WGSL programs', () => {
   it('limits beach material to the actual shoreline mask', () => {
-    expect(terrainShader).toContain('let shoreline = bankAt(input.mapUv)');
-    expect(terrainShader).toContain('landAt(input.mapUv)');
+    expect(terrainShader).toContain('let bankField = bankFieldAt(input.mapUv)');
+    expect(terrainShader).toContain('let shoreline = bankField.g');
+    expect(terrainShader).toContain('bankField.r <= 0.5');
     expect(terrainShader).not.toContain('if (elevation < 12.0)');
   });
 
@@ -14,7 +15,7 @@ describe('WGSL programs', () => {
     expect(terrainShader).toContain('riverField.r > 0.45 || riverField.g > 0.45');
     expect(waterShader).toContain('if (riverField.r > 0.45)');
     expect(waterShader).toContain('landAt(input.mapUv) >= 0.5 && riverField.g <= 0.45');
-    expect(terrainShader).toContain('bankAt(input.mapUv)');
+    expect(terrainShader).toContain('bankField.g');
     expect(waterShader).toContain('mix(waterDepthAt(input.mapUv), 0.08, visualRiver)');
     expect(waterShader).toContain('(1.0 - visualRiver * 0.80)');
     expect(waterShader).not.toContain('if (provinceAt(input.mapUv)');
@@ -46,6 +47,15 @@ describe('WGSL programs', () => {
     expect(propShader).toContain('treePartVisible(variant, part)');
     expect(propShader).toContain('textureSampleLevel(treeMaterialTexture');
     expect(propShader).toContain('clamp(record.b.w, 0.0, 1.0)');
+    expect(propShader).not.toContain('input.materialPart > 8.5');
+  });
+
+  it('uses precomputed terrain normals, faithful mipmapped albedo, prop AO, and packed navigation', () => {
+    expect(terrainShader).toContain('let navigation = navigationAt(input.mapUv)');
+    expect(terrainShader).toContain('let bakedSurface = textureSample(terrainAlbedoTexture');
+    expect(terrainShader).toContain('baseColor *= bakedSurface.a');
+    expect(terrainShader).toContain('smoothstep(3000.0, 4500.0');
+    expect(terrainShader).not.toContain('textureSampleLevel(terrainAlbedoTexture');
   });
 
   it('derives political tint and country borders from mutable province ownership', () => {

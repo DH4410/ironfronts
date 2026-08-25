@@ -3,6 +3,7 @@ export interface BinaryField {
   width: number;
   height: number;
   format: string;
+  mipLevelCount?: number;
 }
 
 export interface BinaryBufferDescriptor {
@@ -45,9 +46,9 @@ export interface WorldManifest {
   fields: {
     height: BinaryField;
     surface: BinaryField;
-    farAlbedo: BinaryField;
-    roads: BinaryField;
-    waterways: BinaryField;
+    terrainNormal: BinaryField;
+    terrainAlbedo: BinaryField;
+    navigation: BinaryField;
     coast: BinaryField;
     provinceIds: BinaryField;
   };
