@@ -6,7 +6,7 @@ export interface MenuHandlers {
   onLaunch: () => void;
 }
 
-const OPEN_DURATION = 1600;
+const OPEN_DURATION = 1200;
 
 interface Rect { left: number; top: number; width: number; height: number }
 
@@ -20,11 +20,9 @@ export function mountMenu(handlers: MenuHandlers): void {
 
   const panel = document.createElement('div');
   panel.className = 'ifm__panel';
-  panel.innerHTML = '<div class="ifm__panel-stack"></div><div class="ifm__panel-paper"></div><div class="ifm__panel-cover"></div>';
+  panel.innerHTML = '<div class="ifm__panel-sweep"></div>';
   stage.appendChild(panel);
-  const panelStack = requiredChild<HTMLElement>(panel, '.ifm__panel-stack');
-  const panelPaper = requiredChild<HTMLElement>(panel, '.ifm__panel-paper');
-  const panelCover = requiredChild<HTMLElement>(panel, '.ifm__panel-cover');
+  const sweep = requiredChild<HTMLElement>(panel, '.ifm__panel-sweep');
 
   let busy = false;
   let openCard: HTMLButtonElement | null = null;
@@ -40,27 +38,22 @@ export function mountMenu(handlers: MenuHandlers): void {
 
   /** One update() drives every sub-motion from the same t (0=closed card, 1=open file). */
   function update(t: number): void {
-    const moveT = smooth(phase(t, 0, 0.55));
-    const hingeT = smooth(phase(t, 0.35, 0.75));
-    const revealT = smooth(phase(t, 0.65, 1));
+    const moveT = smooth(phase(t, 0, 0.6));
+    const revealT = smooth(phase(t, 0.55, 1));
     const rect: Rect = {
       left: transitionSource.left + (transitionTarget.left - transitionSource.left) * moveT,
       top: transitionSource.top + (transitionTarget.top - transitionSource.top) * moveT,
       width: transitionSource.width + (transitionTarget.width - transitionSource.width) * moveT,
       height: transitionSource.height + (transitionTarget.height - transitionSource.height) * moveT,
     };
-    const arc = Math.sin(Math.PI * moveT) * Math.min(48, transitionSource.height * 0.12);
     panel.style.left = `${rect.left}px`;
-    panel.style.top = `${rect.top - arc}px`;
+    panel.style.top = `${rect.top}px`;
     panel.style.width = `${rect.width}px`;
     panel.style.height = `${rect.height}px`;
-    panelStack.style.opacity = String(1 - hingeT * 0.7);
-    panelCover.style.transform = `rotateY(${-104 * hingeT}deg)`;
-    panelCover.style.opacity = String(1 - hingeT * 0.92);
-    panelPaper.style.transform = `scale(${0.96 + 0.04 * revealT})`;
-    // Crossfade: the panel's plain paper face hands off to the real subpage
-    // content over the same reveal window, so nothing just sits static.
-    panelPaper.style.opacity = String(1 - revealT);
+    sweep.style.transform = `translateY(${moveT * 260 - 40}%)`;
+    sweep.style.opacity = String(1 - smooth(phase(t, 0.45, 0.62)));
+    // Crossfade: the panel hands off to the real subpage content over the
+    // same reveal window, so nothing just sits there once it stops moving.
     if (transitionPage) transitionPage.style.opacity = String(revealT);
   }
 
@@ -95,7 +88,6 @@ export function mountMenu(handlers: MenuHandlers): void {
     page.style.opacity = '';
     page.style.pointerEvents = '';
     main.style.pointerEvents = 'none';
-    document.body.classList.add('ifm-subpage-open');
     busy = false;
   }
 
@@ -114,7 +106,6 @@ export function mountMenu(handlers: MenuHandlers): void {
     page.style.opacity = '';
     page.style.pointerEvents = '';
     main.style.pointerEvents = '';
-    document.body.classList.remove('ifm-subpage-open');
     openCard = null;
     openScreen = null;
     busy = false;
