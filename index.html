@@ -11,10 +11,196 @@
     <canvas id="world" aria-label="Interactive 3D world map"></canvas>
     <canvas id="country-labels" class="country-labels" aria-hidden="true" hidden></canvas>
 
-    <header class="brand" aria-label="Ironfronts renderer">
+    <header class="brand" aria-label="Ironfronts renderer" hidden>
       <span class="brand__eyebrow">WORLD RENDERER</span>
       <span class="brand__title">IRONFRONTS</span>
     </header>
+
+    <div id="menu-root" class="ifm" role="dialog" aria-label="Ironfronts main menu">
+      <div class="ifm__backdrop" aria-hidden="true">
+        <div class="ifm__map"></div>
+        <div class="ifm__shade"></div>
+        <div class="ifm__vignette"></div>
+        <div class="ifm__grain"></div>
+
+        <div class="ifm__compass" aria-hidden="true"></div>
+        <div class="ifm__notebook" aria-hidden="true"><span>Field&nbsp;Orders</span></div>
+
+        <div class="ifm__relics" aria-hidden="true">
+          <div class="ifm__scrap ifm__scrap--2"></div>
+          <div class="ifm__scrap ifm__scrap--1"></div>
+          <div class="ifm__photo"></div>
+          <div class="ifm__pen"></div>
+        </div>
+      </div>
+
+      <header class="ifm__logo"><img src="/menu/title.png" alt="Ironfronts" /></header>
+
+      <main class="ifm__screen" id="ifm-main" data-screen="main">
+        <div class="ifm__grid" id="ifm-grid">
+          <button class="ifm__card" data-open="campaign" aria-label="New Campaign">
+            <span class="ifm__stack ifm__stack--a"></span><span class="ifm__stack ifm__stack--b"></span>
+            <span class="ifm__cover"></span>
+            <span class="ifm__tab-text">Operation Order</span>
+            <span class="ifm__code">IF / 01</span>
+            <div class="ifm__content">
+              <span class="ifm__icon" style="--icon:url(/menu/icons/laurels.svg)"></span>
+              <div class="ifm__label-plate">
+                <span class="ifm__eyelet"></span>
+                <strong>New Campaign</strong>
+                <small>Start a new war.</small>
+                <span class="ifm__stamp ifm__stamp--left">Top Secret</span>
+              </div>
+              <div class="ifm__meta"><small>FILE NO.</small><b>IF-1944-001</b></div>
+            </div>
+          </button>
+
+          <button class="ifm__card" data-open="continue" aria-label="Continue">
+            <span class="ifm__stack ifm__stack--a"></span><span class="ifm__stack ifm__stack--b"></span>
+            <span class="ifm__cover"></span>
+            <span class="ifm__tab-text">Active Dossier</span>
+            <span class="ifm__code">IF / 02</span>
+            <div class="ifm__content">
+              <span class="ifm__icon" style="--icon:url(/menu/icons/history.svg)"></span>
+              <div class="ifm__label-plate">
+                <span class="ifm__eyelet"></span>
+                <strong>Continue</strong>
+                <small>Resume your last campaign.</small>
+                <span class="ifm__typemark">Dossier<b>No. 1944-08</b></span>
+              </div>
+              <div class="ifm__meta"><small>FILE NO.</small><b>IF-1944-002</b></div>
+            </div>
+          </button>
+
+          <button class="ifm__card" data-open="sandbox" aria-label="Map Sandbox">
+            <span class="ifm__stack ifm__stack--a"></span><span class="ifm__stack ifm__stack--b"></span>
+            <span class="ifm__cover"></span>
+            <span class="ifm__tab-text">Field Atlas</span>
+            <span class="ifm__code">IF / 03</span>
+            <div class="ifm__content">
+              <span class="ifm__icon" style="--icon:url(/menu/icons/globe.svg)"></span>
+              <div class="ifm__label-plate">
+                <strong>Map Sandbox</strong>
+                <small>Explore the world freely.</small>
+                <span class="ifm__seal">&#9733;</span>
+              </div>
+              <div class="ifm__meta"><small>FILE NO.</small><b>IF-1944-003</b></div>
+            </div>
+          </button>
+
+          <button class="ifm__card" data-open="settings" aria-label="Settings">
+            <span class="ifm__stack ifm__stack--a"></span><span class="ifm__stack ifm__stack--b"></span>
+            <span class="ifm__cover"></span>
+            <span class="ifm__tab-text">Command Prefs</span>
+            <span class="ifm__code">IF / 04</span>
+            <div class="ifm__content">
+              <span class="ifm__icon" style="--icon:url(/menu/icons/cog.svg)"></span>
+              <div class="ifm__label-plate">
+                <strong>Settings</strong>
+                <small>Adjust game preferences.</small>
+                <span class="ifm__stamp ifm__stamp--right">Confidential</span>
+              </div>
+              <div class="ifm__meta"><small>FILE NO.</small><b>IF-1944-004</b></div>
+            </div>
+          </button>
+        </div>
+      </main>
+
+      <section class="ifm__subpage" id="ifm-campaign" data-screen="campaign" hidden>
+        <article class="ifm__file">
+          <header class="ifm__file-header">
+            <button class="ifm__back" data-back>&larr; War Room</button>
+            <div><small>Operation Order // New Command</small><h2>Choose Campaign</h2><p>Select a strategic starting point before deployment.</p></div>
+            <b class="ifm__classification">Top Secret</b>
+          </header>
+          <div class="ifm__body">
+            <div class="ifm__map-photo"><span>European Theater</span></div>
+            <div class="ifm__list">
+              <button class="ifm__row is-selected"><span><b>World at War</b><small>Global campaign across every theater.</small></span><em>1939</em></button>
+              <button class="ifm__row"><span><b>Operation Barbarossa</b><small>Compressed eastern-front campaign.</small></span><em>1941</em></button>
+              <button class="ifm__row"><span><b>Operation Overlord</b><small>Break the Atlantic wall and reclaim Europe.</small></span><em>1944</em></button>
+              <button class="ifm__primary" id="ifm-start-operation">Begin Operation <span>&rarr;</span></button>
+            </div>
+          </div>
+          <footer class="ifm__doc-footer"><span>Department of Military Operations</span><span>File IF-1944-001</span></footer>
+        </article>
+      </section>
+
+      <section class="ifm__subpage" id="ifm-continue" data-screen="continue" hidden>
+        <article class="ifm__file">
+          <header class="ifm__file-header">
+            <button class="ifm__back" data-back>&larr; War Room</button>
+            <div><small>Archive // Active Operations</small><h2>Continue Campaign</h2><p>Resume a previously filed command.</p></div>
+            <b class="ifm__classification">War File</b>
+          </header>
+          <div class="ifm__body">
+            <div class="ifm__list">
+              <button class="ifm__row is-selected"><span><b>Autosave — Western Front</b><small>6 May 1944 · 08:00</small></span><em>68 Days</em></button>
+              <button class="ifm__row"><span><b>Smolensk Offensive</b><small>5 May 1944 · 22:15</small></span><em>67 Days</em></button>
+              <button class="ifm__row"><span><b>Prepare for Moscow</b><small>3 May 1944 · 18:42</small></span><em>65 Days</em></button>
+            </div>
+            <div class="ifm__list">
+              <div class="ifm__map-photo"><span>Western Front</span></div>
+              <button class="ifm__primary" id="ifm-resume-operation">Resume Operation <span>&rarr;</span></button>
+            </div>
+          </div>
+          <footer class="ifm__doc-footer"><span>Archive Record IF-1944-002</span><span>HQ Central Records</span></footer>
+        </article>
+      </section>
+
+      <section class="ifm__subpage" id="ifm-sandbox" data-screen="sandbox" hidden>
+        <article class="ifm__file">
+          <header class="ifm__file-header">
+            <button class="ifm__back" data-back>&larr; War Room</button>
+            <div><small>Field Atlas // Free Inspection</small><h2>Map Sandbox</h2><p>Explore the world freely.</p></div>
+            <b class="ifm__classification">Unrestricted</b>
+          </header>
+          <div class="ifm__body ifm__body--wide">
+            <div class="ifm__map-photo" style="height:100%"><span>Europe</span></div>
+            <div class="ifm__list">
+              <label class="ifm__row" style="cursor:default"><span><b>Political ownership</b><small>Country tint and national borders.</small></span><input type="checkbox" checked></label>
+              <label class="ifm__row" style="cursor:default"><span><b>Road network</b><small>Terrain-draped movement paths.</small></span><input type="checkbox" checked></label>
+              <label class="ifm__row" style="cursor:default"><span><b>Waterways</b><small>Rivers, lakes and canals.</small></span><input type="checkbox" checked></label>
+              <button class="ifm__primary" id="ifm-enter-sandbox">Enter Map Sandbox <span>&rarr;</span></button>
+            </div>
+          </div>
+          <footer class="ifm__doc-footer"><span>Field Atlas FA-08-17</span><span>Cartographic Division</span></footer>
+        </article>
+      </section>
+
+      <section class="ifm__subpage" id="ifm-settings" data-screen="settings" hidden>
+        <article class="ifm__file">
+          <header class="ifm__file-header">
+            <button class="ifm__back" data-back>&larr; War Room</button>
+            <div><small>Command Preferences // Configuration</small><h2>Settings</h2><p>Adjust game preferences and display options.</p></div>
+            <b class="ifm__classification">Confidential</b>
+          </header>
+          <div class="ifm__body">
+            <div class="ifm__list">
+              <label class="ifm__row" style="cursor:default"><span><b>UI scale</b><small>Scale command panels and text.</small></span><input type="range" min="80" max="125" value="100"></label>
+              <label class="ifm__row" style="cursor:default"><span><b>Map labels</b><small>Show country and province names.</small></span><input type="checkbox" checked></label>
+            </div>
+            <div class="ifm__list">
+              <label class="ifm__row" style="cursor:default"><span><b>Master volume</b><small>Overall audio output.</small></span><input type="range" min="0" max="100" value="74"></label>
+              <label class="ifm__row" style="cursor:default"><span><b>Render scale</b><small>World renderer resolution.</small></span><input type="range" min="70" max="100" value="100"></label>
+              <button class="ifm__primary" id="ifm-apply-settings">Apply Preferences <span>&rarr;</span></button>
+            </div>
+          </div>
+          <footer class="ifm__doc-footer"><span>Command Prefs IF-1944-004</span><span>Local Configuration</span></footer>
+        </article>
+      </section>
+
+      <footer class="ifm__footer">
+        <button class="ifm__footer-item" id="ifm-language"><span class="ifm__footer-icon">&#9711;</span><span><b>Language</b><small>English</small></span></button>
+        <span class="ifm__footer-divider"></span>
+        <button class="ifm__footer-item" id="ifm-news"><span class="ifm__footer-icon">&#9646;</span><span><b>News</b><small>What's new</small></span></button>
+        <div class="ifm__footer-spacer"></div>
+        <span class="ifm__footer-version">Version 1.0.0<br><small>Build 19440606</small></span>
+        <span class="ifm__shield">I</span>
+      </footer>
+
+      <div class="ifm__stage" id="ifm-stage" hidden aria-hidden="true"></div>
+    </div>
 
     <section id="loading" class="loading" aria-live="polite">
       <div class="loading__line"><span id="loading-stage">Preparing WebGPU</span><span id="loading-value">0%</span></div>

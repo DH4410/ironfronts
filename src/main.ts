@@ -1,5 +1,6 @@
 import './styles.css';
 import '@fontsource/bitter/latin-ext-800.css';
+import { mountMenu } from './menu/menu';
 import { WorldRenderer } from './renderer';
 import type { FrameStats, HoverInfo } from './types';
 
@@ -30,12 +31,19 @@ const debugLegend = required<HTMLElement>('debug-legend');
 const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
-if (!navigator.gpu) {
-  loading.hidden = true;
-  unsupported.hidden = false;
-} else {
-  void start();
-}
+let rendererStarted = false;
+mountMenu({
+  onLaunch: () => {
+    if (rendererStarted) return;
+    rendererStarted = true;
+    if (!navigator.gpu) {
+      loading.hidden = true;
+      unsupported.hidden = false;
+    } else {
+      void start();
+    }
+  },
+});
 
 async function start(): Promise<void> {
   const renderer = new WorldRenderer(canvas, countryLabels);
