@@ -30,6 +30,8 @@ import { loadWorldAssetBuffers } from './world-assets';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
 
+export type MapMode = 'political' | 'diplomacy' | 'clear' | 'balanced';
+
 export class WorldRenderer {
   readonly camera = new StrategyCamera();
 
@@ -124,6 +126,7 @@ export class WorldRenderer {
   private showWaterwayNetwork = false;
   private showBorders = true;
   private showCountryOverlay = true;
+  private mapMode: MapMode = 'balanced';
   private showProps = true;
   private showRoads = true;
   private showHiddenConnections = true;
@@ -379,6 +382,10 @@ export class WorldRenderer {
     this.showCountryOverlay = enabled;
     this.countryLabels?.setVisible(enabled && this.performanceLayers.countryLabels && this.debugView === 0);
     this.updateBorderVisibility();
+  }
+
+  setMapMode(mode: MapMode): void {
+    this.mapMode = mode;
   }
 
   setProvinceOwner(provinceId: number, countryId: number): void {
@@ -663,7 +670,10 @@ export class WorldRenderer {
     values.set([0.42, 0.83, 0.36, this.elapsed], 36);
     values.set([this.canvas.width, this.canvas.height, 1 / this.canvas.width, 1 / this.canvas.height], 40);
     values.set([this.manifest.world.width, this.manifest.world.height, this.manifest.terrain.maxHeight, this.debugView], 44);
-    values.set([this.hoveredId, this.camera.distance, this.showCountryOverlay && this.performanceLayers.countryTint ? 1 : 0, 0], 48);
+    const tintMode = this.showCountryOverlay && this.performanceLayers.countryTint
+      ? this.mapMode === 'political' ? 2 : this.mapMode === 'balanced' ? 1 : 0
+      : 0;
+    values.set([this.hoveredId, this.camera.distance, tintMode, 0], 48);
     values.set([this.manifest.terrain.chunksX, this.manifest.terrain.chunksY, this.manifest.terrain.gridResolution, this.showWireframe ? 1 : 0], 52);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, values);
   }

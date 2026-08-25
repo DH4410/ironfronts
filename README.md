@@ -23,7 +23,7 @@ With the dev server running, `npm run visual-check` launches Chrome through Play
 - Mouse wheel: zoom
 - Right drag: rotate and tilt
 - WASD or arrow keys: pan
-- C: toggle country colors, political borders, and country labels
+- Map overlay island: switch between Political, Diplomacy, Clear, and Balanced views
 - F3: world inspector with terrain, infrastructure, waterway, coastline, and navigation views
 - [ / ] while F3 is open: cycle diagnostic views
 

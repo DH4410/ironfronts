@@ -49,12 +49,12 @@ if (!status.unsupported) {
   validation.visibleCountryLabels = await page.evaluate(() =>
     window.__ironfrontsRenderer?.getPerformanceSnapshot().workload.labels ?? 0);
   if (validation.visibleCountryLabels <= 0) errors.push('validation: no country labels are visible at world zoom');
-  await page.keyboard.press('KeyC');
+  await page.evaluate(() => window.__ironfrontsRenderer?.setCountryOverlayVisible(false));
   await page.waitForTimeout(120);
   validation.countryToggleHidesLabels = await page.evaluate(() =>
     (window.__ironfrontsRenderer?.getPerformanceSnapshot().workload.labels ?? -1) === 0);
   if (!validation.countryToggleHidesLabels) errors.push('validation: country overlay toggle did not hide labels');
-  await page.keyboard.press('KeyC');
+  await page.evaluate(() => window.__ironfrontsRenderer?.setCountryOverlayVisible(true));
   await page.evaluate(() => {
     const renderer = window.__ironfrontsRenderer;
     renderer?.setProvinceOwner(0, 1);

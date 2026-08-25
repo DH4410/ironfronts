@@ -1,6 +1,6 @@
 import './styles.css';
 import '@fontsource/bitter/latin-ext-800.css';
-import { WorldRenderer } from './renderer';
+import { WorldRenderer, type MapMode } from './renderer';
 import type { FrameStats, HoverInfo } from './types';
 
 const canvas = required<HTMLCanvasElement>('world');
@@ -27,6 +27,7 @@ const debugWaterways = required<HTMLInputElement>('debug-waterways');
 const debugProps = required<HTMLInputElement>('debug-props');
 const debugDescription = required<HTMLElement>('debug-description');
 const debugLegend = required<HTMLElement>('debug-legend');
+const mapModeInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="map-mode"]')];
 const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
@@ -49,13 +50,11 @@ async function start(): Promise<void> {
     renderer.setDebugView(mode);
     updateDebugHelp(mode);
   };
+  const applyMapMode = () => {
+    const selected = mapModeInputs.find((input) => input.checked)?.value;
+    if (selected && isMapMode(selected)) renderer.setMapMode(selected);
+  };
   window.addEventListener('keydown', (event) => {
-    if (event.code === 'KeyC' && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLSelectElement)) {
-      event.preventDefault();
-      debugCountries.checked = !debugCountries.checked;
-      renderer.setCountryOverlayVisible(debugCountries.checked);
-      return;
-    }
     if (event.code === 'F3') {
       event.preventDefault();
       diagnostics.hidden = !diagnostics.hidden;
@@ -69,6 +68,8 @@ async function start(): Promise<void> {
     debugView.selectedIndex = (debugView.selectedIndex + direction + count) % count;
     applyDebugView();
   });
+  for (const input of mapModeInputs) input.addEventListener('change', applyMapMode);
+  applyMapMode();
   debugView.addEventListener('change', applyDebugView);
   debugWireframe.addEventListener('change', () => renderer.setWireframe(debugWireframe.checked));
   debugCountries.addEventListener('change', () => renderer.setCountryOverlayVisible(debugCountries.checked));
@@ -213,4 +214,8 @@ function required<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing required element #${id}`);
   return element as T;
+}
+
+function isMapMode(value: string): value is MapMode {
+  return value === 'political' || value === 'diplomacy' || value === 'clear' || value === 'balanced';
 }

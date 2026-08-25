@@ -67,13 +67,15 @@
       <p class="diagnostics__hint"><kbd>[</kbd> <kbd>]</kbd> cycle views</p>
     </aside>
 
-    <div class="controls" aria-hidden="true">
-      <span><kbd>Drag</kbd> pan</span>
-      <span><kbd>Wheel</kbd> zoom</span>
-      <span><kbd>Right drag</kbd> orbit</span>
-      <span><kbd>C</kbd> countries</span>
-      <span><kbd>F3</kbd> diagnostics</span>
-    </div>
+    <fieldset class="map-modes" aria-label="Map overlay">
+      <legend>MAP OVERLAY</legend>
+      <div class="map-modes__options">
+        <label><input type="radio" name="map-mode" value="political" /> Political map</label>
+        <label title="Diplomacy map is not implemented yet"><input type="radio" name="map-mode" value="diplomacy" /> Diplomacy map</label>
+        <label><input type="radio" name="map-mode" value="clear" /> Clear map</label>
+        <label><input type="radio" name="map-mode" value="balanced" checked /> Balanced map</label>
+      </div>
+    </fieldset>
 
     <section id="unsupported" class="unsupported" hidden>
       <p class="unsupported__eyebrow">RENDERER UNAVAILABLE</p>
