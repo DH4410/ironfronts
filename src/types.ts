@@ -26,18 +26,6 @@ export interface CountryRecord {
   capitalProvinceId: number;
 }
 
-export interface ProvinceDetails {
-  version: number;
-  provinces: Array<{
-    id: number;
-    center: [number, number];
-    terrainId: number;
-    visualBiome: string;
-    population: number;
-    coastal: boolean;
-  }>;
-}
-
 export interface WorldManifest {
   version: number;
   generatedSeed: number;

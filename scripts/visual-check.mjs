@@ -1,35 +1,13 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright-core';
+import { launchCheckPage } from './qa/browser.mjs';
+import { writeJsonReport } from './qa/reports.mjs';
 
-const executablePath = process.env.IRONFRONTS_BROWSER ?? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const outputDirectory = fileURLToPath(new URL('../artifacts/', import.meta.url));
-// Chrome's Windows headless backend does not expose the machine's WebGPU
-// adapter reliably. Default to a short-lived headed window on Windows; CI can
-// still opt into headless mode explicitly.
-const headless = process.env.IRONFRONTS_HEADLESS
-  ? process.env.IRONFRONTS_HEADLESS !== 'false'
-  : process.platform !== 'win32';
 await mkdir(outputDirectory, { recursive: true });
 
-const browser = await chromium.launch({
-  executablePath,
-  headless,
-  args: headless ? [
-    '--enable-unsafe-webgpu',
-    '--enable-unsafe-swiftshader',
-    '--enable-features=Vulkan',
-    '--use-angle=swiftshader',
-    '--disable-vulkan-surface',
-  ] : ['--enable-unsafe-webgpu'],
-});
-const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 });
-const errors = [];
-page.on('console', (message) => {
-  if (message.type() === 'error') errors.push(`console: ${message.text()}`);
-});
-page.on('pageerror', (error) => errors.push(`page: ${error.message}`));
+const { browser, page, errors, headless } = await launchCheckPage();
 
 await page.goto(process.argv[2] ?? 'http://127.0.0.1:5173/', { waitUntil: 'networkidle' });
 await page.waitForFunction(() => document.querySelector('#loading')?.hasAttribute('hidden') || !document.querySelector('#unsupported')?.hasAttribute('hidden'), null, { timeout: 30_000 });
@@ -177,7 +155,7 @@ if (!status.unsupported) {
 }
 
 const report = { ...status, headless, validation, errors };
-await writeFile(path.join(outputDirectory, 'visual-report.json'), `${JSON.stringify(report, null, 2)}\n`);
+await writeJsonReport(outputDirectory, 'visual-report.json', report);
 console.log(JSON.stringify(report, null, 2));
 await browser.close();
 if (status.unsupported || errors.length) process.exitCode = 1;

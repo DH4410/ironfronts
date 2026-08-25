@@ -1,76 +1,10 @@
-import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
-import { ROAD_MAX_GRADE, ROAD_WIDTH, ROUTING_CACHE_VERSION, sampleHeight, sampleScalar, unwrapNear, wrap } from './infrastructure/common.mjs';
+import { ROAD_MAX_GRADE, sampleHeight, unwrapNear, wrap } from './infrastructure/common.mjs';
 import { buildCityPlans } from './infrastructure/city-plans.mjs';
 import { buildMeshes } from './infrastructure/meshes.mjs';
 import { assembleProvinceRoutes } from './infrastructure/province-routes.mjs';
 import { buildFurniture, rasterRoadField } from './infrastructure/outputs.mjs';
-import { adaptRoute } from './infrastructure/road-routing.mjs';
-
-function routeCachePath(routes, heights, landField) {
-  const digest = createHash('sha256')
-    .update(ROUTING_CACHE_VERSION)
-    .update(JSON.stringify(routes.map((route) => [route.start, route.end, route.points])))
-    .update(Buffer.from(heights.buffer, heights.byteOffset, heights.byteLength))
-    .update(Buffer.from(landField.buffer, landField.byteOffset, landField.byteLength))
-    .digest('hex').slice(0, 20);
-  const directory = path.resolve('artifacts', 'road-cache');
-  mkdirSync(directory, { recursive: true });
-  return path.join(directory, `${ROUTING_CACHE_VERSION}-${digest}.json`);
-}
-
-function adaptRoutesWithCache(routes, context) {
-  const cachePath = routeCachePath(routes, context.heights, context.landField);
-  if (existsSync(cachePath)) {
-    try {
-      const cached = JSON.parse(readFileSync(cachePath, 'utf8'));
-      if (cached.version === ROUTING_CACHE_VERSION && cached.routes.length === routes.length) {
-        for (let index = 0; index < routes.length; index += 1) routes[index].points = cached.routes[index];
-        console.log(`Reused terrain-draped road cache ${path.basename(cachePath)}`);
-        return;
-      }
-    } catch (error) {
-      console.warn(`Ignoring unreadable road routing cache: ${error.message}`);
-    }
-  }
-  for (const route of routes) adaptRoute(route, context);
-  writeFileSync(cachePath, JSON.stringify({ version: ROUTING_CACHE_VERSION, routes: routes.map((route) => route.points) }));
-  console.log(`Stored terrain-draped road cache ${path.basename(cachePath)}`);
-}
-
-function auditRoute(route, context) {
-  const { heights, landField, fieldWidth, fieldHeight, worldWidth, worldHeight } = context;
-  const halfWidth = ROAD_WIDTH * 0.5 + 0.45;
-  let maximumGrade = 0;
-  for (let index = 0; index + 1 < route.points.length; index += 1) {
-    const a = route.points[index];
-    const b = route.points[index + 1];
-    const bx = unwrapNear(b.x, a.x, worldWidth);
-    const dx = bx - a.x;
-    const dz = b.z - a.z;
-    const length = Math.max(0.001, Math.hypot(dx, dz));
-    const nx = -dz / length;
-    const nz = dx / length;
-    const steps = Math.max(1, Math.ceil(length));
-    let previousHeight;
-    for (let step = 0; step <= steps; step += 1) {
-      const t = step / steps;
-      const x = a.x + dx * t;
-      const z = a.z + dz * t;
-      for (const lateral of [-halfWidth, 0, halfWidth]) {
-        if (sampleScalar(landField, fieldWidth, fieldHeight, worldWidth, worldHeight, x + nx * lateral, z + nz * lateral) < 0.5) {
-          return { visible: false, reason: 'water', maximumGrade, x, z };
-        }
-      }
-      const terrain = sampleHeight(heights, fieldWidth, fieldHeight, worldWidth, worldHeight, x, z);
-      if (previousHeight !== undefined) maximumGrade = Math.max(maximumGrade,
-        Math.abs(terrain - previousHeight) / Math.max(0.001, length / steps));
-      previousHeight = terrain;
-    }
-  }
-  return { visible: true, maximumGrade };
-}
+import { adaptRoutesWithCache } from './infrastructure/route-cache.mjs';
+import { auditRoute } from './infrastructure/route-audit.mjs';
 
 function suppressIllegalCrossings(routes, worldWidth) {
   const cellSize = 6;

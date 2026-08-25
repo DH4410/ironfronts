@@ -1,3 +1,7 @@
+import { WORLD_FOG_END_RATIO } from './world-fog';
+
+export { WORLD_FOG_END_RATIO, WORLD_FOG_START_RATIO } from './world-fog';
+
 export type FrustumPlanes = Float32Array;
 
 /**
@@ -6,8 +10,6 @@ export type FrustumPlanes = Float32Array;
  * frustum test decides which chunks are actually submitted to the GPU.
  */
 export const WORLD_COPY_INDICES = [0, 1, 2] as const;
-export const WORLD_FOG_START_RATIO = 0.77;
-export const WORLD_FOG_END_RATIO = 0.985;
 
 export function sphereIntersectsHorizontalWorldWindow(
   centerX: number,

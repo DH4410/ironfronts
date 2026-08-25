@@ -1,13 +1,5 @@
 import { clamp, sampleHeight, unwrapNear, wrap } from '../infrastructure/common.mjs';
-
-const RIVER_NAMES = new Set([
-  'Colorado River', 'Congo River', 'Donau', 'Ganga River', 'Hooghly River', 'Indus River',
-  'Krishna River', 'Lena', 'Meghna River', 'Mekong River', 'Mississippi River', 'Nile', 'Ob River',
-  'Padma River', 'Rhein', 'Rio Amazonas', 'Snake River', 'St. Lawrence', 'Tocantina River',
-  'Volga', 'Yangtze River', 'Yellow River', 'Yukon River', 'Yunisei',
-]);
-
-const CANAL_NAMES = new Set(['Kiel Canal', 'Suez Channel']);
+import { collectWaterwayEdges, isCanal, isRiver, nodeName } from './waterway-selection.mjs';
 
 // The terrain grid is intentionally much coarser than roads and waterways.
 // Sub-unit sampling keeps the solved channel, its clip mask, and its rendered
@@ -16,78 +8,6 @@ const SAMPLE_SPACING = 0.6;
 const OPEN_WATER_HEIGHT = 0.42;
 const MINIMUM_RIVER_HALF_WIDTH = 5.5;
 const MINIMUM_CANAL_HALF_WIDTH = 5.0;
-
-function nodeName(node) {
-  return node?.location_name ?? '';
-}
-
-function isRiver(node) {
-  return node?.kind === 'sea_point' && RIVER_NAMES.has(nodeName(node));
-}
-
-function isCanal(node) {
-  return node?.kind === 'sea_point' && CANAL_NAMES.has(nodeName(node));
-}
-
-function selectSuezEdges(suez, candidates, nodes) {
-  const gulf = candidates.find((edge) => nodeName(nodes[edge.node_a === suez.node_id ? edge.node_b : edge.node_a]) === 'Gulf of Suez');
-  if (!gulf) return [];
-  const gulfNode = nodes[gulf.node_a === suez.node_id ? gulf.node_b : gulf.node_a];
-  const gx = gulfNode.x - suez.x;
-  const gz = gulfNode.y - suez.y;
-  const gulfLength = Math.max(0.001, Math.hypot(gx, gz));
-  const mediterranean = candidates
-    .filter((edge) => nodeName(nodes[edge.node_a === suez.node_id ? edge.node_b : edge.node_a]) === 'Mediterranean Sea')
-    .map((edge) => {
-      const endpoint = nodes[edge.node_a === suez.node_id ? edge.node_b : edge.node_a];
-      const dx = endpoint.x - suez.x;
-      const dz = endpoint.y - suez.y;
-      return { edge, alignment: (dx * gx + dz * gz) / (Math.max(0.001, Math.hypot(dx, dz)) * gulfLength) };
-    })
-    .sort((a, b) => a.alignment - b.alignment)[0]?.edge;
-  return mediterranean ? [mediterranean, gulf] : [gulf];
-}
-
-function collectEdges(networkData, connectionData) {
-  const nodes = networkData.nodes;
-  const byNode = Array.from({ length: nodes.length }, () => []);
-  for (const edge of connectionData.segments) {
-    byNode[edge.node_a]?.push(edge);
-    byNode[edge.node_b]?.push(edge);
-  }
-
-  const selected = new Map();
-  const add = (edge, kind) => selected.set(edge.segment_id, { ...edge, kind });
-  for (const edge of connectionData.segments) {
-    const a = nodes[edge.node_a];
-    const b = nodes[edge.node_b];
-    if (!a || !b || edge.medium !== 'sea') continue;
-    if (isRiver(a) && isRiver(b)) add(edge, 0);
-    else if ((isRiver(a) && b.kind === 'sea_point') || (isRiver(b) && a.kind === 'sea_point')) add(edge, 0);
-    else if (isCanal(a) && isCanal(b)) add(edge, 1);
-  }
-
-  // Kiel is a chain with one open-water endpoint at each side. Suez is stored
-  // as a single named point in the broader sea graph, so select the two nearly
-  // opposite links that form its actual Mediterranean-to-Gulf passage.
-  for (const node of nodes) {
-    if (nodeName(node) === 'Kiel Canal') {
-      for (const edge of byNode[node.node_id]) {
-        const other = nodes[edge.node_a === node.node_id ? edge.node_b : edge.node_a];
-        if (edge.medium === 'sea' && other?.kind === 'sea_point') add(edge, 1);
-      }
-    }
-  }
-  const suez = nodes.find((node) => nodeName(node) === 'Suez Channel');
-  if (suez) {
-    const candidates = byNode[suez.node_id].filter((edge) => {
-      const other = nodes[edge.node_a === suez.node_id ? edge.node_b : edge.node_a];
-      return edge.medium === 'sea' && other?.kind === 'sea_point';
-    });
-    for (const edge of selectSuezEdges(suez, candidates, nodes)) add(edge, 1);
-  }
-  return [...selected.values()].sort((a, b) => a.segment_id - b.segment_id);
-}
 
 function pointId(provinceIds, idWidth, idHeight, worldWidth, worldHeight, x, z) {
   const px = wrap(Math.floor(x / worldWidth * idWidth), idWidth);
@@ -219,7 +139,7 @@ export function buildWaterways({
   const started = performance.now();
   const context = { provinceIds, idWidth, idHeight, heights, heightWidth, heightHeight, worldWidth, worldHeight };
   const nodes = networkData.nodes;
-  const edges = collectEdges(networkData, connectionData);
+  const edges = collectWaterwayEdges(networkData, connectionData);
   const incident = new Map();
   for (const edge of edges) {
     if (!incident.has(edge.node_a)) incident.set(edge.node_a, []);

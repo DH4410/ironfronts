@@ -1,36 +1,16 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright-core';
+import { launchCheckPage } from './qa/browser.mjs';
+import { writeJsonReport, writeTextReport } from './qa/reports.mjs';
 
-const executablePath = process.env.IRONFRONTS_BROWSER ?? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
 const outputDirectory = fileURLToPath(new URL('../artifacts/', import.meta.url));
 const scenarioDuration = Number(process.env.IRONFRONTS_BENCHMARK_MS ?? 2_200);
 const warmupDuration = Number(process.env.IRONFRONTS_BENCHMARK_WARMUP_MS ?? 600);
-const headless = process.env.IRONFRONTS_HEADLESS
-  ? process.env.IRONFRONTS_HEADLESS !== 'false'
-  : process.platform !== 'win32';
 const targetUrl = new URL(process.argv[2] ?? 'http://127.0.0.1:5173/');
 targetUrl.searchParams.set('benchmark', '1');
 
 await mkdir(outputDirectory, { recursive: true });
-const browser = await chromium.launch({
-  executablePath,
-  headless,
-  args: headless ? [
-    '--enable-unsafe-webgpu',
-    '--enable-unsafe-swiftshader',
-    '--enable-features=Vulkan',
-    '--use-angle=swiftshader',
-    '--disable-vulkan-surface',
-  ] : ['--enable-unsafe-webgpu'],
-});
-const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 });
-const errors = [];
-page.on('console', (message) => {
-  if (message.type() === 'error') errors.push(`console: ${message.text()}`);
-});
-page.on('pageerror', (error) => errors.push(`page: ${error.message}`));
+const { browser, page, errors, headless } = await launchCheckPage();
 await page.addInitScript(() => {
   window.__ironfrontsLongTasks = [];
   if ('PerformanceObserver' in window) {
@@ -275,8 +255,8 @@ const report = {
   scenarios,
   errors,
 };
-await writeFile(path.join(outputDirectory, 'performance-report.json'), `${JSON.stringify(report, null, 2)}\n`);
-await writeFile(path.join(outputDirectory, 'performance-report.md'), renderMarkdown(report));
+await writeJsonReport(outputDirectory, 'performance-report.json', report);
+await writeTextReport(outputDirectory, 'performance-report.md', renderMarkdown(report));
 console.log(renderConsoleSummary(report));
 await browser.close();
 if (unsupported || errors.length) process.exitCode = 1;

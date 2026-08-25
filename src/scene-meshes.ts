@@ -43,16 +43,6 @@ export function createTerrainMesh(device: GPUDevice, resolution: number, skirts 
   return uploadMesh(device, 'terrain grid', new Float32Array(vertexValues), new Uint16Array(indexValues));
 }
 
-export function createTreeMesh(device: GPUDevice): Mesh {
-  const builder = new MeshBuilder();
-  // One compact primitive set is morphed into five silhouettes by the prop
-  // vertex shader. Parts 1-3 are broadleaf crowns; 4-6 are conifer tiers.
-  builder.addBox(-0.5, 0, -0.5, 0.5, 1, 0.5, 0);
-  for (let part = 1; part <= 3; part += 1) builder.addFacetedSphere(part);
-  for (let part = 4; part <= 6; part += 1) builder.addCone(0, -1, 0, 1, 1, 8, part);
-  return uploadMesh(device,'tree mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
-}
-
 export function createTreeFamilyMesh(device: GPUDevice, family: 'broadleaf' | 'conifer', lod: 0 | 1 | 2): Mesh {
   const builder = new MeshBuilder();
   if (lod < 2) builder.addBox(-0.5, 0, -0.5, 0.5, 1, 0.5, 0);
@@ -63,17 +53,6 @@ export function createTreeFamilyMesh(device: GPUDevice, family: 'broadleaf' | 'c
     for (let part = 4; part < 4 + partCount; part += 1) builder.addCone(0, -1, 0, 1, 1, lod === 2 ? 6 : 8, part);
   }
   return uploadMesh(device, `${family} tree lod ${lod}`, new Float32Array(builder.vertices), new Uint16Array(builder.indices));
-}
-
-export function createBuildingMesh(device: GPUDevice): Mesh {
-  const builder = new MeshBuilder();
-  builder.addBox(-0.5, 0, -0.5, 0.5, 1, 0.5, 0);
-  builder.addGableRoof(-0.56, 1, -0.56, 0.56, 1.24, 0.56, 1);
-  builder.addBox(-0.68, 0, -0.38, 0.68, 0.42, 0.38, 2, 2);
-  builder.addBox(-0.18, 1, -0.18, 0.18, 1.52, 0.18, 3, 3);
-  builder.addHipRoof(0, 1, 0, 0.62, 1.24, 4);
-  builder.addBox(-0.54, 1, -0.54, 0.54, 1.055, 0.54, 5, 5);
-  return uploadMesh(device,'building mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
 }
 
 export function createBuildingArchetypeMesh(device: GPUDevice, archetype: number, lod: 0 | 1): Mesh {

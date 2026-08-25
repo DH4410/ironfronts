@@ -1,46 +1,8 @@
-import { FIELD_HEIGHT, FIELD_WIDTH, SEED, WORLD_HEIGHT, WORLD_WIDTH } from './config.mjs';
+import { FIELD_HEIGHT, FIELD_WIDTH, WORLD_HEIGHT, WORLD_WIDTH } from './config.mjs';
 import { blurField, clamp, smoothstep, wrap } from './raster.mjs';
 import { ROAD_MAX_GRADE } from '../infrastructure/common.mjs';
 import { assembleProvinceRoutes } from '../infrastructure/province-routes.mjs';
-
-function hash2(x, y, seed = SEED) {
-  let value = Math.imul(x ^ seed, 0x45d9f3b) ^ Math.imul(y + seed, 0x27d4eb2d);
-  value ^= value >>> 15;
-  value = Math.imul(value, 0x85ebca6b);
-  value ^= value >>> 13;
-  return (value >>> 0) / 0xffffffff;
-}
-
-function periodicNoise(u, v, cellsX, cellsY) {
-  const x = u * cellsX, y = v * cellsY;
-  const x0 = Math.floor(x), y0 = Math.floor(y);
-  const tx = x - x0, ty = y - y0;
-  const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
-  const sample = (px, py) => hash2(wrap(px, cellsX), clamp(py, 0, cellsY));
-  const top = sample(x0, y0) * (1 - sx) + sample(x0 + 1, y0) * sx;
-  const bottom = sample(x0, y0 + 1) * (1 - sx) + sample(x0 + 1, y0 + 1) * sx;
-  return top * (1 - sy) + bottom * sy;
-}
-
-function fbm(u, v) {
-  let value = 0, amplitude = 0.56, normalization = 0;
-  for (const [x, y] of [[9, 5], [19, 10], [37, 19], [73, 37]]) {
-    value += periodicNoise(u, v, x, y) * amplitude;
-    normalization += amplitude;
-    amplitude *= 0.5;
-  }
-  return value / normalization;
-}
-
-function terrainLimit(terrain, hillEnvelope, mountainEnvelope, regionalMountain) {
-  const base = terrain === 1 ? 18 : terrain === 2 ? 60 : 8;
-  return clamp(Math.max(base,
-    8 + hillEnvelope * 10 + mountainEnvelope * 44 + regionalMountain * 8), 8, 60);
-}
-
-function slopeLimit(hillEnvelope, mountainEnvelope) {
-  return 0.65 + hillEnvelope * 0.50 + mountainEnvelope * 0.85;
-}
+import { periodicTopographyNoise, terrainHeightLimit, terrainSlopeLimit, topographyFbm } from './topography-noise.mjs';
 
 function cleanAndProject(heights, caps, limits, landField, passes = 10) {
   const width = FIELD_WIDTH, height = FIELD_HEIGHT;
@@ -338,13 +300,13 @@ export function generateTopography({ landField, terrainField, provinceField, coa
       const index = y * FIELD_WIDTH + x;
       if (!landField[index]) continue;
       const u = x / FIELD_WIDTH;
-      const noise = fbm(u, v), macro = periodicNoise(u, v, 13, 7);
-      const ridge = 1 - Math.abs(periodicNoise(u, v, 31, 16) * 2 - 1);
+      const noise = topographyFbm(u, v), macro = periodicTopographyNoise(u, v, 13, 7);
+      const ridge = 1 - Math.abs(periodicTopographyNoise(u, v, 31, 16) * 2 - 1);
       const mountain = smoothstep(0.012, 0.72, mountainShoulder[index]);
       const regionalMountain = smoothstep(0.02, 0.18, mountainCluster[index]);
       const hill = clamp(Math.max(smoothstep(0.02, 0.78, hillShoulder[index]), mountain * 0.38), 0, 1);
-      caps[index] = terrainLimit(terrainField[index], hill, mountain, regionalMountain);
-      limits[index] = slopeLimit(hill, mountain);
+      caps[index] = terrainHeightLimit(terrainField[index], hill, mountain, regionalMountain);
+      limits[index] = terrainSlopeLimit(hill, mountain);
       const coast = smoothstep(0.48, 0.995, coastBlend[index]);
       const continental = smoothstep(0, 18, landDistance[index]);
       const base = 1.2 + coast * (1.1 + continental * 1.8 + (macro - 0.5) * 1.4 + (noise - 0.5) * 1.2);

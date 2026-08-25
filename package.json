@@ -8,9 +8,12 @@
     "dev": "vite",
     "build:world": "node scripts/build-world.mjs",
     "build": "npm run build:world && tsc --noEmit && vite build",
+    "check": "tsc --noEmit && npm run lint:scripts && npm run test:architecture && vitest run",
+    "lint:scripts": "eslint \"scripts/**/*.mjs\"",
     "preview": "vite preview",
     "pretest": "npm run build:world",
     "test": "vitest run",
+    "test:architecture": "vitest run tests/architecture.test.ts",
     "visual-check": "node scripts/visual-check.mjs",
     "performance-check": "node scripts/performance-check.mjs"
   },
@@ -20,6 +23,7 @@
   "devDependencies": {
     "@types/node": "^24.0.0",
     "@webgpu/types": "^0.1.64",
+    "eslint": "^10.9.1",
     "playwright-core": "^1.62.1",
     "pngjs": "^7.0.0",
     "typescript": "^5.9.2",

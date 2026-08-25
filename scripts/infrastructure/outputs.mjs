@@ -1,4 +1,4 @@
-import { ROAD_WIDTH, clamp, smoothstep, unwrapNear, wrap } from './common.mjs';
+import { ROAD_WIDTH, smoothstep, unwrapNear, wrap } from './common.mjs';
 
 export function rasterRoadField(routes, width, height, worldWidth, worldHeight, landField, landWidth, landHeight) {
   const field = new Uint8Array(width * height * 2);

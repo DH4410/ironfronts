@@ -1,46 +1,29 @@
 import { vec3 } from 'gl-matrix';
 import { StrategyCamera } from './camera';
+import { buildPropVisibility, buildTerrainVisibility } from './chunk-visibility';
 import { buildCountryColorBuffer, CountryLabelLayer } from './country-overlay';
+import { align4, fetchBinary, fetchJson, uploadMipmappedTexture, uploadTexture } from './gpu-utils';
 import { createMaterialTexture, createTreeMaterialTexture } from './material-texture';
 import {
   createEmptyRenderWorkload, PerformanceMonitor,
-  type PerformancePhases, type PerformanceSnapshot, type RenderCategory, type RenderWorkload,
+  type PerformancePhases, type PerformanceSnapshot, type RenderCategory,
 } from './performance-monitor';
+import { createHoverInfo, pickTerrainPoint } from './picking';
+import { PoliticalCache } from './political-cache';
 import { createRendererLayouts, createRendererPipelines } from './renderer-pipelines';
+import { beginWorldFrame, submitWorldFrame } from './renderer-frame';
+import type { InstanceLayer, PerformanceLayerVisibility } from './renderer-types';
 import {
   createBarrierMesh, createBuildingArchetypeMesh, createLampMesh, createSignMesh, createTerrainMesh,
   createTreeFamilyMesh, uploadIndexedMesh,
 } from './scene-meshes';
 import type { Mesh } from './scene-meshes';
-import type { BinaryField, CountryRecord, FrameStats, HoverInfo, ProgressReporter, PropChunkRange, ProvinceRecord, WorldManifest } from './types';
+import type { CountryRecord, FrameStats, HoverInfo, ProgressReporter, PropChunkRange, ProvinceRecord, WorldManifest } from './types';
 import {
   extractFrustumPlanes, sphereIntersectsFrustum, sphereIntersectsHorizontalWorldWindow, WORLD_COPY_INDICES,
 } from './visibility';
-
-interface InstanceLayer {
-  buffer: GPUBuffer;
-  params: GPUBuffer;
-  bindGroup: GPUBindGroup;
-  count: number;
-  views?: Map<string, {
-    buffer: GPUBuffer;
-    bindGroup: GPUBindGroup;
-    revision: number;
-    draws: Array<{ mesh: Mesh; firstInstance: number; instanceCount: number; lod: number }>;
-    visibleChunks: number;
-  }>;
-}
-
-interface PerformanceLayerVisibility {
-  terrain: boolean;
-  ocean: boolean;
-  trees: boolean;
-  buildings: boolean;
-  roadFurniture: boolean;
-  countryTint: boolean;
-  countryBorders: boolean;
-  countryLabels: boolean;
-}
+import { sampleWrappedField } from './world-sampling';
+import { loadWorldAssetBuffers } from './world-assets';
 
 export class WorldRenderer {
   readonly camera = new StrategyCamera();
@@ -102,11 +85,7 @@ export class WorldRenderer {
   private materialTexture!: GPUTexture;
   private treeMaterialTexture!: GPUTexture;
   private provincePoliticalColorTexture!: GPUTexture;
-  private provincePoliticalColors!: Uint8Array;
-  private politicalOverlayProvinceIds!: Uint16Array;
-  private politicalOverlayBounds: Array<{ minX: number; minY: number; maxX: number; maxY: number } | undefined> = [];
-  private politicalOverlayWidth = 0;
-  private politicalOverlayHeight = 0;
+  private politicalCache!: PoliticalCache;
   private countryColors!: Float32Array;
   private visibleTerrainBuffer!: GPUBuffer;
   private terrainLodDraws: Array<{ firstInstance: number; instanceCount: number; lod: number }> = [];
@@ -116,8 +95,6 @@ export class WorldRenderer {
   private heightData!: Float32Array;
   private provinceData!: Uint16Array;
   private provinceOwners!: Uint32Array;
-  private borderData!: Float32Array;
-  private borderSegmentsByProvince: number[][] = [];
   private provinceById = new Map<number, ProvinceRecord>();
   private countryById = new Map<number, CountryRecord>();
   private countryLabels?: CountryLabelLayer;
@@ -213,70 +190,55 @@ export class WorldRenderer {
     this.createLayouts();
 
     report('Loading terrain fields', 0.2);
-    const [heightBuffer, surfaceBuffer, terrainNormalBuffer, terrainAlbedoBuffer, navigationBuffer, coastBuffer, provinceBuffer, roadVertexBuffer, roadIndexBuffer,
-      hiddenConnectionVertexBuffer, hiddenConnectionIndexBuffer, waterwayVertexBuffer, waterwayIndexBuffer,
-      borderBuffer, treeBuffer, buildingBuffer, lampBuffer, barrierBuffer, signBuffer,
-      provinceOwnerData, provinceAdjacencyData, provinceLabelData] = await Promise.all([
-      fetchBinary(`/world/${this.manifest.fields.height.url}`),
-      fetchBinary(`/world/${this.manifest.fields.surface.url}`),
-      fetchBinary(`/world/${this.manifest.fields.terrainNormal.url}`),
-      fetchBinary(`/world/${this.manifest.fields.terrainAlbedo.url}`),
-      fetchBinary(`/world/${this.manifest.fields.navigation.url}`),
-      fetchBinary(`/world/${this.manifest.fields.coast.url}`),
-      fetchBinary(`/world/${this.manifest.fields.provinceIds.url}`),
-      fetchBinary(`/world/${this.manifest.buffers.roadVertices.url}`),
-      fetchBinary(`/world/${this.manifest.buffers.roadIndices.url}`),
-      fetchBinary(`/world/${this.manifest.buffers.hiddenConnectionVertices.url}`),
-      fetchBinary(`/world/${this.manifest.buffers.hiddenConnectionIndices.url}`),
-      fetchBinary(`/world/${this.manifest.buffers.waterwayVertices.url}`),
-      fetchBinary(`/world/${this.manifest.buffers.waterwayIndices.url}`),
-      fetchBinary(`/world/${this.manifest.buffers.borders.url}`),
-      fetchBinary(`/world/${this.manifest.buffers.trees.url}`),
-      fetchBinary(`/world/${this.manifest.buffers.buildings.url}`),
-      fetchBinary(`/world/${this.manifest.buffers.lamps.url}`),
-      fetchBinary(`/world/${this.manifest.buffers.barriers.url}`),
-      fetchBinary(`/world/${this.manifest.buffers.signs.url}`),
-      fetchBinary(`/world/${this.manifest.politics.owners.url}`),
-      fetchBinary(`/world/${this.manifest.politics.adjacency.url}`),
-      fetchBinary(`/world/${this.manifest.politics.labelData.url}`),
-    ]);
+    const {
+      heightBuffer, surfaceBuffer, terrainNormalBuffer, terrainAlbedoBuffer, navigationBuffer, coastBuffer,
+      provinceBuffer, roadVertexBuffer, roadIndexBuffer, hiddenConnectionVertexBuffer, hiddenConnectionIndexBuffer,
+      waterwayVertexBuffer, waterwayIndexBuffer, borderBuffer, treeBuffer, buildingBuffer, lampBuffer,
+      barrierBuffer, signBuffer, provinceOwnerData, provinceAdjacencyData, provinceLabelData,
+    } = await loadWorldAssetBuffers(this.manifest);
     this.heightData = new Float32Array(heightBuffer);
     this.provinceData = new Uint16Array(provinceBuffer);
     this.provinceOwners = new Uint32Array(provinceOwnerData);
     this.countryColors = buildCountryColorBuffer(this.manifest.politics.countries);
-    this.preparePoliticalCaches(borderBuffer);
+    this.politicalCache = new PoliticalCache(
+      this.manifest,
+      this.provinceData,
+      this.provinceOwners,
+      this.countryColors,
+      borderBuffer,
+    );
 
     report('Uploading terrain fields', 0.37);
-    this.heightTexture = this.uploadTexture(
+    this.heightTexture = uploadTexture(this.device,
       'terrain height', this.manifest.fields.height.width, this.manifest.fields.height.height,
       'r32float', new Uint8Array(heightBuffer), this.manifest.fields.height.width * 4,
     );
-    this.surfaceTexture = this.uploadTexture(
+    this.surfaceTexture = uploadTexture(this.device,
       'terrain surface', this.manifest.fields.surface.width, this.manifest.fields.surface.height,
       'rgba8uint', new Uint8Array(surfaceBuffer), this.manifest.fields.surface.width * 4,
     );
-    this.terrainNormalTexture = this.uploadTexture(
+    this.terrainNormalTexture = uploadTexture(this.device,
       'precomputed terrain normals', this.manifest.fields.terrainNormal.width, this.manifest.fields.terrainNormal.height,
       'rg8snorm', new Uint8Array(terrainNormalBuffer), this.manifest.fields.terrainNormal.width * 2,
     );
-    this.terrainAlbedoTexture = this.uploadMipmappedTexture(
+    this.terrainAlbedoTexture = uploadMipmappedTexture(this.device,
       'baked terrain albedo and occlusion', this.manifest.fields.terrainAlbedo, new Uint8Array(terrainAlbedoBuffer),
     );
-    this.navigationTexture = this.uploadTexture(
+    this.navigationTexture = uploadTexture(this.device,
       'packed roads and waterways', this.manifest.fields.navigation.width, this.manifest.fields.navigation.height,
       'rgba8unorm', new Uint8Array(navigationBuffer), this.manifest.fields.navigation.width * 4,
     );
-    this.coastTexture = this.uploadTexture(
+    this.coastTexture = uploadTexture(this.device,
       'signed-distance bank field', this.manifest.fields.coast.width, this.manifest.fields.coast.height,
       'rg8unorm', new Uint8Array(coastBuffer), this.manifest.fields.coast.width * 2,
     );
-    this.provinceTexture = this.uploadTexture(
+    this.provinceTexture = uploadTexture(this.device,
       'province ids', this.manifest.fields.provinceIds.width, this.manifest.fields.provinceIds.height,
       'r16uint', new Uint8Array(provinceBuffer), this.manifest.fields.provinceIds.width * 2,
     );
-    this.provincePoliticalColorTexture = this.uploadTexture(
-      'province political colors', this.politicalOverlayWidth, this.politicalOverlayHeight,
-      'rgba8unorm', this.provincePoliticalColors, this.politicalOverlayWidth * 4,
+    this.provincePoliticalColorTexture = uploadTexture(this.device,
+      'province political colors', this.politicalCache.width, this.politicalCache.height,
+      'rgba8unorm', this.politicalCache.colors, this.politicalCache.width * 4,
     );
 
     report('Preparing terrain and tree materials', 0.49);
@@ -410,7 +372,12 @@ export class WorldRenderer {
       this.provinceOwners[encodedId] = change.countryId;
       ownershipChanges.push({ provinceId: encodedId, previousCountryId, countryId: change.countryId });
     }
-    this.updatePoliticalCaches(ownershipChanges.map((change) => change.provinceId));
+    this.politicalCache.update(
+      ownershipChanges.map((change) => change.provinceId),
+      this.device,
+      this.provincePoliticalColorTexture,
+      this.borders.buffer,
+    );
     this.countryLabels?.refreshOwnership(ownershipChanges);
     if (this.hoveredId) this.updateHover(this.hoveredId, true);
   }
@@ -515,169 +482,6 @@ export class WorldRenderer {
         { binding: 2, resource: this.device.createSampler({ magFilter: 'linear', minFilter: 'linear' }) },
       ],
     });
-  }
-
-  private uploadTexture(label: string, width: number, height: number, format: GPUTextureFormat, bytes: Uint8Array, bytesPerRow: number): GPUTexture {
-    const texture = this.device.createTexture({
-      label,
-      size: [width, height],
-      format,
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-    });
-    this.device.queue.writeTexture(
-      { texture },
-      bytes.buffer as ArrayBuffer,
-      { offset: bytes.byteOffset, bytesPerRow, rowsPerImage: height },
-      [width, height],
-    );
-    return texture;
-  }
-
-  private uploadMipmappedTexture(label: string, field: BinaryField, bytes: Uint8Array): GPUTexture {
-    const mipLevelCount = field.mipLevelCount ?? 1;
-    const texture = this.device.createTexture({
-      label,
-      size: [field.width, field.height],
-      format: field.format as GPUTextureFormat,
-      mipLevelCount,
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
-    });
-    let width = field.width;
-    let height = field.height;
-    let offset = 0;
-    for (let mipLevel = 0; mipLevel < mipLevelCount; mipLevel += 1) {
-      const byteLength = width * height * 4;
-      this.device.queue.writeTexture(
-        { texture, mipLevel },
-        bytes.buffer as ArrayBuffer,
-        { offset: bytes.byteOffset + offset, bytesPerRow: width * 4, rowsPerImage: height },
-        [width, height],
-      );
-      offset += byteLength;
-      width = Math.max(1, Math.floor(width / 2));
-      height = Math.max(1, Math.floor(height / 2));
-    }
-    if (offset !== bytes.byteLength) throw new Error(`${label} mip data size mismatch: used ${offset}, received ${bytes.byteLength}`);
-    return texture;
-  }
-
-  private createStorageBuffer(label: string, data: ArrayBufferView): GPUBuffer {
-    const buffer = this.device.createBuffer({
-      label,
-      size: align4(data.byteLength),
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
-    this.device.queue.writeBuffer(buffer, 0, data.buffer as ArrayBuffer, data.byteOffset, data.byteLength);
-    return buffer;
-  }
-
-  private preparePoliticalCaches(borderBuffer: ArrayBuffer): void {
-    this.politicalOverlayWidth = this.manifest.fields.terrainAlbedo.width;
-    this.politicalOverlayHeight = this.manifest.fields.terrainAlbedo.height;
-    this.provincePoliticalColors = new Uint8Array(this.politicalOverlayWidth * this.politicalOverlayHeight * 4);
-    this.politicalOverlayProvinceIds = new Uint16Array(this.politicalOverlayWidth * this.politicalOverlayHeight);
-    this.politicalOverlayBounds = new Array(this.provinceOwners.length);
-    const sourceWidth = this.manifest.fields.provinceIds.width;
-    const sourceHeight = this.manifest.fields.provinceIds.height;
-    for (let y = 0; y < this.politicalOverlayHeight; y += 1) {
-      const sourceY = Math.min(sourceHeight - 1, Math.floor((y + 0.5) * sourceHeight / this.politicalOverlayHeight));
-      for (let x = 0; x < this.politicalOverlayWidth; x += 1) {
-        const sourceX = Math.min(sourceWidth - 1, Math.floor((x + 0.5) * sourceWidth / this.politicalOverlayWidth));
-        const index = y * this.politicalOverlayWidth + x;
-        const provinceId = this.provinceData[sourceY * sourceWidth + sourceX] ?? 0;
-        this.politicalOverlayProvinceIds[index] = provinceId;
-        if (provinceId > 0) {
-          const bounds = this.politicalOverlayBounds[provinceId];
-          if (bounds) {
-            bounds.minX = Math.min(bounds.minX, x);
-            bounds.minY = Math.min(bounds.minY, y);
-            bounds.maxX = Math.max(bounds.maxX, x);
-            bounds.maxY = Math.max(bounds.maxY, y);
-          } else {
-            this.politicalOverlayBounds[provinceId] = { minX: x, minY: y, maxX: x, maxY: y };
-          }
-        }
-        this.writePoliticalOverlayPixel(index, provinceId);
-      }
-    }
-    this.borderData = new Float32Array(borderBuffer);
-    this.borderSegmentsByProvince = Array.from({ length: this.provinceOwners.length }, () => [] as number[]);
-    for (let segment = 0; segment < this.manifest.buffers.borders.count; segment += 1) {
-      const offset = segment * 8;
-      const provinceA = Math.round(this.borderData[offset + 4]);
-      const provinceB = Math.round(this.borderData[offset + 5]);
-      if (provinceA < this.borderSegmentsByProvince.length) this.borderSegmentsByProvince[provinceA].push(segment);
-      if (provinceB > 0 && provinceB < this.borderSegmentsByProvince.length) this.borderSegmentsByProvince[provinceB].push(segment);
-      const heightAndFlag = Math.abs(this.borderData[offset + 6]);
-      this.borderData[offset + 6] = this.provinceOwners[provinceA] !== this.provinceOwners[provinceB]
-        ? -heightAndFlag : heightAndFlag;
-    }
-  }
-
-  private writePoliticalOverlayPixel(index: number, provinceId: number): void {
-    const owner = this.provinceOwners[provinceId];
-    const target = index * 4;
-    if (!owner) {
-      this.provincePoliticalColors.fill(0, target, target + 4);
-      return;
-    }
-    const source = owner * 4;
-    this.provincePoliticalColors[target] = Math.round(this.countryColors[source] * 255);
-    this.provincePoliticalColors[target + 1] = Math.round(this.countryColors[source + 1] * 255);
-    this.provincePoliticalColors[target + 2] = Math.round(this.countryColors[source + 2] * 255);
-    this.provincePoliticalColors[target + 3] = 255;
-  }
-
-  private updatePoliticalCaches(provinceIds: number[]): void {
-    if (!provinceIds.length) return;
-    const affectedSegments = new Set<number>();
-    for (const provinceId of provinceIds) {
-      const bounds = this.politicalOverlayBounds[provinceId];
-      if (bounds) {
-        for (let y = bounds.minY; y <= bounds.maxY; y += 1) {
-          for (let x = bounds.minX; x <= bounds.maxX; x += 1) {
-            const index = y * this.politicalOverlayWidth + x;
-            if (this.politicalOverlayProvinceIds[index] === provinceId) this.writePoliticalOverlayPixel(index, provinceId);
-          }
-        }
-        this.device.queue.writeTexture(
-          { texture: this.provincePoliticalColorTexture, origin: [bounds.minX, bounds.minY] },
-          this.provincePoliticalColors.buffer as ArrayBuffer,
-          {
-            offset: this.provincePoliticalColors.byteOffset
-              + (bounds.minY * this.politicalOverlayWidth + bounds.minX) * 4,
-            bytesPerRow: this.politicalOverlayWidth * 4,
-            rowsPerImage: this.politicalOverlayHeight,
-          },
-          [bounds.maxX - bounds.minX + 1, bounds.maxY - bounds.minY + 1],
-        );
-      }
-      for (const segment of this.borderSegmentsByProvince[provinceId] ?? []) affectedSegments.add(segment);
-    }
-    const sortedSegments = [...affectedSegments].sort((a, b) => a - b);
-    for (const segment of sortedSegments) {
-      const offset = segment * 8;
-      const provinceA = Math.round(this.borderData[offset + 4]);
-      const provinceB = Math.round(this.borderData[offset + 5]);
-      const heightAndFlag = Math.abs(this.borderData[offset + 6]);
-      this.borderData[offset + 6] = this.provinceOwners[provinceA] !== this.provinceOwners[provinceB]
-        ? -heightAndFlag : heightAndFlag;
-    }
-    let start = 0;
-    while (start < sortedSegments.length) {
-      let end = start + 1;
-      while (end < sortedSegments.length && sortedSegments[end] === sortedSegments[end - 1] + 1) end += 1;
-      const firstSegment = sortedSegments[start];
-      const segmentCount = sortedSegments[end - 1] - firstSegment + 1;
-      this.device.queue.writeBuffer(
-        this.borders.buffer,
-        firstSegment * 8 * 4,
-        this.borderData.buffer as ArrayBuffer,
-        this.borderData.byteOffset + firstSegment * 8 * 4,
-        segmentCount * 8 * 4,
-      );
-      start = end;
-    }
   }
 
   private updateBorderVisibility(): void {
@@ -835,33 +639,16 @@ export class WorldRenderer {
   private render(visibleLabels: number): void {
     if (!this.depthTexture) return;
     this.frameWorkload = createEmptyRenderWorkload(visibleLabels);
-    const encoder = this.device.createCommandEncoder({ label: 'world frame' });
     const collectGpuTiming = Boolean(this.gpuQuerySet && this.gpuResolveBuffer && this.gpuReadBuffer)
       && !this.gpuReadPending && this.gpuQueryCountdown++ % 4 === 0;
     const gpuTimingEpoch = this.performanceEpoch;
-    const passDescriptor: GPURenderPassDescriptor = {
-      label: 'world render pass',
-      colorAttachments: [{
-        view: this.context.getCurrentTexture().createView(),
-        clearValue: { r: 0.45, g: 0.57, b: 0.61, a: 1 },
-        loadOp: 'clear',
-        storeOp: 'store',
-      }],
-      depthStencilAttachment: {
-        view: this.depthTexture.createView(),
-        depthClearValue: 1,
-        depthLoadOp: 'clear',
-        depthStoreOp: 'store',
-      },
-    };
-    if (collectGpuTiming && this.gpuQuerySet) {
-      passDescriptor.timestampWrites = {
-        querySet: this.gpuQuerySet,
-        beginningOfPassWriteIndex: 0,
-        endOfPassWriteIndex: 1,
-      };
-    }
-    const pass = encoder.beginRenderPass(passDescriptor);
+    const frame = beginWorldFrame(
+      this.device,
+      this.context,
+      this.depthTexture,
+      collectGpuTiming ? this.gpuQuerySet : undefined,
+    );
+    const pass = frame.pass;
 
     pass.setBindGroup(0, this.commonBindGroup);
     pass.setPipeline(this.polarCapPipeline);
@@ -897,19 +684,19 @@ export class WorldRenderer {
       pass.setPipeline(this.waterwayPipeline);
       pass.setVertexBuffer(0, this.waterwayMesh.vertex);
       pass.setIndexBuffer(this.waterwayMesh.index, 'uint32');
-      this.drawChunkedInfrastructure(pass, this.waterwayMesh, this.manifest.infrastructureChunks.waterways, 'waterways', 9_200);
+      this.drawChunkedInfrastructure(pass, this.manifest.infrastructureChunks.waterways, 'waterways', 9_200);
     }
 
     if (this.showRoads || this.showHiddenConnections) pass.setPipeline(this.infrastructurePipeline);
     if (this.showRoads) {
       pass.setVertexBuffer(0, this.roadMesh.vertex);
       pass.setIndexBuffer(this.roadMesh.index, 'uint32');
-      this.drawChunkedInfrastructure(pass, this.roadMesh, this.manifest.infrastructureChunks.roads, 'roads');
+      this.drawChunkedInfrastructure(pass, this.manifest.infrastructureChunks.roads, 'roads');
     }
     if (this.showHiddenConnections) {
       pass.setVertexBuffer(0, this.hiddenConnectionMesh.vertex);
       pass.setIndexBuffer(this.hiddenConnectionMesh.index, 'uint32');
-      this.drawChunkedInfrastructure(pass, this.hiddenConnectionMesh, this.manifest.infrastructureChunks.hiddenConnections, 'hiddenLinks', 8_000);
+      this.drawChunkedInfrastructure(pass, this.manifest.infrastructureChunks.hiddenConnections, 'hiddenLinks', 8_000);
     }
 
     if (this.showProps) {
@@ -950,12 +737,13 @@ export class WorldRenderer {
       pass.draw(6, visibleLabels);
       this.recordTriangleDraw('labels', visibleLabels * 2, visibleLabels);
     }
-    pass.end();
-    if (collectGpuTiming && this.gpuQuerySet && this.gpuResolveBuffer && this.gpuReadBuffer) {
-      encoder.resolveQuerySet(this.gpuQuerySet, 0, 2, this.gpuResolveBuffer, 0);
-      encoder.copyBufferToBuffer(this.gpuResolveBuffer, 0, this.gpuReadBuffer, 0, 16);
-    }
-    this.device.queue.submit([encoder.finish()]);
+    submitWorldFrame(
+      this.device,
+      frame,
+      collectGpuTiming ? this.gpuQuerySet : undefined,
+      collectGpuTiming ? this.gpuResolveBuffer : undefined,
+      collectGpuTiming ? this.gpuReadBuffer : undefined,
+    );
     if (collectGpuTiming) this.readGpuTiming(gpuTimingEpoch);
   }
 
@@ -989,52 +777,27 @@ export class WorldRenderer {
       layer.views.set(viewKey, view);
     }
     if (view.revision !== this.camera.revision) {
-      const chunksX = this.manifest.propChunks.chunksX;
-      const chunksY = this.manifest.propChunks.chunksY;
-      const chunkWidth = this.manifest.world.width / chunksX;
-      const chunkHeight = this.manifest.world.height / chunksY;
-      const chunkRadius = Math.hypot(chunkWidth, chunkHeight) * 0.55;
-      const buckets = groupMeshes.map((meshes) => meshes.map(() => [] as number[]));
-      view.visibleChunks = 0;
-      for (const copy of WORLD_COPY_INDICES) {
-        const copyOffset = (copy - 1) * this.manifest.world.width;
-        for (let chunkIndex = 0; chunkIndex < ranges.length; chunkIndex += 1) {
-          const range = ranges[chunkIndex];
-          if (!range?.instanceCount) continue;
-          const centerX = (chunkIndex % chunksX + 0.5) * chunkWidth + copyOffset;
-          const centerZ = (Math.floor(chunkIndex / chunksX) + 0.5) * chunkHeight;
-          const distance = Math.hypot(centerX - this.camera.position[0], centerZ - this.camera.position[2], this.camera.position[1]);
-          if (distance > maximumDistance + chunkRadius) continue;
-          if (!this.chunkIntersectsView(centerX, centerZ, chunkRadius)) continue;
-          view.visibleChunks += 1;
-          const lod = distance < lodDistances[0] ? 0 : distance < lodDistances[1] ? 1 : 2;
-          const groups = groupMeshes.length === 1 ? [range] : range.groups;
-          for (let group = 0; group < groups.length; group += 1) {
-            const groupRange = groups[group];
-            if (!groupRange?.instanceCount) continue;
-            const meshGroup = Math.min(group, groupMeshes.length - 1);
-            const meshLod = Math.min(lod, groupMeshes[meshGroup].length - 1);
-            const bucket = buckets[meshGroup][meshLod];
-            for (let index = 0; index < groupRange.instanceCount; index += 1) {
-              bucket.push(copy * layer.count + groupRange.firstInstance + index);
-            }
-          }
-        }
+      const visibility = buildPropVisibility(
+        this.manifest,
+        ranges,
+        groupMeshes,
+        layer.count,
+        this.camera.position,
+        maximumDistance,
+        lodDistances,
+        (centerX, centerZ, radius) => this.chunkIntersectsView(centerX, centerZ, radius),
+      );
+      view.visibleChunks = visibility.visibleChunks;
+      view.draws = visibility.draws;
+      if (visibility.instances.length) {
+        this.device.queue.writeBuffer(
+          view.buffer,
+          0,
+          visibility.instances.buffer as ArrayBuffer,
+          visibility.instances.byteOffset,
+          visibility.instances.byteLength,
+        );
       }
-      const count = buckets.flat(2).length;
-      const visibleInstances = new Uint32Array(count);
-      view.draws = [];
-      let cursor = 0;
-      for (let group = 0; group < buckets.length; group += 1) {
-        for (let lod = 0; lod < buckets[group].length; lod += 1) {
-          const bucket = buckets[group][lod];
-          if (!bucket.length) continue;
-          visibleInstances.set(bucket, cursor);
-          view.draws.push({ mesh: groupMeshes[group][lod], firstInstance: cursor, instanceCount: bucket.length, lod });
-          cursor += bucket.length;
-        }
-      }
-      if (visibleInstances.length) this.device.queue.writeBuffer(view.buffer, 0, visibleInstances);
       view.revision = this.camera.revision;
     }
     if (category === 'trees') this.frameWorkload.visibleChunks.trees += view.visibleChunks;
@@ -1065,46 +828,26 @@ export class WorldRenderer {
   private updateVisibleTerrainChunks(): void {
     if (this.lastTerrainVisibilityRevision === this.camera.revision) return;
     this.lastTerrainVisibilityRevision = this.camera.revision;
-    const chunksX = this.manifest.terrain.chunksX;
-    const chunksY = this.manifest.terrain.chunksY;
-    const chunksPerWorld = chunksX * chunksY;
-    const chunkWidth = this.manifest.world.width / chunksX;
-    const chunkHeight = this.manifest.world.height / chunksY;
-    const chunkRadius = Math.hypot(chunkWidth, chunkHeight) * 0.72;
-    const lodEntries: number[][] = [[], [], [], []];
-    for (const copy of WORLD_COPY_INDICES) {
-      const copyOffset = (copy - 1) * this.manifest.world.width;
-      for (let chunkY = 0; chunkY < chunksY; chunkY += 1) {
-        for (let chunkX = 0; chunkX < chunksX; chunkX += 1) {
-          const centerX = (chunkX + 0.5) * chunkWidth + copyOffset;
-          const centerZ = (chunkY + 0.5) * chunkHeight;
-          const centerY = this.sampleHeight(centerX, centerZ);
-          const distance = Math.hypot(
-            centerX - this.camera.position[0], centerY - this.camera.position[1], centerZ - this.camera.position[2],
-          );
-          if (!this.chunkIntersectsView(centerX, centerZ, chunkRadius)) continue;
-          const lod = distance < 1_050 ? 0 : distance < 2_350 ? 1 : distance < 5_000 ? 2 : 3;
-          lodEntries[lod].push(copy * chunksPerWorld + chunkY * chunksX + chunkX);
-        }
-      }
+    const visibility = buildTerrainVisibility(
+      this.manifest,
+      this.camera.position,
+      (x, z) => this.sampleHeight(x, z),
+      (centerX, centerZ, radius) => this.chunkIntersectsView(centerX, centerZ, radius),
+    );
+    this.terrainLodDraws = visibility.draws;
+    if (visibility.instances.length) {
+      this.device.queue.writeBuffer(
+        this.visibleTerrainBuffer,
+        0,
+        visibility.instances.buffer as ArrayBuffer,
+        visibility.instances.byteOffset,
+        visibility.instances.byteLength,
+      );
     }
-    const flattened = new Uint32Array(lodEntries.reduce((sum, entries) => sum + entries.length, 0));
-    this.terrainLodDraws = [];
-    let cursor = 0;
-    for (let lod = 0; lod < lodEntries.length; lod += 1) {
-      const entries = lodEntries[lod];
-      if (entries.length) {
-        flattened.set(entries, cursor);
-        this.terrainLodDraws.push({ firstInstance: cursor, instanceCount: entries.length, lod });
-        cursor += entries.length;
-      }
-    }
-    if (flattened.length) this.device.queue.writeBuffer(this.visibleTerrainBuffer, 0, flattened);
   }
 
   private drawChunkedInfrastructure(
     pass: GPURenderPassEncoder,
-    mesh: Mesh,
     ranges: Array<{ firstIndex: number; indexCount: number }>,
     category: 'roads' | 'hiddenLinks' | 'waterways',
     maximumDistance = 4_000,
@@ -1223,27 +966,16 @@ export class WorldRenderer {
 
   private pickProvince(clientX: number, clientY: number): { raycastMs: number; hoverUiMs: number } {
     const started = performance.now();
-    const ray = this.camera.screenRay(clientX, clientY);
-    if (ray.direction[1] >= -0.0001) {
-      return this.finishPicking(0, started);
-    }
-    const topY = this.manifest.terrain.maxHeight + 12;
-    let low = Math.max(0, (topY - ray.origin[1]) / ray.direction[1]);
-    let high = Math.max(0, (-2 - ray.origin[1]) / ray.direction[1]);
-    if (high < low) [low, high] = [high, low];
-    const point = this.pickPoint;
-    for (let iteration = 0; iteration < 8; iteration += 1) {
-      const distance = (low + high) * 0.5;
-      vec3.scaleAndAdd(point, ray.origin, ray.direction, distance);
-      const height = this.sampleHeight(point[0], point[2]);
-      if (point[1] > height) low = distance;
-      else high = distance;
-    }
-    vec3.scaleAndAdd(point, ray.origin, ray.direction, (low + high) * 0.5);
-    if (point[2] < 0 || point[2] >= this.manifest.world.height) {
-      return this.finishPicking(0, started);
-    }
-    const id = this.sampleProvince(point[0], point[2]);
+    const point = pickTerrainPoint(
+      this.camera,
+      clientX,
+      clientY,
+      this.manifest.terrain.maxHeight,
+      this.manifest.world.height,
+      (x, z) => this.sampleHeight(x, z),
+      this.pickPoint,
+    );
+    const id = point ? this.sampleProvince(point[0], point[2]) : 0;
     return this.finishPicking(id, started);
   }
 
@@ -1255,17 +987,25 @@ export class WorldRenderer {
   }
 
   private sampleHeight(worldX: number, worldZ: number): number {
-    const field = this.manifest.fields.height;
-    const x = wrap(Math.floor(worldX / this.manifest.world.width * field.width), field.width);
-    const y = clamp(Math.floor(worldZ / this.manifest.world.height * field.height), 0, field.height - 1);
-    return this.heightData[y * field.width + x] ?? 0;
+    return sampleWrappedField(
+      this.heightData,
+      this.manifest.fields.height,
+      this.manifest.world.width,
+      this.manifest.world.height,
+      worldX,
+      worldZ,
+    );
   }
 
   private sampleProvince(worldX: number, worldZ: number): number {
-    const field = this.manifest.fields.provinceIds;
-    const x = wrap(Math.floor(worldX / this.manifest.world.width * field.width), field.width);
-    const y = clamp(Math.floor(worldZ / this.manifest.world.height * field.height), 0, field.height - 1);
-    return this.provinceData[y * field.width + x] ?? 0;
+    return sampleWrappedField(
+      this.provinceData,
+      this.manifest.fields.provinceIds,
+      this.manifest.world.width,
+      this.manifest.world.height,
+      worldX,
+      worldZ,
+    );
   }
 
   private updateHover(encodedId: number, force = false): void {
@@ -1278,16 +1018,7 @@ export class WorldRenderer {
   }
 
   private toHoverInfo(encodedId: number): HoverInfo | null {
-    const province = this.provinceById.get(encodedId - 1);
-    if (!province) return null;
-    const country = this.countryById.get(this.provinceOwners[encodedId]);
-    return {
-      id: province.id,
-      name: province.name,
-      terrain: province.terrain,
-      country: country?.name ?? 'Unassigned',
-      countryColor: country?.color ?? '#808080',
-    };
+    return createHoverInfo(encodedId, this.provinceById, this.countryById, this.provinceOwners);
   }
 
   private updateStats(): void {
@@ -1320,22 +1051,6 @@ export class WorldRenderer {
       performance,
     });
   }
-}
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to load ${url}: ${response.status}`);
-  return response.json() as Promise<T>;
-}
-
-async function fetchBinary(url: string): Promise<ArrayBuffer> {
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to load ${url}: ${response.status}`);
-  return response.arrayBuffer();
-}
-
-function align4(value: number): number {
-  return (value + 3) & ~3;
 }
 
 function clamp(value: number, min: number, max: number): number {

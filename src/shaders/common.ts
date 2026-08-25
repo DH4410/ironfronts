@@ -1,4 +1,4 @@
-import { WORLD_FOG_END_RATIO, WORLD_FOG_START_RATIO } from '../visibility';
+import { WORLD_FOG_END_RATIO, WORLD_FOG_START_RATIO } from '../world-fog';
 
 export const commonWgsl = /* wgsl */ `
 struct Uniforms {

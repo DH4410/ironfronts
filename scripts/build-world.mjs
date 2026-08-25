@@ -1,18 +1,21 @@
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildInfrastructure } from './build-infrastructure.mjs';
 import { FIELD_HEIGHT, FIELD_WIDTH, ID_HEIGHT, ID_WIDTH, SEED, WORLD_HEIGHT, WORLD_WIDTH } from './world/config.mjs';
-import { blurField, clamp, distanceToValue, wrap } from './world/raster.mjs';
+import { blurField, clamp, distanceToValue } from './world/raster.mjs';
+import { writeTypedArtifact } from './world/artifact-writer.mjs';
+import { buildBorders, buildConnections, chunkInstanceRecords, chunkLineRecords } from './world/chunk-packing.mjs';
 import { buildInstances } from './world/instances.mjs';
 import { generateTopography } from './world/topography.mjs';
 import { buildBankField } from './world/water-fields.mjs';
 import { buildWaterways } from './world/waterways.mjs';
 import { buildTerrainAwareWaterways } from './world/terrain-aware-waterways.mjs';
+import { fbm } from './world/noise.mjs';
 import { seatRiverTerrain } from './world/river-terrain.mjs';
 import { buildVisualRiverField } from './world/visual-rivers.mjs';
 import { buildBakedTerrainAlbedo, buildNavigationField, buildTerrainNormals } from './world/terrain-precompute.mjs';
-import { sampleHeight } from './infrastructure/common.mjs';
+import { fillProvincePolygon, readMaterialJson } from './world/source-data.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MATERIAL = path.join(ROOT, 'material');
@@ -39,190 +42,19 @@ const visualCodes = new Map([
   ['Arctic', 8],
 ]);
 
-function hash2(x, y, seed = SEED) {
-  let h = Math.imul(x ^ seed, 0x27d4eb2d) ^ Math.imul(y, 0x165667b1);
-  h ^= h >>> 15;
-  h = Math.imul(h, 0x85ebca6b);
-  h ^= h >>> 13;
-  return (h >>> 0) / 0xffffffff;
-}
-
-function periodicNoise(u, v, cellsX, cellsY) {
-  const px = u * cellsX;
-  const py = v * cellsY;
-  const x0 = Math.floor(px);
-  const y0 = Math.floor(py);
-  const tx0 = px - x0;
-  const ty0 = py - y0;
-  const tx = tx0 * tx0 * (3 - 2 * tx0);
-  const ty = ty0 * ty0 * (3 - 2 * ty0);
-  const ix0 = wrap(x0, cellsX);
-  const ix1 = wrap(x0 + 1, cellsX);
-  const iy0 = clamp(y0, 0, cellsY);
-  const iy1 = clamp(y0 + 1, 0, cellsY);
-  const a = hash2(ix0, iy0);
-  const b = hash2(ix1, iy0);
-  const c = hash2(ix0, iy1);
-  const d = hash2(ix1, iy1);
-  const top = a + (b - a) * tx;
-  const bottom = c + (d - c) * tx;
-  return top + (bottom - top) * ty;
-}
-
-function fbm(u, v) {
-  let value = 0;
-  let weight = 0.55;
-  let total = 0;
-  for (let octave = 0; octave < 5; octave += 1) {
-    const cellsX = 8 << octave;
-    const cellsY = Math.max(4, Math.round(cellsX * WORLD_HEIGHT / WORLD_WIDTH));
-    value += periodicNoise(u, v, cellsX, cellsY) * weight;
-    total += weight;
-    weight *= 0.5;
-  }
-  return value / total;
-}
-
-async function readJson(relativePath) {
-  return JSON.parse(await readFile(path.join(MATERIAL, relativePath), 'utf8'));
-}
-
-function fillPolygon(ids, points, encodedId) {
-  const scaled = points.map(([x, y]) => [x * ID_WIDTH / WORLD_WIDTH, y * ID_HEIGHT / WORLD_HEIGHT]);
-  let minY = ID_HEIGHT - 1;
-  let maxY = 0;
-  for (const [, y] of scaled) {
-    minY = Math.min(minY, Math.floor(y));
-    maxY = Math.max(maxY, Math.ceil(y));
-  }
-  minY = clamp(minY, 0, ID_HEIGHT - 1);
-  maxY = clamp(maxY, 0, ID_HEIGHT - 1);
-
-  for (let py = minY; py <= maxY; py += 1) {
-    const scanY = py + 0.5;
-    const intersections = [];
-    for (let i = 0, j = scaled.length - 1; i < scaled.length; j = i, i += 1) {
-      const [xi, yi] = scaled[i];
-      const [xj, yj] = scaled[j];
-      if ((yi > scanY) !== (yj > scanY)) {
-        intersections.push(xi + (scanY - yi) * (xj - xi) / (yj - yi));
-      }
-    }
-    intersections.sort((a, b) => a - b);
-    for (let i = 0; i + 1 < intersections.length; i += 2) {
-      const xStart = Math.ceil(intersections[i] - 0.5);
-      const xEnd = Math.floor(intersections[i + 1] - 0.5);
-      for (let px = xStart; px <= xEnd; px += 1) {
-        ids[py * ID_WIDTH + wrap(px, ID_WIDTH)] = encodedId;
-      }
-    }
-  }
-}
-
-function writeTyped(relativePath, typedArray) {
-  const bytes = Buffer.from(typedArray.buffer, typedArray.byteOffset, typedArray.byteLength);
-  return writeFile(path.join(OUTPUT, relativePath), bytes);
-}
-
-function buildBorders(borderData, heights) {
-  const records = [];
-  for (const segment of borderData.segments) {
-    const neighbor = segment.neighbor_province_id;
-    if (neighbor !== null && segment.province_id > neighbor) continue;
-    for (let index = 0; index + 1 < segment.coordinates.length; index += 1) {
-      const [x1, y1] = segment.coordinates[index];
-      const [x2, y2] = segment.coordinates[index + 1];
-      const height1 = sampleHeight(heights, FIELD_WIDTH, FIELD_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, x1, y1);
-      const height2 = sampleHeight(heights, FIELD_WIDTH, FIELD_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, x2, y2);
-      // The first height stores a +1 sentinel so its sign can be toggled at
-      // runtime to cache whether this segment is currently a country border.
-      records.push(x1, y1, x2, y2, segment.province_id + 1, neighbor === null ? 0 : neighbor + 1, height1 + 1, height2);
-    }
-  }
-  return new Float32Array(records);
-}
-
-function chunkLineRecords(source) {
-  const stride = 8;
-  const chunksX = 32;
-  const chunksY = 16;
-  const buckets = Array.from({ length: chunksX * chunksY }, () => []);
-  for (let offset = 0; offset < source.length; offset += stride) {
-    const x1 = source[offset];
-    let x2 = source[offset + 2];
-    if (x2 - x1 > WORLD_WIDTH * 0.5) x2 -= WORLD_WIDTH;
-    else if (x2 - x1 < -WORLD_WIDTH * 0.5) x2 += WORLD_WIDTH;
-    const centerX = wrap((x1 + x2) * 0.5, WORLD_WIDTH);
-    const centerY = clamp((source[offset + 1] + source[offset + 3]) * 0.5, 0, WORLD_HEIGHT - 0.001);
-    const chunkX = Math.min(chunksX - 1, Math.floor(centerX / WORLD_WIDTH * chunksX));
-    const chunkY = Math.min(chunksY - 1, Math.floor(centerY / WORLD_HEIGHT * chunksY));
-    const bucket = buckets[chunkY * chunksX + chunkX];
-    for (let component = 0; component < stride; component += 1) bucket.push(source[offset + component]);
-  }
-  const data = new Float32Array(source.length);
-  const ranges = [];
-  let firstInstance = 0;
-  let cursor = 0;
-  for (const bucket of buckets) {
-    data.set(bucket, cursor);
-    const instanceCount = bucket.length / stride;
-    ranges.push({ firstInstance, instanceCount });
-    firstInstance += instanceCount;
-    cursor += bucket.length;
-  }
-  return { data, chunksX, chunksY, ranges };
-}
-
-function buildConnections(connectionData) {
-  const records = [];
-  for (const edge of connectionData.segments) {
-    records.push(edge.x1, edge.y1, edge.x2, edge.y2, edge.medium === 'land' ? 1 : 0, 0, 0, 0);
-  }
-  return new Float32Array(records);
-}
-
-function chunkInstanceRecords(source, groupForRecord = () => 0, groupCount = 1) {
-  const stride = 8;
-  const chunksX = 32;
-  const chunksY = 16;
-  const buckets = Array.from({ length: chunksX * chunksY }, () =>
-    Array.from({ length: groupCount }, () => []));
-  for (let offset = 0; offset < source.length; offset += stride) {
-    const chunkX = clamp(Math.floor(source[offset] / WORLD_WIDTH * chunksX), 0, chunksX - 1);
-    const chunkY = clamp(Math.floor(source[offset + 1] / WORLD_HEIGHT * chunksY), 0, chunksY - 1);
-    const group = clamp(groupForRecord(source, offset), 0, groupCount - 1);
-    buckets[chunkY * chunksX + chunkX][group].push(...source.subarray(offset, offset + stride));
-  }
-  const records = [];
-  const ranges = [];
-  let firstInstance = 0;
-  for (const chunkGroups of buckets) {
-    const chunkFirst = firstInstance;
-    const groups = [];
-    for (const groupRecords of chunkGroups) {
-      const instanceCount = groupRecords.length / stride;
-      groups.push({ firstInstance, instanceCount });
-      records.push(...groupRecords);
-      firstInstance += instanceCount;
-    }
-    ranges.push({ firstInstance: chunkFirst, instanceCount: firstInstance - chunkFirst, groups });
-  }
-  return { data: new Float32Array(records), ranges };
-}
-
 async function main() {
   const [geometry, metadata, markers, borderData, connectionData, networkData, mapMetadata,
     countryData, ownershipData, provinceAdjacencyData] = await Promise.all([
-    readJson('geometry/province_polygons_decoded.json'),
-    readJson('metadata/provinces.json'),
-    readJson('geometry/terrain_marker_positions.json'),
-    readJson('topology/logical_border_segments.json'),
-    readJson('movement/connection_segments.json'),
-    readJson('movement/network_nodes.json'),
-    readJson('metadata/map_metadata.json'),
-    readJson('metadata/countries.json'),
-    readJson('metadata/initial_ownership.json'),
-    readJson('topology/province_adjacency.json'),
+    readMaterialJson(MATERIAL, 'geometry/province_polygons_decoded.json'),
+    readMaterialJson(MATERIAL, 'metadata/provinces.json'),
+    readMaterialJson(MATERIAL, 'geometry/terrain_marker_positions.json'),
+    readMaterialJson(MATERIAL, 'topology/logical_border_segments.json'),
+    readMaterialJson(MATERIAL, 'movement/connection_segments.json'),
+    readMaterialJson(MATERIAL, 'movement/network_nodes.json'),
+    readMaterialJson(MATERIAL, 'metadata/map_metadata.json'),
+    readMaterialJson(MATERIAL, 'metadata/countries.json'),
+    readMaterialJson(MATERIAL, 'metadata/initial_ownership.json'),
+    readMaterialJson(MATERIAL, 'topology/province_adjacency.json'),
   ]);
 
   if (geometry.provinces.length !== 3_303 || metadata.provinces.length !== 3_303) {
@@ -238,7 +70,7 @@ async function main() {
   const geometryById = new Map();
   for (const province of geometry.provinces) {
     geometryById.set(province.province_id, province);
-    for (const component of province.components) fillPolygon(provinceIds, component, province.province_id + 1);
+    for (const component of province.components) fillProvincePolygon(provinceIds, component, province.province_id + 1);
   }
   const bankField = buildBankField(provinceIds, ID_WIDTH, ID_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT);
 
@@ -495,30 +327,30 @@ async function main() {
   };
 
   await Promise.all([
-    writeTyped('province-ids.u16', provinceIds),
-    writeTyped('province-owners.u32', provinceOwners),
-    writeTyped('province-adjacency.u32', provinceAdjacency),
-    writeTyped('province-label-data.f32', provinceLabelData),
-    writeTyped('height.f32', heights),
-    writeTyped('surface.rgba8', surface),
-    writeTyped('terrain-normal.rg8', terrainNormals),
-    writeTyped('terrain-albedo.rgba8', terrainAlbedo.data),
-    writeTyped('navigation.rgba8', navigationField),
-    writeTyped('coast.rg8', bankField.field),
-    writeTyped('borders.f32', borders),
-    writeTyped('connections.f32', connections),
-    writeTyped('road-vertices.f32', infrastructure.roadVertices),
-    writeTyped('road-indices.u32', infrastructure.roadIndices),
-    writeTyped('hidden-connection-vertices.f32', infrastructure.hiddenConnectionVertices),
-    writeTyped('hidden-connection-indices.u32', infrastructure.hiddenConnectionIndices),
-    writeTyped('waterway-vertices.f32', waterways.vertices),
-    writeTyped('waterway-indices.u32', waterways.indices),
-    writeTyped('waterway-network-lines.f32', waterways.networkLines),
-    writeTyped('trees.f32', trees),
-    writeTyped('buildings.f32', buildings),
-    writeTyped('lamps.f32', lampChunks.data),
-    writeTyped('barriers.f32', barrierChunks.data),
-    writeTyped('signs.f32', signChunks.data),
+    writeTypedArtifact(OUTPUT, 'province-ids.u16', provinceIds),
+    writeTypedArtifact(OUTPUT, 'province-owners.u32', provinceOwners),
+    writeTypedArtifact(OUTPUT, 'province-adjacency.u32', provinceAdjacency),
+    writeTypedArtifact(OUTPUT, 'province-label-data.f32', provinceLabelData),
+    writeTypedArtifact(OUTPUT, 'height.f32', heights),
+    writeTypedArtifact(OUTPUT, 'surface.rgba8', surface),
+    writeTypedArtifact(OUTPUT, 'terrain-normal.rg8', terrainNormals),
+    writeTypedArtifact(OUTPUT, 'terrain-albedo.rgba8', terrainAlbedo.data),
+    writeTypedArtifact(OUTPUT, 'navigation.rgba8', navigationField),
+    writeTypedArtifact(OUTPUT, 'coast.rg8', bankField.field),
+    writeTypedArtifact(OUTPUT, 'borders.f32', borders),
+    writeTypedArtifact(OUTPUT, 'connections.f32', connections),
+    writeTypedArtifact(OUTPUT, 'road-vertices.f32', infrastructure.roadVertices),
+    writeTypedArtifact(OUTPUT, 'road-indices.u32', infrastructure.roadIndices),
+    writeTypedArtifact(OUTPUT, 'hidden-connection-vertices.f32', infrastructure.hiddenConnectionVertices),
+    writeTypedArtifact(OUTPUT, 'hidden-connection-indices.u32', infrastructure.hiddenConnectionIndices),
+    writeTypedArtifact(OUTPUT, 'waterway-vertices.f32', waterways.vertices),
+    writeTypedArtifact(OUTPUT, 'waterway-indices.u32', waterways.indices),
+    writeTypedArtifact(OUTPUT, 'waterway-network-lines.f32', waterways.networkLines),
+    writeTypedArtifact(OUTPUT, 'trees.f32', trees),
+    writeTypedArtifact(OUTPUT, 'buildings.f32', buildings),
+    writeTypedArtifact(OUTPUT, 'lamps.f32', lampChunks.data),
+    writeTypedArtifact(OUTPUT, 'barriers.f32', barrierChunks.data),
+    writeTypedArtifact(OUTPUT, 'signs.f32', signChunks.data),
     writeFile(path.join(OUTPUT, 'world-generation-report.json'), `${JSON.stringify(worldGenerationReport, null, 2)}\n`),
     writeFile(path.join(OUTPUT, 'province-details.json'), `${JSON.stringify(provinceDetails)}\n`),
     writeFile(path.join(OUTPUT, 'world.json'), `${JSON.stringify(manifest)}\n`),
