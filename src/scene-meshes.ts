@@ -76,16 +76,14 @@ export function createBuildingMesh(device: GPUDevice): Mesh {
   return uploadMesh(device,'building mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
 }
 
-export function createBuildingArchetypeMesh(device: GPUDevice, archetype: number, lod: 0 | 1 | 2): Mesh {
+export function createBuildingArchetypeMesh(device: GPUDevice, archetype: number, lod: 0 | 1): Mesh {
   const builder = new MeshBuilder();
   builder.addBox(-0.5, 0, -0.5, 0.5, 1, 0.5, 0);
-  if (lod < 2) {
-    if (archetype === 1) builder.addHipRoof(0, 1, 0, 0.62, 1.24, 4);
-    else if (archetype === 2) builder.addBox(-0.54, 1, -0.54, 0.54, 1.055, 0.54, 5, 5);
-    else builder.addGableRoof(-0.56, 1, -0.56, 0.56, lod === 0 ? 1.24 : 1.18, 0.56, 1);
-    if (lod === 0 && archetype === 3) builder.addBox(-0.68, 0, -0.38, 0.68, 0.42, 0.38, 2, 2);
-    if (lod === 0 && archetype === 4) builder.addBox(-0.18, 1, -0.18, 0.18, 1.52, 0.18, 3, 3);
-  }
+  if (archetype === 1) builder.addHipRoof(0, 1, 0, 0.62, 1.24, 4);
+  else if (archetype === 2) builder.addBox(-0.54, 1, -0.54, 0.54, 1.055, 0.54, 5, 5);
+  else builder.addGableRoof(-0.56, 1, -0.56, 0.56, lod === 0 ? 1.24 : 1.18, 0.56, 1);
+  if (lod === 0 && archetype === 3) builder.addBox(-0.68, 0, -0.38, 0.68, 0.42, 0.38, 2, 2);
+  if (lod === 0 && archetype === 4) builder.addBox(-0.18, 1, -0.18, 0.18, 1.52, 0.18, 3, 3);
   return uploadMesh(device, `building archetype ${archetype} lod ${lod}`, new Float32Array(builder.vertices), new Uint16Array(builder.indices));
 }
 

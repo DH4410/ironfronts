@@ -297,7 +297,7 @@ export class WorldRenderer {
     this.treeMeshes = (['broadleaf', 'conifer'] as const).map((family) =>
       [0, 1, 2].map((lod) => createTreeFamilyMesh(this.device, family, lod as 0 | 1 | 2)));
     this.buildingMeshes = Array.from({ length: 5 }, (_, archetype) =>
-      [0, 1, 2].map((lod) => createBuildingArchetypeMesh(this.device, archetype, lod as 0 | 1 | 2)));
+      [0, 1].map((lod) => createBuildingArchetypeMesh(this.device, archetype, lod as 0 | 1)));
     this.lampMesh = createLampMesh(this.device);
     this.barrierMesh = createBarrierMesh(this.device);
     this.signMesh = createSignMesh(this.device);
