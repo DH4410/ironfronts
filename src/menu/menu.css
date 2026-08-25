@@ -124,7 +124,12 @@
 .ifm__footer-item { display: flex; align-items: center; gap: .7em; border: 0; background: transparent; cursor: pointer; }
 .ifm__footer-item b { display: block; font: 700 .72em/1 var(--ifm-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--hud-text); }
 .ifm__footer-item small { display: block; margin-top: .25em; font: 400 .82em var(--ifm-sans); color: var(--hud-text-dim); }
-.ifm__footer-icon { display: grid; place-items: center; width: 1.9em; height: 1.9em; border-radius: 50%; border: 1px solid var(--hud-line); color: var(--hud-gold); font-size: 1em; }
+.ifm__footer-icon { display: grid; place-items: center; width: 1.9em; height: 1.9em; border-radius: 50%; border: 1px solid var(--hud-line); }
+.ifm__footer-icon::after {
+  content: ""; width: 55%; height: 55%; background-color: var(--hud-gold);
+  -webkit-mask: var(--icon) center/contain no-repeat;
+  mask: var(--icon) center/contain no-repeat;
+}
 .ifm__footer-divider { width: 1px; height: 2.2em; background: var(--hud-line); }
 .ifm__footer-spacer { flex: 1; }
 .ifm__footer-version { text-align: right; font: 700 .68em/1.5 var(--ifm-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--hud-text-dim); }
