@@ -8,6 +8,8 @@ export interface CountryLabelGlyph {
   advanceAtMeasurementSize: number;
   widthAtMeasurementSize: number;
   heightAtMeasurementSize: number;
+  inkWidthAtMeasurementSize: number;
+  inkHeightAtMeasurementSize: number;
 }
 
 export const LABEL_MEASUREMENT_SIZE = 20;
@@ -57,9 +59,9 @@ export class CountryLabelAtlas {
       + (index + 1 < characters.length ? this.trackingAtMeasurementSize : 0), 0);
   }
 
-  private measureAdvance(character: string, fontSize: number): number {
+  private measureCharacter(character: string, fontSize: number): TextMetrics {
     this.context.font = `${LABEL_FONT_WEIGHT} ${fontSize}px ${LABEL_FONT_FAMILY}`;
-    return this.context.measureText(character).width;
+    return this.context.measureText(character);
   }
 
   private build(countries: CountryRecord[]): void {
@@ -68,22 +70,28 @@ export class CountryLabelAtlas {
       for (const character of country.name.toLocaleUpperCase()) characters.add(character);
     }
 
-    const placements: Array<{ character: string; x: number; y: number; width: number; height: number }> = [];
+    const placements: Array<{
+      character: string; x: number; y: number; width: number; height: number; inkWidth: number; inkHeight: number;
+    }> = [];
     let x = ATLAS_PADDING;
     let y = ATLAS_PADDING;
     let rowHeight = 0;
     const height = Math.ceil(ATLAS_FONT_SIZE * 1.35) + ATLAS_PADDING * 2;
     for (const character of characters) {
-      const advance = this.measureAdvance(character, ATLAS_FONT_SIZE);
+      const metrics = this.measureCharacter(character, ATLAS_FONT_SIZE);
+      const advance = metrics.width;
       this.advances.set(character, advance * LABEL_MEASUREMENT_SIZE / ATLAS_FONT_SIZE);
       if (character.trim().length === 0) continue;
       const width = Math.ceil(advance) + ATLAS_PADDING * 2;
+      const outlineAndShadow = ATLAS_FONT_SIZE * 0.16;
+      const inkWidth = Math.max(1, metrics.actualBoundingBoxLeft + metrics.actualBoundingBoxRight) + outlineAndShadow;
+      const inkHeight = Math.max(1, metrics.actualBoundingBoxAscent + metrics.actualBoundingBoxDescent) + outlineAndShadow;
       if (x + width + ATLAS_PADDING > ATLAS_WIDTH) {
         x = ATLAS_PADDING;
         y += rowHeight;
         rowHeight = 0;
       }
-      placements.push({ character, x, y, width, height });
+      placements.push({ character, x, y, width, height, inkWidth, inkHeight });
       x += width;
       rowHeight = Math.max(rowHeight, height);
     }
@@ -117,6 +125,8 @@ export class CountryLabelAtlas {
         advanceAtMeasurementSize: this.getAdvance(placement.character),
         widthAtMeasurementSize: placement.width * LABEL_MEASUREMENT_SIZE / ATLAS_FONT_SIZE,
         heightAtMeasurementSize: placement.height * LABEL_MEASUREMENT_SIZE / ATLAS_FONT_SIZE,
+        inkWidthAtMeasurementSize: placement.inkWidth * LABEL_MEASUREMENT_SIZE / ATLAS_FONT_SIZE,
+        inkHeightAtMeasurementSize: placement.inkHeight * LABEL_MEASUREMENT_SIZE / ATLAS_FONT_SIZE,
       });
     }
   }

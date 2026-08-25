@@ -1,6 +1,6 @@
 import type { CountryRecord } from './types';
 import { CountryLabelAtlas } from './country-labels/atlas';
-import { LABEL_GLYPH_STRIDE, layoutCountryLabel } from './country-labels/layout';
+import { LABEL_GLYPH_STRIDE, layoutCountryLabelWithinTerritory } from './country-labels/layout';
 import { createCountryAnchor, type CountryAnchor } from './country-labels/topology';
 
 export { buildCountryColorBuffer } from './country-labels/colors';
@@ -33,6 +33,8 @@ export class CountryLabelLayer {
     adjacencyPairs: Uint32Array,
     private readonly labelData: Float32Array,
     private readonly worldWidth: number,
+    private readonly ownsPoint: (countryId: number, x: number, z: number) => boolean,
+    private readonly territorySampleSpacing: number,
   ) {
     // Retain the old DOM element for API compatibility, but labels now render
     // as world-space WebGPU glyphs rather than a composited screen overlay.
@@ -164,10 +166,46 @@ export class CountryLabelLayer {
         anchor.axisZ *= -1;
       }
       this.anchors.set(countryId, anchor);
-      this.glyphsByCountry.set(countryId, layoutCountryLabel(country.name, anchor, this.atlas));
+      const candidates = this.countryLabelCandidates(anchor, largestComponent);
+      const glyphs = layoutCountryLabelWithinTerritory(
+        country.name,
+        anchor,
+        this.atlas,
+        candidates,
+        (x, z) => this.ownsPoint(countryId, x, z),
+        this.territorySampleSpacing,
+      );
+      if (glyphs.length) this.glyphsByCountry.set(countryId, glyphs);
+      else this.glyphsByCountry.delete(countryId);
     } else {
       this.anchors.delete(countryId);
       this.glyphsByCountry.delete(countryId);
     }
+  }
+
+  private countryLabelCandidates(anchor: CountryAnchor, component: number[]): Array<{ x: number; z: number }> {
+    const candidates = [{ x: anchor.x, z: anchor.z }];
+    const ranked = [...component].sort((provinceA, provinceB) => {
+      const score = (province: number) => {
+        const offset = province * 3;
+        const rawDistanceX = Math.abs(this.labelData[offset] - anchor.x);
+        const distanceX = Math.min(rawDistanceX, this.worldWidth - rawDistanceX);
+        const distanceZ = this.labelData[offset + 1] - anchor.z;
+        const centrality = Math.hypot(
+          distanceX / Math.max(1, anchor.span),
+          distanceZ / Math.max(1, anchor.crossSpan),
+        );
+        return centrality - Math.log2(this.labelData[offset + 2] + 1) * 0.015;
+      };
+      return score(provinceA) - score(provinceB);
+    });
+    for (const province of ranked.slice(0, 24)) {
+      const offset = province * 3;
+      const candidate = { x: this.labelData[offset], z: this.labelData[offset + 1] };
+      if (!candidates.some((existing) => Math.hypot(existing.x - candidate.x, existing.z - candidate.z) < 1)) {
+        candidates.push(candidate);
+      }
+    }
+    return candidates;
   }
 }

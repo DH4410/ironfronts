@@ -23,7 +23,6 @@ struct Uniforms {
 @group(0) @binding(8) var terrainNormalTexture: texture_2d<f32>;
 @group(0) @binding(9) var treeMaterialTexture: texture_2d_array<f32>;
 @group(0) @binding(10) var provincePoliticalColorTexture: texture_2d<f32>;
-@group(0) @binding(11) var<storage, read> provinceOwners: array<u32>;
 @group(0) @binding(12) var<storage, read> visibleTerrainChunks: array<u32>;
 @group(0) @binding(13) var terrainAlbedoTexture: texture_2d<f32>;
 

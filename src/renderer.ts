@@ -3,6 +3,7 @@ import { StrategyCamera } from './camera';
 import { buildPropVisibility, buildTerrainVisibility } from './chunk-visibility';
 import { buildCountryColorBuffer, CountryLabelLayer } from './country-overlay';
 import { loadCountryLabelFont } from './country-labels/atlas';
+import { isValidCountryLabelPoint } from './country-labels/territory';
 import { align4, fetchBinary, fetchJson, uploadMipmappedTexture, uploadTexture } from './gpu-utils';
 import { createMaterialTexture, createTreeMaterialTexture } from './material-texture';
 import {
@@ -27,6 +28,7 @@ import { sampleWrappedField } from './world-sampling';
 import { loadWorldAssetBuffers } from './world-assets';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
+const COUNTRY_LABEL_MIN_ALTITUDE = 600;
 
 export class WorldRenderer {
   readonly camera = new StrategyCamera();
@@ -98,8 +100,8 @@ export class WorldRenderer {
   private frustumPlanesRevision = -1;
   private heightData!: Float32Array;
   private provinceData!: Uint16Array;
+  private waterwayMask!: Uint8Array;
   private provinceOwners!: Uint32Array;
-  private provinceOwnerBuffer!: GPUBuffer;
   private provinceById = new Map<number, ProvinceRecord>();
   private countryById = new Map<number, CountryRecord>();
   private countryLabels?: CountryLabelLayer;
@@ -203,6 +205,7 @@ export class WorldRenderer {
     } = await loadWorldAssetBuffers(this.manifest);
     this.heightData = new Float32Array(heightBuffer);
     this.provinceData = new Uint16Array(provinceBuffer);
+    this.waterwayMask = buildWaterwayMask(new Uint8Array(navigationBuffer), this.provinceData.length);
     this.provinceOwners = new Uint32Array(provinceOwnerData);
     this.countryColors = buildCountryColorBuffer(this.manifest.politics.countries);
     this.politicalCache = new PoliticalCache(
@@ -256,18 +259,6 @@ export class WorldRenderer {
       size: 256,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    this.provinceOwnerBuffer = this.device.createBuffer({
-      label: 'province country owners',
-      size: Math.max(4, this.provinceOwners.byteLength),
-      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-    });
-    this.device.queue.writeBuffer(
-      this.provinceOwnerBuffer,
-      0,
-      this.provinceOwners.buffer as ArrayBuffer,
-      this.provinceOwners.byteOffset,
-      this.provinceOwners.byteLength,
-    );
     this.visibleTerrainBuffer = this.device.createBuffer({
       label: 'visible terrain chunks',
       size: this.manifest.terrain.chunksX * this.manifest.terrain.chunksY * 3 * 4,
@@ -288,7 +279,6 @@ export class WorldRenderer {
         { binding: 8, resource: this.terrainNormalTexture.createView() },
         { binding: 9, resource: this.treeMaterialTexture.createView({ dimension: '2d-array' }) },
         { binding: 10, resource: this.provincePoliticalColorTexture.createView() },
-        { binding: 11, resource: { buffer: this.provinceOwnerBuffer } },
         { binding: 12, resource: { buffer: this.visibleTerrainBuffer } },
         { binding: 13, resource: this.terrainAlbedoTexture.createView() },
       ],
@@ -330,6 +320,16 @@ export class WorldRenderer {
         new Uint32Array(provinceAdjacencyData),
         new Float32Array(provinceLabelData),
         this.manifest.world.width,
+        (countryId, x, z) => isValidCountryLabelPoint(
+          countryId,
+          this.sampleProvince(x, z),
+          this.sampleWaterway(x, z),
+          this.provinceOwners,
+        ),
+        Math.max(
+          this.manifest.world.width / this.manifest.fields.provinceIds.width,
+          this.manifest.world.height / this.manifest.fields.provinceIds.height,
+        ),
       );
       this.createCountryLabelResources();
     }
@@ -389,7 +389,6 @@ export class WorldRenderer {
       const previousCountryId = this.provinceOwners[encodedId];
       if (previousCountryId === change.countryId) continue;
       this.provinceOwners[encodedId] = change.countryId;
-      this.device.queue.writeBuffer(this.provinceOwnerBuffer, encodedId * 4, new Uint32Array([change.countryId]));
       ownershipChanges.push({ provinceId: encodedId, previousCountryId, countryId: change.countryId });
     }
     this.politicalCache.update(
@@ -603,8 +602,9 @@ export class WorldRenderer {
 
     phaseStarted = performance.now();
     this.countryLabels?.setVisible(this.showCountryOverlay && this.performanceLayers.countryLabels && this.debugView === 0);
-    const visibleLabels = this.countryLabels?.visibleLabelCount ?? 0;
-    const visibleLabelGlyphs = this.countryLabels?.visibleGlyphCount ?? 0;
+    const labelsAboveMinimumAltitude = this.camera.position[1] >= COUNTRY_LABEL_MIN_ALTITUDE;
+    const visibleLabels = labelsAboveMinimumAltitude ? this.countryLabels?.visibleLabelCount ?? 0 : 0;
+    const visibleLabelGlyphs = labelsAboveMinimumAltitude ? this.countryLabels?.visibleGlyphCount ?? 0 : 0;
     if (this.countryLabels
       && this.countryLabelBuffer
       && this.countryLabelParamsBuffer
@@ -1056,6 +1056,14 @@ export class WorldRenderer {
     return createHoverInfo(encodedId, this.provinceById, this.countryById, this.provinceOwners);
   }
 
+  private sampleWaterway(worldX: number, worldZ: number): boolean {
+    const field = this.manifest.fields.navigation;
+    const x = wrap(Math.floor(worldX / this.manifest.world.width * field.width), field.width);
+    const y = clamp(Math.floor(worldZ / this.manifest.world.height * field.height), 0, field.height - 1);
+    const index = y * field.width + x;
+    return (this.waterwayMask[index >>> 3] & (1 << (index & 7))) !== 0;
+  }
+
   private updateStats(): void {
     if (!this.onStats) {
       this.statsFrameCountdown = 0;
@@ -1094,4 +1102,15 @@ function clamp(value: number, min: number, max: number): number {
 
 function wrap(value: number, size: number): number {
   return ((value % size) + size) % size;
+}
+
+function buildWaterwayMask(navigationData: Uint8Array, pixelCount: number): Uint8Array {
+  const mask = new Uint8Array(Math.ceil(pixelCount / 8));
+  for (let index = 0; index < pixelCount; index += 1) {
+    const offset = index * 4;
+    if (navigationData[offset + 2] > 114 || navigationData[offset + 3] > 114) {
+      mask[index >>> 3] |= 1 << (index & 7);
+    }
+  }
+  return mask;
 }

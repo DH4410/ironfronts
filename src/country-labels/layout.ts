@@ -11,11 +11,18 @@ export interface CountryLabelMetrics {
   measureLabel(label: string): number;
 }
 
+export interface CountryLabelCandidate {
+  x: number;
+  z: number;
+}
+
 /** Builds camera-independent glyph quads along a stable, gently curved map-space baseline. */
 export function layoutCountryLabel(
   name: string,
   anchor: CountryAnchor,
   atlas: CountryLabelMetrics,
+  sizeMultiplier = 1,
+  curveDirection = 1,
 ): Float32Array {
   const label = name.toLocaleUpperCase();
   const measuredWidth = atlas.measureLabel(label);
@@ -26,7 +33,7 @@ export function layoutCountryLabel(
   const scale = Math.min(
     availableWidth / measuredWidth,
     availableHeight / atlas.lineHeightAtMeasurementSize,
-  );
+  ) * sizeMultiplier;
   if (!Number.isFinite(scale) || scale <= 0) return new Float32Array(0);
 
   const labelWidth = measuredWidth * scale;
@@ -47,8 +54,8 @@ export function layoutCountryLabel(
     const advance = atlas.getAdvance(character) * scale;
     const centerDistance = pen + advance * 0.5;
     const t = labelWidth > 0 ? Math.min(1, Math.max(0, centerDistance / labelWidth + 0.5)) : 0.5;
-    const crossOffset = -4 * curvature * t * (1 - t);
-    const crossSlope = labelWidth > 0 ? -4 * curvature * (1 - 2 * t) / labelWidth : 0;
+    const crossOffset = -4 * curvature * curveDirection * t * (1 - t);
+    const crossSlope = labelWidth > 0 ? -4 * curvature * curveDirection * (1 - 2 * t) / labelWidth : 0;
     const tangentLength = Math.hypot(
       anchor.axisX + crossX * crossSlope,
       anchor.axisZ + crossZ * crossSlope,
@@ -68,12 +75,75 @@ export function layoutCountryLabel(
         glyph.v0,
         glyph.u1,
         glyph.v1,
-        anchor.countryId,
-        0,
+        glyph.inkWidthAtMeasurementSize * scale,
+        glyph.inkHeightAtMeasurementSize * scale,
       );
     }
     pen += advance;
     if (index + 1 < characters.length) pen += atlas.trackingAtMeasurementSize * scale;
   }
   return new Float32Array(values);
+}
+
+/** Chooses the largest layout whose visible glyph area stays entirely on owned land. */
+export function layoutCountryLabelWithinTerritory(
+  name: string,
+  anchor: CountryAnchor,
+  atlas: CountryLabelMetrics,
+  candidates: CountryLabelCandidate[],
+  ownsPoint: (x: number, z: number) => boolean,
+  sampleSpacing = 8,
+): Float32Array {
+  const sizeSteps = [1, 0.88, 0.76, 0.64, 0.52, 0.42, 0.34, 0.27, 0.21, 0.16, 0.12];
+  const nudge = sampleSpacing * 2;
+  const localNudges = [
+    [0, 0], [nudge, 0], [-nudge, 0], [0, nudge], [0, -nudge],
+    [nudge, nudge], [nudge, -nudge], [-nudge, nudge], [-nudge, -nudge],
+  ] as const;
+  const crossX = -anchor.axisZ;
+  const crossZ = anchor.axisX;
+  for (const size of sizeSteps) {
+    for (const candidate of candidates) {
+      for (const [along, across] of localNudges) {
+        const x = candidate.x + anchor.axisX * along + crossX * across;
+        const z = candidate.z + anchor.axisZ * along + crossZ * across;
+        // Available space is often asymmetric around the dominant axis. Try
+        // both bows and a straight baseline before shrinking the name.
+        for (const curveDirection of [1, -1, 0]) {
+          const data = layoutCountryLabel(name, { ...anchor, x, z }, atlas, size, curveDirection);
+          if (data.length && glyphsStayWithinTerritory(data, ownsPoint, sampleSpacing)) return data;
+        }
+      }
+    }
+  }
+  return new Float32Array(0);
+}
+
+function glyphsStayWithinTerritory(
+  data: Float32Array,
+  ownsPoint: (x: number, z: number) => boolean,
+  sampleSpacing: number,
+): boolean {
+  for (let offset = 0; offset < data.length; offset += LABEL_GLYPH_STRIDE) {
+    const centerX = data[offset];
+    const centerZ = data[offset + 1];
+    const tangentX = data[offset + 2];
+    const tangentZ = data[offset + 3];
+    const width = data[offset + 10];
+    const height = data[offset + 11];
+    const crossX = -tangentZ;
+    const crossZ = tangentX;
+    const alongSamples = Math.max(3, Math.ceil(width / sampleSpacing) + 1);
+    const acrossSamples = Math.max(3, Math.ceil(height / sampleSpacing) + 1);
+    for (let alongIndex = 0; alongIndex < alongSamples; alongIndex += 1) {
+      const along = -0.5 + alongIndex / (alongSamples - 1);
+      for (let acrossIndex = 0; acrossIndex < acrossSamples; acrossIndex += 1) {
+        const across = -0.5 + acrossIndex / (acrossSamples - 1);
+        const x = centerX + tangentX * width * along + crossX * height * across;
+        const z = centerZ + tangentZ * width * along + crossZ * height * across;
+        if (!ownsPoint(x, z)) return false;
+      }
+    }
+  }
+  return true;
 }
