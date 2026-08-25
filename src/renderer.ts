@@ -15,6 +15,7 @@ import { PoliticalCache } from './political-cache';
 import { createRendererLayouts, createRendererPipelines } from './renderer-pipelines';
 import { beginWorldFrame, submitWorldFrame } from './renderer-frame';
 import type { InstanceLayer, PerformanceLayerVisibility } from './renderer-types';
+import { COUNTRY_LABEL_FADE_END_ALTITUDE } from './shaders/country-labels';
 import {
   createBarrierMesh, createBuildingArchetypeMesh, createLampMesh, createSignMesh, createTerrainMesh,
   createTreeFamilyMesh, uploadIndexedMesh,
@@ -28,7 +29,6 @@ import { sampleWrappedField } from './world-sampling';
 import { loadWorldAssetBuffers } from './world-assets';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
-const COUNTRY_LABEL_MIN_ALTITUDE = 600;
 
 export class WorldRenderer {
   readonly camera = new StrategyCamera();
@@ -330,6 +330,11 @@ export class WorldRenderer {
           this.manifest.world.width / this.manifest.fields.provinceIds.width,
           this.manifest.world.height / this.manifest.fields.provinceIds.height,
         ),
+        (x, z) => this.sampleHeight(x, z),
+        Math.min(
+          this.manifest.world.width / this.manifest.fields.height.width,
+          this.manifest.world.height / this.manifest.fields.height.height,
+        ) * 0.5,
       );
       this.createCountryLabelResources();
     }
@@ -602,9 +607,9 @@ export class WorldRenderer {
 
     phaseStarted = performance.now();
     this.countryLabels?.setVisible(this.showCountryOverlay && this.performanceLayers.countryLabels && this.debugView === 0);
-    const labelsAboveMinimumAltitude = this.camera.position[1] >= COUNTRY_LABEL_MIN_ALTITUDE;
-    const visibleLabels = labelsAboveMinimumAltitude ? this.countryLabels?.visibleLabelCount ?? 0 : 0;
-    const visibleLabelGlyphs = labelsAboveMinimumAltitude ? this.countryLabels?.visibleGlyphCount ?? 0 : 0;
+    const labelsAboveFadeEnd = this.camera.position[1] > COUNTRY_LABEL_FADE_END_ALTITUDE;
+    const visibleLabels = labelsAboveFadeEnd ? this.countryLabels?.visibleLabelCount ?? 0 : 0;
+    const visibleLabelGlyphs = labelsAboveFadeEnd ? this.countryLabels?.visibleGlyphCount ?? 0 : 0;
     if (this.countryLabels
       && this.countryLabelBuffer
       && this.countryLabelParamsBuffer

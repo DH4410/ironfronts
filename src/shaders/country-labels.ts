@@ -1,5 +1,8 @@
 import { commonWgsl } from './common';
 
+export const COUNTRY_LABEL_FADE_START_ALTITUDE = 600;
+export const COUNTRY_LABEL_FADE_END_ALTITUDE = 250;
+
 export const countryLabelShader = commonWgsl + /* wgsl */ `
 struct CountryLabelGlyph { a: vec4f, b: vec4f, c: vec4f };
 struct CountryLabelParams { glyphCount: u32, worldCopyCount: u32, unused: vec2u };
@@ -32,11 +35,16 @@ fn countryLabelVertex(
   let crossAxis = vec2f(-tangent.y, tangent.x);
   let copyOffset = f32(i32(copyIndex) - 1) * uniforms.map.x;
   let worldXZ = glyph.a.xy + tangent * local.x + crossAxis * local.y + vec2f(copyOffset, 0.0);
-  let worldPosition = vec3f(worldXZ.x, uniforms.map.z + 1.0, worldXZ.y);
+  let worldPosition = vec3f(worldXZ.x, glyph.c.z, worldXZ.y);
   var output: CountryLabelOutput;
   output.position = uniforms.viewProjection * vec4f(worldPosition, 1.0);
   output.uv = mix(glyph.b.zw, glyph.c.xy, corner + vec2f(0.5));
-  output.fogVisibility = 1.0 - horizontalWorldFog(worldXZ.x);
+  let altitudeVisibility = smoothstep(
+    ${COUNTRY_LABEL_FADE_END_ALTITUDE.toFixed(1)},
+    ${COUNTRY_LABEL_FADE_START_ALTITUDE.toFixed(1)},
+    uniforms.camera.y
+  );
+  output.fogVisibility = (1.0 - horizontalWorldFog(worldXZ.x)) * altitudeVisibility;
   return output;
 }
 

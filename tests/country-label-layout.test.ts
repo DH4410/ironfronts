@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { CountryLabelGlyph } from '../src/country-labels/atlas';
 import {
-  LABEL_GLYPH_STRIDE, layoutCountryLabel, layoutCountryLabelWithinTerritory, type CountryLabelMetrics,
+  LABEL_GLYPH_STRIDE, LABEL_TERRAIN_HEIGHT_OFFSET, layoutCountryLabel,
+  layoutCountryLabelWithinTerritory, placeCountryLabelOnTerrain, type CountryLabelMetrics,
 } from '../src/country-labels/layout';
 import type { CountryAnchor } from '../src/country-labels/topology';
 import { isValidCountryLabelPoint } from '../src/country-labels/territory';
@@ -70,6 +71,17 @@ describe('country label layout', () => {
     const first = layoutCountryLabel('NORTHLAND', anchor({ axisX: 0.8, axisZ: 0.6 }), metrics);
     const second = layoutCountryLabel('NORTHLAND', anchor({ axisX: 0.8, axisZ: 0.6 }), metrics);
     expect(second).toEqual(first);
+  });
+
+  it('places each glyph just above its own highest terrain sample', () => {
+    const layout = layoutCountryLabel('AB', anchor({ span: 100, crossSpan: 40 }), metrics);
+    const placed = placeCountryLabelOnTerrain(
+      layout,
+      (x) => x < 502 ? 12 : 37,
+      2,
+    );
+    expect(placed[10]).toBeCloseTo(12 + LABEL_TERRAIN_HEIGHT_OFFSET);
+    expect(placed[LABEL_GLYPH_STRIDE + 10]).toBeCloseTo(37 + LABEL_TERRAIN_HEIGHT_OFFSET);
   });
 
   it('moves and scales a label until all glyphs fit owned land', () => {
