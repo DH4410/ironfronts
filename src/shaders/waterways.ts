@@ -48,10 +48,12 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   let canal = input.kind > 0.5;
   let debugMode = u32(uniforms.map.w + 0.5);
   if (debugMode == 6u) {
-    return select(vec4f(0.02, 0.94, 1.0, 1.0), vec4f(0.98, 0.72, 0.10, 1.0), canal);
+    let worldFog = horizontalWorldFog(input.worldPosition.x);
+    return select(vec4f(0.02, 0.94, 1.0, 1.0 - worldFog), vec4f(0.98, 0.72, 0.10, 1.0 - worldFog), canal);
   }
   if (debugMode == 9u) {
-    return select(vec4f(0.02, 0.78, 0.98, 1.0), vec4f(0.77, 0.42, 0.96, 1.0), canal);
+    let worldFog = horizontalWorldFog(input.worldPosition.x);
+    return select(vec4f(0.02, 0.78, 0.98, 1.0 - worldFog), vec4f(0.77, 0.42, 0.96, 1.0 - worldFog), canal);
   }
   let time = uniforms.sunTime.w;
   let flow = normalize(input.flow + vec2f(0.00001, 0.0));
@@ -84,6 +86,8 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   color = mix(color, vec3f(0.39, 0.59, 0.62), fresnel * 0.42);
   color += vec3f(1.0, 0.84, 0.58) * sun * 0.28;
   let fog = smoothstep(4000.0, 12000.0, distance(uniforms.camera.xyz, input.worldPosition));
-  return vec4f(mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.80), input.visibility * 0.985);
+  let worldFog = horizontalWorldFog(input.worldPosition.x);
+  let foggedColor = mix(mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.80), worldFogColor(), worldFog);
+  return vec4f(foggedColor, input.visibility * 0.985 * (1.0 - worldFog));
 }
 `;

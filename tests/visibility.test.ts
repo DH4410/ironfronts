@@ -1,6 +1,8 @@
 import { mat4, vec3 } from 'gl-matrix';
 import { describe, expect, it } from 'vitest';
-import { extractFrustumPlanes, sphereIntersectsFrustum, WORLD_COPY_INDICES } from '../src/visibility';
+import {
+  extractFrustumPlanes, sphereIntersectsFrustum, sphereIntersectsHorizontalWorldWindow, WORLD_COPY_INDICES,
+} from '../src/visibility';
 
 function createTestFrustum(): Float32Array {
   const projection = mat4.create();
@@ -15,6 +17,16 @@ function createTestFrustum(): Float32Array {
 describe('world visibility', () => {
   it('always considers the previous, current, and next wrapped world', () => {
     expect(WORLD_COPY_INDICES).toEqual([0, 1, 2]);
+  });
+
+  it('moves the fog-backed horizontal visibility window with the camera target', () => {
+    const worldWidth = 1_000;
+    expect(sphereIntersectsHorizontalWorldWindow(-900, 0, 0, worldWidth)).toBe(true);
+    expect(sphereIntersectsHorizontalWorldWindow(-980, 0, 0, worldWidth)).toBe(false);
+    expect(sphereIntersectsHorizontalWorldWindow(20, 0, 1_000, worldWidth)).toBe(false);
+    expect(sphereIntersectsHorizontalWorldWindow(20, 0, 990, worldWidth)).toBe(true);
+    // Bounds crossing the fully fogged limit remain conservative.
+    expect(sphereIntersectsHorizontalWorldWindow(-980, 20, 0, worldWidth)).toBe(true);
   });
 
   it('keeps a chunk that crosses the near plane even when its center is too close', () => {

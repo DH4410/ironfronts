@@ -6,6 +6,17 @@ export type FrustumPlanes = Float32Array;
  * frustum test decides which chunks are actually submitted to the GPU.
  */
 export const WORLD_COPY_INDICES = [0, 1, 2] as const;
+export const WORLD_FOG_START_RATIO = 0.82;
+export const WORLD_FOG_END_RATIO = 0.97;
+
+export function sphereIntersectsHorizontalWorldWindow(
+  centerX: number,
+  radius: number,
+  targetX: number,
+  worldWidth: number,
+): boolean {
+  return Math.abs(centerX - targetX) <= worldWidth * WORLD_FOG_END_RATIO + radius;
+}
 
 /** Extracts normalized planes from a column-major WebGPU (zero-to-one Z) view-projection matrix. */
 export function extractFrustumPlanes(matrix: ArrayLike<number>, output = new Float32Array(24)): FrustumPlanes {

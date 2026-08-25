@@ -1,3 +1,5 @@
+import { WORLD_FOG_END_RATIO, WORLD_FOG_START_RATIO } from '../visibility';
+
 export const commonWgsl = /* wgsl */ `
 struct Uniforms {
   viewProjection: mat4x4f,
@@ -112,5 +114,23 @@ fn valueNoise(point: vec2f) -> f32 {
   let c = noiseHash(cell + vec2f(0.0, 1.0));
   let d = noiseHash(cell + vec2f(1.0, 1.0));
   return mix(mix(a, b, blend.x), mix(c, d, blend.x), blend.y);
+}
+
+fn worldFogColor() -> vec3f {
+  // Keep the fully fogged edge identical to the render-pass clear color so
+  // the final world geometry disappears without exposing its hard boundary.
+  return vec3f(0.45, 0.57, 0.61);
+}
+
+fn horizontalWorldFog(worldX: f32) -> f32 {
+  // uniforms.camera.w stores the wrapped camera-target X. The fade window
+  // follows that target, so moving sideways carries the hidden world edges
+  // with the camera instead of revealing a fixed cutoff in map coordinates.
+  let horizontalDistance = abs(worldX - uniforms.camera.w);
+  return smoothstep(
+    uniforms.map.x * ${WORLD_FOG_START_RATIO.toFixed(2)},
+    uniforms.map.x * ${WORLD_FOG_END_RATIO.toFixed(2)},
+    horizontalDistance
+  );
 }
 `;

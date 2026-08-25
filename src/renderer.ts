@@ -13,7 +13,9 @@ import {
 } from './scene-meshes';
 import type { Mesh } from './scene-meshes';
 import type { BinaryField, CountryRecord, FrameStats, HoverInfo, ProgressReporter, PropChunkRange, ProvinceRecord, WorldManifest } from './types';
-import { extractFrustumPlanes, sphereIntersectsFrustum, WORLD_COPY_INDICES } from './visibility';
+import {
+  extractFrustumPlanes, sphereIntersectsFrustum, sphereIntersectsHorizontalWorldWindow, WORLD_COPY_INDICES,
+} from './visibility';
 
 interface InstanceLayer {
   buffer: GPUBuffer;
@@ -817,7 +819,7 @@ export class WorldRenderer {
     const values = new Float32Array(64);
     values.set(this.camera.viewProjection, 0);
     values.set(this.camera.inverseViewProjection, 16);
-    values.set([this.camera.position[0], this.camera.position[1], this.camera.position[2], 1], 32);
+    values.set([this.camera.position[0], this.camera.position[1], this.camera.position[2], this.camera.target[0]], 32);
     values.set([0.42, 0.83, 0.36, this.elapsed], 36);
     values.set([this.canvas.width, this.canvas.height, 1 / this.canvas.width, 1 / this.canvas.height], 40);
     values.set([this.manifest.world.width, this.manifest.world.height, this.manifest.terrain.maxHeight, this.debugView], 44);
@@ -1041,6 +1043,9 @@ export class WorldRenderer {
   }
 
   private chunkIntersectsView(centerX: number, centerZ: number, radius: number): boolean {
+    if (!sphereIntersectsHorizontalWorldWindow(
+      centerX, radius, this.camera.target[0], this.manifest.world.width,
+    )) return false;
     if (this.frustumPlanesRevision !== this.camera.revision) {
       extractFrustumPlanes(this.camera.viewProjection, this.frustumPlanes);
       this.frustumPlanesRevision = this.camera.revision;

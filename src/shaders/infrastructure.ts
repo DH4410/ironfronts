@@ -42,7 +42,8 @@ fn infrastructureFragment(input: InfrastructureOutput) -> @location(0) vec4f {
   if (dotted && fract(input.roadUv.x / 6.4) > 0.40) { discard; }
   let debugMode = u32(uniforms.map.w + 0.5);
   if (debugMode == 8u || debugMode == 9u) {
-    return vec4f(select(vec3f(0.98, 0.20, 0.07), vec3f(0.96, 0.78, 0.22), dotted), input.visibility);
+    let worldFog = horizontalWorldFog(input.worldPosition.x);
+    return vec4f(select(vec3f(0.98, 0.20, 0.07), vec3f(0.96, 0.78, 0.22), dotted), input.visibility * (1.0 - worldFog));
   }
   let grit = fract(sin(dot(floor(input.worldPosition.xz * 2.2), vec2f(12.9898, 78.233))) * 43758.5453);
   let rutA = 1.0 - smoothstep(0.045, 0.12, abs(input.roadUv.y - 0.43));
@@ -53,7 +54,8 @@ fn infrastructureFragment(input: InfrastructureOutput) -> @location(0) vec4f {
   let diffuse = max(dot(normal, normalize(uniforms.sunTime.xyz)), 0.0);
   let light = 0.48 + normal.y * 0.16 + diffuse * 0.58;
   let fog = smoothstep(3500.0, 11000.0, distance(uniforms.camera.xyz, input.worldPosition));
-  color = mix(color * light, vec3f(0.58, 0.69, 0.72), fog * 0.78);
-  return vec4f(color, input.visibility);
+  let worldFog = horizontalWorldFog(input.worldPosition.x);
+  color = mix(mix(color * light, vec3f(0.58, 0.69, 0.72), fog * 0.78), worldFogColor(), worldFog);
+  return vec4f(color, input.visibility * (1.0 - worldFog));
 }
 `;

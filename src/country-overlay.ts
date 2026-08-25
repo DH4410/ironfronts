@@ -14,6 +14,7 @@ interface RenderedCountryLabel {
   country: CountryRecord;
   x: number;
   y: number;
+  worldX: number;
   angle: number;
   fontSize: number;
 }
@@ -219,7 +220,7 @@ export class CountryLabelLayer {
       let angle = Math.atan2(right.y - left.y, right.x - left.x);
       while (angle > Math.PI * 0.5) angle -= Math.PI;
       while (angle < -Math.PI * 0.5) angle += Math.PI;
-      renderedLabels.push({ country, x: center.x, y: center.y, angle, fontSize });
+      renderedLabels.push({ country, x: center.x, y: center.y, worldX: center.worldX, angle, fontSize });
     }
     this.buildInstances(renderedLabels);
     this.lastCameraRevision = cameraRevision;
@@ -299,7 +300,7 @@ export class CountryLabelLayer {
         atlas.widthAtMeasurementSize * scale,
         atlas.heightAtMeasurementSize * scale,
         Math.cos(label.angle), Math.sin(label.angle), atlas.u0, atlas.v0,
-        atlas.u1, atlas.v1, 0, 0,
+        atlas.u1, atlas.v1, label.worldX, 0,
       ], cursor);
       cursor += LABEL_INSTANCE_STRIDE;
     }

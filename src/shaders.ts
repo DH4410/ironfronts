@@ -194,7 +194,8 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let distanceToCamera = distance(uniforms.camera.xyz, input.worldPosition);
   let fog = smoothstep(3600.0, 11500.0, distanceToCamera);
   let fogColor = vec3f(0.58, 0.69, 0.72);
-  return vec4f(mix(lit, fogColor, fog * 0.78), 1.0);
+  let distanceFogged = mix(lit, fogColor, fog * 0.78);
+  return vec4f(mix(distanceFogged, worldFogColor(), horizontalWorldFog(input.worldPosition.x)), 1.0);
 }
 `;
 
@@ -282,7 +283,8 @@ fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
   color = mix(color, vec3f(0.73, 0.82, 0.77), foam * 0.52);
   color += vec3f(1.0, 0.86, 0.61) * sun * (0.34 + ripple * 0.05);
   let fog = smoothstep(4000.0, 12000.0, distance(uniforms.camera.xyz, input.worldPosition));
-  return vec4f(mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.8), 0.97);
+  let distanceFogged = mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.8);
+  return vec4f(mix(distanceFogged, worldFogColor(), horizontalWorldFog(input.worldPosition.x)), 0.97);
 }
 `;
 
@@ -501,8 +503,9 @@ fn propFragment(input: PropVertexOutput) -> @location(0) vec4f {
   }
   let distanceToCamera = distance(uniforms.camera.xyz, input.worldPosition);
   let fog = smoothstep(3100.0, 9200.0, distanceToCamera);
-  let color = mix(albedo * light, vec3f(0.58, 0.69, 0.72), fog * 0.78);
-  return vec4f(color, input.visibility * input.opacity);
+  let worldFog = horizontalWorldFog(input.worldPosition.x);
+  let color = mix(mix(albedo * light, vec3f(0.58, 0.69, 0.72), fog * 0.78), worldFogColor(), worldFog);
+  return vec4f(color, input.visibility * input.opacity * (1.0 - worldFog));
 }
 `;
 
@@ -515,6 +518,7 @@ struct LineParams { count: u32, mode: u32, enabled: u32, padding: u32 };
 struct LineOutput {
   @builtin(position) position: vec4f,
   @location(0) color: vec4f,
+  @location(1) fogVisibility: f32,
 };
 
 @vertex
@@ -584,13 +588,15 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   var output: LineOutput;
   output.position = clip + vec4f(pixelOffset * clip.w, 0.0, 0.0);
   output.color = color;
+  output.fogVisibility = 1.0 - horizontalWorldFog(select(world0.x, world1.x, endpoint == 1u));
   return output;
 }
 
 @fragment
 fn lineFragment(input: LineOutput) -> @location(0) vec4f {
-  if (input.color.a < 0.002) { discard; }
-  return input.color;
+  let color = vec4f(input.color.rgb, input.color.a * input.fogVisibility);
+  if (color.a < 0.002) { discard; }
+  return color;
 }
 `;
 
@@ -603,6 +609,7 @@ struct CountryLabelRecord { a: vec4f, b: vec4f, c: vec4f };
 struct CountryLabelOutput {
   @builtin(position) position: vec4f,
   @location(0) uv: vec2f,
+  @location(1) @interpolate(flat) fogVisibility: f32,
 };
 
 @vertex
@@ -626,12 +633,14 @@ fn countryLabelVertex(
   var output: CountryLabelOutput;
   output.position = vec4f(ndc, 0.0, 1.0);
   output.uv = mix(label.b.zw, label.c.xy, corner + vec2f(0.5));
+  output.fogVisibility = 1.0 - horizontalWorldFog(label.c.z);
   return output;
 }
 
 @fragment
 fn countryLabelFragment(input: CountryLabelOutput) -> @location(0) vec4f {
-  let color = textureSample(countryLabelAtlas, countryLabelSampler, input.uv);
+  let sampled = textureSample(countryLabelAtlas, countryLabelSampler, input.uv);
+  let color = vec4f(sampled.rgb, sampled.a * input.fogVisibility);
   if (color.a < 0.01) { discard; }
   return color;
 }
