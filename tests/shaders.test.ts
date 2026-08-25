@@ -65,12 +65,16 @@ describe('WGSL programs', () => {
     expect(terrainShader).toContain('let politicalColor = politicalColorAt(input.mapUv)');
     expect(terrainShader).not.toContain('let provinceId = provinceAt(input.mapUv)');
     expect(terrainShader).toContain('smoothstep(\n        3000.0,\n        6500.0,\n        uniforms.camera.y');
-    expect(terrainShader).toContain('let balancedStrength = mix(\n        0.20,\n        0.82,\n        overview');
+    expect(terrainShader).toContain('let balancedStrength = mix(\n        0.10,\n        0.82,\n        overview');
     expect(terrainShader).toContain('balancedStrength,\n        0.85,\n        uniforms.interaction.z > 1.5');
     expect(terrainShader).toContain('fog * 0.39');
-    expect(lineShader).toContain('let countryBoundary = line.b.z < 0.0');
+    expect(lineShader).toContain('let countryBoundary = line.b.z < 0.0 && line.b.y > 0.5');
     expect(lineShader).toContain('height0 = abs(line.b.z) + 0.8');
     expect(lineShader).toContain('(lineParams.enabled & 2u) != 0u');
+    expect(lineShader).toContain('mix(0.60, 0.94, nearFactor)');
+    expect(lineShader).toContain('let riverSignal = max(waterwayAt(input.mapUv), visualRiverAt(input.mapUv))');
+    expect(lineShader).toContain('styledColor = mix(input.outerColor, input.innerColor, centerCoverage)');
+    expect(lineShader).toContain('mix(0.30, 0.10, nearFactor)');
   });
 
   it('builds purely visual periodic polar shelves with water gaps and an outer fog', () => {
