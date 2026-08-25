@@ -1,4 +1,7 @@
-import { countryLabelShader, infrastructureShader, lineShader, propShader, terrainShader, waterShader, waterwayShader } from './shaders';
+import {
+  countryLabelShader, infrastructureShader, lineShader, polarCapShader, propShader, terrainShader, waterShader,
+  waterwayShader,
+} from './shaders';
 
 export interface RendererLayouts {
   common: GPUBindGroupLayout;
@@ -9,6 +12,7 @@ export interface RendererLayouts {
 
 export interface RendererPipelines {
   terrain: GPURenderPipeline;
+  polarCaps: GPURenderPipeline;
   water: GPURenderPipeline;
   waterways: GPURenderPipeline;
   infrastructure: GPURenderPipeline;
@@ -69,6 +73,7 @@ export function createRendererPipelines(
 ): RendererPipelines {
   const depthStencil: GPUDepthStencilState = { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' };
   const terrainModule = device.createShaderModule({ label: 'terrain shader', code: terrainShader });
+  const polarCapModule = device.createShaderModule({ label: 'polar cap shader', code: polarCapShader });
   const waterModule = device.createShaderModule({ label: 'water shader', code: waterShader });
   const waterwayModule = device.createShaderModule({ label: 'static waterway shader', code: waterwayShader });
   const infrastructureModule = device.createShaderModule({ label: 'terrain-draped road shader', code: infrastructureShader });
@@ -83,6 +88,14 @@ export function createRendererPipelines(
       { shaderLocation: 0, offset: 0, format: 'float32x2' }, { shaderLocation: 1, offset: 8, format: 'float32' },
     ] }] },
     fragment: { module: terrainModule, entryPoint: 'terrainFragment', targets: [{ format }] },
+    primitive: { topology: 'triangle-list', cullMode: 'none' }, depthStencil,
+  });
+  const polarCaps = device.createRenderPipeline({
+    label: 'visual polar caps pipeline', layout: commonLayout,
+    vertex: { module: polarCapModule, entryPoint: 'polarCapVertex', buffers: [{ arrayStride: 12, attributes: [
+      { shaderLocation: 0, offset: 0, format: 'float32x2' }, { shaderLocation: 1, offset: 8, format: 'float32' },
+    ] }] },
+    fragment: { module: polarCapModule, entryPoint: 'polarCapFragment', targets: [{ format }] },
     primitive: { topology: 'triangle-list', cullMode: 'none' }, depthStencil,
   });
   const water = device.createRenderPipeline({
@@ -136,7 +149,7 @@ export function createRendererPipelines(
     primitive: { topology: 'triangle-list', cullMode: 'none' },
     depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
   });
-  return { terrain, water, waterways, infrastructure, props, lines, countryLabels };
+  return { terrain, polarCaps, water, waterways, infrastructure, props, lines, countryLabels };
 }
 
 const alphaBlend: GPUBlendState = {

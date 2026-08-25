@@ -116,6 +116,49 @@ fn valueNoise(point: vec2f) -> f32 {
   return mix(mix(a, b, blend.x), mix(c, d, blend.x), blend.y);
 }
 
+fn oceanWaveHeight(world: vec2f, openWater: f32) -> f32 {
+  let time = uniforms.sunTime.w;
+  let windWarp = valueNoise(world / 920.0 + vec2f(time * 0.006, -time * 0.004)) - 0.5;
+  let directionA = normalize(vec2f(0.88 + windWarp * 0.42, 0.47 - windWarp * 0.28));
+  let directionB = normalize(vec2f(-0.31 + windWarp * 0.22, 0.95));
+  let packet = 0.68 + valueNoise(world / 310.0 - vec2f(time * 0.018, time * 0.011)) * 0.42;
+  return (sin(dot(world, directionA) * 0.014 + time * (0.47 + windWarp * 0.08)) * 0.42
+    + sin(dot(world, directionB) * 0.026 - time * 0.39 + windWarp * 2.1) * 0.24
+    + sin(dot(world, normalize(directionA + directionB * 0.37)) * 0.061 + time * 0.83) * 0.08)
+    * packet * mix(0.09, 1.0, openWater);
+}
+
+fn oceanSurfaceColor(worldPosition: vec3f, depth: f32, shoreline: f32, visualRiver: f32) -> vec3f {
+  let time = uniforms.sunTime.w;
+  let world = worldPosition.xz;
+  let warp = vec2f(valueNoise(world / 175.0 + vec2f(time * 0.025, -time * 0.017)),
+    valueNoise(world / 243.0 + vec2f(-time * 0.013, time * 0.021))) - 0.5;
+  let waveA = sin(dot(world + warp * 36.0, normalize(vec2f(0.86, 0.51))) * 0.019 + time * 0.53);
+  let waveB = sin(dot(world - warp * 24.0, normalize(vec2f(-0.28, 0.96))) * 0.034 - time * 0.41);
+  let rippleNoise = valueNoise(world / 19.0 + warp * 1.7 + vec2f(time * 0.11, -time * 0.07));
+  let ripple = rippleNoise * 2.0 - 1.0;
+  let normal = normalize(vec3f((waveA * 0.78 + waveB * 0.41 + ripple * 0.22) * 0.105, 1.0,
+    (waveA * 0.38 - waveB * 0.82 + ripple * 0.19) * 0.09));
+  let viewDirection = normalize(uniforms.camera.xyz - worldPosition);
+  let fresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 4.5);
+  let sun = pow(max(dot(reflect(-normalize(uniforms.sunTime.xyz), normal), viewDirection), 0.0), 112.0);
+  let shelf = smoothstep(0.0, 0.44, depth);
+  let shallow = vec3f(0.12, 0.48, 0.52);
+  let deep = vec3f(0.025, 0.16, 0.255);
+  var color = mix(shallow, deep, shelf);
+  color = mix(color, vec3f(0.40, 0.60, 0.63), fresnel * 0.64);
+  let foamBreak = valueNoise(world / 11.0 + warp * 2.4 + vec2f(time * 0.15, -time * 0.09));
+  let foam = shoreline * (1.0 - visualRiver * 0.80) * smoothstep(0.54, 0.82, foamBreak + waveA * 0.12);
+  color = mix(color, vec3f(0.73, 0.82, 0.77), foam * 0.52);
+  color += vec3f(1.0, 0.86, 0.61) * sun * (0.34 + ripple * 0.05);
+  return color;
+}
+
+fn applyOceanDistanceFog(color: vec3f, worldPosition: vec3f) -> vec3f {
+  let fog = smoothstep(4000.0, 12000.0, distance(uniforms.camera.xyz, worldPosition));
+  return mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.80);
+}
+
 fn worldFogColor() -> vec3f {
   // Keep the fully fogged edge identical to the render-pass clear color so
   // the final world geometry disappears without exposing its hard boundary.
@@ -128,8 +171,8 @@ fn horizontalWorldFog(worldX: f32) -> f32 {
   // with the camera instead of revealing a fixed cutoff in map coordinates.
   let horizontalDistance = abs(worldX - uniforms.camera.w);
   return smoothstep(
-    uniforms.map.x * ${WORLD_FOG_START_RATIO.toFixed(2)},
-    uniforms.map.x * ${WORLD_FOG_END_RATIO.toFixed(2)},
+    uniforms.map.x * ${WORLD_FOG_START_RATIO.toFixed(3)},
+    uniforms.map.x * ${WORLD_FOG_END_RATIO.toFixed(3)},
     horizontalDistance
   );
 }

@@ -22,11 +22,11 @@ describe('world visibility', () => {
   it('moves the fog-backed horizontal visibility window with the camera target', () => {
     const worldWidth = 1_000;
     expect(sphereIntersectsHorizontalWorldWindow(-900, 0, 0, worldWidth)).toBe(true);
-    expect(sphereIntersectsHorizontalWorldWindow(-980, 0, 0, worldWidth)).toBe(false);
-    expect(sphereIntersectsHorizontalWorldWindow(20, 0, 1_000, worldWidth)).toBe(false);
+    expect(sphereIntersectsHorizontalWorldWindow(-990, 0, 0, worldWidth)).toBe(false);
+    expect(sphereIntersectsHorizontalWorldWindow(10, 0, 1_000, worldWidth)).toBe(false);
     expect(sphereIntersectsHorizontalWorldWindow(20, 0, 990, worldWidth)).toBe(true);
     // Bounds crossing the fully fogged limit remain conservative.
-    expect(sphereIntersectsHorizontalWorldWindow(-980, 20, 0, worldWidth)).toBe(true);
+    expect(sphereIntersectsHorizontalWorldWindow(-990, 10, 0, worldWidth)).toBe(true);
   });
 
   it('keeps a chunk that crosses the near plane even when its center is too close', () => {

@@ -63,6 +63,7 @@ export class WorldRenderer {
   private commonBindGroup!: GPUBindGroup;
   private uniformBuffer!: GPUBuffer;
   private terrainPipeline!: GPURenderPipeline;
+  private polarCapPipeline!: GPURenderPipeline;
   private waterPipeline!: GPURenderPipeline;
   private waterwayPipeline!: GPURenderPipeline;
   private infrastructurePipeline!: GPURenderPipeline;
@@ -73,6 +74,7 @@ export class WorldRenderer {
   private countryLabelBindGroup?: GPUBindGroup;
   private lastCountryLabelRevision = -1;
   private terrainMeshes!: Mesh[];
+  private polarCapMesh!: Mesh;
   private waterMeshes!: Mesh[];
   private roadMesh!: Mesh;
   private hiddenConnectionMesh!: Mesh;
@@ -316,6 +318,7 @@ export class WorldRenderer {
     this.createPipelines();
     this.terrainMeshes = [this.manifest.terrain.gridResolution, 33, 17, 9]
       .map((resolution) => createTerrainMesh(this.device, resolution, true));
+    this.polarCapMesh = createTerrainMesh(this.device, 65);
     this.waterMeshes = [33, 25, 17, 9].map((resolution) => createTerrainMesh(this.device, resolution));
     this.roadMesh = uploadIndexedMesh(this.device, 'terrain roads', roadVertexBuffer, roadIndexBuffer, this.manifest.buffers.roadIndices.count);
     this.hiddenConnectionMesh = uploadIndexedMesh(this.device, 'floating hidden connections', hiddenConnectionVertexBuffer,
@@ -475,6 +478,7 @@ export class WorldRenderer {
       countryLabels: this.countryLabelLayout,
     });
     this.terrainPipeline = pipelines.terrain;
+    this.polarCapPipeline = pipelines.polarCaps;
     this.waterPipeline = pipelines.water;
     this.waterwayPipeline = pipelines.waterways;
     this.infrastructurePipeline = pipelines.infrastructure;
@@ -860,6 +864,11 @@ export class WorldRenderer {
     const pass = encoder.beginRenderPass(passDescriptor);
 
     pass.setBindGroup(0, this.commonBindGroup);
+    pass.setPipeline(this.polarCapPipeline);
+    pass.setVertexBuffer(0, this.polarCapMesh.vertex);
+    pass.setIndexBuffer(this.polarCapMesh.index, 'uint16');
+    pass.drawIndexed(this.polarCapMesh.indexCount, 6);
+    this.recordIndexedDraw('polarCaps', this.polarCapMesh.indexCount, 6);
     this.frameWorkload.visibleChunks.terrain = this.terrainLodDraws.reduce((sum, draw) => sum + draw.instanceCount, 0);
     for (const draw of this.terrainLodDraws) this.frameWorkload.lodInstances.terrain[draw.lod] += draw.instanceCount;
     if (this.performanceLayers.ocean) {

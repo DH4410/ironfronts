@@ -1,6 +1,7 @@
 import { commonWgsl } from './shaders/common';
 export { commonWgsl } from './shaders/common';
 export { infrastructureShader } from './shaders/infrastructure';
+export { polarCapShader } from './shaders/polar-caps';
 export { waterwayShader } from './shaders/waterways';
 
 export const terrainShader = commonWgsl + /* wgsl */ `
@@ -224,16 +225,8 @@ fn waterVertex(input: WaterVertexInput, @builtin(instance_index) instanceIndex: 
   let uv = vec2f((f32(chunkX) + input.grid.x) / f32(chunksX), (f32(chunkY) + input.grid.y) / f32(chunksY));
   let copyOffset = f32(i32(copyIndex) - 1) * uniforms.map.x;
   let xz = vec2f(uv.x * uniforms.map.x + copyOffset, uv.y * uniforms.map.y);
-  let time = uniforms.sunTime.w;
   let openWater = 1.0 - bankAt(uv);
-  let windWarp = valueNoise(xz / 920.0 + vec2f(time * 0.006, -time * 0.004)) - 0.5;
-  let directionA = normalize(vec2f(0.88 + windWarp * 0.42, 0.47 - windWarp * 0.28));
-  let directionB = normalize(vec2f(-0.31 + windWarp * 0.22, 0.95));
-  let packet = 0.68 + valueNoise(xz / 310.0 - vec2f(time * 0.018, time * 0.011)) * 0.42;
-  let waveHeight = (sin(dot(xz, directionA) * 0.014 + time * (0.47 + windWarp * 0.08)) * 0.42
-    + sin(dot(xz, directionB) * 0.026 - time * 0.39 + windWarp * 2.1) * 0.24
-    + sin(dot(xz, normalize(directionA + directionB * 0.37)) * 0.061 + time * 0.83) * 0.08)
-    * packet * mix(0.09, 1.0, openWater);
+  let waveHeight = oceanWaveHeight(xz, openWater);
   let worldPosition = vec3f(uv.x * uniforms.map.x + copyOffset, 0.35 + waveHeight, uv.y * uniforms.map.y);
   var output: WaterVertexOutput;
   output.position = uniforms.viewProjection * vec4f(worldPosition, 1.0);
@@ -259,31 +252,9 @@ fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
   if (debugMode == 9u) {
     return vec4f(mix(vec3f(0.025, 0.12, 0.25), vec3f(0.18, 0.48, 0.98), visualRiver), 1.0);
   }
-  let time = uniforms.sunTime.w;
-  let world = input.worldPosition.xz;
-  let warp = vec2f(valueNoise(world / 175.0 + vec2f(time * 0.025, -time * 0.017)),
-    valueNoise(world / 243.0 + vec2f(-time * 0.013, time * 0.021))) - 0.5;
-  let waveA = sin(dot(world + warp * 36.0, normalize(vec2f(0.86, 0.51))) * 0.019 + time * 0.53);
-  let waveB = sin(dot(world - warp * 24.0, normalize(vec2f(-0.28, 0.96))) * 0.034 - time * 0.41);
-  let rippleNoise = valueNoise(world / 19.0 + warp * 1.7 + vec2f(time * 0.11, -time * 0.07));
-  let ripple = rippleNoise * 2.0 - 1.0;
-  let normal = normalize(vec3f((waveA * 0.78 + waveB * 0.41 + ripple * 0.22) * 0.105, 1.0,
-    (waveA * 0.38 - waveB * 0.82 + ripple * 0.19) * 0.09));
-  let viewDirection = normalize(uniforms.camera.xyz - input.worldPosition);
-  let fresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 4.5);
-  let sun = pow(max(dot(reflect(-normalize(uniforms.sunTime.xyz), normal), viewDirection), 0.0), 112.0);
   let depth = mix(waterDepthAt(input.mapUv), 0.08, visualRiver);
-  let shelf = smoothstep(0.0, 0.44, depth);
-  let shallow = vec3f(0.12, 0.48, 0.52);
-  let deep = vec3f(0.025, 0.16, 0.255);
-  var color = mix(shallow, deep, shelf);
-  color = mix(color, vec3f(0.40, 0.60, 0.63), fresnel * 0.64);
-  let foamBreak = valueNoise(world / 11.0 + warp * 2.4 + vec2f(time * 0.15, -time * 0.09));
-  let foam = bankAt(input.mapUv) * (1.0 - visualRiver * 0.80) * smoothstep(0.54, 0.82, foamBreak + waveA * 0.12);
-  color = mix(color, vec3f(0.73, 0.82, 0.77), foam * 0.52);
-  color += vec3f(1.0, 0.86, 0.61) * sun * (0.34 + ripple * 0.05);
-  let fog = smoothstep(4000.0, 12000.0, distance(uniforms.camera.xyz, input.worldPosition));
-  let distanceFogged = mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.8);
+  let color = oceanSurfaceColor(input.worldPosition, depth, bankAt(input.mapUv), visualRiver);
+  let distanceFogged = applyOceanDistanceFog(color, input.worldPosition);
   return vec4f(mix(distanceFogged, worldFogColor(), horizontalWorldFog(input.worldPosition.x)), 0.97);
 }
 `;

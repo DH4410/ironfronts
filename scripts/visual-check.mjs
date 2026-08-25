@@ -132,10 +132,13 @@ if (!status.unsupported) {
   await captureCamera([world.width - 24, world.height * 0.5], 'camera-seam-east-tilted.png', 1_800, -1.18, 0.43);
   await captureCamera([24, world.height * 0.5], 'camera-horizontal-edge-fog-west.png', 9_000, 1.57, 0.43);
   await captureCamera([world.width - 24, world.height * 0.5], 'camera-horizontal-edge-fog-east.png', 9_000, -1.57, 0.43);
+  await captureCamera([world.width * 0.5, 24], 'polar-cap-north.png', 2_400, 0, 0.56);
+  await captureCamera([world.width * 0.5, world.height - 24], 'polar-cap-south.png', 2_400, Math.PI, 0.56);
+  await captureCamera([world.width * 0.5, 24], 'polar-cap-north-overview.png', 7_000, 0, 0.72);
   const chunkCorner = [world.width * 17 / world.chunksX, world.height * 9 / world.chunksY];
   await captureCamera(chunkCorner, 'camera-max-zoom-chunk-corner-a.png', 180, -0.78, 1.23);
   await captureCamera(chunkCorner, 'camera-max-zoom-chunk-corner-b.png', 180, 2.36, 1.23);
-  validation.cameraRegressionCaptures = 6;
+  validation.cameraRegressionCaptures = 9;
 
   await captureShowcase('urban', 'roads-urban.png', 410);
   await captureShowcase('mountain', 'roads-mountain.png', 480);
