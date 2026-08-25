@@ -2,6 +2,7 @@ import { vec3 } from 'gl-matrix';
 import { StrategyCamera } from './camera';
 import { buildPropVisibility, buildTerrainVisibility } from './chunk-visibility';
 import { buildCountryColorBuffer, CountryLabelLayer } from './country-overlay';
+import { loadCountryLabelFont } from './country-labels/atlas';
 import { align4, fetchBinary, fetchJson, uploadMipmappedTexture, uploadTexture } from './gpu-utils';
 import { createMaterialTexture, createTreeMaterialTexture } from './material-texture';
 import {
@@ -24,6 +25,8 @@ import {
 } from './visibility';
 import { sampleWrappedField } from './world-sampling';
 import { loadWorldAssetBuffers } from './world-assets';
+
+const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
 
 export class WorldRenderer {
   readonly camera = new StrategyCamera();
@@ -54,6 +57,7 @@ export class WorldRenderer {
   private linePipeline!: GPURenderPipeline;
   private countryLabelPipeline!: GPURenderPipeline;
   private countryLabelBuffer?: GPUBuffer;
+  private countryLabelParamsBuffer?: GPUBuffer;
   private countryLabelBindGroup?: GPUBindGroup;
   private lastCountryLabelRevision = -1;
   private terrainMeshes!: Mesh[];
@@ -95,6 +99,7 @@ export class WorldRenderer {
   private heightData!: Float32Array;
   private provinceData!: Uint16Array;
   private provinceOwners!: Uint32Array;
+  private provinceOwnerBuffer!: GPUBuffer;
   private provinceById = new Map<number, ProvinceRecord>();
   private countryById = new Map<number, CountryRecord>();
   private countryLabels?: CountryLabelLayer;
@@ -251,6 +256,18 @@ export class WorldRenderer {
       size: 256,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
+    this.provinceOwnerBuffer = this.device.createBuffer({
+      label: 'province country owners',
+      size: Math.max(4, this.provinceOwners.byteLength),
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    this.device.queue.writeBuffer(
+      this.provinceOwnerBuffer,
+      0,
+      this.provinceOwners.buffer as ArrayBuffer,
+      this.provinceOwners.byteOffset,
+      this.provinceOwners.byteLength,
+    );
     this.visibleTerrainBuffer = this.device.createBuffer({
       label: 'visible terrain chunks',
       size: this.manifest.terrain.chunksX * this.manifest.terrain.chunksY * 3 * 4,
@@ -271,6 +288,7 @@ export class WorldRenderer {
         { binding: 8, resource: this.terrainNormalTexture.createView() },
         { binding: 9, resource: this.treeMaterialTexture.createView({ dimension: '2d-array' }) },
         { binding: 10, resource: this.provincePoliticalColorTexture.createView() },
+        { binding: 11, resource: { buffer: this.provinceOwnerBuffer } },
         { binding: 12, resource: { buffer: this.visibleTerrainBuffer } },
         { binding: 13, resource: this.terrainAlbedoTexture.createView() },
       ],
@@ -304,6 +322,7 @@ export class WorldRenderer {
     this.borders = this.createInstanceLayer('borders', borderBuffer, this.manifest.buffers.borders.count, 0, this.lineLayout);
     this.updateBorderVisibility();
     if (this.countryLabelCanvas) {
+      await loadCountryLabelFont();
       this.countryLabels = new CountryLabelLayer(
         this.countryLabelCanvas,
         this.manifest.politics.countries,
@@ -370,6 +389,7 @@ export class WorldRenderer {
       const previousCountryId = this.provinceOwners[encodedId];
       if (previousCountryId === change.countryId) continue;
       this.provinceOwners[encodedId] = change.countryId;
+      this.device.queue.writeBuffer(this.provinceOwnerBuffer, encodedId * 4, new Uint32Array([change.countryId]));
       ownershipChanges.push({ provinceId: encodedId, previousCountryId, countryId: change.countryId });
     }
     this.politicalCache.update(
@@ -457,9 +477,14 @@ export class WorldRenderer {
   private createCountryLabelResources(): void {
     if (!this.countryLabels) return;
     this.countryLabelBuffer = this.device.createBuffer({
-      label: 'country label instances',
-      size: Math.max(4, this.manifest.politics.countries.length * 12 * 4),
+      label: 'country label glyphs',
+      size: Math.max(4, this.countryLabels.maximumGlyphCount * 12 * 4),
       usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    this.countryLabelParamsBuffer = this.device.createBuffer({
+      label: 'country label parameters',
+      size: 16,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     const atlas = this.countryLabels.atlasCanvas;
     const atlasTexture = this.device.createTexture({
@@ -479,7 +504,10 @@ export class WorldRenderer {
       entries: [
         { binding: 0, resource: { buffer: this.countryLabelBuffer } },
         { binding: 1, resource: atlasTexture.createView() },
-        { binding: 2, resource: this.device.createSampler({ magFilter: 'linear', minFilter: 'linear' }) },
+        { binding: 2, resource: this.device.createSampler({
+          magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', maxAnisotropy: 8,
+        }) },
+        { binding: 3, resource: { buffer: this.countryLabelParamsBuffer } },
       ],
     });
   }
@@ -575,15 +603,11 @@ export class WorldRenderer {
 
     phaseStarted = performance.now();
     this.countryLabels?.setVisible(this.showCountryOverlay && this.performanceLayers.countryLabels && this.debugView === 0);
-    const visibleLabels = this.countryLabels?.update(
-      this.camera.viewProjection,
-      this.canvas.width,
-      this.canvas.height,
-      (x, z) => this.sampleHeight(x, z),
-      this.camera.revision,
-    ) ?? 0;
+    const visibleLabels = this.countryLabels?.visibleLabelCount ?? 0;
+    const visibleLabelGlyphs = this.countryLabels?.visibleGlyphCount ?? 0;
     if (this.countryLabels
       && this.countryLabelBuffer
+      && this.countryLabelParamsBuffer
       && this.countryLabels.renderRevision !== this.lastCountryLabelRevision) {
       const data = this.countryLabels.renderData;
       if (data.byteLength) {
@@ -591,6 +615,9 @@ export class WorldRenderer {
           this.countryLabelBuffer, 0, data.buffer as ArrayBuffer, data.byteOffset, data.byteLength,
         );
       }
+      this.device.queue.writeBuffer(
+        this.countryLabelParamsBuffer, 0, new Uint32Array([data.length / 12, WORLD_COPY_INDICES.length, 0, 0]),
+      );
       this.lastCountryLabelRevision = this.countryLabels.renderRevision;
     }
     const labelsMs = performance.now() - phaseStarted;
@@ -608,7 +635,7 @@ export class WorldRenderer {
     }
 
     phaseStarted = performance.now();
-    this.render(visibleLabels);
+    this.render(visibleLabels, visibleLabelGlyphs);
     const renderMs = performance.now() - phaseStarted;
     const phases: PerformancePhases = {
       camera: cameraMs,
@@ -636,7 +663,7 @@ export class WorldRenderer {
     this.device.queue.writeBuffer(this.uniformBuffer, 0, values);
   }
 
-  private render(visibleLabels: number): void {
+  private render(visibleLabels: number, visibleLabelGlyphs: number): void {
     if (!this.depthTexture) return;
     this.frameWorkload = createEmptyRenderWorkload(visibleLabels);
     const collectGpuTiming = Boolean(this.gpuQuerySet && this.gpuResolveBuffer && this.gpuReadBuffer)
@@ -699,6 +726,9 @@ export class WorldRenderer {
       this.drawChunkedInfrastructure(pass, this.manifest.infrastructureChunks.hiddenConnections, 'hiddenLinks', 8_000);
     }
 
+    const labelsAboveProps = this.camera.distance >= LABELS_ABOVE_PROPS_DISTANCE;
+    if (!labelsAboveProps) this.drawCountryLabels(pass, visibleLabelGlyphs);
+
     if (this.showProps) {
       pass.setPipeline(this.propPipeline);
       if (this.performanceLayers.trees) {
@@ -713,6 +743,8 @@ export class WorldRenderer {
         this.drawPropChunks(pass, this.signs, this.manifest.propChunks.signs, [[this.signMesh]], 'roadFurniture', 1_900, [1_900, 1_900]);
       }
     }
+
+    if (labelsAboveProps) this.drawCountryLabels(pass, visibleLabelGlyphs);
 
     pass.setPipeline(this.linePipeline);
     if (this.showBorders || (this.showCountryOverlay && this.performanceLayers.countryBorders)) {
@@ -730,12 +762,6 @@ export class WorldRenderer {
       const instances = this.waterwayNetwork.count * WORLD_COPY_INDICES.length;
       pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.waterwayNetwork.count);
       this.recordTriangleDraw('debugLines', instances * 2, instances);
-    }
-    if (visibleLabels > 0 && this.countryLabelBindGroup) {
-      pass.setPipeline(this.countryLabelPipeline);
-      pass.setBindGroup(1, this.countryLabelBindGroup);
-      pass.draw(6, visibleLabels);
-      this.recordTriangleDraw('labels', visibleLabels * 2, visibleLabels);
     }
     submitWorldFrame(
       this.device,
@@ -812,6 +838,15 @@ export class WorldRenderer {
       if (category === 'trees') this.frameWorkload.lodInstances.trees[draw.lod] += draw.instanceCount;
       else if (category === 'buildings') this.frameWorkload.lodInstances.buildings[draw.lod] += draw.instanceCount;
     }
+  }
+
+  private drawCountryLabels(pass: GPURenderPassEncoder, glyphCount: number): void {
+    if (glyphCount <= 0 || !this.countryLabelBindGroup) return;
+    const instances = glyphCount * WORLD_COPY_INDICES.length;
+    pass.setPipeline(this.countryLabelPipeline);
+    pass.setBindGroup(1, this.countryLabelBindGroup);
+    pass.draw(6, instances);
+    this.recordTriangleDraw('labels', instances * 2, instances);
   }
 
   private chunkIntersectsView(centerX: number, centerZ: number, radius: number): boolean {

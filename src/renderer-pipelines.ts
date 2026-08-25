@@ -36,6 +36,7 @@ export function createRendererLayouts(device: GPUDevice): RendererLayouts {
       { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
       { binding: 10, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 11, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
       { binding: 12, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       { binding: 13, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ],
@@ -61,6 +62,7 @@ export function createRendererLayouts(device: GPUDevice): RendererLayouts {
       { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      { binding: 3, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
     ],
   });
   return { common, instances, lines, countryLabels };
@@ -139,7 +141,7 @@ export function createRendererPipelines(
     vertex: { module: lineModule, entryPoint: 'lineVertex' },
     fragment: { module: lineModule, entryPoint: 'lineFragment', targets: [{ format, blend: alphaBlend }] },
     primitive: { topology: 'triangle-list', cullMode: 'none' },
-    depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less-equal' },
+    depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
   });
   const countryLabels = device.createRenderPipeline({
     label: 'country label pipeline',
@@ -147,7 +149,7 @@ export function createRendererPipelines(
     vertex: { module: countryLabelModule, entryPoint: 'countryLabelVertex' },
     fragment: { module: countryLabelModule, entryPoint: 'countryLabelFragment', targets: [{ format, blend: alphaBlend }] },
     primitive: { topology: 'triangle-list', cullMode: 'none' },
-    depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
+    depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less-equal' },
   });
   return { terrain, polarCaps, water, waterways, infrastructure, props, lines, countryLabels };
 }

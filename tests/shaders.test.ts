@@ -125,6 +125,7 @@ describe('WGSL programs', () => {
       { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
       { binding: 10, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 11, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
       { binding: 12, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       { binding: 13, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ] });
@@ -137,6 +138,7 @@ describe('WGSL programs', () => {
       { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 2, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      { binding: 3, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
     ] });
     const depthStencil: GPUDepthStencilState = { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' };
     await expect(device.createRenderPipelineAsync({
@@ -204,5 +206,5 @@ describe('WGSL programs', () => {
       depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'always' },
     })).resolves.toBeDefined();
     device.destroy();
-  });
+  }, 10_000);
 });

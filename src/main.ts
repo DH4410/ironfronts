@@ -1,4 +1,5 @@
 import './styles.css';
+import '@fontsource/bitter/latin-ext-800.css';
 import { WorldRenderer } from './renderer';
 import type { FrameStats, HoverInfo } from './types';
 
