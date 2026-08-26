@@ -18,6 +18,7 @@ struct WaterwayOutput {
   @location(3) @interpolate(flat) kind: f32,
   @location(4) visibility: f32,
   @location(5) flow: vec2f,
+  @location(6) speed: f32,
 };
 
 @vertex
@@ -31,6 +32,7 @@ fn waterwayVertex(input: WaterwayInput, @builtin(instance_index) instanceIndex: 
   output.edgeFactor = input.edgeFactor;
   output.kind = input.kind;
   output.flow = input.flow;
+  output.speed = input.speed;
   output.visibility = 1.0 - smoothstep(7600.0, 9200.0, distance(uniforms.camera.xyz, worldPosition));
   return output;
 }
@@ -40,6 +42,14 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   let longitudinalVariation = fwidth(input.waterUv.x);
   if (input.visibility < 0.02) { discard; }
   let mapUv = input.worldPosition.xz / uniforms.map.xy;
+  let visualRiver = input.kind > 0.1 && input.kind < 0.5;
+  let visualSignal = visualRiverAt(mapUv);
+  let visualAntialias = max(fwidth(visualSignal) * 0.85, 0.012);
+  var visualCoverage = 1.0;
+  if (visualRiver) {
+    if (visualSignal < 0.45 - visualAntialias) { discard; }
+    visualCoverage = smoothstep(0.45 - visualAntialias, 0.45 + visualAntialias, visualSignal);
+  }
   // Once an authored channel has entered broad static water, the ocean/lake
   // pass owns the surface. This removes distant source-graph tails while the
   // near-bank overlap still hides any seam at the mouth.
@@ -65,6 +75,17 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   let coastShallow = vec3f(0.12, 0.48, 0.52);
   let coastDeep = vec3f(0.025, 0.16, 0.255);
   var color = mix(coastShallow, coastDeep, shelf);
+  // Two inexpensive flow-aligned bands provide readable downstream motion
+  // without displacing geometry or turning the river into a noisy surface.
+  let alongFlow = dot(input.worldPosition.xz, flow);
+  let acrossFlow = dot(input.worldPosition.xz, across);
+  let flowTime = uniforms.sunTime.w * input.speed;
+  let rippleA = sin(alongFlow * 0.11 - flowTime * 0.78 + sin(acrossFlow * 0.16) * 0.32);
+  let rippleB = sin(alongFlow * 0.23 - flowTime * 1.31 - acrossFlow * 0.07);
+  let flowShimmer = clamp(0.5 + rippleA * 0.31 + rippleB * 0.19, 0.0, 1.0);
+  let calmEdge = 1.0 - input.edgeFactor * 0.35;
+  color *= 0.97 + flowShimmer * calmEdge * 0.045;
+  color += vec3f(0.035, 0.055, 0.06) * smoothstep(0.76, 1.0, flowShimmer) * calmEdge;
   let viewDirection = normalize(uniforms.camera.xyz - input.worldPosition);
   let fresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 4.5);
   let sun = pow(max(dot(reflect(-normalize(uniforms.sunTime.xyz), normal), viewDirection), 0.0), 112.0);
@@ -96,6 +117,6 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   let fog = smoothstep(4000.0, 12000.0, distance(uniforms.camera.xyz, input.worldPosition));
   let worldFog = horizontalWorldFog(input.worldPosition.x);
   let foggedColor = mix(mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.40), worldFogColor(), worldFog);
-  return vec4f(foggedColor, input.visibility * 0.985 * (1.0 - worldFog));
+  return vec4f(foggedColor, input.visibility * visualCoverage * 0.985 * (1.0 - worldFog));
 }
 `;

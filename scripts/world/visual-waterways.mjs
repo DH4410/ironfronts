@@ -1,12 +1,35 @@
 import { sampleHeight } from '../infrastructure/common.mjs';
-import { clamp, wrap } from './raster.mjs';
+import { clamp, smoothstep, wrap } from './raster.mjs';
 
 export const VISUAL_WATERWAY_KIND = 0.25;
 export const VISUAL_WATERWAY_THRESHOLD = 0.45;
-const WATER_SURFACE_LIFT = 0.08;
+const WATER_SURFACE_LIFT = 0.14;
+const VISUAL_MESH_SUBDIVISIONS = 2;
 
 function isActive(mask, index) {
   return (mask[index] ?? 0) / 255 > VISUAL_WATERWAY_THRESHOLD;
+}
+
+function hasActiveNeighbor(mask, x, y, width, height) {
+  for (let oy = -1; oy <= 1; oy += 1) {
+    const py = y + oy;
+    if (py < 0 || py >= height) continue;
+    for (let ox = -1; ox <= 1; ox += 1) {
+      if (isActive(mask, py * width + wrap(x + ox, width))) return true;
+    }
+  }
+  return false;
+}
+
+function sampleMask(mask, width, height, gridX, gridY) {
+  const fx = gridX - 0.5;
+  const fy = clamp(gridY - 0.5, 0, height - 1);
+  const x0raw = Math.floor(fx), y0 = Math.floor(fy);
+  const tx = fx - x0raw, ty = fy - y0;
+  const x0 = wrap(x0raw, width), x1 = wrap(x0 + 1, width), y1 = Math.min(height - 1, y0 + 1);
+  const top = mask[y0 * width + x0] * (1 - tx) + mask[y0 * width + x1] * tx;
+  const bottom = mask[y1 * width + x0] * (1 - tx) + mask[y1 * width + x1] * tx;
+  return (top * (1 - ty) + bottom * ty) / 255;
 }
 
 function worldCenter(x, y, width, height, worldWidth, worldHeight) {
@@ -97,17 +120,6 @@ function principalFlow(record, slotByIndex, width, height, pixelWidth, pixelHeig
   return [fx, fz];
 }
 
-function cornerEdgeFactor(cx, cy, slotByIndex, width, height) {
-  let active = 0;
-  for (const [ox, oy] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) {
-    const py = cy + oy;
-    if (py < 0 || py >= height) continue;
-    const px = wrap(cx + ox, width);
-    if (slotByIndex.get(py * width + px) !== undefined) active += 1;
-  }
-  return clamp(1 - Math.max(0, active - 1) * 0.25, 0.25, 1);
-}
-
 function sortIndicesByChunk(indices, batches, chunksX, chunksY) {
   const byChunk = Array.from({ length: chunksX * chunksY }, () => []);
   for (const batch of batches) byChunk[batch.chunk].push(batch);
@@ -127,7 +139,7 @@ function sortIndicesByChunk(indices, batches, chunksX, chunksY) {
 export function buildVisualWaterways({ visualMask, provinceIds, width, height, worldWidth, worldHeight, heights, heightWidth, heightHeight, chunksX = 32, chunksY = 16 }) {
   const started = performance.now();
   const solved = solveVisualWaterwayHeights({ visualMask, provinceIds, width, height, worldWidth, worldHeight, heights, heightWidth, heightHeight });
-  const { records, slotByIndex } = solved;
+  const { slotByIndex } = solved;
   const pixelWidth = worldWidth / width;
   const pixelHeight = worldHeight / height;
   const vertices = [];
@@ -141,27 +153,44 @@ export function buildVisualWaterways({ visualMask, provinceIds, width, height, w
     return vertex;
   };
 
-  for (const record of records) {
-    const x0 = record.x / width * worldWidth;
-    const x1 = (record.x + 1) / width * worldWidth;
-    const z0 = record.y / height * worldHeight;
-    const z1 = (record.y + 1) / height * worldHeight;
-    const cx = (x0 + x1) * 0.5;
-    const cz = (z0 + z1) * 0.5;
-    const flow = principalFlow(record, slotByIndex, width, height, pixelWidth, pixelHeight);
-    const speed = 0.46 + 0.08 * Math.sin(record.index * 0.017);
-    const center = addVertex([cx, record.height + 0.018, cz], [cx / 24, cz / 24], 0, flow, speed);
-    const corners = [
-      [x0, z0, record.x, record.y], [x1, z0, record.x + 1, record.y],
-      [x1, z1, record.x + 1, record.y + 1], [x0, z1, record.x, record.y + 1],
-    ].map(([x, z, gx, gy]) => addVertex([x, sampleHeight(
-      heights, heightWidth, heightHeight, worldWidth, worldHeight, x, z,
-    ) + WATER_SURFACE_LIFT, z],
-      [x / 24, z / 24], cornerEdgeFactor(gx, gy, slotByIndex, width, height), flow, speed * 0.48));
-    const firstIndex = indices.length;
-    indices.push(center, corners[0], corners[1], center, corners[1], corners[2],
-      center, corners[2], corners[3], center, corners[3], corners[0]);
-    batches.push({ chunk: chunkFor(cx, cz), firstIndex, indexCount: 12 });
+  let supportCells = 0;
+  for (let cellY = 0; cellY < height; cellY += 1) {
+    for (let cellX = 0; cellX < width; cellX += 1) {
+      if (!hasActiveNeighbor(visualMask, cellX, cellY, width, height)) continue;
+      supportCells += 1;
+      const record = { x: cellX, y: cellY, index: cellY * width + cellX };
+      const x0 = record.x / width * worldWidth;
+      const x1 = (record.x + 1) / width * worldWidth;
+      const z0 = record.y / height * worldHeight;
+      const z1 = (record.y + 1) / height * worldHeight;
+      const cx = (x0 + x1) * 0.5;
+      const cz = (z0 + z1) * 0.5;
+      const flow = principalFlow(record, slotByIndex, width, height, pixelWidth, pixelHeight);
+      const speed = 0.46 + 0.08 * Math.sin(record.index * 0.017);
+      const grid = [];
+      for (let sy = 0; sy <= VISUAL_MESH_SUBDIVISIONS; sy += 1) {
+        const row = [];
+        for (let sx = 0; sx <= VISUAL_MESH_SUBDIVISIONS; sx += 1) {
+          const u = sx / VISUAL_MESH_SUBDIVISIONS, v = sy / VISUAL_MESH_SUBDIVISIONS;
+          const x = x0 + (x1 - x0) * u, z = z0 + (z1 - z0) * v;
+          const signal = sampleMask(visualMask, width, height, record.x + u, record.y + v);
+          const edgeFactor = Math.max(0.02, 1 - smoothstep(VISUAL_WATERWAY_THRESHOLD, 0.82, signal));
+          row.push(addVertex([x, sampleHeight(
+            heights, heightWidth, heightHeight, worldWidth, worldHeight, x, z,
+          ) + WATER_SURFACE_LIFT, z], [x / 24, z / 24], edgeFactor, flow, speed * (0.48 + signal * 0.52)));
+        }
+        grid.push(row);
+      }
+      const firstIndex = indices.length;
+      for (let sy = 0; sy < VISUAL_MESH_SUBDIVISIONS; sy += 1) {
+        for (let sx = 0; sx < VISUAL_MESH_SUBDIVISIONS; sx += 1) {
+          const topLeft = grid[sy][sx], topRight = grid[sy][sx + 1];
+          const bottomLeft = grid[sy + 1][sx], bottomRight = grid[sy + 1][sx + 1];
+          indices.push(topLeft, bottomLeft, bottomRight, topLeft, bottomRight, topRight);
+        }
+      }
+      batches.push({ chunk: chunkFor(cx, cz), firstIndex, indexCount: indices.length - firstIndex });
+    }
   }
 
   const sorted = sortIndicesByChunk(indices, batches, chunksX, chunksY);
@@ -173,6 +202,10 @@ export function buildVisualWaterways({ visualMask, provinceIds, width, height, w
       ...solved.report,
       surface: 'terrain-aware explicit visual-river mesh',
       kind: VISUAL_WATERWAY_KIND,
+      meshSubdivisions: VISUAL_MESH_SUBDIVISIONS,
+      maximumSampleSpacing: Math.max(pixelWidth, pixelHeight) / VISUAL_MESH_SUBDIVISIONS,
+      surfaceLift: WATER_SURFACE_LIFT,
+      supportCells,
       triangles: sorted.indices.length / 3,
       totalBuildMilliseconds: performance.now() - started,
     },

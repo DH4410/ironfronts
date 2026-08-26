@@ -132,12 +132,15 @@ describe('generated v12 world package', () => {
     const sourceRiverPoints = source.nodes.filter((node) => node.kind === 'sea_point' && riverNames.has(node.location_name));
     const sourceCanalPoints = source.nodes.filter((node) => node.kind === 'sea_point' && ['Kiel Canal', 'Suez Channel'].includes(node.location_name));
     expect(report.version).toBe('world-generation-v12');
-    expect(report.waterways.animatedSurface).toBe(false);
-    expect(report.waterways.animation).toBe('none');
-    expect(report.waterways.terrainTreatment).toBe('shallow lower-only channel; independently draped surface vertices');
-    expect(report.waterways.terrainClipMask).toBe(false);
+    expect(report.waterways.animatedSurface).toBe(true);
+    expect(report.waterways.animation).toBe('simple-flow-aligned-shimmer');
+    expect(report.waterways.terrainTreatment).toBe('shallow lower-only channel with guarded inner terrain clip and independently draped surface vertices');
+    expect(report.waterways.terrainClipMask).toBe(true);
     expect(report.waterways.terrainOverlayMask).toBe(true);
     expect(report.waterways.minimumRiverWidth).toBeGreaterThanOrEqual(11);
+    expect(report.waterways.crossSectionSamples).toBe(5);
+    expect(report.waterways.nodeCapSegments).toBe(24);
+    expect(report.waterways.surfaceLift).toBe(0.14);
     expect(report.waterways.canalSurface).toBe('static-water province-zero channel');
     expect(report.waterways.riverSystems).toHaveLength(24);
     expect(sourceRiverPoints).toHaveLength(520);
@@ -165,6 +168,10 @@ describe('generated v12 world package', () => {
     expect(maskBytes.some((value, index) => index % 4 === 3 && value > 0)).toBe(true);
     expect(report.visualRivers.minimumRenderedWidth).toBeGreaterThanOrEqual(7.5);
     expect(report.visualRivers.minimumRenderedWidth).toBeLessThan(report.waterways.minimumRiverWidth);
+    expect(report.waterways.visualSurface.meshSubdivisions).toBe(2);
+    expect(report.waterways.visualSurface.maximumSampleSpacing).toBeLessThanOrEqual(1.7);
+    expect(report.waterways.visualSurface.renderKind).toBe(0.25);
+    expect(report.waterways.visualSurface.surfaceLift).toBe(0.14);
     expect(report.visualRivers.centerPixels).toBeGreaterThan(0);
     expect(report.visualRivers.widenedLandPixels).toBeGreaterThan(0);
     expect(data.counts.visualRiverComponents).toBeGreaterThan(0);
@@ -202,7 +209,7 @@ describe('generated v12 world package', () => {
       const offset = vertex * 10;
       expect(vertices[offset + 1]).toBeGreaterThanOrEqual(0.079);
       expect(vertices[offset + 1]).toBeLessThanOrEqual(60.7);
-      expect([0, 1]).toContain(vertices[offset + 6]);
+      expect([0, 0.25, 1]).toContain(vertices[offset + 6]);
       expect(Math.hypot(vertices[offset + 7], vertices[offset + 8])).toBeGreaterThan(0.99);
       expect(vertices[offset + 9]).toBeGreaterThan(0);
       const x = vertices[offset], y = vertices[offset + 1], z = vertices[offset + 2];
@@ -213,9 +220,9 @@ describe('generated v12 world package', () => {
       if (provinceIds[pz * data.fields.navigation.width + px] !== 0) {
         const lift = y - sampleTerrainHeight(x, z);
         // Stored float32 X/Z values can shift the resampled height slightly on
-        // the steepest cells; the authored lift itself is 0.08-0.098.
-        expect(lift).toBeGreaterThanOrEqual(0.065);
-        expect(lift).toBeLessThanOrEqual(0.115);
+        // the steepest cells; the authored lift itself is 0.14-0.155.
+        expect(lift).toBeGreaterThanOrEqual(0.12);
+        expect(lift).toBeLessThanOrEqual(0.18);
         drapedLandVertices += 1;
       }
     }
@@ -238,6 +245,7 @@ describe('generated v12 world package', () => {
     for (let index = 0; index < indices.length; index += 127) expect(indices[index]).toBeLessThan(data.buffers.waterwayVertices.count);
     expect(data.infrastructureChunks.waterways).toHaveLength(512);
     expect(data.infrastructureChunks.waterways.reduce((sum, range) => sum + range.indexCount, 0)).toBe(indices.length);
+    expect(data.counts.waterwayTriangles).toBeLessThan(700_000);
   });
 
   it('emits finite capped topography without terrain-class spikes', async () => {

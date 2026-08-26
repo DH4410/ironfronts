@@ -14,10 +14,9 @@ describe('WGSL programs', () => {
     expect(terrainShader).not.toContain('if (elevation < 12.0)');
   });
 
-  it('renders rivers as terrain overlays without punching holes through mountain surfaces', () => {
+  it('clips only the guarded river core while explicit water covers the wider contour', () => {
     const terrainFragment = terrainShader.slice(terrainShader.indexOf('@fragment\nfn terrainFragment'));
-    expect(terrainFragment).not.toContain('if (riverField.r');
-    expect(terrainFragment).not.toContain('if (riverField.g');
+    expect(terrainFragment).toContain('riverField.r > 0.60 || riverField.g > 0.60');
     expect(waterShader).toContain('riverField.r > 0.45 || riverField.g > 0.45');
     expect(waterShader).toContain('if (landAt(input.mapUv) >= 0.5)');
     expect(terrainShader).toContain('bankField.g');
@@ -33,11 +32,14 @@ describe('WGSL programs', () => {
     expect(infrastructureShader).not.toContain('corridorId');
   });
 
-  it('renders supplied waterways with static flow-aligned detail and gives canals the ocean palette', () => {
+  it('renders supplied waterways with subtle flow-aligned motion and gives canals the ocean palette', () => {
     const fragment = waterwayShader.slice(waterwayShader.indexOf('@fragment\nfn waterwayFragment'));
-    expect(fragment).not.toContain('uniforms.sunTime.w');
-    expect(fragment).not.toContain('advectedTime');
+    expect(fragment).toContain('uniforms.sunTime.w * input.speed');
+    expect(fragment).toContain('let flowShimmer =');
     expect(waterwayShader).toContain('let flow = normalize(input.flow');
+    expect(waterwayShader).toContain('let visualRiver = input.kind > 0.1 && input.kind < 0.5');
+    expect(waterwayShader).toContain('visualRiverAt(mapUv)');
+    expect(waterwayShader).toContain('fwidth(visualSignal)');
     expect(fragment).not.toContain('brokenStreak');
     expect(waterwayShader).toContain('let canal = input.kind > 0.5');
     expect(waterwayShader).toContain('let coastShallow = vec3f(0.12, 0.48, 0.52)');
@@ -46,7 +48,7 @@ describe('WGSL programs', () => {
     expect(waterwayShader).toContain('!canal && uniforms.interaction.w > 0.5');
     expect(waterwayShader).toContain('leftCountry.a > 0.0 && rightCountry.a > 0.0');
     expect(waterwayShader).toContain('let dashVisible = fract(input.waterUv.x) < 0.54');
-    expect(terrainShader).not.toContain('let riverField = navigation.ba');
+    expect(terrainShader).toContain('let riverField = navigation.ba');
     expect(terrainShader).toContain('debugMode == 6u');
     expect(terrainShader).toContain('debugMode == 9u');
     expect(lineShader).toContain('lineParams.mode == 2u');

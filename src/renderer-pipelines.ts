@@ -116,7 +116,13 @@ export function createRendererPipelines(
       { shaderLocation: 4, offset: 28, format: 'float32x2' }, { shaderLocation: 5, offset: 36, format: 'float32' },
     ] }] },
     fragment: { module: waterwayModule, entryPoint: 'waterwayFragment', targets: [{ format, blend: alphaBlend }] },
-    primitive: { topology: 'triangle-list', cullMode: 'none' }, depthStencil,
+    primitive: { topology: 'triangle-list', cullMode: 'none' },
+    depthStencil: {
+      ...depthStencil,
+      depthCompare: 'less-equal',
+      depthBias: -1,
+      depthBiasSlopeScale: -0.25,
+    },
   });
   const infrastructure = device.createRenderPipeline({
     label: 'terrain-draped roads pipeline', layout: commonLayout,

@@ -5,6 +5,9 @@ import { collectWaterwayEdges, isCanal, isRiver, nodeName } from './waterway-sel
 // Sub-unit sampling keeps the channel mask and terrain-draped surface aligned.
 const SAMPLE_SPACING = 0.6;
 const OPEN_WATER_HEIGHT = 0.42;
+const WATER_SURFACE_LIFT = 0.14;
+const MOVEMENT_CROSS_SECTION_SAMPLES = 5;
+const NODE_CAP_SEGMENTS = 24;
 const MINIMUM_RIVER_HALF_WIDTH = 5.5;
 const MINIMUM_CANAL_HALF_WIDTH = 5.0;
 
@@ -14,7 +17,7 @@ function pointId(provinceIds, idWidth, idHeight, worldWidth, worldHeight, x, z) 
   return provinceIds[pz * idWidth + px];
 }
 
-function drapedHeight(context, x, z, lift = 0.08) {
+function drapedHeight(context, x, z, lift = WATER_SURFACE_LIFT) {
   const terrain = sampleHeight(context.heights, context.heightWidth, context.heightHeight,
     context.worldWidth, context.worldHeight, x, z);
   return terrain > 0.04 ? terrain + lift : OPEN_WATER_HEIGHT;
@@ -265,19 +268,23 @@ export function buildWaterways({
       const leftZ = z + section.nz * section.left;
       const right = x - section.nx * section.right;
       const rightZ = z - section.nz * section.right;
-      const leftY = drapedHeight(context, left, leftZ);
-      const rightY = drapedHeight(context, right, rightZ);
-      rings.push([
-        addVertex([left, leftY, leftZ], [length * t / 24, 0], 1, edge.kind, flow, speed * 0.32),
-        addVertex([x, y + 0.015, z], [length * t / 24, 0.5], 0, edge.kind, flow, speed),
-        addVertex([right, rightY, rightZ], [length * t / 24, 1], 1, edge.kind, flow, speed * 0.32),
-      ]);
+      const across = [
+        [left, leftZ, 0, 1, 0.32],
+        [(left + x) * 0.5, (leftZ + z) * 0.5, 0.25, 0.48, 0.62],
+        [x, z, 0.5, 0, 1],
+        [(x + right) * 0.5, (z + rightZ) * 0.5, 0.75, 0.48, 0.62],
+        [right, rightZ, 1, 1, 0.32],
+      ];
+      rings.push(across.map(([sampleX, sampleZ, acrossUv, edgeFactor, speedFactor]) => addVertex(
+        [sampleX, drapedHeight(context, sampleX, sampleZ, acrossUv === 0.5 ? WATER_SURFACE_LIFT + 0.015 : WATER_SURFACE_LIFT), sampleZ],
+        [length * t / 24, acrossUv], edgeFactor, edge.kind, flow, speed * speedFactor,
+      )));
       const openWaterTail = pointId(provinceIds, idWidth, idHeight, worldWidth, worldHeight, x, z) === 0 && !section.banked;
       if (!openWaterTail) {
         markCorridor(clearance, idWidth, idHeight, worldWidth, worldHeight, x, z, section, 2.5);
-        // A small conservative overlap prevents terrain fragments from peeking
-        // through the edge of an obliquely viewed ribbon.
-        markCorridor(mask, idWidth, idHeight, worldWidth, worldHeight, x, z, section, 0.45);
+        // Keep the terrain-removal signal safely inside the explicit ribbon;
+        // the render-time filtered contour supplies the remaining overlap.
+        markCorridor(mask, idWidth, idHeight, worldWidth, worldHeight, x, z, section, -0.7);
       }
       minimumHeight = Math.min(minimumHeight, y);
       maximumHeight = Math.max(maximumHeight, y);
@@ -288,10 +295,11 @@ export function buildWaterways({
       const firstIndex = indices.length;
       const current = rings[index];
       const next = rings[index + 1];
-      indices.push(current[0], next[0], next[1], current[0], next[1], current[1]);
-      indices.push(current[1], next[1], next[2], current[1], next[2], current[2]);
+      for (let lane = 0; lane < MOVEMENT_CROSS_SECTION_SAMPLES - 1; lane += 1) {
+        indices.push(current[lane], next[lane], next[lane + 1], current[lane], next[lane + 1], current[lane + 1]);
+      }
       batches.push({ chunk: chunkFor((samples[index].x + samples[index + 1].x) * 0.5,
-        (samples[index].z + samples[index + 1].z) * 0.5), firstIndex, indexCount: 12 });
+        (samples[index].z + samples[index + 1].z) * 0.5), firstIndex, indexCount: 24 });
     }
   }
 
@@ -308,19 +316,20 @@ export function buildWaterways({
     const other = nodes[firstEdge.node_a === nodeId ? firstEdge.node_b : firstEdge.node_a];
     const flowLength = Math.max(0.001, Math.hypot(unwrapNear(other.x, node.x, worldWidth) - node.x, other.y - node.y));
     const flow = [(unwrapNear(other.x, node.x, worldWidth) - node.x) / flowLength, (other.y - node.y) / flowLength];
-    const center = addVertex([node.x, drapedHeight(context, node.x, node.y, 0.095), node.y],
+    const center = addVertex([node.x, drapedHeight(context, node.x, node.y, WATER_SURFACE_LIFT + 0.015), node.y],
       [0, 0.5], 0, kind, flow, kind === 1 ? 0.3 : 0.58);
     const ring = [];
-    for (let step = 0; step < 12; step += 1) {
-      const angle = step / 12 * Math.PI * 2;
+    const capSegments = NODE_CAP_SEGMENTS;
+    for (let step = 0; step < capSegments; step += 1) {
+      const angle = step / capSegments * Math.PI * 2;
       const ringX = node.x + Math.cos(angle) * surface.radius;
       const ringZ = node.y + Math.sin(angle) * surface.radius;
       ring.push(addVertex([ringX, drapedHeight(context, ringX, ringZ), ringZ],
-        [0, step / 12], 1, kind, flow, kind === 1 ? 0.18 : 0.24));
+        [0, step / capSegments], 1, kind, flow, kind === 1 ? 0.18 : 0.24));
     }
-    for (let step = 0; step < 12; step += 1) indices.push(center, ring[step], ring[(step + 1) % 12]);
+    for (let step = 0; step < capSegments; step += 1) indices.push(center, ring[step], ring[(step + 1) % capSegments]);
     batches.push({ chunk: chunkFor(node.x, node.y), firstIndex, indexCount: indices.length - firstIndex });
-    markCircle(mask, idWidth, idHeight, worldWidth, worldHeight, node.x, node.y, surface.radius + 0.35);
+    markCircle(mask, idWidth, idHeight, worldWidth, worldHeight, node.x, node.y, Math.max(0.5, surface.radius - 0.7));
     markCircle(clearance, idWidth, idHeight, worldWidth, worldHeight, node.x, node.y, surface.radius + 2.5, true);
   }
 
@@ -338,11 +347,14 @@ export function buildWaterways({
   const suezNode = canalNodes.find((node) => nodeName(node) === 'Suez Channel');
   const report = {
     source: 'material/movement network sea_point graph',
-    animatedSurface: false,
-    animation: 'none',
-    terrainTreatment: 'shallow lower-only channel; independently draped surface vertices',
+    animatedSurface: true,
+    animation: 'simple-flow-aligned-shimmer',
+    terrainTreatment: 'shallow lower-only channel with guarded inner terrain clip and independently draped surface vertices',
     sampleSpacing: SAMPLE_SPACING,
-    terrainClipMask: false,
+    crossSectionSamples: MOVEMENT_CROSS_SECTION_SAMPLES,
+    nodeCapSegments: NODE_CAP_SEGMENTS,
+    surfaceLift: WATER_SURFACE_LIFT,
+    terrainClipMask: true,
     terrainOverlayMask: true,
     riverSystems: [...new Set(riverNodes.map(nodeName))].sort(),
     riverSourcePoints: riverNodes.length,

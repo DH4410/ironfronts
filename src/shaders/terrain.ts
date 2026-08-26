@@ -66,6 +66,10 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let bankField = bankFieldAt(input.mapUv);
   if (bankField.r <= 0.5) { discard; }
   let navigation = navigationAt(input.mapUv);
+  let riverField = navigation.ba;
+  // Water owns only the inner channel. Its wider 0.45 coverage contour keeps
+  // this conservative 0.60 terrain cut hidden even on coarse terrain LODs.
+  if (riverField.r > 0.60 || riverField.g > 0.60) { discard; }
 
   let surface = surfaceAt(input.mapUv);
   let terrain = surface.r;
