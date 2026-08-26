@@ -6,100 +6,48 @@ export interface MenuHandlers {
   onLaunch: () => void;
 }
 
-const OPEN_DURATION = 1200;
-
-interface Rect { left: number; top: number; width: number; height: number }
-
-const ZERO_RECT: Rect = { left: 0, top: 0, width: 0, height: 0 };
+const OPEN_DURATION = 1250;
 
 export function mountMenu(handlers: MenuHandlers): void {
   const root = requiredId<HTMLElement>('menu-root');
   const brand = document.querySelector<HTMLElement>('.brand');
   const main = requiredId<HTMLElement>('ifm-main');
-  const stage = requiredId<HTMLElement>('ifm-stage');
-
-  const panel = document.createElement('div');
-  panel.className = 'ifm__panel';
-  panel.innerHTML = '<div class="ifm__panel-sweep"></div>';
-  stage.appendChild(panel);
-  const sweep = requiredChild<HTMLElement>(panel, '.ifm__panel-sweep');
+  const map = requiredChild<HTMLElement>(root, '.ifm__map');
 
   let busy = false;
-  let openCard: HTMLButtonElement | null = null;
   let openScreen: string | null = null;
-  let transitionSource: Rect = ZERO_RECT;
-  let transitionTarget: Rect = ZERO_RECT;
-  let transitionPage: HTMLElement | null = null;
-  let transitionClone: HTMLElement | null = null;
+  let transitionFile: HTMLElement | null = null;
 
-  function rectOf(el: Element): Rect {
-    const r = el.getBoundingClientRect();
-    return { left: r.left, top: r.top, width: r.width, height: r.height };
-  }
-
-  /** One update() drives every sub-motion from the same t (0=closed card, 1=open file). */
+  /**
+   * One update() drives every sub-motion from the same t (0=on the menu,
+   * 1=dossier open). Instead of any button or panel stretching, the desk
+   * photo itself pans and zooms down — a camera settling onto the map —
+   * while the menu racks out of focus behind the document that fades in.
+   */
   function update(t: number): void {
-    const moveT = smooth(phase(t, 0, 0.6));
-    const revealT = smooth(phase(t, 0.55, 1));
-    const rect: Rect = {
-      left: transitionSource.left + (transitionTarget.left - transitionSource.left) * moveT,
-      top: transitionSource.top + (transitionTarget.top - transitionSource.top) * moveT,
-      width: transitionSource.width + (transitionTarget.width - transitionSource.width) * moveT,
-      height: transitionSource.height + (transitionTarget.height - transitionSource.height) * moveT,
-    };
-    panel.style.left = `${rect.left}px`;
-    panel.style.top = `${rect.top}px`;
-    panel.style.width = `${rect.width}px`;
-    panel.style.height = `${rect.height}px`;
-    // A paper document doesn't zoom in flat — it's lifted off the desk at a
-    // slight angle and settles flush as it's laid down on the panel.
-    panel.style.transform = `rotate(${(1 - moveT) * -1.8}deg)`;
-    sweep.style.transform = `translateY(${moveT * 260 - 40}%)`;
-    sweep.style.opacity = String(1 - smooth(phase(t, 0.45, 0.62)));
-    // The card's own icon/title ride along (scaled up) as the panel grows,
-    // so there's always real content in view instead of a blank rectangle;
-    // it crossfades into the real subpage over the same reveal window the
-    // page fades in on, so nothing sits static once the motion settles.
-    if (transitionClone && transitionSource.width && transitionSource.height) {
-      const scaleX = rect.width / transitionSource.width;
-      const scaleY = rect.height / transitionSource.height;
-      transitionClone.style.transform = `scale(${scaleX}, ${scaleY})`;
-      transitionClone.style.opacity = String(1 - revealT);
+    const panT = smooth(phase(t, 0, 0.92));
+    const outT = smooth(phase(t, 0, 0.6));
+    const inT = smooth(phase(t, 0.4, 1));
+
+    map.style.backgroundPosition = `center ${6 + panT * 56}%`;
+    map.style.backgroundSize = `${150 - panT * 30}% auto`;
+    map.style.filter = `brightness(${(.86 + panT * .09).toFixed(3)}) saturate(.92) contrast(1.02)`;
+
+    main.style.opacity = String(1 - outT);
+    main.style.transform = `translateY(${outT * -24}px)`;
+    main.style.filter = `blur(${(outT * 5).toFixed(2)}px)`;
+
+    if (transitionFile) {
+      transitionFile.style.opacity = String(inT);
+      transitionFile.style.transform = `translateY(${((1 - inT) * 28).toFixed(2)}px)`;
+      transitionFile.style.filter = `blur(${((1 - inT) * 5).toFixed(2)}px)`;
     }
-    if (transitionPage) transitionPage.style.opacity = String(revealT);
   }
 
-  async function playTransition(card: HTMLButtonElement, fileEl: HTMLElement, page: HTMLElement, direction: 1 | -1): Promise<void> {
-    transitionSource = rectOf(card);
-    transitionTarget = rectOf(fileEl);
-    transitionPage = page;
-
-    const cloneWrap = document.createElement('div');
-    cloneWrap.className = 'ifm__panel-clone';
-    const clone = card.cloneNode(true) as HTMLElement;
-    card.classList.add('is-source');
-    clone.removeAttribute('id');
-    clone.tabIndex = -1;
-    clone.setAttribute('aria-hidden', 'true');
-    clone.style.position = 'absolute';
-    clone.style.top = '0';
-    clone.style.left = '0';
-    clone.style.pointerEvents = 'none';
-    clone.style.cursor = 'default';
-    clone.style.transformOrigin = 'top left';
-    clone.style.transition = 'none';
-    cloneWrap.appendChild(clone);
-    panel.appendChild(cloneWrap);
-    transitionClone = clone;
-
-    stage.hidden = false;
+  async function playTransition(fileEl: HTMLElement, direction: 1 | -1): Promise<void> {
+    transitionFile = fileEl;
     await runChoreo(OPEN_DURATION, direction, update);
-    stage.hidden = true;
-    card.classList.remove('is-source');
-    transitionPage = null;
-    transitionClone = null;
-    panel.style.transform = '';
-    cloneWrap.remove();
+    transitionFile = null;
   }
 
   async function openDossier(card: HTMLButtonElement): Promise<void> {
@@ -111,35 +59,30 @@ export function mountMenu(handlers: MenuHandlers): void {
     if (!page || !fileEl) return;
 
     busy = true;
-    openCard = card;
     openScreen = name;
 
     page.hidden = false;
-    page.style.opacity = '0';
+    fileEl.style.opacity = '0';
     page.style.pointerEvents = 'none';
-    await playTransition(card, fileEl, page, 1);
-    page.style.opacity = '';
+    await playTransition(fileEl, 1);
     page.style.pointerEvents = '';
     main.style.pointerEvents = 'none';
     busy = false;
   }
 
   async function closeDossier(): Promise<void> {
-    if (busy || !openScreen || !openCard) return;
+    if (busy || !openScreen) return;
     const name = openScreen;
-    const card = openCard;
     const page = document.getElementById(`ifm-${name}`);
     const fileEl = page?.querySelector<HTMLElement>('.ifm__file');
     if (!page || !fileEl) return;
 
     busy = true;
-    page.style.pointerEvents = 'none';
-    await playTransition(card, fileEl, page, -1);
-    page.hidden = true;
-    page.style.opacity = '';
-    page.style.pointerEvents = '';
     main.style.pointerEvents = '';
-    openCard = null;
+    page.style.pointerEvents = 'none';
+    await playTransition(fileEl, -1);
+    page.hidden = true;
+    page.style.pointerEvents = '';
     openScreen = null;
     busy = false;
   }

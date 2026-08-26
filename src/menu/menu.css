@@ -23,11 +23,15 @@
 .ifm * { box-sizing: border-box; }
 .ifm button { font: inherit; color: inherit; }
 
-/* ---------- backdrop ---------- */
+/* ---------- backdrop ----------
+   The desk photo is the transition: on the menu it's zoomed into the top
+   (lamp, letters, compass), and opening a dossier pans/zooms it down like a
+   camera settling onto the map, driven frame-by-frame from menu.ts so it
+   shares the same single clock as the rest of the choreography. */
 .ifm__backdrop { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
 .ifm__map {
   position: absolute; inset: -8%;
-  background: url('/menu/desk-bg.jpg') center 38%/cover no-repeat;
+  background: url('/menu/desk-scene.jpg') center 6%/150% auto no-repeat;
   filter: brightness(.86) saturate(.92) contrast(1.02);
 }
 .ifm__wash {
@@ -72,7 +76,6 @@
   box-shadow: 0 1.8vh 3.4vh rgba(0,0,0,.55), 0 0 0 1px rgba(232,201,136,.25), 0 0 28px rgba(201,164,99,.18);
 }
 .ifm__card:focus-visible { outline: none; }
-.ifm__card.is-source { visibility: hidden; }
 
 .ifm__corner { position: absolute; width: 16px; height: 16px; border: var(--hud-line-bright) solid; opacity: .55; transition: width .35s ease, height .35s ease, opacity .35s ease; }
 .ifm__card:hover .ifm__corner { width: 22px; height: 22px; opacity: .95; }
@@ -180,22 +183,3 @@
 .ifm__primary:hover { filter: brightness(1.08); }
 .ifm__doc-footer { flex: 0 0 auto; position: relative; display: flex; justify-content: space-between; padding: 1em 1.6em; border-top: 1px solid var(--hud-line); color: var(--hud-text-dim); font: 700 .64em/1 var(--ifm-sans); letter-spacing: .1em; text-transform: uppercase; }
 
-/* ---------- transition stage (single-clock choreography) ---------- */
-.ifm__stage { position: fixed; inset: 0; z-index: 20; pointer-events: none; }
-.ifm__stage[hidden] { display: none; }
-.ifm__panel {
-  position: fixed;
-  background:
-    linear-gradient(var(--hud-panel-strong), var(--hud-panel-strong)),
-    url('/menu/paper.jpg') center/cover;
-  background-blend-mode: multiply;
-  border: 1px solid var(--hud-line-bright);
-  box-shadow: 0 3vh 7vh rgba(0,0,0,.6), 0 0 40px rgba(201,164,99,.16);
-  overflow: hidden;
-}
-.ifm__panel-sweep { position: absolute; left: 0; right: 0; height: 40%; background: linear-gradient(180deg, transparent, rgba(232,201,136,.14), transparent); }
-.ifm__panel-clone {
-  position: absolute; inset: 0; transform-origin: top left; pointer-events: none;
-  display: flex; flex-direction: column; align-items: center;
-}
-.ifm__panel-clone .ifm__corner { display: none; }
