@@ -5,6 +5,8 @@ import { buildCountryColorBuffer, CountryLabelLayer } from './country-overlay';
 import { loadCountryLabelFont } from './country-labels/atlas';
 import { isValidCountryLabelPoint } from './country-labels/territory';
 import { buildDiplomacyColorData, findCountryByName } from './diplomacy';
+import { EnvironmentController, type TimeOfDayState } from './environment-controller';
+import { FRAME_UNIFORM_BYTES, packFrameUniforms } from './frame-uniforms';
 import { align4, fetchBinary, fetchJson, uploadMipmappedTexture, uploadTexture } from './gpu-utils';
 import { createMaterialTexture, createTreeMaterialTexture } from './material-texture';
 import {
@@ -31,22 +33,15 @@ import {
 } from './visibility';
 import { sampleWrappedField } from './world-sampling';
 import { loadWorldAssetBuffers } from './world-assets';
-import {
-  advanceHour, calculateTimeOfDay, clampTimeMultiplier, DEFAULT_START_HOUR, formatClock, wrapHour,
-  type TimeOfDayLighting,
-} from './time-of-day';
+import { getVisibleInstanceView, updateVisibleInstanceView } from './visible-instance-cache';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
-const RAIN_TRANSITION_SECONDS = 1.5;
 const MIN_RAIN_PARTICLES = 400;
 const MAX_RAIN_PARTICLES = 1_400;
 
 export type MapMode = 'political' | 'diplomacy' | 'clear' | 'balanced';
 
-export interface TimeOfDayState extends TimeOfDayLighting {
-  clock: string;
-  multiplier: number;
-}
+export type { TimeOfDayState } from './environment-controller';
 
 export class WorldRenderer {
   readonly camera = new StrategyCamera();
@@ -62,7 +57,9 @@ export class WorldRenderer {
   private readonly countryLabelCanvas?: HTMLCanvasElement;
   private adapter!: GPUAdapter;
   private device!: GPUDevice;
+  private deviceReady = false;
   private context!: GPUCanvasContext;
+  private contextConfigured = false;
   private format!: GPUTextureFormat;
   private depthTexture?: GPUTexture;
   private commonLayout!: GPUBindGroupLayout;
@@ -132,16 +129,15 @@ export class WorldRenderer {
   private readonly diplomaticRelations = new Map<number, DiplomaticRelation>();
   private countryLabels?: CountryLabelLayer;
   private running = false;
+  private initialized = false;
+  private disposed = false;
+  private runtimeBindingsAttached = false;
+  private interactionAbort?: AbortController;
   private frameHandle = 0;
   private previousTime = performance.now();
   private elapsed = 0;
-  private timeOfDayHour = DEFAULT_START_HOUR;
-  private timeMultiplier = 1;
-  private timeLighting = calculateTimeOfDay(DEFAULT_START_HOUR);
+  private readonly environment = new EnvironmentController();
   private reportedClock = '';
-  private rainEnabled = false;
-  private rainIntensity = 0;
-  private frameSkyColor: [number, number, number] = [...calculateTimeOfDay(DEFAULT_START_HOUR).skyColor];
   private performanceMonitor = new PerformanceMonitor(false);
   private frameWorkload = createEmptyRenderWorkload();
   private statsFrameCountdown = 0;
@@ -180,6 +176,10 @@ export class WorldRenderer {
   private readonly pickPoint = vec3.create();
   private clickStart?: { pointerId: number; x: number; y: number };
   private resizeObserver?: ResizeObserver;
+  private readonly onUncapturedError = (event: GPUUncapturedErrorEvent): void => {
+    const message = event.error instanceof GPUValidationError ? event.error.message : String(event.error);
+    console.error(`WebGPU validation error: ${message}`);
+  };
 
   constructor(canvas: HTMLCanvasElement, countryLabelCanvas?: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -187,6 +187,8 @@ export class WorldRenderer {
   }
 
   async initialize(report: ProgressReporter): Promise<void> {
+    if (this.disposed) throw new Error('Cannot initialize a disposed renderer');
+    if (this.initialized) return;
     if (!navigator.gpu) throw new Error('WebGPU is unavailable');
     report('Loading world manifest', 0.04);
     this.manifest = await fetchJson<WorldManifest>('/world/world.json');
@@ -211,6 +213,7 @@ export class WorldRenderer {
     this.device = await this.adapter.requestDevice({
       requiredFeatures: gpuTimingSupported ? ['timestamp-query'] : [],
     });
+    this.deviceReady = true;
     this.performanceMonitor = new PerformanceMonitor(gpuTimingSupported);
     if (gpuTimingSupported) {
       this.gpuQuerySet = this.device.createQuerySet({ type: 'timestamp', count: 2 });
@@ -226,13 +229,11 @@ export class WorldRenderer {
       });
     }
     this.device.lost.then((info) => {
+      if (this.disposed) return;
       console.error('WebGPU device lost', info);
       if (this.running) window.location.reload();
     });
-    this.device.addEventListener('uncapturederror', (event) => {
-      const message = event.error instanceof GPUValidationError ? event.error.message : String(event.error);
-      console.error(`WebGPU validation error: ${message}`);
-    });
+    this.device.addEventListener('uncapturederror', this.onUncapturedError);
 
     this.context = this.canvas.getContext('webgpu') as GPUCanvasContext;
     this.format = navigator.gpu.getPreferredCanvasFormat();
@@ -307,7 +308,7 @@ export class WorldRenderer {
     ]);
     this.uniformBuffer = this.device.createBuffer({
       label: 'frame uniforms',
-      size: 256,
+      size: FRAME_UNIFORM_BYTES,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
     this.visibleTerrainBuffer = this.device.createBuffer({
@@ -391,10 +392,8 @@ export class WorldRenderer {
       this.createCountryLabelResources();
     }
 
-    this.camera.attach(this.canvas);
-    this.attachInteraction();
-    this.resizeObserver = new ResizeObserver(() => this.resize());
-    this.resizeObserver.observe(this.canvas);
+    this.initialized = true;
+    this.attachRuntimeBindings();
     this.resize();
     this.camera.update(0);
     report('World ready', 1);
@@ -402,7 +401,10 @@ export class WorldRenderer {
   }
 
   start(): void {
+    if (this.disposed) throw new Error('Cannot start a disposed renderer');
+    if (!this.initialized) throw new Error('Renderer must be initialized before it can start');
     if (this.running) return;
+    this.attachRuntimeBindings();
     this.running = true;
     this.previousTime = performance.now();
     this.frameHandle = requestAnimationFrame(this.frame);
@@ -411,8 +413,27 @@ export class WorldRenderer {
   stop(): void {
     this.running = false;
     cancelAnimationFrame(this.frameHandle);
-    this.camera.detach();
-    this.resizeObserver?.disconnect();
+    this.frameHandle = 0;
+    this.detachRuntimeBindings();
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.stop();
+    this.disposed = true;
+    this.performanceEpoch += 1;
+    this.onHover = undefined;
+    this.onStats = undefined;
+    this.onDiplomacyChange = undefined;
+    this.onProvinceCaptured = undefined;
+    this.onTimeOfDayChange = undefined;
+    if (!this.deviceReady) return;
+    this.device.removeEventListener('uncapturederror', this.onUncapturedError);
+    if (this.contextConfigured) this.context.unconfigure();
+    this.depthTexture?.destroy();
+    this.gpuQuerySet?.destroy();
+    this.device.destroy();
+    this.deviceReady = false;
   }
 
   setDebugView(mode: number): void {
@@ -420,35 +441,30 @@ export class WorldRenderer {
   }
 
   setTimeOfDay(hour: number): void {
-    this.timeOfDayHour = wrapHour(hour);
-    this.timeLighting = calculateTimeOfDay(this.timeOfDayHour);
+    this.environment.setTimeOfDay(hour);
     this.notifyTimeOfDayChange(true);
   }
 
   setTimeMultiplier(multiplier: number): number {
-    this.timeMultiplier = clampTimeMultiplier(multiplier);
+    const value = this.environment.setTimeMultiplier(multiplier);
     this.notifyTimeOfDayChange(true);
-    return this.timeMultiplier;
+    return value;
   }
 
   setRainEnabled(enabled: boolean): void {
-    this.rainEnabled = enabled;
+    this.environment.setRainEnabled(enabled);
   }
 
   isRainEnabled(): boolean {
-    return this.rainEnabled;
+    return this.environment.isRainEnabled();
   }
 
   getRainIntensity(): number {
-    return this.rainIntensity;
+    return this.environment.rainIntensity;
   }
 
   getTimeOfDay(): TimeOfDayState {
-    return {
-      ...this.timeLighting,
-      clock: formatClock(this.timeOfDayHour),
-      multiplier: this.timeMultiplier,
-    };
+    return this.environment.getTimeOfDay();
   }
 
   setWireframe(enabled: boolean): void {
@@ -690,29 +706,52 @@ export class WorldRenderer {
     return { buffer, params, bindGroup, count, views };
   }
 
-  private attachInteraction(): void {
+  private attachRuntimeBindings(): void {
+    if (this.runtimeBindingsAttached) return;
+    this.runtimeBindingsAttached = true;
+    this.camera.attach(this.canvas);
+    this.interactionAbort = new AbortController();
+    this.attachInteraction(this.interactionAbort.signal);
+    this.resizeObserver ??= new ResizeObserver(() => this.resize());
+    this.resizeObserver.observe(this.canvas);
+  }
+
+  private detachRuntimeBindings(): void {
+    if (!this.runtimeBindingsAttached) return;
+    this.runtimeBindingsAttached = false;
+    this.camera.detach();
+    this.interactionAbort?.abort();
+    this.interactionAbort = undefined;
+    this.resizeObserver?.disconnect();
+    this.clickStart = undefined;
+    this.pointer.inside = false;
+    this.pickingDirty = false;
+    this.updateHover(0);
+  }
+
+  private attachInteraction(signal: AbortSignal): void {
     this.canvas.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
       this.clickStart = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
-    });
+    }, { signal });
     window.addEventListener('pointerup', (event) => {
       const start = this.clickStart;
       this.clickStart = undefined;
       if (!start || start.pointerId !== event.pointerId || event.button !== 0) return;
       if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 5) return;
       this.captureProvinceAt(event.clientX, event.clientY);
-    });
+    }, { signal });
     this.canvas.addEventListener('pointermove', (event) => {
       this.pointer.x = event.clientX;
       this.pointer.y = event.clientY;
       this.pointer.inside = true;
       this.pickingDirty = true;
-    });
+    }, { signal });
     this.canvas.addEventListener('pointerleave', () => {
       this.pointer.inside = false;
       this.pickingDirty = false;
       this.updateHover(0);
-    });
+    }, { signal });
   }
 
   private resize(): void {
@@ -723,6 +762,7 @@ export class WorldRenderer {
     this.canvas.width = width;
     this.canvas.height = height;
     this.context.configure({ device: this.device, format: this.format, alphaMode: 'opaque' });
+    this.contextConfigured = true;
     this.depthTexture?.destroy();
     this.depthTexture = this.device.createTexture({
       label: 'main depth',
@@ -740,9 +780,7 @@ export class WorldRenderer {
     const deltaMs = Math.min(50, frameMs);
     this.previousTime = time;
     this.elapsed += deltaMs / 1000;
-    this.timeOfDayHour = advanceHour(this.timeOfDayHour, Math.min(frameMs, 250) / 1000, this.timeMultiplier);
-    this.timeLighting = calculateTimeOfDay(this.timeOfDayHour);
-    this.updateWeather(deltaMs / 1000);
+    this.environment.update(Math.min(frameMs, 250) / 1000, deltaMs / 1000);
     this.notifyTimeOfDayChange();
 
     let phaseStarted = performance.now();
@@ -806,23 +844,25 @@ export class WorldRenderer {
   };
 
   private updateUniforms(): void {
-    const values = new Float32Array(64);
-    values.set(this.camera.viewProjection, 0);
-    values.set(this.camera.inverseViewProjection, 16);
-    values.set([this.camera.position[0], this.camera.position[1], this.camera.position[2], this.camera.target[0]], 32);
-    values.set([...this.timeLighting.sunDirection, this.elapsed], 36);
-    values.set([this.canvas.width, this.canvas.height, 1 / this.canvas.width, 1 / this.canvas.height], 40);
-    values.set([this.manifest.world.width, this.manifest.world.height, this.manifest.terrain.maxHeight, this.debugView], 44);
     const tintMode = this.showCountryOverlay && this.performanceLayers.countryTint
       ? this.mapMode === 'diplomacy' ? 3 : this.mapMode === 'political' ? 2 : this.mapMode === 'balanced' ? 1 : 0
       : 0;
     const countryBordersEnabled = this.showCountryOverlay && this.performanceLayers.countryBorders ? 1 : 0;
-    values.set([this.hoveredId, this.camera.distance, tintMode, countryBordersEnabled], 48);
-    values.set([this.manifest.terrain.chunksX, this.manifest.terrain.chunksY, this.manifest.terrain.gridResolution, this.showWireframe ? 1 : 0], 52);
-    values.set([
-      this.timeLighting.daylight, this.timeLighting.twilight, this.timeLighting.night, this.timeOfDayHour / 24,
-    ], 56);
-    values.set([...this.frameSkyColor, this.rainIntensity], 60);
+    const lighting = this.environment.lighting;
+    const skyColor = this.environment.skyColor;
+    const values = packFrameUniforms({
+      viewProjection: this.camera.viewProjection,
+      inverseViewProjection: this.camera.inverseViewProjection,
+      camera: [this.camera.position[0], this.camera.position[1], this.camera.position[2], this.camera.target[0]],
+      sunTime: [...lighting.sunDirection, this.elapsed],
+      viewport: [this.canvas.width, this.canvas.height, 1 / this.canvas.width, 1 / this.canvas.height],
+      map: [this.manifest.world.width, this.manifest.world.height, this.manifest.terrain.maxHeight, this.debugView],
+      interaction: [this.hoveredId, this.camera.distance, tintMode, countryBordersEnabled],
+      terrainInfo: [this.manifest.terrain.chunksX, this.manifest.terrain.chunksY, this.manifest.terrain.gridResolution, this.showWireframe ? 1 : 0],
+      lighting: [lighting.daylight, lighting.twilight, lighting.night, this.environment.dayPhase],
+      sky: [...skyColor, 0],
+      weather: [this.environment.rainIntensity, 0, 0, 0],
+    });
     this.device.queue.writeBuffer(this.uniformBuffer, 0, values);
   }
 
@@ -836,7 +876,7 @@ export class WorldRenderer {
       this.device,
       this.context,
       this.depthTexture,
-      this.frameSkyColor,
+      this.environment.skyColor,
       collectGpuTiming ? this.gpuQuerySet : undefined,
     );
     const pass = frame.pass;
@@ -940,26 +980,14 @@ export class WorldRenderer {
   }
 
   private notifyTimeOfDayChange(force = false): void {
-    const clock = formatClock(this.timeOfDayHour);
+    const clock = this.environment.getTimeOfDay().clock;
     if (!force && clock === this.reportedClock) return;
     this.reportedClock = clock;
     this.onTimeOfDayChange?.(this.getTimeOfDay());
   }
 
-  private updateWeather(deltaSeconds: number): void {
-    const target = this.rainEnabled ? 1 : 0;
-    const step = Math.min(1, deltaSeconds / RAIN_TRANSITION_SECONDS);
-    if (this.rainIntensity < target) this.rainIntensity = Math.min(target, this.rainIntensity + step);
-    else if (this.rainIntensity > target) this.rainIntensity = Math.max(target, this.rainIntensity - step);
-
-    const nightOvercast: [number, number, number] = [0.045, 0.062, 0.10];
-    const dayOvercast: [number, number, number] = [0.29, 0.35, 0.38];
-    const overcast = mixRgb(nightOvercast, dayOvercast, this.timeLighting.daylight);
-    this.frameSkyColor = mixRgb(this.timeLighting.skyColor, overcast, this.rainIntensity * 0.78);
-  }
-
   private drawRain(pass: GPURenderPassEncoder): void {
-    if (this.rainIntensity < 0.005 || this.debugView !== 0) return;
+    if (this.environment.rainIntensity < 0.005 || this.debugView !== 0) return;
     const viewportParticles = Math.ceil(this.canvas.width * this.canvas.height / 2_200);
     const particles = Math.min(MAX_RAIN_PARTICLES, Math.max(MIN_RAIN_PARTICLES, viewportParticles));
     pass.setPipeline(this.rainPipeline);
@@ -968,25 +996,8 @@ export class WorldRenderer {
   }
 
   private drawCityLights(pass: GPURenderPassEncoder): void {
-    if (!this.buildings.views) throw new Error('Missing visible-instance storage for city lights');
     const viewKey = 'cityLights';
-    let view = this.buildings.views.get(viewKey);
-    if (!view) {
-      const buffer = this.device.createBuffer({
-        label: 'city light visible instances', size: Math.max(4, this.buildings.count * 3 * 4),
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-      const bindGroup = this.device.createBindGroup({
-        label: 'city light visible bind group', layout: this.instanceLayout,
-        entries: [
-          { binding: 0, resource: { buffer: this.buildings.buffer } },
-          { binding: 1, resource: { buffer: this.buildings.params } },
-          { binding: 2, resource: { buffer } },
-        ],
-      });
-      view = { buffer, bindGroup, revision: -1, draws: [], visibleChunks: 0 };
-      this.buildings.views.set(viewKey, view);
-    }
+    const view = getVisibleInstanceView(this.device, this.instanceLayout, this.buildings, viewKey, 'city light');
     if (view.revision !== this.camera.revision) {
       const visibility = buildPropVisibility(
         this.manifest,
@@ -998,18 +1009,7 @@ export class WorldRenderer {
         [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY],
         (centerX, centerZ, radius) => this.chunkIntersectsView(centerX, centerZ, radius),
       );
-      view.visibleChunks = visibility.visibleChunks;
-      view.draws = visibility.draws;
-      if (visibility.instances.length) {
-        this.device.queue.writeBuffer(
-          view.buffer,
-          0,
-          visibility.instances.buffer as ArrayBuffer,
-          visibility.instances.byteOffset,
-          visibility.instances.byteLength,
-        );
-      }
-      view.revision = this.camera.revision;
+      updateVisibleInstanceView(this.device.queue, view, this.camera.revision, visibility);
     }
     this.frameWorkload.visibleChunks.buildings = Math.max(
       this.frameWorkload.visibleChunks.buildings,
@@ -1033,25 +1033,8 @@ export class WorldRenderer {
     lodDistances: [number, number],
   ): void {
     if (this.camera.position[1] > maximumDistance * 1.15) return;
-    if (!layer.views) throw new Error(`Missing visible-instance storage for ${category}`);
     const viewKey = String(category);
-    let view = layer.views.get(viewKey);
-    if (!view) {
-      const buffer = this.device.createBuffer({
-        label: `${category} visible instances`, size: Math.max(4, layer.count * 3 * 4),
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-      const bindGroup = this.device.createBindGroup({
-        label: `${category} visible bind group`, layout: this.instanceLayout,
-        entries: [
-          { binding: 0, resource: { buffer: layer.buffer } },
-          { binding: 1, resource: { buffer: layer.params } },
-          { binding: 2, resource: { buffer } },
-        ],
-      });
-      view = { buffer, bindGroup, revision: -1, draws: [], visibleChunks: 0 };
-      layer.views.set(viewKey, view);
-    }
+    const view = getVisibleInstanceView(this.device, this.instanceLayout, layer, viewKey, category);
     if (view.revision !== this.camera.revision) {
       const visibility = buildPropVisibility(
         this.manifest,
@@ -1063,18 +1046,7 @@ export class WorldRenderer {
         lodDistances,
         (centerX, centerZ, radius) => this.chunkIntersectsView(centerX, centerZ, radius),
       );
-      view.visibleChunks = visibility.visibleChunks;
-      view.draws = visibility.draws;
-      if (visibility.instances.length) {
-        this.device.queue.writeBuffer(
-          view.buffer,
-          0,
-          visibility.instances.buffer as ArrayBuffer,
-          visibility.instances.byteOffset,
-          visibility.instances.byteLength,
-        );
-      }
-      view.revision = this.camera.revision;
+      updateVisibleInstanceView(this.device.queue, view, this.camera.revision, visibility);
     }
     if (category === 'trees') this.frameWorkload.visibleChunks.trees += view.visibleChunks;
     else if (category === 'buildings') this.frameWorkload.visibleChunks.buildings += view.visibleChunks;
@@ -1386,14 +1358,6 @@ function clamp(value: number, min: number, max: number): number {
 
 function wrap(value: number, size: number): number {
   return ((value % size) + size) % size;
-}
-
-function mixRgb(
-  a: [number, number, number],
-  b: [number, number, number],
-  amount: number,
-): [number, number, number] {
-  return a.map((value, index) => value + (b[index] - value) * amount) as [number, number, number];
 }
 
 function buildWaterwayMask(navigationData: Uint8Array, pixelCount: number): Uint8Array {

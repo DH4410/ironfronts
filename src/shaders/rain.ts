@@ -80,7 +80,7 @@ fn rainVertex(
       worldXZ.y + corner.y * impactSize
     );
     output.position = uniforms.viewProjection * vec4f(impactPosition, 1.0);
-    output.opacity = uniforms.sky.w * rangeVisibility
+    output.opacity = uniforms.weather.x * rangeVisibility
       * (1.0 - smoothstep(1250.0, 2750.0, uniforms.camera.y))
       * select(0.0, 1.0, impactAge > 0.0);
     output.depthFade = 1.0;
@@ -96,7 +96,7 @@ fn rainVertex(
     let widthPixels = mix(0.45, 0.88, seedShape);
     let pixelOffset = screenNormal * corner.x * widthPixels * 2.0 / uniforms.viewport.xy;
     output.position = clip + vec4f(pixelOffset * clip.w, 0.0, 0.0);
-    output.opacity = uniforms.sky.w * strategicReadability * rangeVisibility
+    output.opacity = uniforms.weather.x * strategicReadability * rangeVisibility
       * smoothstep(0.015, 0.075, fall) * mix(0.30, 0.54, seedShape);
     output.depthFade = mix(1.0, 0.72, clamp(cameraDistance / fieldRadius, 0.0, 1.0));
   }

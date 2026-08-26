@@ -218,7 +218,7 @@ fn propFragment(input: PropVertexOutput) -> @location(0) vec4f {
     }
     albedo *= treeMaterial;
   }
-  albedo = mix(albedo, albedo * vec3f(0.72, 0.78, 0.81), uniforms.sky.w * 0.40);
+  albedo = mix(albedo, albedo * vec3f(0.72, 0.78, 0.81), uniforms.weather.x * 0.40);
   let distanceToCamera = distance(uniforms.camera.xyz, input.worldPosition);
   let fog = smoothstep(3100.0, 9200.0, distanceToCamera);
   let worldFog = horizontalWorldFog(input.worldPosition.x);

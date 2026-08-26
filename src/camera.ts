@@ -49,8 +49,10 @@ export class StrategyCamera {
   }
 
   attach(canvas: HTMLCanvasElement): void {
+    if (this.canvas === canvas) return;
+    if (this.canvas) this.detach();
     this.canvas = canvas;
-    canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+    canvas.addEventListener('contextmenu', this.onContextMenu);
     canvas.addEventListener('pointerdown', this.onPointerDown);
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
@@ -64,6 +66,7 @@ export class StrategyCamera {
 
   detach(): void {
     if (!this.canvas) return;
+    this.canvas.removeEventListener('contextmenu', this.onContextMenu);
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
@@ -72,6 +75,8 @@ export class StrategyCamera {
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('resize', this.refreshCanvasRect);
     window.removeEventListener('scroll', this.refreshCanvasRect, true);
+    this.keys.clear();
+    this.dragMode = null;
     this.canvas = undefined;
   }
 
@@ -144,6 +149,10 @@ export class StrategyCamera {
     this.canvasRect = rect
       ? { left: rect.left, top: rect.top, width: Math.max(1, rect.width), height: Math.max(1, rect.height) }
       : { left: 0, top: 0, width: this.viewportWidth, height: this.viewportHeight };
+  };
+
+  private onContextMenu = (event: Event): void => {
+    event.preventDefault();
   };
 
   private pan(rightAmount: number, forwardAmount: number): void {

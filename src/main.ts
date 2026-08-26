@@ -60,6 +60,9 @@ if (!navigator.gpu) {
 
 async function start(): Promise<void> {
   const renderer = new WorldRenderer(canvas, countryLabels);
+  window.addEventListener('pagehide', (event) => {
+    if (!event.persisted) renderer.dispose();
+  });
   if (import.meta.env.DEV || new URLSearchParams(window.location.search).has('benchmark')) {
     (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
   }

@@ -113,7 +113,7 @@ describe('WGSL programs', () => {
   it('generates bounded world-space rain and terrain impacts without particle buffers or CPU state', () => {
     expect(rainShader).toContain('@builtin(instance_index) instanceIndex: u32');
     expect(rainShader).toContain('uniforms.sunTime.w * speed');
-    expect(rainShader).toContain('uniforms.sky.w * strategicReadability');
+    expect(rainShader).toContain('uniforms.weather.x * strategicReadability');
     expect(rainShader).toContain('let ground = heightAt(mapUv)');
     expect(rainShader).toContain('uniforms.viewProjection * vec4f(topWorld');
     expect(rainShader).toContain('let impact = instanceIndex % 9u == 0u');

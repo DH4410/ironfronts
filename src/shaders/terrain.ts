@@ -231,7 +231,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   baseColor *= bakedSurface.a;
 
   baseColor *= 0.92 + variation * 0.14;
-  baseColor = mix(baseColor, baseColor * vec3f(0.74, 0.79, 0.83), uniforms.sky.w * 0.42);
+  baseColor = mix(baseColor, baseColor * vec3f(0.74, 0.79, 0.83), uniforms.weather.x * 0.42);
   let sunDirection = normalize(uniforms.sunTime.xyz);
   var lit = baseColor * surfaceLight(normal);
   lit += vec3f(0.12, 0.15, 0.13) * pow(max(dot(normal, normalize(sunDirection + normalize(uniforms.camera.xyz - input.worldPosition))), 0.0), 24.0) * 0.08 * uniforms.lighting.x;

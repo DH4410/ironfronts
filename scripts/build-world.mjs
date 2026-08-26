@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildInfrastructure } from './build-infrastructure.mjs';
@@ -20,8 +20,62 @@ import { buildPoliticalPalette } from './world/political-palette.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MATERIAL = path.join(ROOT, 'material');
-const OUTPUT = path.join(ROOT, 'public', 'world');
+const PUBLIC = path.join(ROOT, 'public');
+const FINAL_OUTPUT = path.join(PUBLIC, 'world');
+const OUTPUT = path.join(PUBLIC, `.world-staging-${process.pid}`);
+const BACKUP_OUTPUT = path.join(PUBLIC, '.world-previous');
 const TEXTURES = path.join(ROOT, 'public', 'textures');
+
+function assertManagedOutput(target) {
+  const relative = path.relative(PUBLIC, path.resolve(target));
+  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+    throw new Error(`Refusing to manage unexpected world output path: ${target}`);
+  }
+}
+
+async function exists(target) {
+  try {
+    await access(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function recoverInterruptedPromotion() {
+  const [finalExists, backupExists] = await Promise.all([exists(FINAL_OUTPUT), exists(BACKUP_OUTPUT)]);
+  if (!finalExists && backupExists) {
+    await rename(BACKUP_OUTPUT, FINAL_OUTPUT);
+    console.warn('Recovered the previous world package after an interrupted promotion.');
+  } else if (finalExists && backupExists) {
+    await rm(BACKUP_OUTPUT, { recursive: true, force: true });
+  }
+}
+
+async function validateStagedWorld() {
+  for (const name of ['world.json', 'province-ids.u16', 'height.f32', 'surface.rgba8']) {
+    const info = await stat(path.join(OUTPUT, name));
+    if (!info.isFile() || info.size === 0) throw new Error(`Generated world asset is empty: ${name}`);
+  }
+  const manifest = JSON.parse(await readFile(path.join(OUTPUT, 'world.json'), 'utf8'));
+  if (manifest.counts?.provinces !== 3_303) throw new Error('Generated world manifest failed province-count validation');
+}
+
+async function promoteStagedWorld() {
+  await validateStagedWorld();
+  await rm(BACKUP_OUTPUT, { recursive: true, force: true });
+  const hadPreviousWorld = await exists(FINAL_OUTPUT);
+  if (hadPreviousWorld) await rename(FINAL_OUTPUT, BACKUP_OUTPUT);
+  try {
+    await rename(OUTPUT, FINAL_OUTPUT);
+  } catch (error) {
+    if (hadPreviousWorld && !await exists(FINAL_OUTPUT) && await exists(BACKUP_OUTPUT)) {
+      await rename(BACKUP_OUTPUT, FINAL_OUTPUT);
+    }
+    throw error;
+  }
+  await rm(BACKUP_OUTPUT, { recursive: true, force: true });
+}
 
 const terrainCodes = new Map([
   [10, 0],
@@ -44,6 +98,11 @@ const visualCodes = new Map([
 ]);
 
 async function main() {
+  for (const target of [FINAL_OUTPUT, OUTPUT, BACKUP_OUTPUT]) assertManagedOutput(target);
+  await recoverInterruptedPromotion();
+  await rm(OUTPUT, { recursive: true, force: true });
+  await mkdir(OUTPUT, { recursive: true });
+
   const [geometry, metadata, markers, borderData, connectionData, networkData, mapMetadata,
     countryData, ownershipData, provinceAdjacencyData] = await Promise.all([
     readMaterialJson(MATERIAL, 'geometry/province_polygons_decoded.json'),
@@ -62,10 +121,6 @@ async function main() {
     throw new Error('Expected 3,303 provinces in geometry and metadata');
   }
 
-  const expectedOutput = path.resolve(ROOT, 'public', 'world');
-  if (path.resolve(OUTPUT) !== expectedOutput) throw new Error(`Refusing to clean unexpected output directory: ${OUTPUT}`);
-  await rm(expectedOutput, { recursive: true, force: true });
-  await mkdir(expectedOutput, { recursive: true });
   console.log(`Rasterizing ${geometry.provinces.length} provinces at ${ID_WIDTH}x${ID_HEIGHT}…`);
   const provinceIds = new Uint16Array(ID_WIDTH * ID_HEIGHT);
   const geometryById = new Map();
@@ -385,10 +440,12 @@ async function main() {
     writeFile(path.join(OUTPUT, 'province-details.json'), `${JSON.stringify(provinceDetails)}\n`),
     writeFile(path.join(OUTPUT, 'world.json'), `${JSON.stringify(manifest)}\n`),
   ]);
+  await promoteStagedWorld();
   console.log(`World assets ready: ${provinceRecords.length} provinces, ${waterways.stats.riverSystems} river systems, ${waterways.stats.canalSystems} canals, ${infrastructure.stats.logicalRoads} logical roads (${infrastructure.stats.emittedRoads} visible, ${infrastructure.stats.hiddenRoads} hidden), ${trees.length / 8} trees, ${buildings.length / 8} buildings.`);
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
+  await rm(OUTPUT, { recursive: true, force: true }).catch(() => undefined);
   console.error(error);
   process.exitCode = 1;
 });
