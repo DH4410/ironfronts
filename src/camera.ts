@@ -25,6 +25,9 @@ export class StrategyCamera {
   private keys = new Set<string>();
   private dragMode: 'pan' | 'orbit' | null = null;
   private lastPointer = [0, 0];
+  private readonly activeTouches = new Map<number, { x: number; y: number }>();
+  private pinchCenter = [0, 0];
+  private pinchDistance = 0;
   private canvas?: HTMLCanvasElement;
   private canvasRect = { left: 0, top: 0, width: 1, height: 1 };
   private readonly move = vec3.create();
@@ -56,6 +59,7 @@ export class StrategyCamera {
     canvas.addEventListener('pointerdown', this.onPointerDown);
     window.addEventListener('pointermove', this.onPointerMove);
     window.addEventListener('pointerup', this.onPointerUp);
+    window.addEventListener('pointercancel', this.onPointerUp);
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
@@ -70,12 +74,15 @@ export class StrategyCamera {
     this.canvas.removeEventListener('pointerdown', this.onPointerDown);
     window.removeEventListener('pointermove', this.onPointerMove);
     window.removeEventListener('pointerup', this.onPointerUp);
+    window.removeEventListener('pointercancel', this.onPointerUp);
     this.canvas.removeEventListener('wheel', this.onWheel);
     window.removeEventListener('keydown', this.onKeyDown);
     window.removeEventListener('keyup', this.onKeyUp);
     window.removeEventListener('resize', this.refreshCanvasRect);
     window.removeEventListener('scroll', this.refreshCanvasRect, true);
     this.keys.clear();
+    this.activeTouches.clear();
+    this.pinchDistance = 0;
     this.dragMode = null;
     this.canvas = undefined;
   }
@@ -171,12 +178,54 @@ export class StrategyCamera {
 
   private onPointerDown = (event: PointerEvent): void => {
     if (event.button !== 0 && event.button !== 2) return;
+    if (event.pointerType === 'touch') {
+      event.preventDefault();
+      this.activeTouches.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      this.canvas?.setPointerCapture?.(event.pointerId);
+      if (this.activeTouches.size === 1) {
+        this.dragMode = 'pan';
+        this.lastPointer = [event.clientX, event.clientY];
+      } else {
+        this.dragMode = null;
+        this.startPinch();
+      }
+      return;
+    }
     this.dragMode = event.button === 2 ? 'orbit' : 'pan';
     this.lastPointer = [event.clientX, event.clientY];
     this.canvas?.setPointerCapture?.(event.pointerId);
   };
 
   private onPointerMove = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch') {
+      const touch = this.activeTouches.get(event.pointerId);
+      if (!touch) return;
+      event.preventDefault();
+      touch.x = event.clientX;
+      touch.y = event.clientY;
+
+      if (this.activeTouches.size >= 2) {
+        const [first, second] = [...this.activeTouches.values()];
+        const centerX = (first.x + second.x) * 0.5;
+        const centerY = (first.y + second.y) * 0.5;
+        const distance = Math.max(1, Math.hypot(second.x - first.x, second.y - first.y));
+        const dx = centerX - this.pinchCenter[0];
+        const dy = centerY - this.pinchCenter[1];
+        if (this.pinchDistance > 0) this.zoomAt(centerX, centerY, this.pinchDistance / distance);
+        const panScale = this.distance * 0.00145;
+        this.pan(-dx * panScale, -dy * panScale);
+        this.pinchCenter = [centerX, centerY];
+        this.pinchDistance = distance;
+        return;
+      }
+
+      const dx = event.clientX - this.lastPointer[0];
+      const dy = event.clientY - this.lastPointer[1];
+      this.lastPointer = [event.clientX, event.clientY];
+      const scale = this.distance * 0.00145;
+      this.pan(-dx * scale, -dy * scale);
+      return;
+    }
     if (!this.dragMode) return;
     const dx = event.clientX - this.lastPointer[0];
     const dy = event.clientY - this.lastPointer[1];
@@ -190,26 +239,48 @@ export class StrategyCamera {
     }
   };
 
-  private onPointerUp = (): void => {
+  private onPointerUp = (event: PointerEvent): void => {
+    if (event.pointerType === 'touch') {
+      this.activeTouches.delete(event.pointerId);
+      if (this.activeTouches.size === 1) {
+        const remaining = this.activeTouches.values().next().value as { x: number; y: number };
+        this.dragMode = 'pan';
+        this.lastPointer = [remaining.x, remaining.y];
+      } else {
+        this.dragMode = null;
+      }
+      this.pinchDistance = 0;
+      return;
+    }
     this.dragMode = null;
   };
 
   private onWheel = (event: WheelEvent): void => {
     event.preventDefault();
-    const before = this.groundPoint(event.clientX, event.clientY);
+    this.zoomAt(event.clientX, event.clientY, Math.exp(event.deltaY * 0.00115));
+  };
+
+  private startPinch(): void {
+    const [first, second] = [...this.activeTouches.values()];
+    if (!first || !second) return;
+    this.pinchCenter = [(first.x + second.x) * 0.5, (first.y + second.y) * 0.5];
+    this.pinchDistance = Math.max(1, Math.hypot(second.x - first.x, second.y - first.y));
+  }
+
+  private zoomAt(clientX: number, clientY: number, factor: number): void {
+    const before = this.groundPoint(clientX, clientY);
     const beforeX = before?.[0];
     const beforeZ = before?.[2];
-    const factor = Math.exp(event.deltaY * 0.00115);
     this.distance = clamp(this.distance * factor, this.minDistance, this.maxDistance);
     this.recalculateMatrices();
-    const after = this.groundPoint(event.clientX, event.clientY);
+    const after = this.groundPoint(clientX, clientY);
     if (beforeX !== undefined && beforeZ !== undefined && after) {
       this.target[0] += beforeX - after[0];
       this.target[2] += beforeZ - after[2];
       this.normalizeTarget();
       this.recalculateMatrices();
     }
-  };
+  }
 
   private groundPoint(clientX: number, clientY: number): vec3 | null {
     const ray = this.screenRay(clientX, clientY);

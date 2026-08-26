@@ -20,6 +20,7 @@ const loadingQuoteSource = required<HTMLElement>('loading-quote-source');
 const tooltip = required<HTMLElement>('tooltip');
 const tooltipName = required<HTMLElement>('tooltip-name');
 const tooltipTerrain = required<HTMLElement>('tooltip-terrain');
+const debugToggle = required<HTMLButtonElement>('debug-toggle');
 const diagnostics = required<HTMLElement>('diagnostics');
 const diagnosticsStats = required<HTMLElement>('diagnostics-stats');
 const diagnosticsPerformance = required<HTMLElement>('diagnostics-performance');
@@ -172,11 +173,16 @@ async function start(): Promise<void> {
     const selected = mapModeInputs.find((input) => input.checked)?.value;
     if (selected && isMapMode(selected)) renderer.setMapMode(selected);
   };
+  const toggleDiagnostics = () => {
+    diagnostics.hidden = !diagnostics.hidden;
+    debugToggle.setAttribute('aria-expanded', String(!diagnostics.hidden));
+    renderer.onStats = diagnostics.hidden ? undefined : updateDiagnostics;
+  };
+  debugToggle.addEventListener('click', toggleDiagnostics);
   window.addEventListener('keydown', (event) => {
     if (event.code === 'F3') {
       event.preventDefault();
-      diagnostics.hidden = !diagnostics.hidden;
-      renderer.onStats = diagnostics.hidden ? undefined : updateDiagnostics;
+      toggleDiagnostics();
       return;
     }
     if (diagnostics.hidden || (event.code !== 'BracketLeft' && event.code !== 'BracketRight')) return;

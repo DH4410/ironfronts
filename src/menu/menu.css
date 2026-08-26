@@ -271,3 +271,72 @@
   font: 600 .56em/1 var(--ifm-sans); letter-spacing: .08em; text-transform: uppercase;
 }
 
+@media (max-width: 720px) {
+  .ifm { min-height: 100dvh; font-size: 13px; }
+  .ifm__map { inset: -3%; background-position: 58% top; }
+  .ifm__screen {
+    justify-content: center;
+    gap: 14px;
+    padding: max(14px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 12px max(12px, env(safe-area-inset-left));
+  }
+  .ifm__logo { margin-top: 0; }
+  .ifm__logo img { width: min(78vw, 360px); }
+  .ifm__eyebrow { gap: 8px; }
+  .ifm__eyebrow span { width: 28px; }
+  .ifm__eyebrow b { font-size: .58em; letter-spacing: .28em; }
+
+  .ifm__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    width: min(100%, 430px);
+  }
+  .ifm__card { width: 100%; height: clamp(128px, 18.5svh, 168px); }
+  .ifm__icon { width: 25%; margin-top: 9%; }
+  .ifm__card strong { margin-top: 8%; font-size: 1.16em; }
+  .ifm__card small { margin-top: .35em; font-size: .72em; }
+  .ifm__card-foot { padding: .62em .75em; }
+
+  .ifm__footer {
+    min-height: 52px;
+    height: auto;
+    margin: 0 max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    padding: 7px 10px;
+    gap: 9px;
+  }
+  .ifm__footer-divider { display: none; }
+  .ifm__footer-item { gap: .45em; }
+  .ifm__footer-version { display: none; }
+  .ifm__shield { margin-left: auto; }
+
+  .ifm__subpage {
+    align-items: flex-start;
+    padding: max(10px, env(safe-area-inset-top)) max(9px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(9px, env(safe-area-inset-left));
+  }
+  .ifm__file { width: 100%; max-height: none; min-height: calc(100dvh - 20px); }
+  .ifm__file-header { grid-template-columns: 1fr auto; gap: .8em; padding: 1em; }
+  .ifm__back { grid-column: 1 / -1; justify-self: start; min-height: 40px; }
+  .ifm__file-header h2 { font-size: 1.7em; }
+  .ifm__file-header p { font-size: .9em; line-height: 1.35; }
+  .ifm__doc-code { padding: .45em .55em; font-size: .52em; }
+  .ifm__body,
+  .ifm__body--map-left,
+  .ifm__body--wide { grid-template-columns: minmax(0, 1fr); padding: 1em; gap: 1em; overflow: visible; }
+  .ifm__map-photo { min-height: 150px; }
+  .ifm__row { min-height: 48px; }
+  .ifm__briefing { grid-column: 1; }
+  .ifm__briefing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8em; }
+  .ifm__primary { min-height: 44px; }
+  .ifm__doc-footer { padding: .8em 1em; gap: 1em; }
+}
+
+@media (max-height: 500px) and (pointer: coarse) {
+  .ifm__screen { justify-content: flex-start; gap: 8px; padding-top: 8px; }
+  .ifm__logo img { width: min(34vw, 250px); }
+  .ifm__eyebrow { display: none; }
+  .ifm__grid { display: grid; grid-template-columns: repeat(4, minmax(132px, 1fr)); width: min(94vw, 760px); gap: 8px; }
+  .ifm__card { width: 100%; height: 142px; }
+  .ifm__card small { display: none; }
+  .ifm__footer { min-height: 44px; }
+}
+

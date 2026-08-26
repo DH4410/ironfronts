@@ -732,13 +732,28 @@ export class WorldRenderer {
   private attachInteraction(signal: AbortSignal): void {
     this.canvas.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
+      if (event.pointerType === 'touch' && !event.isPrimary) {
+        this.clickStart = undefined;
+        return;
+      }
       this.clickStart = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+      this.pointer.x = event.clientX;
+      this.pointer.y = event.clientY;
+      this.pointer.inside = true;
+      this.pickingDirty = true;
     }, { signal });
     window.addEventListener('pointerup', (event) => {
       const start = this.clickStart;
       this.clickStart = undefined;
       if (!start || start.pointerId !== event.pointerId || event.button !== 0) return;
-      if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 5) return;
+      const tapSlop = event.pointerType === 'touch' ? 12 : 5;
+      if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > tapSlop) return;
+      if (event.pointerType === 'touch') {
+        this.pointer.x = event.clientX;
+        this.pointer.y = event.clientY;
+        this.pointer.inside = true;
+        this.finishPicking(this.provinceAtScreenPoint(event.clientX, event.clientY), performance.now());
+      }
       this.captureProvinceAt(event.clientX, event.clientY);
     }, { signal });
     this.canvas.addEventListener('pointermove', (event) => {
@@ -747,7 +762,8 @@ export class WorldRenderer {
       this.pointer.inside = true;
       this.pickingDirty = true;
     }, { signal });
-    this.canvas.addEventListener('pointerleave', () => {
+    this.canvas.addEventListener('pointerleave', (event) => {
+      if (event.pointerType === 'touch') return;
       this.pointer.inside = false;
       this.pickingDirty = false;
       this.updateHover(0);
