@@ -8,6 +8,9 @@ export interface MenuHandlers {
 
 const OPEN_DURATION = 1250;
 
+/** Natural aspect (height/width) of public/menu/desk-scene.jpg, for computing its cover-fit pixel size. */
+const MAP_ASPECT = 2620 / 2402;
+
 export function mountMenu(handlers: MenuHandlers): void {
   const root = requiredId<HTMLElement>('menu-root');
   const brand = document.querySelector<HTMLElement>('.brand');
@@ -20,20 +23,26 @@ export function mountMenu(handlers: MenuHandlers): void {
 
   /**
    * One update() drives every sub-motion from the same t (0=on the menu,
-   * 1=dossier open). The desk photo pans/zooms down like a camera settling
-   * onto the map; the logo and cards are treated as sitting on that same
-   * desk, so they scroll straight up and off with the same pan progress
-   * instead of fading or blurring in place.
+   * 1=dossier open). The desk photo pans down (no extra zoom — the source
+   * is already at cover-fit scale, and zooming further just softens it).
+   * The logo/cards are measured to move by the exact same pixel amount the
+   * backdrop's visible window shifts, so they read as scrolling with the
+   * desk rather than drifting at their own independent speed.
    */
   function update(t: number): void {
     const panT = smooth(phase(t, 0, 0.92));
     const inT = smooth(phase(t, 0.45, 1));
 
-    map.style.backgroundPosition = `center ${6 + panT * 56}%`;
-    map.style.backgroundSize = `${132 - panT * 20}% auto`;
+    const box = map.getBoundingClientRect();
+    const renderedHeight = box.width * MAP_ASPECT;
+    const excess = Math.max(0, renderedHeight - box.height);
+    const posY = panT * 62;
+    const offsetPx = excess * (posY / 100);
+
+    map.style.backgroundPosition = `center ${posY.toFixed(2)}%`;
     map.style.filter = `brightness(${(.86 + panT * .09).toFixed(3)}) saturate(.92) contrast(1.02)`;
 
-    main.style.transform = `translateY(${(panT * -72).toFixed(2)}vh)`;
+    main.style.transform = `translateY(${(-offsetPx).toFixed(2)}px)`;
 
     if (transitionFile) {
       transitionFile.style.opacity = String(inT);
