@@ -4,6 +4,7 @@ export interface ExternalMeshData {
 }
 
 const KENNEY_SUBURBAN_BASE = 'https://raw.githubusercontent.com/petroulacl/fps-buildings-env-kit/main/buildings/kenney-city-kit-suburban/Models/OBJ%20format';
+const MODEL_FETCH_TIMEOUT_MS = 2_000;
 
 const BUILDING_SOURCES = [
   `${KENNEY_SUBURBAN_BASE}/building-type-a.obj`,
@@ -22,7 +23,11 @@ export const externalBuildingMeshes = new Map<number, ExternalMeshData>();
 
 if (typeof window !== 'undefined') {
   const results = await Promise.allSettled(BUILDING_SOURCES.map(async (url, archetype) => {
-    const response = await fetch(url, { cache: 'force-cache', mode: 'cors' });
+    const response = await fetch(url, {
+      cache: 'force-cache',
+      mode: 'cors',
+      signal: AbortSignal.timeout(MODEL_FETCH_TIMEOUT_MS),
+    });
     if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
     return { archetype, mesh: parseObj(await response.text()) };
   }));
@@ -76,10 +81,12 @@ export function parseObj(source: string): ExternalMeshData {
     packed[offset] = (packed[offset] - centerX) / spanX;
     packed[offset + 1] = (packed[offset + 1] - minY) / spanY;
     packed[offset + 2] = (packed[offset + 2] - centerZ) / spanZ;
+    // Positions are normalized independently on each axis. Normals need the
+    // inverse-transpose of that transform, hence multiplication by the source spans.
     const transformed = normalize([
-      packed[offset + 3] / spanX,
-      packed[offset + 4] / spanY,
-      packed[offset + 5] / spanZ,
+      packed[offset + 3] * spanX,
+      packed[offset + 4] * spanY,
+      packed[offset + 5] * spanZ,
     ]);
     packed[offset + 3] = transformed[0];
     packed[offset + 4] = transformed[1];
