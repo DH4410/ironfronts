@@ -31,7 +31,7 @@ export function mountMenu(handlers: MenuHandlers): void {
    */
   function update(t: number): void {
     const panT = smooth(phase(t, 0, 0.92));
-    const inT = smooth(phase(t, 0.45, 1));
+    const inT = smooth(phase(t, 0.62, 1));
 
     const box = map.getBoundingClientRect();
     const renderedHeight = box.width * MAP_ASPECT;
