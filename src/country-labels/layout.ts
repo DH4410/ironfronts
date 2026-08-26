@@ -2,7 +2,7 @@ import type { CountryLabelGlyph } from './atlas';
 import type { CountryAnchor } from './topology';
 
 export const LABEL_GLYPH_STRIDE = 12;
-export const LABEL_TERRAIN_HEIGHT_OFFSET = 0.6;
+export const LABEL_TERRAIN_HEIGHT_OFFSET = 1.15;
 
 export interface CountryLabelMetrics {
   readonly lineHeightAtMeasurementSize: number;
@@ -17,20 +17,20 @@ export interface CountryLabelCandidate {
   z: number;
 }
 
-/** Builds camera-independent glyph quads along a stable, gently curved map-space baseline. */
+/** Builds camera-independent glyph quads along a restrained map-space baseline. */
 export function layoutCountryLabel(
   name: string,
   anchor: CountryAnchor,
   atlas: CountryLabelMetrics,
   sizeMultiplier = 1,
-  curveDirection = 1,
+  curveDirection = 0,
 ): Float32Array {
   const label = name.toLocaleUpperCase();
   const measuredWidth = atlas.measureLabel(label);
   if (measuredWidth <= 0 || anchor.span <= 0 || anchor.crossSpan <= 0) return new Float32Array(0);
 
-  const availableWidth = anchor.span * 0.7;
-  const availableHeight = anchor.crossSpan * 0.5;
+  const availableWidth = anchor.span * 0.74;
+  const availableHeight = anchor.crossSpan * 0.42;
   const scale = Math.min(
     availableWidth / measuredWidth,
     availableHeight / atlas.lineHeightAtMeasurementSize,
@@ -41,8 +41,8 @@ export function layoutCountryLabel(
   const labelHeight = atlas.lineHeightAtMeasurementSize * scale;
   const spareHeight = Math.max(0, availableHeight - labelHeight);
   const visibleCharacters = [...label].filter((character) => character.trim().length > 0).length;
-  const curvature = visibleCharacters >= 6
-    ? Math.min(labelWidth * 0.065, spareHeight * 0.7)
+  const curvature = curveDirection !== 0 && visibleCharacters >= 9
+    ? Math.min(labelWidth * 0.026, spareHeight * 0.34)
     : 0;
   const crossX = -anchor.axisZ;
   const crossZ = anchor.axisX;
@@ -86,7 +86,7 @@ export function layoutCountryLabel(
   return new Float32Array(values);
 }
 
-/** Chooses the largest layout whose visible glyph area stays entirely on owned land. */
+/** Chooses the largest readable layout whose visible glyph area stays on owned land. */
 export function layoutCountryLabelWithinTerritory(
   name: string,
   anchor: CountryAnchor,
@@ -95,7 +95,9 @@ export function layoutCountryLabelWithinTerritory(
   ownsPoint: (x: number, z: number) => boolean,
   sampleSpacing = 8,
 ): Float32Array {
-  const sizeSteps = [1, 0.88, 0.76, 0.64, 0.52, 0.42, 0.34, 0.27, 0.21, 0.16, 0.12];
+  // Tiny labels were technically valid but created illegible speckles on the
+  // political map. Prefer omitting a microstate label to drawing unreadable text.
+  const sizeSteps = [1, 0.9, 0.8, 0.7, 0.6, 0.52, 0.45, 0.38, 0.32, 0.27, 0.23];
   const nudge = sampleSpacing * 2;
   const localNudges = [
     [0, 0], [nudge, 0], [-nudge, 0], [0, nudge], [0, -nudge],
@@ -108,9 +110,9 @@ export function layoutCountryLabelWithinTerritory(
       for (const [along, across] of localNudges) {
         const x = candidate.x + anchor.axisX * along + crossX * across;
         const z = candidate.z + anchor.axisZ * along + crossZ * across;
-        // Available space is often asymmetric around the dominant axis. Try
-        // both bows and a straight baseline before shrinking the name.
-        for (const curveDirection of [1, -1, 0]) {
+        // Straight labels read best at strategy zoom. Only try a gentle bow
+        // when the straight placement cannot stay inside the territory.
+        for (const curveDirection of [0, 1, -1]) {
           const data = layoutCountryLabel(name, { ...anchor, x, z }, atlas, size, curveDirection);
           if (data.length && glyphsStayWithinTerritory(data, ownsPoint, sampleSpacing)) return data;
         }
@@ -121,10 +123,8 @@ export function layoutCountryLabelWithinTerritory(
 }
 
 /**
- * Replaces the layout-only ink bounds with a render elevation for each glyph.
- * Every letter gets its own flat plane at the highest terrain sample beneath
- * its visible ink, keeping long labels close to the landscape without letting
- * a ridge pass through a character.
+ * Replaces layout-only ink bounds with a render elevation for each glyph.
+ * Each character remains flat and clears the highest terrain beneath its ink.
  */
 export function placeCountryLabelOnTerrain(
   data: Float32Array,
@@ -155,8 +155,6 @@ export function placeCountryLabelOnTerrain(
         ));
       }
     }
-    // These two values were only needed while validating the layout. The GPU
-    // uses c.z for the per-letter elevation and leaves c.w reserved.
     placed[offset + 10] = (Number.isFinite(maximumHeight) ? maximumHeight : 0)
       + LABEL_TERRAIN_HEIGHT_OFFSET;
     placed[offset + 11] = 0;
