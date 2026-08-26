@@ -100,8 +100,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     }
 
     let shoreline = bankField.g * smoothstep(0.50, 0.72, bankField.r);
-    let beachElevation = 1.0 - smoothstep(5.0, 10.0, elevation);
-    baseColor = mix(baseColor, sampleMaterial(7, input.worldPosition, 52.0), shoreline * beachElevation * 0.92);
+    baseColor = mix(baseColor, sampleMaterial(7, input.worldPosition, 52.0), shoreline * 0.72);
     baseColor = mix(baseColor, bakedSurface.rgb, smoothstep(3000.0, 4500.0, uniforms.interaction.y));
   }
   if (terrain == 3u) {

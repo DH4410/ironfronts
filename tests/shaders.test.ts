@@ -21,6 +21,7 @@ describe('WGSL programs', () => {
     expect(waterShader).toContain('riverField.r > 0.45 || riverField.g > 0.45');
     expect(waterShader).toContain('if (landAt(input.mapUv) >= 0.5)');
     expect(terrainShader).toContain('bankField.g');
+    expect(terrainShader).toContain('shoreline * 0.72');
     expect(waterShader).toContain('oceanSurfaceColor(input.worldPosition');
     expect(waterShader).not.toContain('if (provinceAt(input.mapUv)');
   });

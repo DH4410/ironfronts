@@ -1,4 +1,7 @@
-import { wrap } from './raster.mjs';
+import { distanceToValue, smoothstep, wrap } from './raster.mjs';
+
+export const RIVER_CARVE_DEPTH = 0.35;
+export const RIVER_CARVE_FADE = 14;
 
 const SEARCH_DIRECTIONS = [
   [1, 0], [-1, 0], [0, 1], [0, -1],
@@ -62,4 +65,43 @@ export function buildTerrainTopology(provinceIds, movementMask, visualMask) {
     topology[index] = provinceIds[index] !== 0 || movementMask[index] > 127 || visualMask[index] > 127 ? 1 : 0;
   }
   return topology;
+}
+
+export function carveRiverTerrain({
+  heights, landField, width, height, worldWidth, worldHeight,
+  movementMask, visualMask, maskWidth, maskHeight,
+}) {
+  const channel = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      if (landField[index] && channelOverlapsCell(
+        movementMask, visualMask, maskWidth, maskHeight, x, y, width, height,
+      )) channel[index] = 1;
+    }
+  }
+
+  const distance = distanceToValue(channel, width, height, 1);
+  const texelSize = (worldWidth / width + worldHeight / height) * 0.5;
+  let adjustedCells = 0;
+  let totalCut = 0;
+  for (let index = 0; index < heights.length; index += 1) {
+    if (!landField[index]) continue;
+    const distanceWorld = distance[index] * texelSize;
+    if (distanceWorld >= RIVER_CARVE_FADE) continue;
+    const cut = RIVER_CARVE_DEPTH * (1 - smoothstep(0, RIVER_CARVE_FADE, distanceWorld));
+    const next = Math.max(1.2, heights[index] - cut);
+    const applied = heights[index] - next;
+    if (applied <= 0.0001) continue;
+    heights[index] = next;
+    adjustedCells += 1;
+    totalCut += applied;
+  }
+  return {
+    method: 'shallow lower-only river channel with a short bank fade',
+    depth: RIVER_CARVE_DEPTH,
+    fadeDistance: RIVER_CARVE_FADE,
+    adjustedCells,
+    meanCut: totalCut / Math.max(1, adjustedCells),
+  };
 }

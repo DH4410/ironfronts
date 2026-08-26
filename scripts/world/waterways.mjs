@@ -340,7 +340,7 @@ export function buildWaterways({
     source: 'material/movement network sea_point graph',
     animatedSurface: false,
     animation: 'none',
-    terrainTreatment: 'unmodified terrain; independently draped surface vertices',
+    terrainTreatment: 'shallow lower-only channel; independently draped surface vertices',
     sampleSpacing: SAMPLE_SPACING,
     terrainClipMask: false,
     terrainOverlayMask: true,

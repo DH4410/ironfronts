@@ -134,7 +134,7 @@ describe('generated v12 world package', () => {
     expect(report.version).toBe('world-generation-v12');
     expect(report.waterways.animatedSurface).toBe(false);
     expect(report.waterways.animation).toBe('none');
-    expect(report.waterways.terrainTreatment).toBe('unmodified terrain; independently draped surface vertices');
+    expect(report.waterways.terrainTreatment).toBe('shallow lower-only channel; independently draped surface vertices');
     expect(report.waterways.terrainClipMask).toBe(false);
     expect(report.waterways.terrainOverlayMask).toBe(true);
     expect(report.waterways.minimumRiverWidth).toBeGreaterThanOrEqual(11);
@@ -153,8 +153,10 @@ describe('generated v12 world package', () => {
     expect(network.every(Number.isFinite)).toBe(true);
     for (let line = 0; line < data.buffers.waterwayNetworkLines.count; line += 1) {
       const offset = line * 8;
-      expect(network[offset + 4]).toBeGreaterThanOrEqual(0.4);
-      expect(network[offset + 5]).toBeGreaterThanOrEqual(0.4);
+      // A short river-mouth overlap may now sit slightly below the 0.42 ocean
+      // surface as the shallow carved channel dissolves into open water.
+      expect(network[offset + 4]).toBeGreaterThanOrEqual(0.079);
+      expect(network[offset + 5]).toBeGreaterThanOrEqual(0.079);
       expect([0, 1]).toContain(network[offset + 6]);
     }
     expect(data.fields.navigation.format).toBe('rgba8unorm');
@@ -166,6 +168,13 @@ describe('generated v12 world package', () => {
     expect(report.visualRivers.centerPixels).toBeGreaterThan(0);
     expect(report.visualRivers.widenedLandPixels).toBeGreaterThan(0);
     expect(data.counts.visualRiverComponents).toBeGreaterThan(0);
+    expect(report.topography.riverCarving).toEqual(expect.objectContaining({
+      method: 'shallow lower-only river channel with a short bank fade',
+      depth: 0.35,
+      fadeDistance: 14,
+    }));
+    expect(report.topography.riverCarving.adjustedCells).toBeGreaterThan(0);
+    expect(report.banks.riverBankPixels).toBeGreaterThan(0);
     let widenedVisualLandPixels = 0;
     let movementVisualOverlap = 0;
     for (let pixel = 0; pixel < provinceIds.length; pixel += 1) {

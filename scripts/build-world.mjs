@@ -13,7 +13,7 @@ import { buildWaterways } from './world/waterways.mjs';
 import { buildTerrainAwareWaterways } from './world/terrain-aware-waterways.mjs';
 import { fbm } from './world/noise.mjs';
 import { buildVisualRiverField } from './world/visual-rivers.mjs';
-import { buildTerrainTopology, promoteRiverChannelsToTerrain } from './world/river-overlay-terrain.mjs';
+import { carveRiverTerrain, buildTerrainTopology, promoteRiverChannelsToTerrain } from './world/river-overlay-terrain.mjs';
 import { buildBakedTerrainAlbedo, buildNavigationField, buildTerrainNormals } from './world/terrain-precompute.mjs';
 import { fillProvincePolygon, readMaterialJson } from './world/source-data.mjs';
 import { buildPoliticalPalette } from './world/political-palette.mjs';
@@ -178,9 +178,20 @@ async function main() {
     method: 'province-zero river channels promoted before final topography generation',
     restoredCells: riverTerrain.restoredCells,
   };
+  console.log('Carving shallow river beds and banks...');
+  topographyReport.riverCarving = carveRiverTerrain({
+    heights, landField: terrainLandField, width: FIELD_WIDTH, height: FIELD_HEIGHT,
+    worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
+    movementMask: preliminaryWaterways.mask, visualMask: visualRivers.mask,
+    maskWidth: ID_WIDTH, maskHeight: ID_HEIGHT,
+  });
   const terrainTopology = buildTerrainTopology(provinceIds, preliminaryWaterways.mask, visualRivers.mask);
+  const riverMask = new Uint8Array(provinceIds.length);
+  for (let index = 0; index < riverMask.length; index += 1) {
+    riverMask[index] = preliminaryWaterways.mask[index] > 127 || visualRivers.mask[index] > 127 ? 1 : 0;
+  }
   const bankField = buildBankField(
-    provinceIds, ID_WIDTH, ID_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, terrainTopology,
+    provinceIds, ID_WIDTH, ID_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, terrainTopology, riverMask,
   );
   const oceanDistance = distanceToValue(terrainLandField, FIELD_WIDTH, FIELD_HEIGHT, 1);
   for (let y = 0; y < FIELD_HEIGHT; y += 1) {
