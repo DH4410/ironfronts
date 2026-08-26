@@ -17,6 +17,26 @@ function pointProvince(ids, x, y) {
   return ids[py * ID_WIDTH + px];
 }
 
+function buildingFootprintFitsProvince(ids, encodedId, x, y, sx, sz, angle) {
+  // A center-point check is not enough near coastlines: a building can be
+  // anchored on land while most of its rotated footprint hangs over water.
+  // Sample the padded corners and edge midpoints so settlements stay inland.
+  const halfX = sx * 0.62 + 1.6;
+  const halfZ = sz * 0.62 + 1.6;
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  const samples = [
+    [0, 0],
+    [-halfX, -halfZ], [halfX, -halfZ], [halfX, halfZ], [-halfX, halfZ],
+    [-halfX, 0], [halfX, 0], [0, -halfZ], [0, halfZ],
+  ];
+  return samples.every(([localX, localZ]) => {
+    const sampleX = x + localX * cosine - localZ * sine;
+    const sampleY = y + localX * sine + localZ * cosine;
+    return pointProvince(ids, sampleX, sampleY) === encodedId;
+  });
+}
+
 function pickTreeVariant(rng, visual, isPlain) {
   const roll = rng();
   if (isPlain) {
@@ -77,23 +97,27 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
 
     if (province.terrain_type_id !== 14) continue;
     const populationScale = Math.log10(Math.max(1_000, province.population ?? 1_000));
-    const target = clamp(Math.round((populationScale - 3) * 17), 12, 54);
+    // The old fixed minimum of 12 made tiny island settlements as dense as
+    // continental cities. Cap visual density by both population and land area.
+    const populationTarget = clamp(Math.round((populationScale - 3) * 8), 3, 24);
+    const areaCapacity = clamp(Math.round(area / 80), 2, 24);
+    const target = Math.min(populationTarget, areaCapacity);
     const plan = cityPlans.get(province.province_id);
-    const radius = plan?.radius ?? clamp(Math.sqrt(Math.max(30, area)) * 1.9, 9, 38);
+    const radius = plan?.radius ?? clamp(Math.sqrt(Math.max(30, area)) * 1.75, 8, 32);
     const placedBuildings = [];
-    for (let attempt = 0, placed = 0; attempt < target * 56 && placed < target; attempt += 1) {
+    for (let attempt = 0, placed = 0; attempt < target * 72 && placed < target; attempt += 1) {
       const street = plan?.streets[Math.floor(rng() * plan.streets.length)];
       let angle;
       let x;
       let y;
       let distance;
       if (street) {
-        const t = 0.08 + rng() * 0.84;
+        const t = 0.10 + rng() * 0.80;
         const dx = street.x2 - street.x1;
         const dy = street.z2 - street.z1;
         angle = Math.atan2(dy, dx);
         const side = rng() < 0.5 ? -1 : 1;
-        const setback = 4.4 + rng() * Math.max(5.2, radius * 0.34);
+        const setback = 4.8 + rng() * Math.max(4.6, radius * 0.24);
         x = street.x1 + dx * t - Math.sin(angle) * side * setback;
         y = street.z1 + dy * t + Math.cos(angle) * side * setback;
         distance = Math.hypot(x - province.center_x, y - province.center_y);
@@ -108,19 +132,30 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
         + wrap(Math.floor(x / WORLD_WIDTH * ID_WIDTH), ID_WIDTH);
       if (roadClearance[roadIndex] > 178) continue;
       const centerBias = 1 - distance / radius;
+
+      // Keep the current city pass to the three compact sourced house forms.
+      // The taller archetypes read as spiky miniature skylines at map scale.
       let archetype;
-      if (placed === 0 && populationScale > 5.35) archetype = 4;
-      else if (rng() < 0.10) archetype = 3;
-      else if (visual === 'Desert' || visual === 'Sand Dunes' || visual === 'Mediterranean') archetype = rng() < 0.72 ? 2 : 1;
-      else archetype = rng() < 0.46 ? 0 : rng() < 0.72 ? 1 : 2;
-      const sx = archetype === 3 ? 5.4 + rng() * 5.2 : 2.8 + rng() * 4.2;
-      const sz = archetype === 3 ? 4.8 + rng() * 5.8 : 2.8 + rng() * 4.4;
-      if (placedBuildings.some((other) => Math.hypot(other.x - x, other.y - y) < (other.radius + Math.max(sx, sz)) * 0.34)) continue;
-      let sy = 4.2 + rng() * 7.5 + Math.max(0, centerBias) * Math.max(0, populationScale - 4) * 3.6;
-      if (archetype === 4) sy *= 1.55;
-      if (archetype === 3) sy *= 0.68;
-      const palette = visual === 'Desert' || visual === 'Sand Dunes' ? 1 : visual === 'Mediterranean' ? 2 : visual === 'Boreal' || visual === 'Tundra' ? 3 : 0;
-      buildings.push(x, y, sx, sy, sz, angle + (rng() - 0.5) * 0.08, palette + 0.72 + rng() * 0.24, archetype);
+      if (placed === 0 && populationScale > 5.55) archetype = 2;
+      else if (visual === 'Desert' || visual === 'Sand Dunes' || visual === 'Mediterranean') archetype = rng() < 0.62 ? 2 : 1;
+      else {
+        const roll = rng();
+        archetype = roll < 0.44 ? 0 : roll < 0.74 ? 1 : 2;
+      }
+
+      const sx = 3.0 + rng() * 2.8;
+      const sz = 3.0 + rng() * 2.8;
+      const finalAngle = angle + (rng() - 0.5) * 0.08;
+      if (!buildingFootprintFitsProvince(provinceIds, encodedId, x, y, sx, sz, finalAngle)) continue;
+      if (placedBuildings.some((other) => Math.hypot(other.x - x, other.y - y)
+        < (other.radius + Math.max(sx, sz)) * 0.72)) continue;
+
+      const sy = 3.6 + rng() * 4.0
+        + Math.max(0, centerBias) * Math.max(0, populationScale - 4) * 1.6;
+      const palette = visual === 'Desert' || visual === 'Sand Dunes' ? 1
+        : visual === 'Mediterranean' ? 2
+          : visual === 'Boreal' || visual === 'Tundra' ? 3 : 0;
+      buildings.push(x, y, sx, sy, sz, finalAngle, palette + 0.72 + rng() * 0.24, archetype);
       placedBuildings.push({ x, y, radius: Math.max(sx, sz) });
       placed += 1;
     }
