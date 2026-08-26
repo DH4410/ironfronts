@@ -30,6 +30,7 @@ export function mountMenu(handlers: MenuHandlers): void {
   let transitionSource: Rect = ZERO_RECT;
   let transitionTarget: Rect = ZERO_RECT;
   let transitionPage: HTMLElement | null = null;
+  let transitionClone: HTMLElement | null = null;
 
   function rectOf(el: Element): Rect {
     const r = el.getBoundingClientRect();
@@ -50,10 +51,21 @@ export function mountMenu(handlers: MenuHandlers): void {
     panel.style.top = `${rect.top}px`;
     panel.style.width = `${rect.width}px`;
     panel.style.height = `${rect.height}px`;
+    // A paper document doesn't zoom in flat — it's lifted off the desk at a
+    // slight angle and settles flush as it's laid down on the panel.
+    panel.style.transform = `rotate(${(1 - moveT) * -1.8}deg)`;
     sweep.style.transform = `translateY(${moveT * 260 - 40}%)`;
     sweep.style.opacity = String(1 - smooth(phase(t, 0.45, 0.62)));
-    // Crossfade: the panel hands off to the real subpage content over the
-    // same reveal window, so nothing just sits there once it stops moving.
+    // The card's own icon/title ride along (scaled up) as the panel grows,
+    // so there's always real content in view instead of a blank rectangle;
+    // it crossfades into the real subpage over the same reveal window the
+    // page fades in on, so nothing sits static once the motion settles.
+    if (transitionClone && transitionSource.width && transitionSource.height) {
+      const scaleX = rect.width / transitionSource.width;
+      const scaleY = rect.height / transitionSource.height;
+      transitionClone.style.transform = `scale(${scaleX}, ${scaleY})`;
+      transitionClone.style.opacity = String(1 - revealT);
+    }
     if (transitionPage) transitionPage.style.opacity = String(revealT);
   }
 
@@ -61,12 +73,33 @@ export function mountMenu(handlers: MenuHandlers): void {
     transitionSource = rectOf(card);
     transitionTarget = rectOf(fileEl);
     transitionPage = page;
+
+    const cloneWrap = document.createElement('div');
+    cloneWrap.className = 'ifm__panel-clone';
+    const clone = card.cloneNode(true) as HTMLElement;
     card.classList.add('is-source');
+    clone.removeAttribute('id');
+    clone.tabIndex = -1;
+    clone.setAttribute('aria-hidden', 'true');
+    clone.style.position = 'absolute';
+    clone.style.top = '0';
+    clone.style.left = '0';
+    clone.style.pointerEvents = 'none';
+    clone.style.cursor = 'default';
+    clone.style.transformOrigin = 'top left';
+    clone.style.transition = 'none';
+    cloneWrap.appendChild(clone);
+    panel.appendChild(cloneWrap);
+    transitionClone = clone;
+
     stage.hidden = false;
     await runChoreo(OPEN_DURATION, direction, update);
     stage.hidden = true;
     card.classList.remove('is-source');
     transitionPage = null;
+    transitionClone = null;
+    panel.style.transform = '';
+    cloneWrap.remove();
   }
 
   async function openDossier(card: HTMLButtonElement): Promise<void> {

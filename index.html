@@ -20,8 +20,6 @@
       <div class="ifm__backdrop" aria-hidden="true">
         <div class="ifm__map"></div>
         <div class="ifm__wash"></div>
-        <div class="ifm__radar"></div>
-        <div class="ifm__grid-lines"></div>
         <div class="ifm__grain"></div>
       </div>
 
@@ -78,7 +76,7 @@
               <div><small>Operation Order</small><h2>Choose Campaign</h2><p>Select a strategic starting point before deployment.</p></div>
               <span class="ifm__classification">New</span>
             </header>
-            <div class="ifm__body">
+            <div class="ifm__body ifm__body--map-left">
               <div class="ifm__map-photo"><span>European Theater</span></div>
               <div class="ifm__list">
                 <button class="ifm__row is-selected"><span><b>World at War</b><small>Global campaign across every theater.</small></span><em>1939</em></button>
@@ -169,8 +167,17 @@
     </div>
 
     <section id="loading" class="loading" aria-live="polite">
-      <div class="loading__line"><span id="loading-stage">Preparing WebGPU</span><span id="loading-value">0%</span></div>
-      <div class="loading__track"><span id="loading-bar"></span></div>
+      <div class="loading__backdrop" aria-hidden="true"></div>
+      <div class="loading__quote">
+        <span class="loading__mark" aria-hidden="true">&ldquo;</span>
+        <p class="loading__eyebrow" id="loading-kind">Field Notes</p>
+        <blockquote id="loading-quote-text"></blockquote>
+        <cite id="loading-quote-source"></cite>
+      </div>
+      <div class="loading__foot">
+        <div class="loading__line"><span id="loading-stage">Preparing WebGPU</span><span id="loading-value">0%</span></div>
+        <div class="loading__track"><span id="loading-bar"></span></div>
+      </div>
     </section>
 
     <div id="tooltip" class="tooltip" hidden>
