@@ -55,6 +55,7 @@ const debugWarList = required<HTMLElement>('debug-war-list');
 const debugAlliedList = required<HTMLElement>('debug-allied-list');
 const debugDiplomacyStatus = required<HTMLElement>('debug-diplomacy-status');
 const debugCountryNames = required<HTMLDataListElement>('debug-country-names');
+const mapModes = required<HTMLFieldSetElement>('map-modes');
 const mapModeInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="map-mode"]')];
 const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
@@ -68,6 +69,8 @@ mountMenu({
       loading.hidden = true;
       unsupported.hidden = false;
     } else {
+      debugToggle.hidden = false;
+      mapModes.hidden = false;
       void start();
     }
   },

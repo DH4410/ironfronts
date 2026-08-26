@@ -756,6 +756,9 @@ export class WorldRenderer {
       }
       this.captureProvinceAt(event.clientX, event.clientY);
     }, { signal });
+    window.addEventListener('pointercancel', () => {
+      this.clickStart = undefined;
+    }, { signal });
     this.canvas.addEventListener('pointermove', (event) => {
       this.pointer.x = event.clientX;
       this.pointer.y = event.clientY;

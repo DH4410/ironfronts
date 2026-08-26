@@ -220,7 +220,7 @@
       <span id="tooltip-terrain"></span>
     </div>
 
-    <button id="debug-toggle" class="debug-toggle" type="button" aria-controls="diagnostics" aria-expanded="false">
+    <button id="debug-toggle" class="debug-toggle" type="button" aria-controls="diagnostics" aria-expanded="false" hidden>
       <span aria-hidden="true">⌁</span> Debug
     </button>
 
@@ -324,7 +324,7 @@
       </div>
     </aside>
 
-    <fieldset class="map-modes" aria-label="Map overlay">
+    <fieldset id="map-modes" class="map-modes" aria-label="Map overlay" hidden>
       <legend>MAP OVERLAY</legend>
       <div class="map-modes__options">
         <label><input type="radio" name="map-mode" value="political" /> Political map</label>
