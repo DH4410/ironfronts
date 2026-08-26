@@ -54,11 +54,15 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   let hoverId = uniforms.interaction.x;
   let hovered = hoverId > 0.5 && (abs(line.b.x - hoverId) < 0.5 || abs(line.b.y - hoverId) < 0.5);
   let nearFactor = 1.0 - smoothstep(700.0, 8200.0, uniforms.interaction.y);
-  var widthPixels = 0.72 + nearFactor * 0.8;
-  var color = vec4f(0.055, 0.085, 0.077, mix(0.30, 0.10, nearFactor));
+
+  // Province boundaries should act as quiet cartographic structure, not a
+  // second political outline competing with country names and terrain.
+  var widthPixels = 0.48 + nearFactor * 0.28;
+  var color = vec4f(0.055, 0.075, 0.070, mix(0.26, 0.10, nearFactor));
   var innerColor = color;
   var countryCasing = 0.0;
-  if (line.b.y < 0.5) { color.a *= 0.46; }
+  if (line.b.y < 0.5) { color.a *= 0.42; }
+
   if (lineParams.mode == 0u) {
     let provinceBordersVisible = (lineParams.enabled & 1u) != 0u;
     let countryBordersVisible = (lineParams.enabled & 2u) != 0u;
@@ -66,16 +70,18 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
     // political boundary merely because its implicit owner differs.
     let countryBoundary = line.b.z < 0.0 && line.b.y > 0.5;
     if (countryBoundary && countryBordersVisible) {
-      widthPixels = 2.65 - nearFactor * 0.58;
-      color = vec4f(0.035, 0.047, 0.043, mix(0.60, 0.94, nearFactor));
-      innerColor = vec4f(0.77, 0.71, 0.57, mix(0.52, 0.86, nearFactor));
-      countryCasing = 1.0;
+      // One crisp neutral national boundary replaces the previous dark/gold
+      // double casing, which looked like a railway at strategy zoom.
+      widthPixels = 1.72 - nearFactor * 0.28;
+      color = vec4f(0.075, 0.083, 0.078, mix(0.70, 0.86, nearFactor));
+      innerColor = color;
+      countryCasing = 0.0;
     } else if (!provinceBordersVisible) {
       color.a = 0.0;
     }
     if (hovered && (provinceBordersVisible || countryBordersVisible)) {
-      widthPixels = max(widthPixels, 2.8);
-      color = vec4f(0.96, 0.78, 0.35, 0.96);
+      widthPixels = max(widthPixels, 1.9);
+      color = vec4f(0.94, 0.74, 0.30, 0.90);
       innerColor = color;
       countryCasing = 0.0;
     }
@@ -105,7 +111,7 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
 fn lineFragment(input: LineOutput) -> @location(0) vec4f {
   let distanceFromCenter = abs(input.lineSide);
   let centerCoverage = 1.0 - smoothstep(0.43, 0.55, distanceFromCenter);
-  let edgeCoverage = 1.0 - smoothstep(0.88, 1.0, distanceFromCenter);
+  let edgeCoverage = 1.0 - smoothstep(0.82, 1.0, distanceFromCenter);
   if (input.borderMode > 0.5) {
     let riverSignal = max(waterwayAt(input.mapUv), visualRiverAt(input.mapUv));
     // The river surface owns political boundaries over water. Suppressing the
