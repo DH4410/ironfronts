@@ -35,6 +35,22 @@
       </nav>
 
       <div class="diagnostics__panel" data-debug-panel="world">
+        <div class="time-controls">
+          <div class="time-controls__heading"><strong>TIME OF DAY</strong><output id="debug-time-state">Morning · 08:00</output></div>
+          <label class="time-controls__clock" for="debug-time">World clock
+            <input id="debug-time" type="time" value="08:00" step="60" />
+          </label>
+          <div class="time-controls__presets" aria-label="Jump to time of day">
+            <button type="button" data-debug-time="6">Dawn</button>
+            <button type="button" data-debug-time="12">Noon</button>
+            <button type="button" data-debug-time="18">Sunset</button>
+            <button type="button" data-debug-time="0">Night</button>
+          </div>
+          <label class="time-controls__speed" for="debug-time-multiplier">Cycle multiplier
+            <span><input id="debug-time-multiplier" type="number" value="1.0" min="0" max="999.9" step="0.1" inputmode="decimal" /><b>×</b></span>
+          </label>
+          <small>1.0× completes a full day in 10 minutes. 0.0× freezes time.</small>
+        </div>
         <pre id="diagnostics-stats"></pre>
         <div class="diagnostics__group diagnostics__performance">
           <strong>PERFORMANCE</strong>

@@ -1,6 +1,7 @@
 import './styles.css';
 import '@fontsource/bitter/latin-ext-800.css';
-import { WorldRenderer, type MapMode } from './renderer';
+import { WorldRenderer, type MapMode, type TimeOfDayState } from './renderer';
+import { parseClock } from './time-of-day';
 import type { CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo } from './types';
 
 const canvas = required<HTMLCanvasElement>('world');
@@ -15,6 +16,10 @@ const tooltipTerrain = required<HTMLElement>('tooltip-terrain');
 const diagnostics = required<HTMLElement>('diagnostics');
 const diagnosticsStats = required<HTMLElement>('diagnostics-stats');
 const diagnosticsPerformance = required<HTMLElement>('diagnostics-performance');
+const debugTime = required<HTMLInputElement>('debug-time');
+const debugTimeState = required<HTMLOutputElement>('debug-time-state');
+const debugTimeMultiplier = required<HTMLInputElement>('debug-time-multiplier');
+const debugTimePresets = [...document.querySelectorAll<HTMLButtonElement>('[data-debug-time]')];
 const debugView = required<HTMLSelectElement>('debug-view');
 const debugConnections = required<HTMLInputElement>('debug-connections');
 const debugRivers = required<HTMLInputElement>('debug-rivers');
@@ -62,6 +67,22 @@ async function start(): Promise<void> {
   renderer.onProvinceCaptured = (provinceId, previousCountry, player) => {
     setDiplomacyStatus(`Province ${provinceId} taken from ${previousCountry.name} by ${player.name}.`);
   };
+  renderer.onTimeOfDayChange = (state) => updateTimeControls(state);
+
+  debugTime.addEventListener('change', () => {
+    const hour = parseClock(debugTime.value);
+    if (hour !== undefined) renderer.setTimeOfDay(hour);
+  });
+  for (const preset of debugTimePresets) {
+    preset.addEventListener('click', () => renderer.setTimeOfDay(Number(preset.dataset.debugTime)));
+  }
+  const applyTimeMultiplier = () => {
+    if (debugTimeMultiplier.value === '') return;
+    const multiplier = renderer.setTimeMultiplier(Number(debugTimeMultiplier.value));
+    debugTimeMultiplier.value = multiplier.toFixed(1);
+  };
+  debugTimeMultiplier.addEventListener('change', applyTimeMultiplier);
+  debugTimeMultiplier.addEventListener('blur', applyTimeMultiplier);
 
   for (const tab of debugTabs) {
     tab.addEventListener('click', () => {
@@ -180,6 +201,12 @@ async function start(): Promise<void> {
     if (title) title.textContent = 'The world could not be rendered.';
     if (message) message.textContent = error instanceof Error ? error.message : String(error);
   }
+}
+
+function updateTimeControls(state: TimeOfDayState): void {
+  debugTimeState.textContent = `${state.stage} · ${state.clock}`;
+  if (document.activeElement !== debugTime) debugTime.value = state.clock;
+  if (document.activeElement !== debugTimeMultiplier) debugTimeMultiplier.value = state.multiplier.toFixed(1);
 }
 
 function renderDiplomacyState(renderer: WorldRenderer, state: DiplomacyState): void {

@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { WgslReflect } from 'wgsl_reflect/wgsl_reflect.module.js';
 import { create, globals } from 'webgpu';
 import {
-  countryLabelShader, infrastructureShader, lineShader, polarCapShader, propShader, terrainShader, waterShader,
-  waterwayShader,
+  cityLightShader, countryLabelShader, infrastructureShader, lineShader, polarCapShader, propShader, terrainShader,
+  waterShader, waterwayShader,
 } from '../src/shaders';
 
 describe('WGSL programs', () => {
@@ -91,6 +91,7 @@ describe('WGSL programs', () => {
     expect(terrainShader).toContain('let balancedStrength = mix(\n        0.10,\n        0.82,\n        overview');
     expect(terrainShader).toContain('balancedStrength,\n        0.85,\n        uniforms.interaction.z > 1.5');
     expect(terrainShader).toContain('fog * 0.39');
+    expect(terrainShader).toContain('* select(overview * 0.82, 1.0, politicalMode || diplomacyMode)');
     expect(lineShader).toContain('let countryBoundary = line.b.z < 0.0 && line.b.y > 0.5');
     expect(lineShader).toContain('height0 = abs(line.b.z) + 0.8');
     expect(lineShader).toContain('(lineParams.enabled & 2u) != 0u');
@@ -116,6 +117,7 @@ describe('WGSL programs', () => {
     ['waterways', waterwayShader, ['waterwayVertex'], ['waterwayFragment']],
     ['infrastructure', infrastructureShader, ['infrastructureVertex'], ['infrastructureFragment']],
     ['props', propShader, ['propVertex'], ['propFragment']],
+    ['city lights', cityLightShader, ['cityLightVertex'], ['cityLightFragment']],
     ['lines', lineShader, ['lineVertex'], ['lineFragment']],
     ['country labels', countryLabelShader, ['countryLabelVertex'], ['countryLabelFragment']],
   ])('parses the %s shader and exposes its render entry points', (_name, source, vertexNames, fragmentNames) => {
@@ -134,7 +136,7 @@ describe('WGSL programs', () => {
     const device = await adapter.requestDevice();
     const modules = new Map<string, GPUShaderModule>();
     for (const [label, source] of [
-      ['terrain', terrainShader], ['polar caps', polarCapShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['lines', lineShader], ['country labels', countryLabelShader],
+      ['terrain', terrainShader], ['polar caps', polarCapShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['city lights', cityLightShader], ['lines', lineShader], ['country labels', countryLabelShader],
     ] as const) {
       const module = device.createShaderModule({ label, code: source });
       modules.set(label, module);
@@ -224,6 +226,13 @@ describe('WGSL programs', () => {
     })).resolves.toBeDefined();
     await expect(device.createRenderPipelineAsync({
       layout: device.createPipelineLayout({ bindGroupLayouts: [common, layer] }),
+      vertex: { module: modules.get('city lights')!, entryPoint: 'cityLightVertex' },
+      fragment: { module: modules.get('city lights')!, entryPoint: 'cityLightFragment', targets: [{ format: 'bgra8unorm' }] },
+      primitive: { topology: 'triangle-list' },
+      depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'less-equal' },
+    })).resolves.toBeDefined();
+    await expect(device.createRenderPipelineAsync({
+      layout: device.createPipelineLayout({ bindGroupLayouts: [common, layer] }),
       vertex: { module: modules.get('lines')!, entryPoint: 'lineVertex' },
       fragment: { module: modules.get('lines')!, entryPoint: 'lineFragment', targets: [{ format: 'bgra8unorm' }] },
       primitive: { topology: 'triangle-list' }, depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'less-equal' },
@@ -236,5 +245,5 @@ describe('WGSL programs', () => {
       depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'always' },
     })).resolves.toBeDefined();
     device.destroy();
-  }, 10_000);
+  }, 20_000);
 });

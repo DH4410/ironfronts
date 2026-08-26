@@ -31,10 +31,19 @@ import {
 } from './visibility';
 import { sampleWrappedField } from './world-sampling';
 import { loadWorldAssetBuffers } from './world-assets';
+import {
+  advanceHour, calculateTimeOfDay, clampTimeMultiplier, DEFAULT_START_HOUR, formatClock, wrapHour,
+  type TimeOfDayLighting,
+} from './time-of-day';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
 
 export type MapMode = 'political' | 'diplomacy' | 'clear' | 'balanced';
+
+export interface TimeOfDayState extends TimeOfDayLighting {
+  clock: string;
+  multiplier: number;
+}
 
 export class WorldRenderer {
   readonly camera = new StrategyCamera();
@@ -44,6 +53,7 @@ export class WorldRenderer {
   onStats?: (stats: FrameStats) => void;
   onDiplomacyChange?: (state: DiplomacyState) => void;
   onProvinceCaptured?: (provinceId: number, previousCountry: CountryRecord, player: CountryRecord) => void;
+  onTimeOfDayChange?: (state: TimeOfDayState) => void;
 
   private readonly canvas: HTMLCanvasElement;
   private readonly countryLabelCanvas?: HTMLCanvasElement;
@@ -64,6 +74,7 @@ export class WorldRenderer {
   private waterwayPipeline!: GPURenderPipeline;
   private infrastructurePipeline!: GPURenderPipeline;
   private propPipeline!: GPURenderPipeline;
+  private cityLightPipeline!: GPURenderPipeline;
   private linePipeline!: GPURenderPipeline;
   private countryLabelPipeline!: GPURenderPipeline;
   private countryLabelBuffer?: GPUBuffer;
@@ -120,6 +131,10 @@ export class WorldRenderer {
   private frameHandle = 0;
   private previousTime = performance.now();
   private elapsed = 0;
+  private timeOfDayHour = DEFAULT_START_HOUR;
+  private timeMultiplier = 1;
+  private timeLighting = calculateTimeOfDay(DEFAULT_START_HOUR);
+  private reportedClock = '';
   private performanceMonitor = new PerformanceMonitor(false);
   private frameWorkload = createEmptyRenderWorkload();
   private statsFrameCountdown = 0;
@@ -397,6 +412,26 @@ export class WorldRenderer {
     this.debugView = mode;
   }
 
+  setTimeOfDay(hour: number): void {
+    this.timeOfDayHour = wrapHour(hour);
+    this.timeLighting = calculateTimeOfDay(this.timeOfDayHour);
+    this.notifyTimeOfDayChange(true);
+  }
+
+  setTimeMultiplier(multiplier: number): number {
+    this.timeMultiplier = clampTimeMultiplier(multiplier);
+    this.notifyTimeOfDayChange(true);
+    return this.timeMultiplier;
+  }
+
+  getTimeOfDay(): TimeOfDayState {
+    return {
+      ...this.timeLighting,
+      clock: formatClock(this.timeOfDayHour),
+      multiplier: this.timeMultiplier,
+    };
+  }
+
   setWireframe(enabled: boolean): void {
     this.showWireframe = enabled;
   }
@@ -553,6 +588,7 @@ export class WorldRenderer {
     this.waterwayPipeline = pipelines.waterways;
     this.infrastructurePipeline = pipelines.infrastructure;
     this.propPipeline = pipelines.props;
+    this.cityLightPipeline = pipelines.cityLights;
     this.linePipeline = pipelines.lines;
     this.countryLabelPipeline = pipelines.countryLabels;
   }
@@ -684,6 +720,9 @@ export class WorldRenderer {
     const deltaMs = Math.min(50, frameMs);
     this.previousTime = time;
     this.elapsed += deltaMs / 1000;
+    this.timeOfDayHour = advanceHour(this.timeOfDayHour, Math.min(frameMs, 250) / 1000, this.timeMultiplier);
+    this.timeLighting = calculateTimeOfDay(this.timeOfDayHour);
+    this.notifyTimeOfDayChange();
 
     let phaseStarted = performance.now();
     this.camera.update(deltaMs / 1000);
@@ -750,7 +789,7 @@ export class WorldRenderer {
     values.set(this.camera.viewProjection, 0);
     values.set(this.camera.inverseViewProjection, 16);
     values.set([this.camera.position[0], this.camera.position[1], this.camera.position[2], this.camera.target[0]], 32);
-    values.set([0.42, 0.83, 0.36, this.elapsed], 36);
+    values.set([...this.timeLighting.sunDirection, this.elapsed], 36);
     values.set([this.canvas.width, this.canvas.height, 1 / this.canvas.width, 1 / this.canvas.height], 40);
     values.set([this.manifest.world.width, this.manifest.world.height, this.manifest.terrain.maxHeight, this.debugView], 44);
     const tintMode = this.showCountryOverlay && this.performanceLayers.countryTint
@@ -759,6 +798,10 @@ export class WorldRenderer {
     const countryBordersEnabled = this.showCountryOverlay && this.performanceLayers.countryBorders ? 1 : 0;
     values.set([this.hoveredId, this.camera.distance, tintMode, countryBordersEnabled], 48);
     values.set([this.manifest.terrain.chunksX, this.manifest.terrain.chunksY, this.manifest.terrain.gridResolution, this.showWireframe ? 1 : 0], 52);
+    values.set([
+      this.timeLighting.daylight, this.timeLighting.twilight, this.timeLighting.night, this.timeOfDayHour / 24,
+    ], 56);
+    values.set([...this.timeLighting.skyColor, 0], 60);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, values);
   }
 
@@ -772,6 +815,7 @@ export class WorldRenderer {
       this.device,
       this.context,
       this.depthTexture,
+      this.timeLighting.skyColor,
       collectGpuTiming ? this.gpuQuerySet : undefined,
     );
     const pass = frame.pass;
@@ -841,6 +885,7 @@ export class WorldRenderer {
         this.drawPropChunks(pass, this.barriers, this.manifest.propChunks.barriers, [[this.barrierMesh]], 'roadFurniture', 1_900, [1_900, 1_900]);
         this.drawPropChunks(pass, this.signs, this.manifest.propChunks.signs, [[this.signMesh]], 'roadFurniture', 1_900, [1_900, 1_900]);
       }
+      if (this.performanceLayers.buildings) this.drawCityLights(pass);
     }
 
     if (labelsAboveProps) this.drawCountryLabels(pass, visibleLabelGlyphs);
@@ -870,6 +915,69 @@ export class WorldRenderer {
       collectGpuTiming ? this.gpuReadBuffer : undefined,
     );
     if (collectGpuTiming) this.readGpuTiming(gpuTimingEpoch);
+  }
+
+  private notifyTimeOfDayChange(force = false): void {
+    const clock = formatClock(this.timeOfDayHour);
+    if (!force && clock === this.reportedClock) return;
+    this.reportedClock = clock;
+    this.onTimeOfDayChange?.(this.getTimeOfDay());
+  }
+
+  private drawCityLights(pass: GPURenderPassEncoder): void {
+    if (!this.buildings.views) throw new Error('Missing visible-instance storage for city lights');
+    const viewKey = 'cityLights';
+    let view = this.buildings.views.get(viewKey);
+    if (!view) {
+      const buffer = this.device.createBuffer({
+        label: 'city light visible instances', size: Math.max(4, this.buildings.count * 3 * 4),
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      const bindGroup = this.device.createBindGroup({
+        label: 'city light visible bind group', layout: this.instanceLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.buildings.buffer } },
+          { binding: 1, resource: { buffer: this.buildings.params } },
+          { binding: 2, resource: { buffer } },
+        ],
+      });
+      view = { buffer, bindGroup, revision: -1, draws: [], visibleChunks: 0 };
+      this.buildings.views.set(viewKey, view);
+    }
+    if (view.revision !== this.camera.revision) {
+      const visibility = buildPropVisibility(
+        this.manifest,
+        this.manifest.propChunks.buildings,
+        this.buildingMeshes.map((group) => [group[group.length - 1]]),
+        this.buildings.count,
+        this.camera.position,
+        Math.max(24_000, this.manifest.world.width * 1.2),
+        [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY],
+        (centerX, centerZ, radius) => this.chunkIntersectsView(centerX, centerZ, radius),
+      );
+      view.visibleChunks = visibility.visibleChunks;
+      view.draws = visibility.draws;
+      if (visibility.instances.length) {
+        this.device.queue.writeBuffer(
+          view.buffer,
+          0,
+          visibility.instances.buffer as ArrayBuffer,
+          visibility.instances.byteOffset,
+          visibility.instances.byteLength,
+        );
+      }
+      view.revision = this.camera.revision;
+    }
+    this.frameWorkload.visibleChunks.buildings = Math.max(
+      this.frameWorkload.visibleChunks.buildings,
+      view.visibleChunks,
+    );
+    pass.setPipeline(this.cityLightPipeline);
+    pass.setBindGroup(1, view.bindGroup);
+    for (const draw of view.draws) {
+      pass.draw(6, draw.instanceCount, 0, draw.firstInstance);
+      this.recordTriangleDraw('buildings', draw.instanceCount * 2, draw.instanceCount);
+    }
   }
 
   private drawPropChunks(

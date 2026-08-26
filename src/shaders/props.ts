@@ -22,6 +22,7 @@ struct PropVertexOutput {
   @location(4) opacity: f32,
   @location(5) materialUv: vec2f,
   @location(6) treeMaterialLayer: f32,
+  @location(7) @interpolate(flat) emissiveKind: f32,
 };
 
 fn rotateY(value: vec3f, angle: f32) -> vec3f {
@@ -127,6 +128,7 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
   var opacity = 1.0;
   var materialUv = vec2f(0.0);
   var treeMaterialLayer = -1.0;
+  var emissiveKind = 0.0;
 
   if (instanceParams.kind == 0u) {
     let variant = min(u32(record.a.w + 0.5), 4u);
@@ -161,6 +163,9 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
       vec3f(0.64, 0.59, 0.49), vec3f(0.43, 0.45, 0.43)
     );
     color = wallPalette[min(palette, 3u)] * (0.82 + tint * 0.22);
+    let absoluteNormal = abs(input.normal);
+    materialUv = select(input.position.zy, input.position.xy, absoluteNormal.z > absoluteNormal.x);
+    if (input.materialPart < 0.5 && absoluteNormal.y < 0.5) { emissiveKind = 1.0; }
     if ((input.materialPart > 0.5 && input.materialPart < 1.5) || (input.materialPart > 3.5 && input.materialPart < 5.5)) {
       let roofPalette = array<vec3f, 4>(vec3f(0.25, 0.18, 0.14), vec3f(0.44, 0.31, 0.20), vec3f(0.39, 0.25, 0.18), vec3f(0.22, 0.25, 0.25));
       color = roofPalette[min(palette, 3u)] * (0.86 + tint * 0.12);
@@ -173,6 +178,7 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
     transformedNormal = rotateY(input.normal, angle);
     if (instanceParams.kind == 2u) {
       color = select(vec3f(0.15, 0.17, 0.16), vec3f(1.0, 0.72, 0.34), input.materialPart > 0.5);
+      if (input.materialPart > 0.5) { emissiveKind = 2.0; }
     } else if (instanceParams.kind == 3u) {
       color = select(vec3f(0.25, 0.22, 0.17), vec3f(0.29, 0.31, 0.30), record.b.w < 0.5);
     } else {
@@ -193,6 +199,7 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
   output.opacity = opacity;
   output.materialUv = materialUv;
   output.treeMaterialLayer = treeMaterialLayer;
+  output.emissiveKind = emissiveKind;
   return output;
 }
 
@@ -200,8 +207,6 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
 fn propFragment(input: PropVertexOutput) -> @location(0) vec4f {
   if (input.visibility < 0.03 || input.opacity < 0.03) { discard; }
   let normal = normalize(input.normal);
-  let diffuse = max(dot(normal, normalize(uniforms.sunTime.xyz)), 0.0);
-  let light = 0.42 + normal.y * 0.18 + diffuse * 0.62;
   var albedo = input.color;
   if (input.treeMaterialLayer > -0.5) {
     let materialLod = clamp(log2(max(1.0, distance(uniforms.camera.xyz, input.worldPosition) / 360.0)), 0.0, 8.0);
@@ -216,7 +221,20 @@ fn propFragment(input: PropVertexOutput) -> @location(0) vec4f {
   let distanceToCamera = distance(uniforms.camera.xyz, input.worldPosition);
   let fog = smoothstep(3100.0, 9200.0, distanceToCamera);
   let worldFog = horizontalWorldFog(input.worldPosition.x);
-  let color = mix(mix(albedo * light, vec3f(0.58, 0.69, 0.72), fog * 0.39), worldFogColor(), worldFog);
+  var emission = vec3f(0.0);
+  if (input.emissiveKind > 0.5 && input.emissiveKind < 1.5) {
+    let windowGrid = (input.materialUv + vec2f(0.5, 0.0)) * vec2f(5.0, 5.0);
+    let windowCell = floor(windowGrid);
+    let windowLocal = fract(windowGrid);
+    let inset = smoothstep(vec2f(0.16, 0.20), vec2f(0.25, 0.28), windowLocal)
+      * (vec2f(1.0) - smoothstep(vec2f(0.72, 0.68), vec2f(0.84, 0.80), windowLocal));
+    let windowShape = inset.x * inset.y;
+    let occupancy = select(0.0, 1.0, noiseHash(windowCell + floor(input.worldPosition.xz * 0.071)) > 0.34);
+    emission = vec3f(1.0, 0.58, 0.19) * windowShape * occupancy * uniforms.lighting.z * 1.35;
+  } else if (input.emissiveKind > 1.5) {
+    emission = vec3f(1.0, 0.60, 0.22) * uniforms.lighting.z * 1.65;
+  }
+  let color = mix(mix(albedo * surfaceLight(normal) + emission, distanceFogColor(), fog * 0.39), worldFogColor(), worldFog);
   return vec4f(color, input.visibility * input.opacity * (1.0 - worldFog));
 }
 `;

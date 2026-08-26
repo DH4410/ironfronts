@@ -86,8 +86,8 @@ fn polarCapFragment(input: PolarCapOutput) -> @location(0) vec4f {
   let crevasse = smoothstep(0.70, 0.91, valueNoise(input.worldPosition.xz / 16.0));
   var iceColor = mix(vec3f(0.57, 0.72, 0.76), vec3f(0.88, 0.93, 0.92), broadIce * 0.72 + iceGrain * 0.18);
   iceColor = mix(iceColor, vec3f(0.32, 0.54, 0.63), crevasse * 0.28);
-  let sunLight = 0.82 + max(dot(normalize(uniforms.sunTime.xyz), vec3f(0.0, 1.0, 0.0)), 0.0) * 0.24;
-  var color = mix(water, iceColor * sunLight, ice);
+  let iceLight = surfaceLight(vec3f(0.0, 1.0, 0.0));
+  var color = mix(water, iceColor * iceLight, ice);
 
   color = applyOceanDistanceFog(color, input.worldPosition);
   let polarFog = smoothstep(0.62, 0.995, input.progress);

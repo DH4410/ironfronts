@@ -93,7 +93,8 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   let foamBreak = valueNoise(input.worldPosition.xz / 11.0);
   let foam = input.edgeFactor * smoothstep(0.54, 0.82, foamBreak);
   color = mix(color, vec3f(0.73, 0.82, 0.77), foam * 0.52);
-  color += vec3f(1.0, 0.86, 0.61) * sun * 0.34;
+  color += vec3f(1.0, 0.86, 0.61) * sun * 0.34 * uniforms.lighting.x;
+  color *= mix(vec3f(0.27, 0.36, 0.56), vec3f(1.0), uniforms.lighting.x);
 
   // River political borders belong to the supplied centerline, not either
   // bank. Sampling beyond both banks makes the line ownership-driven without
@@ -116,7 +117,7 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   }
   let fog = smoothstep(4000.0, 12000.0, distance(uniforms.camera.xyz, input.worldPosition));
   let worldFog = horizontalWorldFog(input.worldPosition.x);
-  let foggedColor = mix(mix(color, vec3f(0.58, 0.69, 0.72), fog * 0.40), worldFogColor(), worldFog);
+  let foggedColor = mix(mix(color, distanceFogColor(), fog * 0.40), worldFogColor(), worldFog);
   return vec4f(foggedColor, input.visibility * visualCoverage * 0.985 * (1.0 - worldFog));
 }
 `;

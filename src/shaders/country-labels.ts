@@ -51,7 +51,8 @@ fn countryLabelVertex(
 @fragment
 fn countryLabelFragment(input: CountryLabelOutput) -> @location(0) vec4f {
   let sampled = textureSample(countryLabelAtlas, countryLabelSampler, input.uv);
-  let color = vec4f(sampled.rgb, sampled.a * input.fogVisibility);
+  let readableInk = mix(sampled.rgb, vec3f(0.91, 0.91, 0.83), uniforms.lighting.z * 0.42);
+  let color = vec4f(readableInk, sampled.a * input.fogVisibility);
   if (color.a < 0.01) { discard; }
   return color;
 }

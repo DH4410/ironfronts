@@ -118,6 +118,22 @@ if (!status.unsupported) {
   await captureCamera(chunkCorner, 'camera-max-zoom-chunk-corner-b.png', 180, 2.36, 1.23);
   validation.cameraRegressionCaptures = 9;
 
+  await page.evaluate(() => {
+    window.__ironfrontsRenderer?.setTimeMultiplier(0);
+    window.__ironfrontsRenderer?.setTimeOfDay(0);
+  });
+  await captureShowcase('urban', 'time-night-urban.png', 410);
+  validation.nightTime = await page.evaluate(() => window.__ironfrontsRenderer?.getTimeOfDay());
+  if (validation.nightTime?.clock !== '00:00' || validation.nightTime?.multiplier !== 0) {
+    errors.push('validation: debug clock did not switch to and freeze at midnight');
+  }
+  await page.evaluate(() => window.__ironfrontsRenderer?.setTimeOfDay(18));
+  await captureShowcase('europe', 'time-sunset-europe.png', 620);
+  await page.evaluate(() => {
+    window.__ironfrontsRenderer?.setTimeOfDay(12);
+    window.__ironfrontsRenderer?.setTimeMultiplier(1);
+  });
+
   await captureShowcase('urban', 'roads-urban.png', 410);
   await captureShowcase('mountain', 'roads-mountain.png', 480);
   await captureShowcase('steepRoad', 'roads-steep.png', 360);

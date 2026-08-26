@@ -108,6 +108,8 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let elevation = input.worldPosition.y;
   let bakedSurface = textureSample(terrainAlbedoTexture, materialSampler, wrappedUv(input.mapUv));
   var baseColor = bakedSurface.rgb;
+  var nightMapColor = vec3f(0.0);
+  var nightMapCompensation = 0.0;
   if (uniforms.interaction.y < 4500.0) {
     baseColor = sampleMaterial(0, input.worldPosition, 92.0);
     if (biome == 1u || biome == 7u) {
@@ -206,6 +208,13 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
         overlayStrength = ${POLITICAL_MAP_TINT_STRENGTH.toFixed(2)};
       }
       baseColor = mix(baseColor, coloredSurface, overlayStrength);
+      // Political and diplomacy modes are ownership-first at every zoom.
+      // Balanced mode only becomes ownership-first at strategic altitude. At
+      // night, lift those presentations toward a controlled-luminance version
+      // of their selected country/relationship color.
+      nightMapColor = overlayColor;
+      nightMapCompensation = uniforms.lighting.z
+        * select(overview * 0.82, 1.0, politicalMode || diplomacyMode);
     }
   }
 
@@ -223,10 +232,14 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
 
   baseColor *= 0.92 + variation * 0.14;
   let sunDirection = normalize(uniforms.sunTime.xyz);
-  let diffuse = max(dot(normal, sunDirection), 0.0);
-  let hemi = 0.46 + normal.y * 0.22;
-  var lit = baseColor * (hemi + diffuse * 0.62);
-  lit += vec3f(0.12, 0.15, 0.13) * pow(max(dot(normal, normalize(sunDirection + normalize(uniforms.camera.xyz - input.worldPosition))), 0.0), 24.0) * 0.08;
+  var lit = baseColor * surfaceLight(normal);
+  lit += vec3f(0.12, 0.15, 0.13) * pow(max(dot(normal, normalize(sunDirection + normalize(uniforms.camera.xyz - input.worldPosition))), 0.0), 24.0) * 0.08 * uniforms.lighting.x;
+  if (nightMapCompensation > 0.001) {
+    let countryLuminance = max(0.08, dot(nightMapColor, vec3f(0.24, 0.68, 0.08)));
+    let targetLuminance = mix(0.36, 0.52, smoothstep(0.10, 0.72, countryLuminance));
+    let readableCountryColor = min(nightMapColor * (targetLuminance / countryLuminance), vec3f(1.0));
+    lit = mix(lit, readableCountryColor, nightMapCompensation * 0.52);
+  }
 
   let debugMode = u32(uniforms.map.w + 0.5);
   if (debugMode == 1u) {
@@ -272,7 +285,7 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
 
   let distanceToCamera = distance(uniforms.camera.xyz, input.worldPosition);
   let fog = smoothstep(3600.0, 11500.0, distanceToCamera);
-  let fogColor = vec3f(0.58, 0.69, 0.72);
+  let fogColor = distanceFogColor();
   let distanceFogged = mix(lit, fogColor, fog * 0.39);
   return vec4f(mix(distanceFogged, worldFogColor(), horizontalWorldFog(input.worldPosition.x)), 1.0);
 }
