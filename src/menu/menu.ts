@@ -94,11 +94,33 @@ export function mountMenu(handlers: MenuHandlers): void {
     if (event.key === 'Escape') void closeDossier();
   });
 
+  const briefing = {
+    objective: document.getElementById('ifm-briefing-objective'),
+    theater: document.getElementById('ifm-briefing-theater'),
+    date: document.getElementById('ifm-briefing-date'),
+    duration: document.getElementById('ifm-briefing-duration'),
+    risk: document.getElementById('ifm-briefing-risk'),
+  };
+
+  /** Campaign's operation rows carry briefing data; other rows have none and are skipped. */
+  function updateBriefing(row: HTMLElement): void {
+    const { objective, theater, date, duration, risk } = briefing;
+    if (!objective || !theater || !date || !duration || !risk) return;
+    objective.textContent = row.dataset.objective ?? '';
+    theater.textContent = row.dataset.theater ?? '';
+    date.textContent = row.dataset.date ?? '';
+    duration.textContent = row.dataset.duration ?? '';
+    const level = row.dataset.risk ?? 'medium';
+    risk.textContent = level.charAt(0).toUpperCase() + level.slice(1);
+    risk.className = `is-risk-${level}`;
+  }
+
   root.querySelectorAll<HTMLButtonElement>('.ifm__row').forEach((row) => {
     row.addEventListener('click', () => {
       const list = row.parentElement;
       list?.querySelectorAll('.ifm__row').forEach((sibling) => sibling.classList.remove('is-selected'));
       row.classList.add('is-selected');
+      if (row.dataset.objective) updateBriefing(row);
     });
   });
 
