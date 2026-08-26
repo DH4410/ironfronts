@@ -213,13 +213,16 @@
 .ifm__row {
   display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .8em; padding: .8em .9em;
   border: 1px solid rgba(201,164,99,.2); border-left: 3px solid transparent;
-  background: linear-gradient(var(--hud-panel), var(--hud-panel-strong)), url('/menu/paper.jpg') center/cover;
+  background: linear-gradient(#332a1c, #1e1810), url('/menu/paper.jpg') top left/220% no-repeat;
   background-blend-mode: multiply;
   color: var(--hud-text); cursor: pointer; text-align: left; transition: border-color .2s ease;
 }
+/* Vary which corner of the paper texture shows so rows in the same list don't read as identical copies. */
+.ifm__row:nth-child(2) { background-position: top right; }
+.ifm__row:nth-child(3) { background-position: bottom right; }
+.ifm__row:nth-child(4) { background-position: bottom left; }
 .ifm__row:hover, .ifm__row.is-selected {
-  background: linear-gradient(rgba(201,164,99,.14), var(--hud-panel-strong)), url('/menu/paper.jpg') center/cover;
-  background-blend-mode: multiply;
+  background-image: linear-gradient(#5a4522, #3a2c15), url('/menu/paper.jpg');
   border-left-color: var(--hud-gold-bright);
 }
 .ifm__row b, .ifm__row small { display: block; }
