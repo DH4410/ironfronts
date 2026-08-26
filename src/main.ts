@@ -1,8 +1,12 @@
 import './styles.css';
 import '@fontsource/bitter/latin-ext-800.css';
+import '@fontsource/special-elite/latin-ext-400.css';
+import '@fontsource/cinzel-decorative/latin-ext-700.css';
+import { mountMenu } from './menu/menu';
 import { WorldRenderer, type MapMode, type TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
 import type { CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo } from './types';
+import { LOADING_QUOTES } from './loadingQuotes';
 
 const canvas = required<HTMLCanvasElement>('world');
 const countryLabels = required<HTMLCanvasElement>('country-labels');
@@ -10,6 +14,9 @@ const loading = required<HTMLElement>('loading');
 const loadingStage = required<HTMLElement>('loading-stage');
 const loadingValue = required<HTMLElement>('loading-value');
 const loadingBar = required<HTMLElement>('loading-bar');
+const loadingKind = required<HTMLElement>('loading-kind');
+const loadingQuoteText = required<HTMLElement>('loading-quote-text');
+const loadingQuoteSource = required<HTMLElement>('loading-quote-source');
 const tooltip = required<HTMLElement>('tooltip');
 const tooltipName = required<HTMLElement>('tooltip-name');
 const tooltipTerrain = required<HTMLElement>('tooltip-terrain');
@@ -51,14 +58,41 @@ const mapModeInputs = [...document.querySelectorAll<HTMLInputElement>('input[nam
 const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
-if (!navigator.gpu) {
-  loading.hidden = true;
-  unsupported.hidden = false;
-} else {
-  void start();
+let rendererStarted = false;
+mountMenu({
+  onLaunch: () => {
+    if (rendererStarted) return;
+    rendererStarted = true;
+    if (!navigator.gpu) {
+      loading.hidden = true;
+      unsupported.hidden = false;
+    } else {
+      void start();
+    }
+  },
+});
+
+function startLoadingQuotes(): () => void {
+  const order = LOADING_QUOTES.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  let index = 0;
+  const show = () => {
+    const quote = LOADING_QUOTES[order[index % order.length]];
+    loadingKind.textContent = quote.kind;
+    loadingQuoteText.textContent = quote.text;
+    loadingQuoteSource.textContent = quote.source;
+    index += 1;
+  };
+  show();
+  const timer = window.setInterval(show, 6000);
+  return () => window.clearInterval(timer);
 }
 
 async function start(): Promise<void> {
+  const stopQuotes = startLoadingQuotes();
   const renderer = new WorldRenderer(canvas, countryLabels);
   window.addEventListener('pagehide', (event) => {
     if (!event.persisted) renderer.dispose();
@@ -195,9 +229,11 @@ async function start(): Promise<void> {
       }));
     applyDebugView();
     loading.classList.add('is-done');
+    stopQuotes();
     window.setTimeout(() => { loading.hidden = true; }, 500);
     renderer.start();
   } catch (error) {
+    stopQuotes();
     console.error(error);
     loading.hidden = true;
     unsupported.hidden = false;
