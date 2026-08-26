@@ -77,9 +77,11 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
     const supportsTrees = isForest || visual === 'Jungle' || visual === 'Boreal' || supportsPlainTrees;
 
     if (supportsTrees) {
+      // Forests should read as texture/detail at map scale, not as opaque piles
+      // of overlapping props. Use fewer, slightly smaller trees than before.
       const target = isPlain
-        ? clamp(Math.round(area / 95), 0, 12)
-        : clamp(Math.round(area / 11 * (isForest ? 1 : 0.35)), 5, isForest ? 90 : 36);
+        ? clamp(Math.round(area / 120), 0, 8)
+        : clamp(Math.round(area / 16 * (isForest ? 1 : 0.32)), 4, isForest ? 58 : 28);
       let placed = 0;
       for (let attempt = 0; attempt < target * 14 && placed < target; attempt += 1) {
         const x = minX + (maxX - minX) * rng();
@@ -90,7 +92,7 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
         if (roadClearance[roadIndex] > 20) continue;
         const variant = pickTreeVariant(rng, visual, isPlain);
         const palette = pickTreePalette(rng, visual, isPlain);
-        trees.push(x, y, 0.72 + rng() * 0.72, variant, rng() * Math.PI * 2, 0.82 + rng() * 0.28, encodedId, palette);
+        trees.push(x, y, 0.68 + rng() * 0.50, variant, rng() * Math.PI * 2, 0.92 + rng() * 0.22, encodedId, palette);
         placed += 1;
       }
     }
