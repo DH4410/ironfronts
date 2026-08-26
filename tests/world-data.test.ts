@@ -115,14 +115,16 @@ describe('generated v12 world package', () => {
 
   it('reconstructs the authoritative river graph and both static ocean-water canals', async () => {
     const data = await manifest();
-    const [vertexBytes, indexBytes, networkBytes, maskBytes, provinceIdBytes, nodeBytes, reportBytes] = await Promise.all([
+    const [vertexBytes, indexBytes, networkBytes, maskBytes, provinceIdBytes, heightBytes, nodeBytes, reportBytes] = await Promise.all([
       readFile('public/world/waterway-vertices.f32'), readFile('public/world/waterway-indices.u32'),
       readFile('public/world/waterway-network-lines.f32'),
       readFile('public/world/navigation.rgba8'),
       readFile('public/world/province-ids.u16'),
+      readFile('public/world/height.f32'),
       readFile('material/movement/network_nodes.json', 'utf8'), readFile('public/world/world-generation-report.json', 'utf8'),
     ]);
     const vertices = viewF32(vertexBytes), indices = viewU32(indexBytes), network = viewF32(networkBytes);
+    const heights = viewF32(heightBytes);
     const provinceIds = new Uint16Array(provinceIdBytes.buffer, provinceIdBytes.byteOffset, provinceIdBytes.byteLength / 2);
     const source = JSON.parse(nodeBytes) as { nodes: Array<{ kind: string; location_name: string }> };
     const report = JSON.parse(reportBytes);
@@ -130,8 +132,11 @@ describe('generated v12 world package', () => {
     const sourceRiverPoints = source.nodes.filter((node) => node.kind === 'sea_point' && riverNames.has(node.location_name));
     const sourceCanalPoints = source.nodes.filter((node) => node.kind === 'sea_point' && ['Kiel Canal', 'Suez Channel'].includes(node.location_name));
     expect(report.version).toBe('world-generation-v12');
-    expect(report.waterways.animatedSurface).toBe(true);
-    expect(report.waterways.animation).toBe('tangent-advection-domain-warp');
+    expect(report.waterways.animatedSurface).toBe(false);
+    expect(report.waterways.animation).toBe('none');
+    expect(report.waterways.terrainTreatment).toBe('unmodified terrain; independently draped surface vertices');
+    expect(report.waterways.terrainClipMask).toBe(false);
+    expect(report.waterways.terrainOverlayMask).toBe(true);
     expect(report.waterways.minimumRiverWidth).toBeGreaterThanOrEqual(11);
     expect(report.waterways.canalSurface).toBe('static-water province-zero channel');
     expect(report.waterways.riverSystems).toHaveLength(24);
@@ -173,14 +178,39 @@ describe('generated v12 world package', () => {
     expect(movementVisualOverlap).toBe(0);
     expect(vertices.every(Number.isFinite)).toBe(true);
     let centerVertices = 0;
+    let drapedLandVertices = 0;
+    const sampleTerrainHeight = (x: number, z: number) => {
+      const width = data.fields.height.width, height = data.fields.height.height;
+      const fx = ((x % data.world.width) + data.world.width) % data.world.width / data.world.width * width - 0.5;
+      const fz = Math.max(0, Math.min(height - 1, z / data.world.height * height - 0.5));
+      const x0raw = Math.floor(fx), z0 = Math.floor(fz), tx = fx - x0raw, tz = fz - z0;
+      const x0 = ((x0raw % width) + width) % width, x1 = (x0 + 1) % width, z1 = Math.min(height - 1, z0 + 1);
+      const top = heights[z0 * width + x0] * (1 - tx) + heights[z0 * width + x1] * tx;
+      const bottom = heights[z1 * width + x0] * (1 - tx) + heights[z1 * width + x1] * tx;
+      return top * (1 - tz) + bottom * tz;
+    };
     for (let vertex = 0; vertex < data.buffers.waterwayVertices.count; vertex += 113) {
       const offset = vertex * 10;
-      expect(vertices[offset + 1]).toBeGreaterThanOrEqual(0.4);
-      expect(vertices[offset + 1]).toBeLessThanOrEqual(60.5);
+      expect(vertices[offset + 1]).toBeGreaterThanOrEqual(0.079);
+      expect(vertices[offset + 1]).toBeLessThanOrEqual(60.7);
       expect([0, 1]).toContain(vertices[offset + 6]);
       expect(Math.hypot(vertices[offset + 7], vertices[offset + 8])).toBeGreaterThan(0.99);
       expect(vertices[offset + 9]).toBeGreaterThan(0);
+      const x = vertices[offset], y = vertices[offset + 1], z = vertices[offset + 2];
+      const px = Math.min(data.fields.navigation.width - 1, Math.max(0,
+        Math.floor(((x % data.world.width) + data.world.width) % data.world.width / data.world.width * data.fields.navigation.width)));
+      const pz = Math.min(data.fields.navigation.height - 1, Math.max(0,
+        Math.floor(z / data.world.height * data.fields.navigation.height)));
+      if (provinceIds[pz * data.fields.navigation.width + px] !== 0) {
+        const lift = y - sampleTerrainHeight(x, z);
+        // Stored float32 X/Z values can shift the resampled height slightly on
+        // the steepest cells; the authored lift itself is 0.08-0.098.
+        expect(lift).toBeGreaterThanOrEqual(0.065);
+        expect(lift).toBeLessThanOrEqual(0.115);
+        drapedLandVertices += 1;
+      }
     }
+    expect(drapedLandVertices).toBeGreaterThan(100);
     for (let vertex = 0; vertex < data.buffers.waterwayVertices.count; vertex += 1) {
       const offset = vertex * 10;
       if (vertices[offset + 5] > 0.01) continue;

@@ -3,9 +3,11 @@ import { blurField, clamp, distanceToValue } from './raster.mjs';
 // The province raster remains the authoritative topology. This presentation
 // field turns its hard boundary into a signed, linearly filterable coastline
 // without the channel-closing behavior of a blur.
-export function buildBankField(provinceIds, width, height, worldWidth, worldHeight) {
+export function buildBankField(provinceIds, width, height, worldWidth, worldHeight, landOverride) {
   const land = new Float32Array(provinceIds.length);
-  for (let index = 0; index < provinceIds.length; index += 1) land[index] = provinceIds[index] === 0 ? 0 : 1;
+  for (let index = 0; index < provinceIds.length; index += 1) {
+    land[index] = landOverride ? Number(landOverride[index] > 0) : provinceIds[index] === 0 ? 0 : 1;
+  }
   const distanceToWater = distanceToValue(land, width, height, 0);
   const distanceToLand = distanceToValue(land, width, height, 1);
   const texelSize = (worldWidth / width + worldHeight / height) * 0.5;

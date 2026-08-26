@@ -1,6 +1,5 @@
 import { buildWaterways as buildMovementWaterways } from './waterways.mjs';
 import { buildVisualWaterways } from './visual-waterways.mjs';
-import { smoothMovementWaterwayGrades } from './waterway-smoothing.mjs';
 
 function mergeChunkedIndices(movement, visual) {
   const vertexOffset = movement.vertices.length / 10;
@@ -39,7 +38,6 @@ function normalizeVisualVertexSemantics(visual) {
 
 export function buildTerrainAwareWaterways({ visualMask, ...movementArgs }) {
   const movement = buildMovementWaterways(movementArgs);
-  const movementSmoothing = smoothMovementWaterwayGrades(movement.vertices);
   const visual = buildVisualWaterways({
     visualMask,
     provinceIds: movementArgs.provinceIds,
@@ -61,7 +59,11 @@ export function buildTerrainAwareWaterways({ visualMask, ...movementArgs }) {
     vertices,
     indices: merged.indices,
     chunkRanges: merged.ranges,
-    report: { ...movement.report, surfaceSmoothing: movementSmoothing, visualSurface: visual.report },
+    report: {
+      ...movement.report,
+      surfaceDraping: 'independent terrain sample per vertex',
+      visualSurface: visual.report,
+    },
     stats: {
       ...movement.stats,
       visualWaterwayTriangles: visual.indices.length / 3,

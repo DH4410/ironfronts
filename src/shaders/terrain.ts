@@ -66,8 +66,6 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let bankField = bankFieldAt(input.mapUv);
   if (bankField.r <= 0.5) { discard; }
   let navigation = navigationAt(input.mapUv);
-  let riverField = navigation.ba;
-  if (riverField.r > 0.45 || riverField.g > 0.45) { discard; }
 
   let surface = surfaceAt(input.mapUv);
   let terrain = surface.r;

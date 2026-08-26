@@ -14,13 +14,14 @@ describe('WGSL programs', () => {
     expect(terrainShader).not.toContain('if (elevation < 12.0)');
   });
 
-  it('clips terrain around widened visual-only channels without replacing movement-river ribbons', () => {
-    expect(terrainShader).toContain('riverField.r > 0.45 || riverField.g > 0.45');
-    expect(waterShader).toContain('if (riverField.r > 0.45)');
-    expect(waterShader).toContain('landAt(input.mapUv) >= 0.5 && riverField.g <= 0.45');
+  it('renders rivers as terrain overlays without punching holes through mountain surfaces', () => {
+    const terrainFragment = terrainShader.slice(terrainShader.indexOf('@fragment\nfn terrainFragment'));
+    expect(terrainFragment).not.toContain('if (riverField.r');
+    expect(terrainFragment).not.toContain('if (riverField.g');
+    expect(waterShader).toContain('riverField.r > 0.45 || riverField.g > 0.45');
+    expect(waterShader).toContain('if (landAt(input.mapUv) >= 0.5)');
     expect(terrainShader).toContain('bankField.g');
-    expect(waterShader).toContain('mix(waterDepthAt(input.mapUv), 0.08, visualRiver)');
-    expect(waterShader).toContain('(1.0 - visualRiver * 0.80)');
+    expect(waterShader).toContain('oceanSurfaceColor(input.worldPosition');
     expect(waterShader).not.toContain('if (provinceAt(input.mapUv)');
   });
 
@@ -31,17 +32,20 @@ describe('WGSL programs', () => {
     expect(infrastructureShader).not.toContain('corridorId');
   });
 
-  it('advects supplied waterways along dense flow vectors and gives canals the ocean palette', () => {
-    expect(waterwayShader).toContain('uniforms.sunTime.w');
+  it('renders supplied waterways with static flow-aligned detail and gives canals the ocean palette', () => {
+    const fragment = waterwayShader.slice(waterwayShader.indexOf('@fragment\nfn waterwayFragment'));
+    expect(fragment).not.toContain('uniforms.sunTime.w');
+    expect(fragment).not.toContain('advectedTime');
     expect(waterwayShader).toContain('let flow = normalize(input.flow');
-    expect(waterwayShader).toContain('brokenStreak');
+    expect(fragment).not.toContain('brokenStreak');
     expect(waterwayShader).toContain('let canal = input.kind > 0.5');
-    expect(waterwayShader).toContain('oceanDeep');
+    expect(waterwayShader).toContain('let coastShallow = vec3f(0.12, 0.48, 0.52)');
+    expect(waterwayShader).toContain('let coastDeep = vec3f(0.025, 0.16, 0.255)');
+    expect(waterwayShader).toContain('normalize(cross(screenDy, screenDx))');
     expect(waterwayShader).toContain('!canal && uniforms.interaction.w > 0.5');
     expect(waterwayShader).toContain('leftCountry.a > 0.0 && rightCountry.a > 0.0');
     expect(waterwayShader).toContain('let dashVisible = fract(input.waterUv.x) < 0.54');
-    expect(terrainShader).toContain('riverField.r > 0.45');
-    expect(terrainShader).toContain('riverField.g > 0.45');
+    expect(terrainShader).not.toContain('let riverField = navigation.ba');
     expect(terrainShader).toContain('debugMode == 6u');
     expect(terrainShader).toContain('debugMode == 9u');
     expect(lineShader).toContain('lineParams.mode == 2u');

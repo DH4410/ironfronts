@@ -12,8 +12,8 @@ import { buildBankField } from './world/water-fields.mjs';
 import { buildWaterways } from './world/waterways.mjs';
 import { buildTerrainAwareWaterways } from './world/terrain-aware-waterways.mjs';
 import { fbm } from './world/noise.mjs';
-import { seatRiverTerrain } from './world/river-terrain.mjs';
 import { buildVisualRiverField } from './world/visual-rivers.mjs';
+import { buildTerrainTopology, promoteRiverChannelsToTerrain } from './world/river-overlay-terrain.mjs';
 import { buildBakedTerrainAlbedo, buildNavigationField, buildTerrainNormals } from './world/terrain-precompute.mjs';
 import { fillProvincePolygon, readMaterialJson } from './world/source-data.mjs';
 import { buildPoliticalPalette } from './world/political-palette.mjs';
@@ -73,8 +73,6 @@ async function main() {
     geometryById.set(province.province_id, province);
     for (const component of province.components) fillProvincePolygon(provinceIds, component, province.province_id + 1);
   }
-  const bankField = buildBankField(provinceIds, ID_WIDTH, ID_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT);
-
   const metadataById = new Map(metadata.provinces.map((province) => [province.province_id, province]));
   const maximumProvinceId = Math.max(...metadata.provinces.map((province) => province.province_id));
   const areaCounts = new Uint32Array(maximumProvinceId + 2);
@@ -135,33 +133,21 @@ async function main() {
       reliefField[index] = [12, 46, 126, 30, 10][terrain];
     }
   }
-  const coastBlend = blurField(landField.slice(), FIELD_WIDTH, FIELD_HEIGHT, 5, 3);
-  const landDistance = distanceToValue(landField, FIELD_WIDTH, FIELD_HEIGHT, 0);
-  const oceanDistance = distanceToValue(landField, FIELD_WIDTH, FIELD_HEIGHT, 1);
-  const { heights, caps, limits, report: topographyReport } = generateTopography({
-    landField, terrainField, provinceField, coastBlend, landDistance, markers, borderData, connectionData, networkData, provinces: metadata.provinces,
+  const provisionalCoastBlend = blurField(landField.slice(), FIELD_WIDTH, FIELD_HEIGHT, 5, 3);
+  const provisionalLandDistance = distanceToValue(landField, FIELD_WIDTH, FIELD_HEIGHT, 0);
+  let topography = generateTopography({
+    landField, terrainField, provinceField, coastBlend: provisionalCoastBlend, landDistance: provisionalLandDistance,
+    markers, borderData, connectionData, networkData, provinces: metadata.provinces,
   });
-  for (let y = 0; y < FIELD_HEIGHT; y += 1) {
-    const v = y / Math.max(1, FIELD_HEIGHT - 1);
-    for (let x = 0; x < FIELD_WIDTH; x += 1) {
-      const index = y * FIELD_WIDTH + x, offset = index * 4;
-      if (!landField[index]) {
-        surface[offset + 2] = Math.round(clamp(oceanDistance[index] / 42, 0, 1) * 255);
-        continue;
-      }
-      surface[offset] = terrainField[index];
-      surface[offset + 1] = biomeField[index];
-      surface[offset + 2] = Math.round(fbm(x / FIELD_WIDTH, v) * 255);
-      surface[offset + 3] = 255;
-    }
-  }
+  let heights = topography.heights;
+  let topographyReport = topography.report;
 
   console.log('Packing movement graph, forests, and cities…');
   const connections = buildConnections(connectionData);
 
-  // The first movement-river pass gives the visual-only detector its exact
-  // exclusion mask and provides terrain-aware river samples for valley seating.
-  console.log('Preparing terrain-aware river corridors...');
+  // The first pass supplies the exclusion mask used to distinguish authored
+  // movement rivers from visual-only topology channels.
+  console.log('Preparing river corridors...');
   const preliminaryWaterways = buildWaterways({
     networkData, connectionData, provinceIds, idWidth: ID_WIDTH, idHeight: ID_HEIGHT, heights,
     heightWidth: FIELD_WIDTH, heightHeight: FIELD_HEIGHT, worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
@@ -171,16 +157,47 @@ async function main() {
     provinceIds, movementMask: preliminaryWaterways.mask, networkData, connectionData, width: ID_WIDTH, height: ID_HEIGHT,
     worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT,
   });
-  console.log('Seating river surfaces into surrounding terrain...');
-  const riverTerrain = seatRiverTerrain({
-    heights, caps, limits, landField, terrainField, fieldWidth: FIELD_WIDTH, fieldHeight: FIELD_HEIGHT,
-    worldWidth: WORLD_WIDTH, worldHeight: WORLD_HEIGHT, movementWaterways: preliminaryWaterways,
-    visualMask: visualRivers.mask, provinceIds, idWidth: ID_WIDTH, idHeight: ID_HEIGHT,
+  console.log('Restoring river channels as intact overlay terrain...');
+  const riverTerrain = promoteRiverChannelsToTerrain({
+    landField, terrainField, biomeField, provinceField, reliefField,
+    width: FIELD_WIDTH, height: FIELD_HEIGHT,
+    movementMask: preliminaryWaterways.mask, visualMask: visualRivers.mask,
+    maskWidth: ID_WIDTH, maskHeight: ID_HEIGHT,
   });
-  Object.assign(topographyReport, riverTerrain.summary);
-  topographyReport.riverSeating = riverTerrain.report;
-
-  console.log('Compiling terrain-aware movement and visual river surfaces...');
+  const terrainLandField = riverTerrain.terrainLandField;
+  const terrainCoastBlend = blurField(terrainLandField.slice(), FIELD_WIDTH, FIELD_HEIGHT, 5, 3);
+  const terrainLandDistance = distanceToValue(terrainLandField, FIELD_WIDTH, FIELD_HEIGHT, 0);
+  topography = generateTopography({
+    landField: terrainLandField, terrainField, provinceField,
+    coastBlend: terrainCoastBlend, landDistance: terrainLandDistance,
+    markers, borderData, connectionData, networkData, provinces: metadata.provinces,
+  });
+  heights = topography.heights;
+  topographyReport = topography.report;
+  topographyReport.riverOverlayRestoration = {
+    method: 'province-zero river channels promoted before final topography generation',
+    restoredCells: riverTerrain.restoredCells,
+  };
+  const terrainTopology = buildTerrainTopology(provinceIds, preliminaryWaterways.mask, visualRivers.mask);
+  const bankField = buildBankField(
+    provinceIds, ID_WIDTH, ID_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, terrainTopology,
+  );
+  const oceanDistance = distanceToValue(terrainLandField, FIELD_WIDTH, FIELD_HEIGHT, 1);
+  for (let y = 0; y < FIELD_HEIGHT; y += 1) {
+    const v = y / Math.max(1, FIELD_HEIGHT - 1);
+    for (let x = 0; x < FIELD_WIDTH; x += 1) {
+      const index = y * FIELD_WIDTH + x, offset = index * 4;
+      if (!terrainLandField[index]) {
+        surface[offset + 2] = Math.round(clamp(oceanDistance[index] / 42, 0, 1) * 255);
+        continue;
+      }
+      surface[offset] = terrainField[index];
+      surface[offset + 1] = biomeField[index];
+      surface[offset + 2] = Math.round(fbm(x / FIELD_WIDTH, v) * 255);
+      surface[offset + 3] = 255;
+    }
+  }
+  console.log('Draping movement and visual river surfaces over terrain...');
   const waterways = buildTerrainAwareWaterways({
     visualMask: visualRivers.mask,
     networkData, connectionData, provinceIds, idWidth: ID_WIDTH, idHeight: ID_HEIGHT, heights,
