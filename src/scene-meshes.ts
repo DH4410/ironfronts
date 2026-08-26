@@ -1,3 +1,4 @@
+import { externalBuildingMeshes } from './external-models';
 import { MeshBuilder } from './geometry';
 
 export interface Mesh {
@@ -56,11 +57,18 @@ export function createTreeFamilyMesh(device: GPUDevice, family: 'broadleaf' | 'c
 }
 
 export function createBuildingArchetypeMesh(device: GPUDevice, archetype: number, lod: 0 | 1): Mesh {
+  if (lod === 0) {
+    const sourced = externalBuildingMeshes.get(archetype);
+    if (sourced) return uploadMesh(device, `Kenney CC0 building archetype ${archetype}`, sourced.vertices, sourced.indices);
+  }
+
+  // Distant fallback remains intentionally tiny: sourced high-detail geometry
+  // is only submitted close to the camera, where its silhouette matters.
   const builder = new MeshBuilder();
   builder.addBox(-0.5, 0, -0.5, 0.5, 1, 0.5, 0);
   if (archetype === 1) builder.addHipRoof(0, 1, 0, 0.62, 1.24, 4);
   else if (archetype === 2) builder.addBox(-0.54, 1, -0.54, 0.54, 1.055, 0.54, 5, 5);
-  else builder.addGableRoof(-0.56, 1, -0.56, 0.56, lod === 0 ? 1.24 : 1.18, 0.56, 1);
+  else builder.addGableRoof(-0.56, 1, -0.56, 0.56, 1.18, 0.56, 1);
   if (lod === 0 && archetype === 3) builder.addBox(-0.68, 0, -0.38, 0.68, 0.42, 0.38, 2, 2);
   if (lod === 0 && archetype === 4) builder.addBox(-0.18, 1, -0.18, 0.18, 1.52, 0.18, 3, 3);
   return uploadMesh(device, `building archetype ${archetype} lod ${lod}`, new Float32Array(builder.vertices), new Uint16Array(builder.indices));
@@ -71,21 +79,21 @@ export function createLampMesh(device: GPUDevice): Mesh {
   builder.addBox(-0.07, 0, -0.07, 0.07, 3.2, 0.07, 0);
   builder.addBox(-0.10, 3.0, -0.10, 0.10, 3.42, 0.10, 0);
   builder.addBox(-0.18, 3.38, -0.18, 0.18, 3.57, 0.18, 1, 1);
-  return uploadMesh(device,'road lamp mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
+  return uploadMesh(device, 'road lamp mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
 }
 
 export function createBarrierMesh(device: GPUDevice): Mesh {
   const builder = new MeshBuilder();
   for (const x of [-0.46, 0, 0.46]) builder.addBox(x - 0.025, 0, -0.07, x + 0.025, 0.86, 0.07, 0);
   builder.addBox(-0.5, 0.58, -0.055, 0.5, 0.72, 0.055, 1, 1);
-  return uploadMesh(device,'road barrier mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
+  return uploadMesh(device, 'road barrier mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
 }
 
 export function createSignMesh(device: GPUDevice): Mesh {
   const builder = new MeshBuilder();
   builder.addBox(-0.045, 0, -0.045, 0.045, 1.55, 0.045, 0);
   builder.addBox(-0.42, 1.08, -0.055, 0.42, 1.52, 0.055, 1, 1);
-  return uploadMesh(device,'road sign mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
+  return uploadMesh(device, 'road sign mesh', new Float32Array(builder.vertices), new Uint16Array(builder.indices));
 }
 
 function uploadMesh(device: GPUDevice, label: string, vertices: Float32Array, indices: Uint16Array): Mesh {
