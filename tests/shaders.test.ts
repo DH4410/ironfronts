@@ -66,6 +66,8 @@ describe('WGSL programs', () => {
   it('uses precomputed terrain normals, faithful mipmapped albedo, prop AO, and packed navigation', () => {
     expect(terrainShader).toContain('let navigation = navigationAt(input.mapUv)');
     expect(terrainShader).toContain('let bakedSurface = textureSample(terrainAlbedoTexture');
+    expect(terrainShader).toContain('fn surfaceTransitionAt');
+    expect(terrainShader).toContain('surfaceTransition * 0.92');
     expect(terrainShader).toContain('baseColor *= bakedSurface.a');
     expect(terrainShader).toContain('smoothstep(3000.0, 4500.0');
     expect(terrainShader).not.toContain('textureSampleLevel(terrainAlbedoTexture');

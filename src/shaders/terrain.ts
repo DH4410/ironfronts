@@ -61,6 +61,34 @@ fn sampleMaterial(layer: i32, worldPosition: vec3f, scale: f32) -> vec3f {
   return mix(detail, broadDetail, 0.18);
 }
 
+fn sameSurfaceMaterial(a: vec4u, b: vec4u) -> bool {
+  return a.r == b.r && a.g == b.g;
+}
+
+fn surfaceTransitionAt(mapUv: vec2f, center: vec4u) -> f32 {
+  let dimensions = vec2f(textureDimensions(surfaceTexture));
+  let texel = 1.0 / dimensions;
+  let cellUv = fract(wrappedUv(mapUv) * dimensions);
+  let left = surfaceAt(mapUv - vec2f(texel.x, 0.0));
+  let right = surfaceAt(mapUv + vec2f(texel.x, 0.0));
+  let up = surfaceAt(mapUv - vec2f(0.0, texel.y));
+  let down = surfaceAt(mapUv + vec2f(0.0, texel.y));
+  var transition = 0.0;
+  if (!sameSurfaceMaterial(center, left)) {
+    transition = max(transition, 1.0 - smoothstep(0.0, 0.82, cellUv.x));
+  }
+  if (!sameSurfaceMaterial(center, right)) {
+    transition = max(transition, 1.0 - smoothstep(0.0, 0.82, 1.0 - cellUv.x));
+  }
+  if (!sameSurfaceMaterial(center, up)) {
+    transition = max(transition, 1.0 - smoothstep(0.0, 0.82, cellUv.y));
+  }
+  if (!sameSurfaceMaterial(center, down)) {
+    transition = max(transition, 1.0 - smoothstep(0.0, 0.82, 1.0 - cellUv.y));
+  }
+  return transition;
+}
+
 @fragment
 fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let bankField = bankFieldAt(input.mapUv);
@@ -105,6 +133,11 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
 
     let shoreline = bankField.g * smoothstep(0.50, 0.72, bankField.r);
     baseColor = mix(baseColor, sampleMaterial(7, input.worldPosition, 52.0), shoreline * 0.72);
+    // The baked albedo is linearly filtered, so using it only in the narrow
+    // categorical boundary band removes square terrain/biome texel edges while
+    // retaining full-resolution tiled material detail everywhere else.
+    let surfaceTransition = surfaceTransitionAt(input.mapUv, surface);
+    baseColor = mix(baseColor, bakedSurface.rgb, surfaceTransition * 0.92);
     baseColor = mix(baseColor, bakedSurface.rgb, smoothstep(3000.0, 4500.0, uniforms.interaction.y));
   }
   if (terrain == 3u) {
