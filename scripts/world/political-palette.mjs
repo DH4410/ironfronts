@@ -1,4 +1,4 @@
-const FAMILY_HUES = [18, 62, 116, 168, 218, 316];
+const FAMILY_HUES = [28, 72, 126, 174, 222, 310];
 const GOLDEN_RATIO_CONJUGATE = 0.6180339887498949;
 
 /** Assigns stable muted colors while keeping adjacent countries in different hue families. */
@@ -74,9 +74,11 @@ function saturation(countryId, neighbors, assignments) {
 function buildFamilyCandidates(baseHue, family, seed) {
   return Array.from({ length: 64 }, (_, index) => {
     const phase = hash(family * 131 + index, seed) / 0xffffffff;
-    const lightness = 0.62 + fract(index * GOLDEN_RATIO_CONJUGATE + phase * 0.17) * 0.12;
-    const chroma = 0.038 + fract(index * 0.414213562373095 + phase * 0.23) * 0.034;
-    const hue = baseHue + (fract(index * 0.7320508075688772 + phase) - 0.5) * 20;
+    // Strategy-map ownership should read clearly without repainting the terrain
+    // in bright poster colors. Keep the families distinct but low-chroma.
+    const lightness = 0.58 + fract(index * GOLDEN_RATIO_CONJUGATE + phase * 0.17) * 0.10;
+    const chroma = 0.024 + fract(index * 0.414213562373095 + phase * 0.23) * 0.024;
+    const hue = baseHue + (fract(index * 0.7320508075688772 + phase) - 0.5) * 16;
     const radians = hue * Math.PI / 180;
     const lab = [lightness, chroma * Math.cos(radians), chroma * Math.sin(radians)];
     return { lab, hex: oklabToHex(lab) };

@@ -53,7 +53,15 @@ fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
     return vec4f(mix(vec3f(0.025, 0.12, 0.25), vec3f(0.18, 0.48, 0.98), visualRiver), 1.0);
   }
   let depth = mix(waterDepthAt(input.mapUv), 0.08, visualRiver);
-  let color = oceanSurfaceColor(input.worldPosition, depth, bankAt(input.mapUv), visualRiver);
+  let rawColor = oceanSurfaceColor(input.worldPosition, depth, bankAt(input.mapUv), visualRiver);
+  // Retain waves, reflections and shoreline detail, but pull the base ocean
+  // away from bright cyan toward a quieter cartographic teal/navy range.
+  let strategicWater = mix(
+    vec3f(0.075, 0.29, 0.31),
+    vec3f(0.025, 0.12, 0.19),
+    smoothstep(0.0, 0.62, depth)
+  );
+  let color = mix(rawColor, strategicWater, 0.32);
   let distanceFogged = applyOceanDistanceFog(color, input.worldPosition);
   return vec4f(mix(distanceFogged, worldFogColor(), horizontalWorldFog(input.worldPosition.x)), 0.97);
 }

@@ -6,12 +6,13 @@ export interface ExternalMeshData {
 const KENNEY_SUBURBAN_BASE = 'https://raw.githubusercontent.com/petroulacl/fps-buildings-env-kit/main/buildings/kenney-city-kit-suburban/Models/OBJ%20format';
 const MODEL_FETCH_TIMEOUT_MS = 2_000;
 
+// Keep the map-scale settlement pass deliberately restrained. These three
+// compact Kenney CC0 houses produce cleaner silhouettes than the taller,
+// more decorative variants previously used for archetypes 3 and 4.
 const BUILDING_SOURCES = [
   `${KENNEY_SUBURBAN_BASE}/building-type-a.obj`,
   `${KENNEY_SUBURBAN_BASE}/building-type-g.obj`,
   `${KENNEY_SUBURBAN_BASE}/building-type-i.obj`,
-  `${KENNEY_SUBURBAN_BASE}/building-type-q.obj`,
-  `${KENNEY_SUBURBAN_BASE}/building-type-t.obj`,
 ] as const;
 
 /**
