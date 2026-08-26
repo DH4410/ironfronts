@@ -95,6 +95,7 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   color = mix(color, vec3f(0.73, 0.82, 0.77), foam * 0.52);
   color += vec3f(1.0, 0.86, 0.61) * sun * 0.34 * uniforms.lighting.x;
   color *= mix(vec3f(0.27, 0.36, 0.56), vec3f(1.0), uniforms.lighting.x);
+  color = mix(color, color * vec3f(0.72, 0.79, 0.83), uniforms.sky.w * 0.32);
 
   // River political borders belong to the supplied centerline, not either
   // bank. Sampling beyond both banks makes the line ownership-driven without

@@ -132,7 +132,14 @@ if (!status.unsupported) {
   await page.evaluate(() => {
     window.__ironfrontsRenderer?.setTimeOfDay(12);
     window.__ironfrontsRenderer?.setTimeMultiplier(1);
+    window.__ironfrontsRenderer?.setRainEnabled(true);
   });
+  await page.waitForTimeout(1_600);
+  await captureShowcase('urban', 'weather-rain-urban.png', 410);
+  validation.rainIntensity = await page.evaluate(() => window.__ironfrontsRenderer?.getRainIntensity());
+  if ((validation.rainIntensity ?? 0) < 0.95) errors.push('validation: rain did not reach full intensity');
+  await page.evaluate(() => window.__ironfrontsRenderer?.setRainEnabled(false));
+  await page.waitForTimeout(1_600);
 
   await captureShowcase('urban', 'roads-urban.png', 410);
   await captureShowcase('mountain', 'roads-mountain.png', 480);

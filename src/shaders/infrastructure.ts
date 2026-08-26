@@ -50,10 +50,11 @@ fn infrastructureFragment(input: InfrastructureOutput) -> @location(0) vec4f {
   let rutB = 1.0 - smoothstep(0.045, 0.12, abs(input.roadUv.y - 0.57));
   var color = mix(vec3f(0.36, 0.285, 0.17), vec3f(0.245, 0.19, 0.115), max(rutA, rutB) * 0.55) * (0.90 + grit * 0.16);
   if (dotted) { color = vec3f(0.96, 0.73, 0.25) * (0.94 + grit * 0.06); }
+  color = mix(color, color * vec3f(0.69, 0.75, 0.78), uniforms.sky.w * 0.44);
   let normal = normalize(input.normal);
   let fog = smoothstep(3500.0, 11000.0, distance(uniforms.camera.xyz, input.worldPosition));
   let worldFog = horizontalWorldFog(input.worldPosition.x);
-  color = mix(mix(color * surfaceLight(normal), distanceFogColor(), fog * 0.39), worldFogColor(), worldFog);
+  color = mix(mix(color * surfaceLight(normal) + wetSurfaceSheen(normal, input.worldPosition), distanceFogColor(), fog * 0.39), worldFogColor(), worldFog);
   return vec4f(color, input.visibility * (1.0 - worldFog));
 }
 `;

@@ -5,6 +5,7 @@ export { infrastructureShader } from './shaders/infrastructure';
 export { lineShader } from './shaders/lines';
 export { polarCapShader } from './shaders/polar-caps';
 export { propShader } from './shaders/props';
+export { rainShader } from './shaders/rain';
 export { terrainShader } from './shaders/terrain';
 export { waterShader } from './shaders/water';
 export { waterwayShader } from './shaders/waterways';

@@ -20,6 +20,7 @@ const debugTime = required<HTMLInputElement>('debug-time');
 const debugTimeState = required<HTMLOutputElement>('debug-time-state');
 const debugTimeMultiplier = required<HTMLInputElement>('debug-time-multiplier');
 const debugTimePresets = [...document.querySelectorAll<HTMLButtonElement>('[data-debug-time]')];
+const debugRain = required<HTMLInputElement>('debug-rain');
 const debugView = required<HTMLSelectElement>('debug-view');
 const debugConnections = required<HTMLInputElement>('debug-connections');
 const debugRivers = required<HTMLInputElement>('debug-rivers');
@@ -83,6 +84,7 @@ async function start(): Promise<void> {
   };
   debugTimeMultiplier.addEventListener('change', applyTimeMultiplier);
   debugTimeMultiplier.addEventListener('blur', applyTimeMultiplier);
+  debugRain.addEventListener('change', () => renderer.setRainEnabled(debugRain.checked));
 
   for (const tab of debugTabs) {
     tab.addEventListener('click', () => {

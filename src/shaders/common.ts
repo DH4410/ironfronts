@@ -143,7 +143,18 @@ fn distanceFogColor() -> vec3f {
   let dayHaze = vec3f(0.58, 0.69, 0.72);
   let nightHaze = vec3f(0.105, 0.135, 0.23);
   let duskHaze = vec3f(0.62, 0.39, 0.29);
-  return mix(mix(nightHaze, dayHaze, uniforms.lighting.x), duskHaze, uniforms.lighting.y * 0.34);
+  let timeHaze = mix(mix(nightHaze, dayHaze, uniforms.lighting.x), duskHaze, uniforms.lighting.y * 0.34);
+  return mix(timeHaze, uniforms.sky.rgb * 1.08, uniforms.sky.w * 0.62);
+}
+
+fn wetSurfaceSheen(normalInput: vec3f, worldPosition: vec3f) -> vec3f {
+  let normal = normalize(normalInput);
+  let viewDirection = normalize(uniforms.camera.xyz - worldPosition);
+  let upward = smoothstep(0.38, 0.96, normal.y);
+  let grazing = pow(1.0 - max(dot(normal, viewDirection), 0.0), 3.2);
+  let closeVisibility = 1.0 - smoothstep(1500.0, 3300.0, distance(uniforms.camera.xyz, worldPosition));
+  return uniforms.sky.rgb * (0.075 + grazing * 0.28)
+    * upward * closeVisibility * uniforms.sky.w;
 }
 
 fn oceanWaveHeight(world: vec2f, openWater: f32) -> f32 {
@@ -155,7 +166,7 @@ fn oceanWaveHeight(world: vec2f, openWater: f32) -> f32 {
   return (sin(dot(world, directionA) * 0.014 + time * (0.47 + windWarp * 0.08)) * 0.42
     + sin(dot(world, directionB) * 0.026 - time * 0.39 + windWarp * 2.1) * 0.24
     + sin(dot(world, normalize(directionA + directionB * 0.37)) * 0.061 + time * 0.83) * 0.08)
-    * packet * mix(0.09, 1.0, openWater);
+    * packet * mix(0.09, 1.0, openWater) * mix(1.0, 1.18, uniforms.sky.w);
 }
 
 fn oceanSurfaceColor(worldPosition: vec3f, depth: f32, shoreline: f32, visualRiver: f32) -> vec3f {
@@ -183,6 +194,7 @@ fn oceanSurfaceColor(worldPosition: vec3f, depth: f32, shoreline: f32, visualRiv
   color += vec3f(1.0, 0.86, 0.61) * sun * (0.34 + ripple * 0.05) * uniforms.lighting.x;
   color *= mix(vec3f(0.27, 0.36, 0.56), vec3f(1.0), uniforms.lighting.x);
   color += vec3f(0.18, 0.14, 0.11) * uniforms.lighting.y * fresnel;
+  color = mix(color, color * vec3f(0.72, 0.79, 0.83), uniforms.sky.w * 0.32);
   return color;
 }
 

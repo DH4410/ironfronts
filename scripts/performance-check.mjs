@@ -125,8 +125,17 @@ if (!unsupported && manifest) {
 
   await measure('dense urban close idle', async () => {
     await setAllLayers();
+    await page.evaluate(() => window.__ironfrontsRenderer.setRainEnabled(false));
     await focus(manifest.showcases.urban, 360);
   }, idle);
+
+  await measure('dense urban rain idle', async () => {
+    await setAllLayers();
+    await page.evaluate(() => window.__ironfrontsRenderer.setRainEnabled(true));
+    await focus(manifest.showcases.urban, 360);
+    await page.waitForTimeout(1_600);
+  }, idle);
+  await page.evaluate(() => window.__ironfrontsRenderer.setRainEnabled(false));
 
   await measure('Europe regional idle', async () => {
     await setAllLayers();

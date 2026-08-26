@@ -218,6 +218,7 @@ fn propFragment(input: PropVertexOutput) -> @location(0) vec4f {
     }
     albedo *= treeMaterial;
   }
+  albedo = mix(albedo, albedo * vec3f(0.72, 0.78, 0.81), uniforms.sky.w * 0.40);
   let distanceToCamera = distance(uniforms.camera.xyz, input.worldPosition);
   let fog = smoothstep(3100.0, 9200.0, distanceToCamera);
   let worldFog = horizontalWorldFog(input.worldPosition.x);
@@ -234,7 +235,9 @@ fn propFragment(input: PropVertexOutput) -> @location(0) vec4f {
   } else if (input.emissiveKind > 1.5) {
     emission = vec3f(1.0, 0.60, 0.22) * uniforms.lighting.z * 1.65;
   }
-  let color = mix(mix(albedo * surfaceLight(normal) + emission, distanceFogColor(), fog * 0.39), worldFogColor(), worldFog);
+  var wetSheen = vec3f(0.0);
+  if (input.treeMaterialLayer < -0.5) { wetSheen = wetSurfaceSheen(normal, input.worldPosition); }
+  let color = mix(mix(albedo * surfaceLight(normal) + emission + wetSheen, distanceFogColor(), fog * 0.39), worldFogColor(), worldFog);
   return vec4f(color, input.visibility * input.opacity * (1.0 - worldFog));
 }
 `;

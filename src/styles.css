@@ -139,6 +139,7 @@ body { user-select: none; }
 .time-controls__speed input[type="number"] { width: 76px; border-radius: 4px 0 0 4px; text-align: right; }
 .time-controls__speed b { display: grid; width: 26px; height: 27px; place-items: center; border: 1px solid #405250; border-left: 0; border-radius: 0 4px 4px 0; color: #c9b477; background: #1b2b2a; font-weight: 500; }
 .time-controls small { display: block; margin-top: 9px; color: #71847e; font-size: 8px; line-height: 1.45; }
+.weather-controls small { display: block; margin: 6px 0 0 23px; color: #71847e; font-size: 8px; line-height: 1.4; }
 
 .country-flag { display: flex; align-items: center; gap: 11px; margin-top: 14px; padding: 11px; border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: rgba(255,255,255,.035); }
 .country-flag__mark { width: 10px; height: 40px; border-radius: 3px; background: var(--player-country-color, #b39b74); box-shadow: 0 0 16px color-mix(in srgb, var(--player-country-color, #b39b74) 42%, transparent); }

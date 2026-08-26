@@ -1,6 +1,6 @@
 import {
-  cityLightShader, countryLabelShader, infrastructureShader, lineShader, polarCapShader, propShader, terrainShader,
-  waterShader, waterwayShader,
+  cityLightShader, countryLabelShader, infrastructureShader, lineShader, polarCapShader, propShader, rainShader,
+  terrainShader, waterShader, waterwayShader,
 } from './shaders';
 
 export interface RendererLayouts {
@@ -18,6 +18,7 @@ export interface RendererPipelines {
   infrastructure: GPURenderPipeline;
   props: GPURenderPipeline;
   cityLights: GPURenderPipeline;
+  rain: GPURenderPipeline;
   lines: GPURenderPipeline;
   countryLabels: GPURenderPipeline;
 }
@@ -82,6 +83,7 @@ export function createRendererPipelines(
   const infrastructureModule = device.createShaderModule({ label: 'terrain-draped road shader', code: infrastructureShader });
   const propModule = device.createShaderModule({ label: 'prop shader', code: propShader });
   const cityLightModule = device.createShaderModule({ label: 'strategic city light shader', code: cityLightShader });
+  const rainModule = device.createShaderModule({ label: 'procedural rain shader', code: rainShader });
   const lineModule = device.createShaderModule({ label: 'line shader', code: lineShader });
   const countryLabelModule = device.createShaderModule({ label: 'country label shader', code: countryLabelShader });
   const commonLayout = device.createPipelineLayout({ bindGroupLayouts: [layouts.common] });
@@ -152,6 +154,13 @@ export function createRendererPipelines(
     primitive: { topology: 'triangle-list', cullMode: 'none' },
     depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less-equal' },
   });
+  const rain = device.createRenderPipeline({
+    label: 'procedural rain pipeline', layout: commonLayout,
+    vertex: { module: rainModule, entryPoint: 'rainVertex' },
+    fragment: { module: rainModule, entryPoint: 'rainFragment', targets: [{ format, blend: alphaBlend }] },
+    primitive: { topology: 'triangle-list', cullMode: 'none' },
+    depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less-equal' },
+  });
   const lines = device.createRenderPipeline({
     label: 'map lines pipeline', layout: device.createPipelineLayout({ bindGroupLayouts: [layouts.common, layouts.lines] }),
     vertex: { module: lineModule, entryPoint: 'lineVertex' },
@@ -167,7 +176,7 @@ export function createRendererPipelines(
     primitive: { topology: 'triangle-list', cullMode: 'none' },
     depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less-equal' },
   });
-  return { terrain, polarCaps, water, waterways, infrastructure, props, cityLights, lines, countryLabels };
+  return { terrain, polarCaps, water, waterways, infrastructure, props, cityLights, rain, lines, countryLabels };
 }
 
 const alphaBlend: GPUBlendState = {

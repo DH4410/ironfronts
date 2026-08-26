@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { WgslReflect } from 'wgsl_reflect/wgsl_reflect.module.js';
 import { create, globals } from 'webgpu';
 import {
-  cityLightShader, countryLabelShader, infrastructureShader, lineShader, polarCapShader, propShader, terrainShader,
-  waterShader, waterwayShader,
+  cityLightShader, countryLabelShader, infrastructureShader, lineShader, polarCapShader, propShader, rainShader,
+  terrainShader, waterShader, waterwayShader,
 } from '../src/shaders';
 
 describe('WGSL programs', () => {
@@ -110,6 +110,20 @@ describe('WGSL programs', () => {
     expect(polarCapShader).not.toContain('navigationAt(input');
   });
 
+  it('generates bounded world-space rain and terrain impacts without particle buffers or CPU state', () => {
+    expect(rainShader).toContain('@builtin(instance_index) instanceIndex: u32');
+    expect(rainShader).toContain('uniforms.sunTime.w * speed');
+    expect(rainShader).toContain('uniforms.sky.w * strategicReadability');
+    expect(rainShader).toContain('let ground = heightAt(mapUv)');
+    expect(rainShader).toContain('uniforms.viewProjection * vec4f(topWorld');
+    expect(rainShader).toContain('let impact = instanceIndex % 9u == 0u');
+    expect(rainShader).toContain('output.landSurface = landAt(mapUv)');
+    expect(rainShader).toContain('let ringRadius = mix(0.18, 0.78, input.impactAge)');
+    expect(rainShader).toContain('let strategicLengthScale = clamp(uniforms.camera.y / 275.0, 1.0, 12.0)');
+    expect(rainShader).toContain('let columnHeight = clamp(uniforms.camera.y * 0.90, 125.0, 6000.0)');
+    expect(rainShader).not.toContain('@group(1)');
+  });
+
   it.each([
     ['terrain', terrainShader, ['terrainVertex'], ['terrainFragment']],
     ['polar caps', polarCapShader, ['polarCapVertex'], ['polarCapFragment']],
@@ -118,6 +132,7 @@ describe('WGSL programs', () => {
     ['infrastructure', infrastructureShader, ['infrastructureVertex'], ['infrastructureFragment']],
     ['props', propShader, ['propVertex'], ['propFragment']],
     ['city lights', cityLightShader, ['cityLightVertex'], ['cityLightFragment']],
+    ['rain', rainShader, ['rainVertex'], ['rainFragment']],
     ['lines', lineShader, ['lineVertex'], ['lineFragment']],
     ['country labels', countryLabelShader, ['countryLabelVertex'], ['countryLabelFragment']],
   ])('parses the %s shader and exposes its render entry points', (_name, source, vertexNames, fragmentNames) => {
@@ -136,7 +151,7 @@ describe('WGSL programs', () => {
     const device = await adapter.requestDevice();
     const modules = new Map<string, GPUShaderModule>();
     for (const [label, source] of [
-      ['terrain', terrainShader], ['polar caps', polarCapShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['city lights', cityLightShader], ['lines', lineShader], ['country labels', countryLabelShader],
+      ['terrain', terrainShader], ['polar caps', polarCapShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['city lights', cityLightShader], ['rain', rainShader], ['lines', lineShader], ['country labels', countryLabelShader],
     ] as const) {
       const module = device.createShaderModule({ label, code: source });
       modules.set(label, module);
@@ -228,6 +243,13 @@ describe('WGSL programs', () => {
       layout: device.createPipelineLayout({ bindGroupLayouts: [common, layer] }),
       vertex: { module: modules.get('city lights')!, entryPoint: 'cityLightVertex' },
       fragment: { module: modules.get('city lights')!, entryPoint: 'cityLightFragment', targets: [{ format: 'bgra8unorm' }] },
+      primitive: { topology: 'triangle-list' },
+      depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'less-equal' },
+    })).resolves.toBeDefined();
+    await expect(device.createRenderPipelineAsync({
+      layout: device.createPipelineLayout({ bindGroupLayouts: [common] }),
+      vertex: { module: modules.get('rain')!, entryPoint: 'rainVertex' },
+      fragment: { module: modules.get('rain')!, entryPoint: 'rainFragment', targets: [{ format: 'bgra8unorm' }] },
       primitive: { topology: 'triangle-list' },
       depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'less-equal' },
     })).resolves.toBeDefined();

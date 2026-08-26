@@ -37,6 +37,9 @@ import {
 } from './time-of-day';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
+const RAIN_TRANSITION_SECONDS = 1.5;
+const MIN_RAIN_PARTICLES = 400;
+const MAX_RAIN_PARTICLES = 1_400;
 
 export type MapMode = 'political' | 'diplomacy' | 'clear' | 'balanced';
 
@@ -75,6 +78,7 @@ export class WorldRenderer {
   private infrastructurePipeline!: GPURenderPipeline;
   private propPipeline!: GPURenderPipeline;
   private cityLightPipeline!: GPURenderPipeline;
+  private rainPipeline!: GPURenderPipeline;
   private linePipeline!: GPURenderPipeline;
   private countryLabelPipeline!: GPURenderPipeline;
   private countryLabelBuffer?: GPUBuffer;
@@ -135,6 +139,9 @@ export class WorldRenderer {
   private timeMultiplier = 1;
   private timeLighting = calculateTimeOfDay(DEFAULT_START_HOUR);
   private reportedClock = '';
+  private rainEnabled = false;
+  private rainIntensity = 0;
+  private frameSkyColor: [number, number, number] = [...calculateTimeOfDay(DEFAULT_START_HOUR).skyColor];
   private performanceMonitor = new PerformanceMonitor(false);
   private frameWorkload = createEmptyRenderWorkload();
   private statsFrameCountdown = 0;
@@ -424,6 +431,18 @@ export class WorldRenderer {
     return this.timeMultiplier;
   }
 
+  setRainEnabled(enabled: boolean): void {
+    this.rainEnabled = enabled;
+  }
+
+  isRainEnabled(): boolean {
+    return this.rainEnabled;
+  }
+
+  getRainIntensity(): number {
+    return this.rainIntensity;
+  }
+
   getTimeOfDay(): TimeOfDayState {
     return {
       ...this.timeLighting,
@@ -589,6 +608,7 @@ export class WorldRenderer {
     this.infrastructurePipeline = pipelines.infrastructure;
     this.propPipeline = pipelines.props;
     this.cityLightPipeline = pipelines.cityLights;
+    this.rainPipeline = pipelines.rain;
     this.linePipeline = pipelines.lines;
     this.countryLabelPipeline = pipelines.countryLabels;
   }
@@ -722,6 +742,7 @@ export class WorldRenderer {
     this.elapsed += deltaMs / 1000;
     this.timeOfDayHour = advanceHour(this.timeOfDayHour, Math.min(frameMs, 250) / 1000, this.timeMultiplier);
     this.timeLighting = calculateTimeOfDay(this.timeOfDayHour);
+    this.updateWeather(deltaMs / 1000);
     this.notifyTimeOfDayChange();
 
     let phaseStarted = performance.now();
@@ -801,7 +822,7 @@ export class WorldRenderer {
     values.set([
       this.timeLighting.daylight, this.timeLighting.twilight, this.timeLighting.night, this.timeOfDayHour / 24,
     ], 56);
-    values.set([...this.timeLighting.skyColor, 0], 60);
+    values.set([...this.frameSkyColor, this.rainIntensity], 60);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, values);
   }
 
@@ -815,7 +836,7 @@ export class WorldRenderer {
       this.device,
       this.context,
       this.depthTexture,
-      this.timeLighting.skyColor,
+      this.frameSkyColor,
       collectGpuTiming ? this.gpuQuerySet : undefined,
     );
     const pass = frame.pass;
@@ -888,6 +909,7 @@ export class WorldRenderer {
       if (this.performanceLayers.buildings) this.drawCityLights(pass);
     }
 
+    this.drawRain(pass);
     if (labelsAboveProps) this.drawCountryLabels(pass, visibleLabelGlyphs);
 
     pass.setPipeline(this.linePipeline);
@@ -922,6 +944,27 @@ export class WorldRenderer {
     if (!force && clock === this.reportedClock) return;
     this.reportedClock = clock;
     this.onTimeOfDayChange?.(this.getTimeOfDay());
+  }
+
+  private updateWeather(deltaSeconds: number): void {
+    const target = this.rainEnabled ? 1 : 0;
+    const step = Math.min(1, deltaSeconds / RAIN_TRANSITION_SECONDS);
+    if (this.rainIntensity < target) this.rainIntensity = Math.min(target, this.rainIntensity + step);
+    else if (this.rainIntensity > target) this.rainIntensity = Math.max(target, this.rainIntensity - step);
+
+    const nightOvercast: [number, number, number] = [0.045, 0.062, 0.10];
+    const dayOvercast: [number, number, number] = [0.29, 0.35, 0.38];
+    const overcast = mixRgb(nightOvercast, dayOvercast, this.timeLighting.daylight);
+    this.frameSkyColor = mixRgb(this.timeLighting.skyColor, overcast, this.rainIntensity * 0.78);
+  }
+
+  private drawRain(pass: GPURenderPassEncoder): void {
+    if (this.rainIntensity < 0.005 || this.debugView !== 0) return;
+    const viewportParticles = Math.ceil(this.canvas.width * this.canvas.height / 2_200);
+    const particles = Math.min(MAX_RAIN_PARTICLES, Math.max(MIN_RAIN_PARTICLES, viewportParticles));
+    pass.setPipeline(this.rainPipeline);
+    pass.draw(6, particles);
+    this.recordTriangleDraw('weather', particles * 2, particles);
   }
 
   private drawCityLights(pass: GPURenderPassEncoder): void {
@@ -1343,6 +1386,14 @@ function clamp(value: number, min: number, max: number): number {
 
 function wrap(value: number, size: number): number {
   return ((value % size) + size) % size;
+}
+
+function mixRgb(
+  a: [number, number, number],
+  b: [number, number, number],
+  amount: number,
+): [number, number, number] {
+  return a.map((value, index) => value + (b[index] - value) * amount) as [number, number, number];
 }
 
 function buildWaterwayMask(navigationData: Uint8Array, pixelCount: number): Uint8Array {
