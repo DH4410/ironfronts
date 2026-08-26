@@ -23,6 +23,7 @@ struct Uniforms {
 @group(0) @binding(8) var terrainNormalTexture: texture_2d<f32>;
 @group(0) @binding(9) var treeMaterialTexture: texture_2d_array<f32>;
 @group(0) @binding(10) var provincePoliticalColorTexture: texture_2d<f32>;
+@group(0) @binding(11) var diplomacyColorTexture: texture_2d<f32>;
 @group(0) @binding(12) var<storage, read> visibleTerrainChunks: array<u32>;
 @group(0) @binding(13) var terrainAlbedoTexture: texture_2d<f32>;
 
@@ -57,6 +58,16 @@ fn politicalColorAt(uvInput: vec2f) -> vec4f {
   let dimensions = textureDimensions(provincePoliticalColorTexture);
   let coordinate = vec2i(min(i32(dimensions.x) - 1, i32(uv.x * f32(dimensions.x))), min(i32(dimensions.y) - 1, i32(uv.y * f32(dimensions.y))));
   return textureLoad(provincePoliticalColorTexture, coordinate, 0);
+}
+
+fn politicalOwnerAt(uvInput: vec2f) -> u32 {
+  return u32(round(politicalColorAt(uvInput).a * 255.0));
+}
+
+fn diplomacyColorFor(owner: u32) -> vec4f {
+  let dimensions = textureDimensions(diplomacyColorTexture);
+  let x = min(i32(owner), i32(dimensions.x) - 1);
+  return textureLoad(diplomacyColorTexture, vec2i(x, 0), 0);
 }
 
 fn surfaceAt(uvInput: vec2f) -> vec4u {

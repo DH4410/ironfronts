@@ -1,7 +1,7 @@
 import './styles.css';
 import '@fontsource/bitter/latin-ext-800.css';
 import { WorldRenderer, type MapMode } from './renderer';
-import type { FrameStats, HoverInfo } from './types';
+import type { CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo } from './types';
 
 const canvas = required<HTMLCanvasElement>('world');
 const countryLabels = required<HTMLCanvasElement>('country-labels');
@@ -27,6 +27,20 @@ const debugWaterways = required<HTMLInputElement>('debug-waterways');
 const debugProps = required<HTMLInputElement>('debug-props');
 const debugDescription = required<HTMLElement>('debug-description');
 const debugLegend = required<HTMLElement>('debug-legend');
+const debugTabs = [...document.querySelectorAll<HTMLButtonElement>('[data-debug-tab]')];
+const debugPanels = [...document.querySelectorAll<HTMLElement>('[data-debug-panel]')];
+const debugPlayerCountry = required<HTMLElement>('debug-player-country');
+const debugCountryFlag = required<HTMLElement>('debug-country-flag');
+const debugPlayerForm = required<HTMLFormElement>('debug-player-form');
+const debugPlayerInput = required<HTMLInputElement>('debug-player-input');
+const debugWarForm = required<HTMLFormElement>('debug-war-form');
+const debugWarInput = required<HTMLInputElement>('debug-at-war');
+const debugAlliedForm = required<HTMLFormElement>('debug-allied-form');
+const debugAlliedInput = required<HTMLInputElement>('debug-allied');
+const debugWarList = required<HTMLElement>('debug-war-list');
+const debugAlliedList = required<HTMLElement>('debug-allied-list');
+const debugDiplomacyStatus = required<HTMLElement>('debug-diplomacy-status');
+const debugCountryNames = required<HTMLDataListElement>('debug-country-names');
 const mapModeInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="map-mode"]')];
 const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
@@ -44,6 +58,50 @@ async function start(): Promise<void> {
     (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
   }
   renderer.onHover = updateTooltip;
+  renderer.onDiplomacyChange = (state) => renderDiplomacyState(renderer, state);
+  renderer.onProvinceCaptured = (provinceId, previousCountry, player) => {
+    setDiplomacyStatus(`Province ${provinceId} taken from ${previousCountry.name} by ${player.name}.`);
+  };
+
+  for (const tab of debugTabs) {
+    tab.addEventListener('click', () => {
+      const selected = tab.dataset.debugTab;
+      for (const candidate of debugTabs) candidate.setAttribute('aria-selected', String(candidate === tab));
+      for (const panel of debugPanels) panel.hidden = panel.dataset.debugPanel !== selected;
+    });
+  }
+
+  debugPlayerForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const country = renderer.setPlayerCountryByName(debugPlayerInput.value);
+    if (!country) {
+      setDiplomacyStatus(`No country exactly matches “${debugPlayerInput.value.trim()}”.`, true);
+      return;
+    }
+    debugPlayerInput.value = '';
+    setDiplomacyStatus(`Country flag switched to ${country.name}. Diplomatic placeholders were cleared.`);
+  });
+
+  const bindRelationForm = (
+    form: HTMLFormElement,
+    input: HTMLInputElement,
+    relation: Exclude<DiplomaticRelation, 'neutral'>,
+  ) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const country = renderer.setDiplomaticRelationByName(input.value, relation);
+      if (!country) {
+        setDiplomacyStatus(`“${input.value.trim()}” is unknown or is your current country.`, true);
+        return;
+      }
+      input.value = '';
+      setDiplomacyStatus(relation === 'war'
+        ? `${country.name} is now at war with you. Click its provinces to take them.`
+        : `${country.name} is now allied with you.`);
+    });
+  };
+  bindRelationForm(debugWarForm, debugWarInput, 'war');
+  bindRelationForm(debugAlliedForm, debugAlliedInput, 'allied');
 
   const applyDebugView = () => {
     const mode = Number(debugView.value);
@@ -101,6 +159,14 @@ async function start(): Promise<void> {
       loadingValue.textContent = `${percentage}%`;
       loadingBar.style.width = `${percentage}%`;
     });
+    debugCountryNames.replaceChildren(...renderer.getCountries()
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((country) => {
+        const option = document.createElement('option');
+        option.value = country.name;
+        return option;
+      }));
     applyDebugView();
     loading.classList.add('is-done');
     window.setTimeout(() => { loading.hidden = true; }, 500);
@@ -114,6 +180,49 @@ async function start(): Promise<void> {
     if (title) title.textContent = 'The world could not be rendered.';
     if (message) message.textContent = error instanceof Error ? error.message : String(error);
   }
+}
+
+function renderDiplomacyState(renderer: WorldRenderer, state: DiplomacyState): void {
+  debugPlayerCountry.textContent = state.player.name;
+  debugCountryFlag.style.setProperty('--player-country-color', state.player.color);
+  renderRelationList(renderer, debugWarList, state.enemies, 'No wars');
+  renderRelationList(renderer, debugAlliedList, state.allies, 'No allies');
+}
+
+function renderRelationList(
+  renderer: WorldRenderer,
+  container: HTMLElement,
+  countries: CountryRecord[],
+  emptyLabel: string,
+): void {
+  if (!countries.length) {
+    const empty = document.createElement('span');
+    empty.className = 'relation-list__empty';
+    empty.textContent = emptyLabel;
+    container.replaceChildren(empty);
+    return;
+  }
+  container.replaceChildren(...countries.map((country) => {
+    const chip = document.createElement('span');
+    chip.className = 'relation-chip';
+    chip.append(country.name);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.title = `Remove ${country.name}`;
+    remove.setAttribute('aria-label', `Remove ${country.name}`);
+    remove.textContent = '×';
+    remove.addEventListener('click', () => {
+      renderer.clearDiplomaticRelation(country.id);
+      setDiplomacyStatus(`${country.name} is neutral again.`);
+    });
+    chip.append(remove);
+    return chip;
+  }));
+}
+
+function setDiplomacyStatus(message: string, error = false): void {
+  debugDiplomacyStatus.textContent = message;
+  debugDiplomacyStatus.classList.toggle('is-error', error);
 }
 
 function updateTooltip(info: HoverInfo | null, x: number, y: number): void {

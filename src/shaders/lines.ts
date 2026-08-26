@@ -14,6 +14,7 @@ struct LineOutput {
   @location(3) lineSide: f32,
   @location(4) @interpolate(flat) countryCasing: f32,
   @location(5) mapUv: vec2f,
+  @location(6) @interpolate(flat) borderMode: f32,
 };
 
 @vertex
@@ -96,6 +97,7 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   output.lineSide = side;
   output.countryCasing = countryCasing;
   output.mapUv = select(uv0, uv1, endpoint == 1u);
+  output.borderMode = select(0.0, 1.0, lineParams.mode == 0u);
   return output;
 }
 
@@ -104,15 +106,15 @@ fn lineFragment(input: LineOutput) -> @location(0) vec4f {
   let distanceFromCenter = abs(input.lineSide);
   let centerCoverage = 1.0 - smoothstep(0.43, 0.55, distanceFromCenter);
   let edgeCoverage = 1.0 - smoothstep(0.88, 1.0, distanceFromCenter);
+  if (input.borderMode > 0.5) {
+    let riverSignal = max(waterwayAt(input.mapUv), visualRiverAt(input.mapUv));
+    // The river surface owns political boundaries over water. Suppressing the
+    // ordinary geometry prevents a separate line from appearing on each bank.
+    if (riverSignal >= 0.15) { discard; }
+  }
   var styledColor = input.outerColor;
   if (input.countryCasing > 0.5) {
-    let riverSignal = max(waterwayAt(input.mapUv), visualRiverAt(input.mapUv));
-    if (riverSignal < 0.15) {
-      styledColor = mix(input.outerColor, input.innerColor, centerCoverage);
-    } else {
-      // River boundaries retain the former restrained single-line treatment.
-      styledColor = vec4f(0.052, 0.067, 0.059, 0.72);
-    }
+    styledColor = mix(input.outerColor, input.innerColor, centerCoverage);
   }
   let color = vec4f(styledColor.rgb, styledColor.a * input.fogVisibility * edgeCoverage);
   if (color.a < 0.002) { discard; }

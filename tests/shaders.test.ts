@@ -37,6 +37,9 @@ describe('WGSL programs', () => {
     expect(waterwayShader).toContain('brokenStreak');
     expect(waterwayShader).toContain('let canal = input.kind > 0.5');
     expect(waterwayShader).toContain('oceanDeep');
+    expect(waterwayShader).toContain('!canal && uniforms.interaction.w > 0.5');
+    expect(waterwayShader).toContain('leftCountry.a > 0.0 && rightCountry.a > 0.0');
+    expect(waterwayShader).toContain('let dashVisible = fract(input.waterUv.x) < 0.54');
     expect(terrainShader).toContain('riverField.r > 0.45');
     expect(terrainShader).toContain('riverField.g > 0.45');
     expect(terrainShader).toContain('debugMode == 6u');
@@ -63,6 +66,11 @@ describe('WGSL programs', () => {
 
   it('derives political tint and country borders from mutable province ownership', () => {
     expect(terrainShader).toContain('let politicalColor = politicalColorAt(input.mapUv)');
+    expect(terrainShader).toContain('diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode');
+    expect(terrainShader).toContain('select(1.30, 1.56, diplomacyMode)');
+    expect(terrainShader).toContain('overlayStrength = max(overlayStrength, 0.30)');
+    expect(terrainShader).toContain('let isPlayer = diplomacyColor.a > 0.25 && diplomacyColor.a < 0.75');
+    expect(terrainShader).toContain('select(0.35, 0.72, uniforms.interaction.z > 1.5)');
     expect(terrainShader).not.toContain('let provinceId = provinceAt(input.mapUv)');
     expect(terrainShader).toContain('smoothstep(\n        3000.0,\n        6500.0,\n        uniforms.camera.y');
     expect(terrainShader).toContain('let balancedStrength = mix(\n        0.10,\n        0.82,\n        overview');
@@ -72,7 +80,7 @@ describe('WGSL programs', () => {
     expect(lineShader).toContain('height0 = abs(line.b.z) + 0.8');
     expect(lineShader).toContain('(lineParams.enabled & 2u) != 0u');
     expect(lineShader).toContain('mix(0.60, 0.94, nearFactor)');
-    expect(lineShader).toContain('let riverSignal = max(waterwayAt(input.mapUv), visualRiverAt(input.mapUv))');
+    expect(lineShader).toContain('if (riverSignal >= 0.15) { discard; }');
     expect(lineShader).toContain('styledColor = mix(input.outerColor, input.innerColor, centerCoverage)');
     expect(lineShader).toContain('mix(0.30, 0.10, nearFactor)');
   });
@@ -132,6 +140,7 @@ describe('WGSL programs', () => {
       { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
       { binding: 10, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 11, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 12, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       { binding: 13, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ] });

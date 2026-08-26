@@ -27,6 +27,14 @@ export interface CountryRecord {
   capitalProvinceId: number;
 }
 
+export type DiplomaticRelation = 'neutral' | 'allied' | 'war';
+
+export interface DiplomacyState {
+  player: CountryRecord;
+  allies: CountryRecord[];
+  enemies: CountryRecord[];
+}
+
 export interface WorldManifest {
   version: number;
   generatedSeed: number;

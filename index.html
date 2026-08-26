@@ -28,50 +28,88 @@
 
     <aside id="diagnostics" class="diagnostics" hidden>
       <div class="diagnostics__head"><strong>WORLD INSPECTOR</strong><span>F3</span></div>
-      <pre id="diagnostics-stats"></pre>
-      <div class="diagnostics__group diagnostics__performance">
-        <strong>PERFORMANCE</strong>
-        <pre id="diagnostics-performance"></pre>
+      <nav class="diagnostics__tabs" aria-label="Inspector sections">
+        <button type="button" data-debug-tab="world" aria-selected="true">World</button>
+        <button type="button" data-debug-tab="diplomacy" aria-selected="false">Diplomacy</button>
+        <button type="button" data-debug-tab="renderer" aria-selected="false">Renderer</button>
+      </nav>
+
+      <div class="diagnostics__panel" data-debug-panel="world">
+        <pre id="diagnostics-stats"></pre>
+        <div class="diagnostics__group diagnostics__performance">
+          <strong>PERFORMANCE</strong>
+          <pre id="diagnostics-performance"></pre>
+        </div>
       </div>
-      <label>View
-        <select id="debug-view">
-          <option value="0">Beauty</option>
-          <option value="1">Elevation</option>
-          <option value="2">Terrain classes</option>
-          <option value="3">Province IDs</option>
-          <option value="4">Surface normals</option>
-          <option value="5">Terrain slope</option>
-          <option value="6">River corridors</option>
-          <option value="7">Land and coast mask</option>
-          <option value="8">Road footprint</option>
-          <option value="9">Navigation composite</option>
-        </select>
-      </label>
-      <p id="debug-description" class="diagnostics__description"></p>
-      <div id="debug-legend" class="diagnostics__legend"></div>
-      <div class="diagnostics__group">
-        <strong>GRAPH OVERLAYS</strong>
-        <label><input id="debug-rivers" type="checkbox" /> River and canal graph</label>
-        <label><input id="debug-connections" type="checkbox" /> Movement graph</label>
+
+      <div class="diagnostics__panel" data-debug-panel="diplomacy" hidden>
+        <div class="country-flag">
+          <span id="debug-country-flag" class="country-flag__mark" aria-hidden="true"></span>
+          <div><small>COUNTRY FLAG</small><strong id="debug-player-country">Spain</strong></div>
+        </div>
+        <form id="debug-player-form" class="diplomacy-form">
+          <label for="debug-player-input">Play as country</label>
+          <div><input id="debug-player-input" type="text" list="debug-country-names" placeholder="Exact country name" autocomplete="off" /><button type="submit">Switch</button></div>
+        </form>
+        <div class="diagnostics__group">
+          <strong>AT WAR WITH</strong>
+          <form id="debug-war-form" class="diplomacy-form diplomacy-form--relation">
+            <div><input id="debug-at-war" type="text" list="debug-country-names" placeholder="Country name" autocomplete="off" /><button type="submit">Add</button></div>
+          </form>
+          <div id="debug-war-list" class="relation-list relation-list--war"><span class="relation-list__empty">No wars</span></div>
+        </div>
+        <div class="diagnostics__group">
+          <strong>ALLIED WITH</strong>
+          <form id="debug-allied-form" class="diplomacy-form diplomacy-form--relation">
+            <div><input id="debug-allied" type="text" list="debug-country-names" placeholder="Country name" autocomplete="off" /><button type="submit">Add</button></div>
+          </form>
+          <div id="debug-allied-list" class="relation-list relation-list--allied"><span class="relation-list__empty">No allies</span></div>
+        </div>
+        <p id="debug-diplomacy-status" class="diplomacy-status" aria-live="polite">Neutral countries are grey. Click an enemy province to take it.</p>
+        <datalist id="debug-country-names"></datalist>
       </div>
-      <div class="diagnostics__group diagnostics__grid">
-        <strong>LAYERS</strong>
-        <label><input id="debug-countries" type="checkbox" checked /> Countries</label>
-        <label><input id="debug-borders" type="checkbox" checked /> Borders</label>
-        <label><input id="debug-roads" type="checkbox" checked /> Roads</label>
-        <label><input id="debug-hidden" type="checkbox" checked /> Dotted links</label>
-        <label><input id="debug-waterways" type="checkbox" checked /> Waterways</label>
-        <label><input id="debug-props" type="checkbox" checked /> Cities and props</label>
-        <label><input id="debug-wireframe" type="checkbox" /> Terrain grid</label>
+
+      <div class="diagnostics__panel" data-debug-panel="renderer" hidden>
+        <label>View
+          <select id="debug-view">
+            <option value="0">Beauty</option>
+            <option value="1">Elevation</option>
+            <option value="2">Terrain classes</option>
+            <option value="3">Province IDs</option>
+            <option value="4">Surface normals</option>
+            <option value="5">Terrain slope</option>
+            <option value="6">River corridors</option>
+            <option value="7">Land and coast mask</option>
+            <option value="8">Road footprint</option>
+            <option value="9">Navigation composite</option>
+          </select>
+        </label>
+        <p id="debug-description" class="diagnostics__description"></p>
+        <div id="debug-legend" class="diagnostics__legend"></div>
+        <div class="diagnostics__group">
+          <strong>GRAPH OVERLAYS</strong>
+          <label><input id="debug-rivers" type="checkbox" /> River and canal graph</label>
+          <label><input id="debug-connections" type="checkbox" /> Movement graph</label>
+        </div>
+        <div class="diagnostics__group diagnostics__grid">
+          <strong>LAYERS</strong>
+          <label><input id="debug-countries" type="checkbox" checked /> Countries</label>
+          <label><input id="debug-borders" type="checkbox" checked /> Borders</label>
+          <label><input id="debug-roads" type="checkbox" checked /> Roads</label>
+          <label><input id="debug-hidden" type="checkbox" checked /> Dotted links</label>
+          <label><input id="debug-waterways" type="checkbox" checked /> Waterways</label>
+          <label><input id="debug-props" type="checkbox" checked /> Cities and props</label>
+          <label><input id="debug-wireframe" type="checkbox" /> Terrain grid</label>
+        </div>
+        <p class="diagnostics__hint"><kbd>[</kbd> <kbd>]</kbd> cycle views</p>
       </div>
-      <p class="diagnostics__hint"><kbd>[</kbd> <kbd>]</kbd> cycle views</p>
     </aside>
 
     <fieldset class="map-modes" aria-label="Map overlay">
       <legend>MAP OVERLAY</legend>
       <div class="map-modes__options">
         <label><input type="radio" name="map-mode" value="political" /> Political map</label>
-        <label title="Diplomacy map is not implemented yet"><input type="radio" name="map-mode" value="diplomacy" /> Diplomacy map</label>
+        <label><input type="radio" name="map-mode" value="diplomacy" /> Diplomacy map</label>
         <label><input type="radio" name="map-mode" value="clear" /> Clear map</label>
         <label><input type="radio" name="map-mode" value="balanced" checked /> Balanced map</label>
       </div>

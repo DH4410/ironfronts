@@ -5,6 +5,7 @@ export const POLITICAL_OVERVIEW_FULL_ALTITUDE = 6_500;
 export const POLITICAL_CLOSE_TINT_STRENGTH = 0.1;
 export const POLITICAL_OVERVIEW_MAX_STRENGTH = 0.82;
 export const POLITICAL_MAP_TINT_STRENGTH = 0.85;
+export const DIPLOMACY_CLOSE_TINT_STRENGTH = 0.3;
 
 export const terrainShader = commonWgsl + /* wgsl */ `
 struct TerrainVertexInput {
@@ -113,9 +114,19 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
 
   if (uniforms.interaction.z > 0.5 && uniforms.map.w < 0.5) {
     let politicalColor = politicalColorAt(input.mapUv);
-    if (politicalColor.a > 0.5) {
+    let owner = u32(round(politicalColor.a * 255.0));
+    if (owner > 0u) {
+      let diplomacyMode = uniforms.interaction.z > 2.5;
+      let diplomacyColor = diplomacyColorFor(owner);
+      let isPlayer = diplomacyColor.a > 0.25 && diplomacyColor.a < 0.75;
+      let hasRelationship = diplomacyColor.a > 0.75;
+      var overlayColor = select(politicalColor.rgb, diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode);
+      if (hasRelationship) {
+        let relationshipBrightness = select(1.30, 1.56, diplomacyMode);
+        overlayColor = min(diplomacyColor.rgb * relationshipBrightness, vec3f(1.0));
+      }
       let terrainLuminance = dot(baseColor, vec3f(0.24, 0.68, 0.08));
-      let coloredSurface = politicalColor.rgb * (0.62 + terrainLuminance * 0.70);
+      let coloredSurface = overlayColor * (0.62 + terrainLuminance * 0.70);
       let overview = smoothstep(
         ${POLITICAL_OVERVIEW_START_ALTITUDE.toFixed(1)},
         ${POLITICAL_OVERVIEW_FULL_ALTITUDE.toFixed(1)},
@@ -126,11 +137,25 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
         ${POLITICAL_OVERVIEW_MAX_STRENGTH.toFixed(2)},
         overview
       );
-      let overlayStrength = select(
+      var overlayStrength = select(
         balancedStrength,
         ${POLITICAL_MAP_TINT_STRENGTH.toFixed(2)},
         uniforms.interaction.z > 1.5
       );
+      if (hasRelationship && !diplomacyMode && uniforms.interaction.z < 1.5) {
+        overlayStrength = max(overlayStrength, ${DIPLOMACY_CLOSE_TINT_STRENGTH.toFixed(2)});
+      }
+      if (diplomacyMode) {
+        overlayStrength = mix(
+          ${DIPLOMACY_CLOSE_TINT_STRENGTH.toFixed(2)},
+          ${POLITICAL_OVERVIEW_MAX_STRENGTH.toFixed(2)},
+          overview
+        );
+      }
+      if (isPlayer) {
+        let playerMinimumStrength = select(0.35, 0.72, uniforms.interaction.z > 1.5);
+        overlayStrength = max(overlayStrength, playerMinimumStrength);
+      }
       baseColor = mix(baseColor, coloredSurface, overlayStrength);
     }
   }

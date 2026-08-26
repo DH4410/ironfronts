@@ -4,6 +4,7 @@ import { buildPropVisibility, buildTerrainVisibility } from './chunk-visibility'
 import { buildCountryColorBuffer, CountryLabelLayer } from './country-overlay';
 import { loadCountryLabelFont } from './country-labels/atlas';
 import { isValidCountryLabelPoint } from './country-labels/territory';
+import { buildDiplomacyColorData, findCountryByName } from './diplomacy';
 import { align4, fetchBinary, fetchJson, uploadMipmappedTexture, uploadTexture } from './gpu-utils';
 import { createMaterialTexture, createTreeMaterialTexture } from './material-texture';
 import {
@@ -21,7 +22,10 @@ import {
   createTreeFamilyMesh, uploadIndexedMesh,
 } from './scene-meshes';
 import type { Mesh } from './scene-meshes';
-import type { CountryRecord, FrameStats, HoverInfo, ProgressReporter, PropChunkRange, ProvinceRecord, WorldManifest } from './types';
+import type {
+  CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo, ProgressReporter, PropChunkRange,
+  ProvinceRecord, WorldManifest,
+} from './types';
 import {
   extractFrustumPlanes, sphereIntersectsFrustum, sphereIntersectsHorizontalWorldWindow, WORLD_COPY_INDICES,
 } from './visibility';
@@ -38,6 +42,8 @@ export class WorldRenderer {
   manifest!: WorldManifest;
   onHover?: (info: HoverInfo | null, x: number, y: number) => void;
   onStats?: (stats: FrameStats) => void;
+  onDiplomacyChange?: (state: DiplomacyState) => void;
+  onProvinceCaptured?: (provinceId: number, previousCountry: CountryRecord, player: CountryRecord) => void;
 
   private readonly canvas: HTMLCanvasElement;
   private readonly countryLabelCanvas?: HTMLCanvasElement;
@@ -93,6 +99,7 @@ export class WorldRenderer {
   private materialTexture!: GPUTexture;
   private treeMaterialTexture!: GPUTexture;
   private provincePoliticalColorTexture!: GPUTexture;
+  private diplomacyColorTexture!: GPUTexture;
   private politicalCache!: PoliticalCache;
   private countryColors!: Float32Array;
   private visibleTerrainBuffer!: GPUBuffer;
@@ -106,6 +113,8 @@ export class WorldRenderer {
   private provinceOwners!: Uint32Array;
   private provinceById = new Map<number, ProvinceRecord>();
   private countryById = new Map<number, CountryRecord>();
+  private playerCountryId = 0;
+  private readonly diplomaticRelations = new Map<number, DiplomaticRelation>();
   private countryLabels?: CountryLabelLayer;
   private running = false;
   private frameHandle = 0;
@@ -147,6 +156,7 @@ export class WorldRenderer {
   private lastPickedCameraRevision = -1;
   private lastPickTime = -Infinity;
   private readonly pickPoint = vec3.create();
+  private clickStart?: { pointerId: number; x: number; y: number };
   private resizeObserver?: ResizeObserver;
 
   constructor(canvas: HTMLCanvasElement, countryLabelCanvas?: HTMLCanvasElement) {
@@ -160,6 +170,13 @@ export class WorldRenderer {
     this.manifest = await fetchJson<WorldManifest>('/world/world.json');
     this.provinceById = new Map(this.manifest.provinces.map((province) => [province.id, province]));
     this.countryById = new Map(this.manifest.politics.countries.map((country) => [country.id, country]));
+    if (this.manifest.politics.countries.some((country) => country.id > 255)) {
+      throw new Error('Diplomacy rendering supports country ids up to 255');
+    }
+    const defaultPlayer = findCountryByName(this.manifest.politics.countries, 'Spain')
+      ?? this.manifest.politics.countries[0];
+    if (!defaultPlayer) throw new Error('The world has no countries');
+    this.playerCountryId = defaultPlayer.id;
     this.camera.configureWorld(this.manifest.world.width, this.manifest.world.height);
     this.camera.minimumAltitude = this.manifest.terrain.maxHeight + 82;
 
@@ -251,6 +268,15 @@ export class WorldRenderer {
       'province political colors', this.politicalCache.width, this.politicalCache.height,
       'rgba8unorm', this.politicalCache.colors, this.politicalCache.width * 4,
     );
+    const diplomacyColors = buildDiplomacyColorData(
+      this.manifest.politics.countries,
+      this.diplomaticRelations,
+      this.playerCountryId,
+    );
+    this.diplomacyColorTexture = uploadTexture(this.device,
+      'diplomacy country colors', diplomacyColors.length / 4, 1,
+      'rgba8unorm', diplomacyColors, diplomacyColors.length,
+    );
 
     report('Preparing terrain and tree materials', 0.49);
     [this.materialTexture, this.treeMaterialTexture] = await Promise.all([
@@ -282,6 +308,7 @@ export class WorldRenderer {
         { binding: 8, resource: this.terrainNormalTexture.createView() },
         { binding: 9, resource: this.treeMaterialTexture.createView({ dimension: '2d-array' }) },
         { binding: 10, resource: this.provincePoliticalColorTexture.createView() },
+        { binding: 11, resource: this.diplomacyColorTexture.createView() },
         { binding: 12, resource: { buffer: this.visibleTerrainBuffer } },
         { binding: 13, resource: this.terrainAlbedoTexture.createView() },
       ],
@@ -349,6 +376,7 @@ export class WorldRenderer {
     this.resize();
     this.camera.update(0);
     report('World ready', 1);
+    this.notifyDiplomacyChange();
   }
 
   start(): void {
@@ -386,6 +414,50 @@ export class WorldRenderer {
 
   setMapMode(mode: MapMode): void {
     this.mapMode = mode;
+  }
+
+  getCountries(): readonly CountryRecord[] {
+    return this.manifest.politics.countries;
+  }
+
+  findCountry(name: string): CountryRecord | undefined {
+    return findCountryByName(this.manifest.politics.countries, name);
+  }
+
+  getDiplomacyState(): DiplomacyState {
+    const player = this.countryById.get(this.playerCountryId);
+    if (!player) throw new Error('The player country is not initialized');
+    const countriesFor = (relation: DiplomaticRelation) => [...this.diplomaticRelations]
+      .filter(([, value]) => value === relation)
+      .map(([countryId]) => this.countryById.get(countryId))
+      .filter((country): country is CountryRecord => Boolean(country))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return { player, allies: countriesFor('allied'), enemies: countriesFor('war') };
+  }
+
+  setPlayerCountryByName(name: string): CountryRecord | undefined {
+    const country = this.findCountry(name);
+    if (!country) return undefined;
+    this.playerCountryId = country.id;
+    this.diplomaticRelations.clear();
+    this.refreshDiplomacyTexture();
+    this.notifyDiplomacyChange();
+    return country;
+  }
+
+  setDiplomaticRelationByName(name: string, relation: Exclude<DiplomaticRelation, 'neutral'>): CountryRecord | undefined {
+    const country = this.findCountry(name);
+    if (!country || country.id === this.playerCountryId) return undefined;
+    this.diplomaticRelations.set(country.id, relation);
+    this.refreshDiplomacyTexture();
+    this.notifyDiplomacyChange();
+    return country;
+  }
+
+  clearDiplomaticRelation(countryId: number): void {
+    if (!this.diplomaticRelations.delete(countryId)) return;
+    this.refreshDiplomacyTexture();
+    this.notifyDiplomacyChange();
   }
 
   setProvinceOwner(provinceId: number, countryId: number): void {
@@ -563,6 +635,17 @@ export class WorldRenderer {
   }
 
   private attachInteraction(): void {
+    this.canvas.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      this.clickStart = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    });
+    window.addEventListener('pointerup', (event) => {
+      const start = this.clickStart;
+      this.clickStart = undefined;
+      if (!start || start.pointerId !== event.pointerId || event.button !== 0) return;
+      if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 5) return;
+      this.captureProvinceAt(event.clientX, event.clientY);
+    });
     this.canvas.addEventListener('pointermove', (event) => {
       this.pointer.x = event.clientX;
       this.pointer.y = event.clientY;
@@ -671,9 +754,10 @@ export class WorldRenderer {
     values.set([this.canvas.width, this.canvas.height, 1 / this.canvas.width, 1 / this.canvas.height], 40);
     values.set([this.manifest.world.width, this.manifest.world.height, this.manifest.terrain.maxHeight, this.debugView], 44);
     const tintMode = this.showCountryOverlay && this.performanceLayers.countryTint
-      ? this.mapMode === 'political' ? 2 : this.mapMode === 'balanced' ? 1 : 0
+      ? this.mapMode === 'diplomacy' ? 3 : this.mapMode === 'political' ? 2 : this.mapMode === 'balanced' ? 1 : 0
       : 0;
-    values.set([this.hoveredId, this.camera.distance, tintMode, 0], 48);
+    const countryBordersEnabled = this.showCountryOverlay && this.performanceLayers.countryBorders ? 1 : 0;
+    values.set([this.hoveredId, this.camera.distance, tintMode, countryBordersEnabled], 48);
     values.set([this.manifest.terrain.chunksX, this.manifest.terrain.chunksY, this.manifest.terrain.gridResolution, this.showWireframe ? 1 : 0], 52);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, values);
   }
@@ -1016,6 +1100,11 @@ export class WorldRenderer {
 
   private pickProvince(clientX: number, clientY: number): { raycastMs: number; hoverUiMs: number } {
     const started = performance.now();
+    const id = this.provinceAtScreenPoint(clientX, clientY);
+    return this.finishPicking(id, started);
+  }
+
+  private provinceAtScreenPoint(clientX: number, clientY: number): number {
     const point = pickTerrainPoint(
       this.camera,
       clientX,
@@ -1025,8 +1114,19 @@ export class WorldRenderer {
       (x, z) => this.sampleHeight(x, z),
       this.pickPoint,
     );
-    const id = point ? this.sampleProvince(point[0], point[2]) : 0;
-    return this.finishPicking(id, started);
+    return point ? this.sampleProvince(point[0], point[2]) : 0;
+  }
+
+  private captureProvinceAt(clientX: number, clientY: number): void {
+    const encodedId = this.provinceAtScreenPoint(clientX, clientY);
+    if (!encodedId) return;
+    const previousCountryId = this.provinceOwners[encodedId];
+    if (this.diplomaticRelations.get(previousCountryId) !== 'war') return;
+    const previousCountry = this.countryById.get(previousCountryId);
+    const player = this.countryById.get(this.playerCountryId);
+    if (!previousCountry || !player) return;
+    this.setProvinceOwner(encodedId - 1, this.playerCountryId);
+    this.onProvinceCaptured?.(encodedId - 1, previousCountry, player);
   }
 
   private finishPicking(encodedId: number, started: number): { raycastMs: number; hoverUiMs: number } {
@@ -1077,6 +1177,24 @@ export class WorldRenderer {
     const y = clamp(Math.floor(worldZ / this.manifest.world.height * field.height), 0, field.height - 1);
     const index = y * field.width + x;
     return (this.waterwayMask[index >>> 3] & (1 << (index & 7))) !== 0;
+  }
+
+  private refreshDiplomacyTexture(): void {
+    const data = buildDiplomacyColorData(
+      this.manifest.politics.countries,
+      this.diplomaticRelations,
+      this.playerCountryId,
+    );
+    this.device.queue.writeTexture(
+      { texture: this.diplomacyColorTexture },
+      data.buffer as ArrayBuffer,
+      { bytesPerRow: data.length, rowsPerImage: 1 },
+      [data.length / 4, 1],
+    );
+  }
+
+  private notifyDiplomacyChange(): void {
+    this.onDiplomacyChange?.(this.getDiplomacyState());
   }
 
   private updateStats(): void {

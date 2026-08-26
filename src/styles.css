@@ -87,8 +87,10 @@ body { user-select: none; }
   z-index: 3;
   top: 20px;
   right: 20px;
-  width: 370px;
+  width: 410px;
+  max-height: calc(100vh - 40px);
   padding: 14px;
+  overflow: hidden;
   border: 1px solid rgba(255,255,255,.18);
   border-radius: 5px;
   background: rgba(11, 20, 21, .88);
@@ -99,6 +101,12 @@ body { user-select: none; }
 
 .diagnostics__head { display: flex; justify-content: space-between; color: #e8d8ad; letter-spacing: .14em; }
 .diagnostics__head span { opacity: .48; }
+.diagnostics__tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin-top: 12px; padding: 3px; border-radius: 5px; background: rgba(255,255,255,.045); }
+.diagnostics__tabs button { padding: 7px 4px; border: 0; border-radius: 3px; color: #879b95; background: transparent; font: 700 8px/1 inherit; letter-spacing: .12em; text-transform: uppercase; cursor: pointer; }
+.diagnostics__tabs button:hover { color: #c7d2cc; background: rgba(255,255,255,.045); }
+.diagnostics__tabs button[aria-selected="true"] { color: #f0dfb5; background: rgba(201,180,119,.14); box-shadow: inset 0 0 0 1px rgba(220,196,139,.17); }
+.diagnostics__panel { max-height: calc(100vh - 126px); padding: 0 2px 2px; overflow-y: auto; scrollbar-color: #4b5f5d transparent; }
+.diagnostics__panel[hidden] { display: none; }
 .diagnostics pre { margin: 12px 0; color: #a9beb5; font: 10px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
 .diagnostics label { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: #cad3cb; }
 .diagnostics label:first-of-type { justify-content: space-between; }
@@ -116,6 +124,28 @@ body { user-select: none; }
 .diagnostics__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
 .diagnostics__grid > strong { grid-column: 1 / -1; }
 .diagnostics__hint { margin: 11px 0 0; color: #71847e; font-size: 9px; text-align: right; }
+
+.country-flag { display: flex; align-items: center; gap: 11px; margin-top: 14px; padding: 11px; border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: rgba(255,255,255,.035); }
+.country-flag__mark { width: 10px; height: 40px; border-radius: 3px; background: var(--player-country-color, #b39b74); box-shadow: 0 0 16px color-mix(in srgb, var(--player-country-color, #b39b74) 42%, transparent); }
+.country-flag div { display: flex; min-width: 0; flex-direction: column; gap: 3px; }
+.country-flag small { color: #7f938d; font-size: 8px; font-weight: 700; letter-spacing: .16em; }
+.country-flag strong { overflow: hidden; color: #f0e7cf; font: 500 17px/1.2 Georgia, serif; text-overflow: ellipsis; white-space: nowrap; }
+.diplomacy-form { margin-top: 12px; }
+.diplomacy-form > label { margin: 0 0 5px; color: #8fa29c; font-size: 8px; font-weight: 700; letter-spacing: .13em; text-transform: uppercase; }
+.diplomacy-form > div { display: grid; grid-template-columns: 1fr auto; gap: 6px; }
+.diplomacy-form input[type="text"] { min-width: 0; width: 100%; padding: 7px 8px; border: 1px solid #405250; border-radius: 4px; outline: none; color: #e4e9e3; background: #142321; font: 10px/1.2 inherit; user-select: text; }
+.diplomacy-form input[type="text"]:focus { border-color: #a8915d; box-shadow: 0 0 0 2px rgba(201,180,119,.1); }
+.diplomacy-form button { padding: 6px 10px; border: 1px solid rgba(220,196,139,.3); border-radius: 4px; color: #e8d8ad; background: rgba(201,180,119,.1); font: 700 8px/1 inherit; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.diplomacy-form button:hover { background: rgba(201,180,119,.18); }
+.diplomacy-form--relation { margin-top: 0; }
+.relation-list { display: flex; flex-wrap: wrap; gap: 5px; min-height: 24px; margin-top: 8px; }
+.relation-list__empty { align-self: center; color: #667a74; font-size: 9px; font-style: italic; }
+.relation-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 7px; border: 1px solid color-mix(in srgb, var(--relation-color) 45%, transparent); border-radius: 12px; color: color-mix(in srgb, var(--relation-color) 72%, white); background: color-mix(in srgb, var(--relation-color) 13%, transparent); font-size: 9px; }
+.relation-chip button { display: grid; width: 15px; height: 15px; padding: 0; place-items: center; border: 0; border-radius: 50%; color: inherit; background: rgba(255,255,255,.08); cursor: pointer; }
+.relation-list--war { --relation-color: #d15a50; }
+.relation-list--allied { --relation-color: #668fc5; }
+.diplomacy-status { min-height: 28px; margin: 13px 0 1px; color: #91a49e; font-size: 9px; line-height: 1.45; }
+.diplomacy-status.is-error { color: #db8b7d; }
 
 .map-modes {
   position: fixed;
@@ -215,5 +245,6 @@ kbd { padding: 2px 5px; border: 1px solid rgba(255,255,255,.24); border-radius: 
 @media (max-width: 720px) {
   .brand { left: 18px; top: 18px; }
   .map-modes { right: 12px; bottom: 12px; min-width: 232px; }
-  .diagnostics { inset: 12px 12px auto auto; }
+  .diagnostics { inset: 12px 12px auto auto; width: min(410px, calc(100vw - 24px)); max-height: calc(100vh - 24px); }
+  .diagnostics__panel { max-height: calc(100vh - 110px); }
 }
