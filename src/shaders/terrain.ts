@@ -122,16 +122,28 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
       let hasRelationship = diplomacyColor.a > 0.75;
       var overlayColor = select(politicalColor.rgb, diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode);
       if (hasRelationship) {
-        let relationshipBrightness = select(1.30, 1.56, diplomacyMode);
-        overlayColor = min(diplomacyColor.rgb * relationshipBrightness, vec3f(1.0));
+        overlayColor = min(diplomacyColor.rgb * 1.30, vec3f(1.0));
       }
-      let terrainLuminance = dot(baseColor, vec3f(0.24, 0.68, 0.08));
-      let coloredSurface = overlayColor * (0.62 + terrainLuminance * 0.70);
       let overview = smoothstep(
         ${POLITICAL_OVERVIEW_START_ALTITUDE.toFixed(1)},
         ${POLITICAL_OVERVIEW_FULL_ALTITUDE.toFixed(1)},
         uniforms.camera.y
       );
+      let terrainLuminance = dot(baseColor, vec3f(0.24, 0.68, 0.08));
+      let tintLuminance = max(0.06, dot(overlayColor, vec3f(0.24, 0.68, 0.08)));
+      let luminanceMatchedTint = overlayColor * (terrainLuminance / tintLuminance);
+      let originalTint = overlayColor * (0.62 + terrainLuminance * 0.70);
+      var preservation = 1.0 - overview;
+      let politicalMode = uniforms.interaction.z > 1.5 && uniforms.interaction.z < 2.5;
+      if (politicalMode) {
+        preservation *= 0.70;
+      }
+      if (isPlayer) {
+        preservation *= 0.45;
+      }
+      let biomeRetention = 0.20 * preservation;
+      var coloredSurface = mix(originalTint, luminanceMatchedTint, preservation);
+      coloredSurface = mix(coloredSurface, baseColor, biomeRetention);
       let balancedStrength = mix(
         ${POLITICAL_CLOSE_TINT_STRENGTH.toFixed(2)},
         ${POLITICAL_OVERVIEW_MAX_STRENGTH.toFixed(2)},
@@ -153,8 +165,11 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
         );
       }
       if (isPlayer) {
-        let playerMinimumStrength = select(0.35, 0.72, uniforms.interaction.z > 1.5);
+        let playerMinimumStrength = select(0.45, 0.85, uniforms.interaction.z > 1.5);
         overlayStrength = max(overlayStrength, playerMinimumStrength);
+      }
+      if (hasRelationship) {
+        overlayStrength = ${POLITICAL_MAP_TINT_STRENGTH.toFixed(2)};
       }
       baseColor = mix(baseColor, coloredSurface, overlayStrength);
     }

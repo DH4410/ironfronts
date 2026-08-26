@@ -21,7 +21,7 @@ export function buildDiplomacyColorData(
     const relation = relations.get(country.id) ?? 'neutral';
     let color: readonly [number, number, number];
     const isPlayer = country.id === playerCountryId;
-    if (isPlayer) color = [0.78, 0.64, 0.31];
+    if (isPlayer) color = [0.86, 0.70, 0.28];
     else if (relation === 'war') color = [0.66, 0.24, 0.21];
     else if (relation === 'allied') color = [0.24, 0.43, 0.65];
     else {

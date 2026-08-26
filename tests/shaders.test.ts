@@ -67,10 +67,16 @@ describe('WGSL programs', () => {
   it('derives political tint and country borders from mutable province ownership', () => {
     expect(terrainShader).toContain('let politicalColor = politicalColorAt(input.mapUv)');
     expect(terrainShader).toContain('diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode');
-    expect(terrainShader).toContain('select(1.30, 1.56, diplomacyMode)');
+    expect(terrainShader).toContain('diplomacyColor.rgb * 1.30');
     expect(terrainShader).toContain('overlayStrength = max(overlayStrength, 0.30)');
     expect(terrainShader).toContain('let isPlayer = diplomacyColor.a > 0.25 && diplomacyColor.a < 0.75');
-    expect(terrainShader).toContain('select(0.35, 0.72, uniforms.interaction.z > 1.5)');
+    expect(terrainShader).toContain('select(0.45, 0.85, uniforms.interaction.z > 1.5)');
+    expect(terrainShader).toContain('overlayColor * (terrainLuminance / tintLuminance)');
+    expect(terrainShader).toContain('var preservation = 1.0 - overview');
+    expect(terrainShader).toContain('let biomeRetention = 0.20 * preservation');
+    expect(terrainShader).toContain('preservation *= 0.70');
+    expect(terrainShader).toContain('preservation *= 0.45');
+    expect(terrainShader).toContain('overlayStrength = 0.85');
     expect(terrainShader).not.toContain('let provinceId = provinceAt(input.mapUv)');
     expect(terrainShader).toContain('smoothstep(\n        3000.0,\n        6500.0,\n        uniforms.camera.y');
     expect(terrainShader).toContain('let balancedStrength = mix(\n        0.10,\n        0.82,\n        overview');

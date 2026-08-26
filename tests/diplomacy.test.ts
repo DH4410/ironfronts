@@ -23,7 +23,7 @@ describe('diplomacy helpers', () => {
     const neutralColors = buildDiplomacyColorData(countries, new Map(), 2);
     const neutralSpain = [...neutralColors.slice(24 * 4, 24 * 4 + 3)];
     expect(Math.max(...neutralSpain) - Math.min(...neutralSpain)).toBeLessThanOrEqual(4);
-    expect([...colors.slice(24 * 4, 24 * 4 + 3)]).toEqual([199, 163, 79]);
+    expect([...colors.slice(24 * 4, 24 * 4 + 3)]).toEqual([219, 179, 71]);
     expect(colors[24 * 4 + 3]).toBe(128);
     expect(colors[2 * 4 + 3]).toBe(255);
   });
