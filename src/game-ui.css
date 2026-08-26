@@ -1,0 +1,277 @@
+.game-hud {
+  position: fixed;
+  z-index: 2;
+  inset: 0;
+  pointer-events: none;
+  color: #e9e6d9;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The old renderer branding and radio island are still present for tests and
+   accessibility, but the player-facing HUD owns their visual presentation. */
+.brand,
+.map-modes { display: none !important; }
+
+.game-hud__topbar {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  right: 16px;
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: minmax(210px, .8fr) auto minmax(290px, .95fr);
+  align-items: center;
+  gap: 16px;
+  padding: 7px 9px;
+  border: 1px solid rgba(213, 201, 166, .22);
+  border-radius: 5px;
+  background:
+    linear-gradient(180deg, rgba(24, 31, 29, .92), rgba(13, 20, 19, .89)),
+    rgba(12, 18, 18, .9);
+  box-shadow: 0 8px 28px rgba(2, 8, 8, .22), inset 0 1px rgba(255,255,255,.03);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+
+.game-hud__country {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 1px 10px 1px 3px;
+  border-right: 1px solid rgba(255,255,255,.08);
+}
+
+.game-hud__country-swatch {
+  width: 7px;
+  height: 34px;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  background: var(--hud-country-color, #b39b74);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--hud-country-color, #b39b74) 42%, transparent);
+}
+
+.game-hud__country span,
+.game-hud__status-item,
+.game-hud__province-head span,
+.game-hud__province-grid span { display: flex; flex-direction: column; min-width: 0; }
+
+.game-hud small {
+  color: #84938d;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: .17em;
+  line-height: 1.2;
+}
+
+.game-hud__country strong {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #f0e7ce;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: .025em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-hud__modes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 4px;
+  background: rgba(255,255,255,.025);
+}
+
+.game-hud__modes button,
+.game-hud__inspector {
+  border: 0;
+  color: #899891;
+  background: transparent;
+  cursor: pointer;
+  font: 800 8px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.game-hud__modes button {
+  min-height: 28px;
+  padding: 0 11px;
+  border-radius: 3px;
+  transition: color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+
+.game-hud__modes button:hover { color: #d7d5ca; background: rgba(255,255,255,.045); }
+.game-hud__modes button.is-active {
+  color: #eee1bd;
+  background: rgba(185, 160, 101, .13);
+  box-shadow: inset 0 0 0 1px rgba(218, 196, 142, .18);
+}
+
+.game-hud__status {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 15px;
+}
+
+.game-hud__status-item {
+  min-width: 80px;
+  padding-left: 12px;
+  border-left: 1px solid rgba(255,255,255,.07);
+}
+
+.game-hud__status-item b {
+  margin-top: 3px;
+  color: #d9ddd6;
+  font: 600 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
+.game-hud__status-item.is-rain b { color: #a8c2c8; }
+
+.game-hud__inspector {
+  width: 32px;
+  height: 30px;
+  border: 1px solid rgba(214, 197, 151, .17);
+  border-radius: 3px;
+  color: #b9aa82;
+  background: rgba(191, 165, 102, .06);
+}
+.game-hud__inspector:hover { color: #f1dfad; background: rgba(191, 165, 102, .13); }
+
+.game-hud__province {
+  position: absolute;
+  left: 17px;
+  bottom: 19px;
+  width: min(315px, calc(100vw - 34px));
+  padding: 12px 13px 10px;
+  border: 1px solid rgba(218, 203, 163, .16);
+  border-radius: 4px;
+  background: linear-gradient(160deg, rgba(18, 27, 25, .92), rgba(11, 18, 18, .88));
+  box-shadow: 0 10px 32px rgba(2,8,8,.24);
+  backdrop-filter: blur(9px);
+  pointer-events: none;
+}
+
+.game-hud__province::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 4px 0 0 4px;
+  background: rgba(190, 171, 122, .25);
+}
+.game-hud__province.has-selection::before { background: var(--hud-province-color, #b9aa87); }
+
+.game-hud__province-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.game-hud__province-head strong {
+  margin-top: 3px;
+  color: #efe6cf;
+  font: 500 16px/1.15 Georgia, serif;
+  letter-spacing: .015em;
+}
+
+#hud-province-color {
+  width: 8px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  background: var(--hud-province-color, #68766e);
+  opacity: .9;
+}
+
+.game-hud__province-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 11px;
+  padding-top: 9px;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+
+.game-hud__province-grid b {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #c8d0c9;
+  font-size: 10px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-hud__province p {
+  margin: 9px 0 0;
+  color: #71827b;
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.game-hud__controls {
+  position: absolute;
+  right: 19px;
+  bottom: 20px;
+  display: flex;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: 3px;
+  color: rgba(221, 225, 217, .48);
+  background: rgba(11, 18, 18, .55);
+  backdrop-filter: blur(5px);
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: .05em;
+}
+
+.game-hud__controls span { white-space: nowrap; }
+.game-hud__controls kbd {
+  margin-right: 3px;
+  color: rgba(231, 216, 173, .62);
+  font: inherit;
+}
+
+/* Keep hover information quick and map-like; the persistent field report is
+   now responsible for the larger detail presentation. */
+.tooltip {
+  min-width: 0 !important;
+  padding: 6px 8px 7px !important;
+  border: 1px solid rgba(240, 226, 188, .22) !important;
+  border-left-width: 2px !important;
+  border-radius: 3px !important;
+  background: rgba(12, 20, 19, .87) !important;
+  box-shadow: 0 5px 18px rgba(3, 9, 9, .2) !important;
+  backdrop-filter: blur(6px) !important;
+}
+.tooltip strong { font-size: 12px !important; }
+.tooltip span { margin-top: 2px !important; font-size: 7px !important; letter-spacing: .10em !important; }
+
+/* Diagnostics stay a developer tool, but opening F3 should sit below the
+   player HUD rather than collide with it. */
+.diagnostics { top: 77px !important; max-height: calc(100vh - 96px) !important; }
+
+@media (max-width: 980px) {
+  .game-hud__topbar { grid-template-columns: minmax(160px, 1fr) auto; }
+  .game-hud__status { display: none; }
+  .game-hud__modes button { padding-inline: 8px; }
+}
+
+@media (max-width: 700px) {
+  .game-hud__topbar { left: 8px; right: 8px; top: 8px; grid-template-columns: 1fr; gap: 6px; }
+  .game-hud__country { border-right: 0; }
+  .game-hud__modes { justify-content: stretch; }
+  .game-hud__modes button { flex: 1; padding-inline: 4px; }
+  .game-hud__province { left: 9px; bottom: 9px; }
+  .game-hud__controls { display: none; }
+}
