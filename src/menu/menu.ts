@@ -20,27 +20,24 @@ export function mountMenu(handlers: MenuHandlers): void {
 
   /**
    * One update() drives every sub-motion from the same t (0=on the menu,
-   * 1=dossier open). Instead of any button or panel stretching, the desk
-   * photo itself pans and zooms down — a camera settling onto the map —
-   * while the menu racks out of focus behind the document that fades in.
+   * 1=dossier open). The desk photo pans/zooms down like a camera settling
+   * onto the map; the logo and cards are treated as sitting on that same
+   * desk, so they scroll straight up and off with the same pan progress
+   * instead of fading or blurring in place.
    */
   function update(t: number): void {
     const panT = smooth(phase(t, 0, 0.92));
-    const outT = smooth(phase(t, 0, 0.6));
-    const inT = smooth(phase(t, 0.4, 1));
+    const inT = smooth(phase(t, 0.45, 1));
 
     map.style.backgroundPosition = `center ${6 + panT * 56}%`;
-    map.style.backgroundSize = `${150 - panT * 30}% auto`;
+    map.style.backgroundSize = `${132 - panT * 20}% auto`;
     map.style.filter = `brightness(${(.86 + panT * .09).toFixed(3)}) saturate(.92) contrast(1.02)`;
 
-    main.style.opacity = String(1 - outT);
-    main.style.transform = `translateY(${outT * -24}px)`;
-    main.style.filter = `blur(${(outT * 5).toFixed(2)}px)`;
+    main.style.transform = `translateY(${(panT * -72).toFixed(2)}vh)`;
 
     if (transitionFile) {
       transitionFile.style.opacity = String(inT);
       transitionFile.style.transform = `translateY(${((1 - inT) * 28).toFixed(2)}px)`;
-      transitionFile.style.filter = `blur(${((1 - inT) * 5).toFixed(2)}px)`;
     }
   }
 

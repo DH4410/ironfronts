@@ -31,7 +31,7 @@
 .ifm__backdrop { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
 .ifm__map {
   position: absolute; inset: -8%;
-  background: url('/menu/desk-scene.jpg') center 6%/150% auto no-repeat;
+  background: url('/menu/desk-scene.jpg') center 6%/132% auto no-repeat;
   filter: brightness(.86) saturate(.92) contrast(1.02);
 }
 .ifm__wash {

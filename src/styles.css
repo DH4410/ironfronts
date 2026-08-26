@@ -65,7 +65,7 @@ body { user-select: none; }
 .loading__backdrop::before {
   content: "";
   position: absolute; inset: 0;
-  background: url('/menu/desk-bg.jpg') center 38%/cover no-repeat;
+  background: url('/menu/desk-scene.jpg') center 30%/cover no-repeat;
   filter: brightness(.82) saturate(.88) contrast(1.02);
 }
 .loading__backdrop::after {
