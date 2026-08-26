@@ -126,7 +126,9 @@ export class PoliticalCache {
     this.colors[target] = Math.round(this.countryColors[source] * 255);
     this.colors[target + 1] = Math.round(this.countryColors[source + 1] * 255);
     this.colors[target + 2] = Math.round(this.countryColors[source + 2] * 255);
-    this.colors[target + 3] = 255;
+    // Country ids fit in one byte. Keeping the owner in alpha lets the terrain
+    // shader select a mutable diplomacy color without another province-sized texture.
+    this.colors[target + 3] = owner;
   }
 
   private updateBorderSegment(segment: number): void {

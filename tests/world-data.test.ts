@@ -23,7 +23,9 @@ interface Manifest {
     owners: { url: string; count: number; stride: number };
     adjacency: { url: string; count: number; stride: number };
     labelData: { url: string; count: number; stride: number };
-    countries: Array<{ id: number; name: string; color: string; capitalProvinceId: number }>;
+    countries: Array<{
+      id: number; name: string; color: string; colorFamily: number; capitalProvinceId: number;
+    }>;
   };
   propChunks: {
     chunksX: number;
@@ -113,14 +115,16 @@ describe('generated v12 world package', () => {
 
   it('reconstructs the authoritative river graph and both static ocean-water canals', async () => {
     const data = await manifest();
-    const [vertexBytes, indexBytes, networkBytes, maskBytes, provinceIdBytes, nodeBytes, reportBytes] = await Promise.all([
+    const [vertexBytes, indexBytes, networkBytes, maskBytes, provinceIdBytes, heightBytes, nodeBytes, reportBytes] = await Promise.all([
       readFile('public/world/waterway-vertices.f32'), readFile('public/world/waterway-indices.u32'),
       readFile('public/world/waterway-network-lines.f32'),
       readFile('public/world/navigation.rgba8'),
       readFile('public/world/province-ids.u16'),
+      readFile('public/world/height.f32'),
       readFile('material/movement/network_nodes.json', 'utf8'), readFile('public/world/world-generation-report.json', 'utf8'),
     ]);
     const vertices = viewF32(vertexBytes), indices = viewU32(indexBytes), network = viewF32(networkBytes);
+    const heights = viewF32(heightBytes);
     const provinceIds = new Uint16Array(provinceIdBytes.buffer, provinceIdBytes.byteOffset, provinceIdBytes.byteLength / 2);
     const source = JSON.parse(nodeBytes) as { nodes: Array<{ kind: string; location_name: string }> };
     const report = JSON.parse(reportBytes);
@@ -129,8 +133,14 @@ describe('generated v12 world package', () => {
     const sourceCanalPoints = source.nodes.filter((node) => node.kind === 'sea_point' && ['Kiel Canal', 'Suez Channel'].includes(node.location_name));
     expect(report.version).toBe('world-generation-v12');
     expect(report.waterways.animatedSurface).toBe(true);
-    expect(report.waterways.animation).toBe('tangent-advection-domain-warp');
+    expect(report.waterways.animation).toBe('simple-flow-aligned-shimmer');
+    expect(report.waterways.terrainTreatment).toBe('shallow lower-only channel with guarded inner terrain clip and independently draped surface vertices');
+    expect(report.waterways.terrainClipMask).toBe(true);
+    expect(report.waterways.terrainOverlayMask).toBe(true);
     expect(report.waterways.minimumRiverWidth).toBeGreaterThanOrEqual(11);
+    expect(report.waterways.crossSectionSamples).toBe(5);
+    expect(report.waterways.nodeCapSegments).toBe(24);
+    expect(report.waterways.surfaceLift).toBe(0.14);
     expect(report.waterways.canalSurface).toBe('static-water province-zero channel');
     expect(report.waterways.riverSystems).toHaveLength(24);
     expect(sourceRiverPoints).toHaveLength(520);
@@ -146,8 +156,10 @@ describe('generated v12 world package', () => {
     expect(network.every(Number.isFinite)).toBe(true);
     for (let line = 0; line < data.buffers.waterwayNetworkLines.count; line += 1) {
       const offset = line * 8;
-      expect(network[offset + 4]).toBeGreaterThanOrEqual(0.4);
-      expect(network[offset + 5]).toBeGreaterThanOrEqual(0.4);
+      // A short river-mouth overlap may now sit slightly below the 0.42 ocean
+      // surface as the shallow carved channel dissolves into open water.
+      expect(network[offset + 4]).toBeGreaterThanOrEqual(0.079);
+      expect(network[offset + 5]).toBeGreaterThanOrEqual(0.079);
       expect([0, 1]).toContain(network[offset + 6]);
     }
     expect(data.fields.navigation.format).toBe('rgba8unorm');
@@ -156,9 +168,20 @@ describe('generated v12 world package', () => {
     expect(maskBytes.some((value, index) => index % 4 === 3 && value > 0)).toBe(true);
     expect(report.visualRivers.minimumRenderedWidth).toBeGreaterThanOrEqual(7.5);
     expect(report.visualRivers.minimumRenderedWidth).toBeLessThan(report.waterways.minimumRiverWidth);
+    expect(report.waterways.visualSurface.meshSubdivisions).toBe(2);
+    expect(report.waterways.visualSurface.maximumSampleSpacing).toBeLessThanOrEqual(1.7);
+    expect(report.waterways.visualSurface.renderKind).toBe(0.25);
+    expect(report.waterways.visualSurface.surfaceLift).toBe(0.14);
     expect(report.visualRivers.centerPixels).toBeGreaterThan(0);
     expect(report.visualRivers.widenedLandPixels).toBeGreaterThan(0);
     expect(data.counts.visualRiverComponents).toBeGreaterThan(0);
+    expect(report.topography.riverCarving).toEqual(expect.objectContaining({
+      method: 'shallow lower-only river channel with a short bank fade',
+      depth: 0.35,
+      fadeDistance: 14,
+    }));
+    expect(report.topography.riverCarving.adjustedCells).toBeGreaterThan(0);
+    expect(report.banks.riverBankPixels).toBeGreaterThan(0);
     let widenedVisualLandPixels = 0;
     let movementVisualOverlap = 0;
     for (let pixel = 0; pixel < provinceIds.length; pixel += 1) {
@@ -171,14 +194,39 @@ describe('generated v12 world package', () => {
     expect(movementVisualOverlap).toBe(0);
     expect(vertices.every(Number.isFinite)).toBe(true);
     let centerVertices = 0;
+    let drapedLandVertices = 0;
+    const sampleTerrainHeight = (x: number, z: number) => {
+      const width = data.fields.height.width, height = data.fields.height.height;
+      const fx = ((x % data.world.width) + data.world.width) % data.world.width / data.world.width * width - 0.5;
+      const fz = Math.max(0, Math.min(height - 1, z / data.world.height * height - 0.5));
+      const x0raw = Math.floor(fx), z0 = Math.floor(fz), tx = fx - x0raw, tz = fz - z0;
+      const x0 = ((x0raw % width) + width) % width, x1 = (x0 + 1) % width, z1 = Math.min(height - 1, z0 + 1);
+      const top = heights[z0 * width + x0] * (1 - tx) + heights[z0 * width + x1] * tx;
+      const bottom = heights[z1 * width + x0] * (1 - tx) + heights[z1 * width + x1] * tx;
+      return top * (1 - tz) + bottom * tz;
+    };
     for (let vertex = 0; vertex < data.buffers.waterwayVertices.count; vertex += 113) {
       const offset = vertex * 10;
-      expect(vertices[offset + 1]).toBeGreaterThanOrEqual(0.4);
-      expect(vertices[offset + 1]).toBeLessThanOrEqual(60.5);
-      expect([0, 1]).toContain(vertices[offset + 6]);
+      expect(vertices[offset + 1]).toBeGreaterThanOrEqual(0.079);
+      expect(vertices[offset + 1]).toBeLessThanOrEqual(60.7);
+      expect([0, 0.25, 1]).toContain(vertices[offset + 6]);
       expect(Math.hypot(vertices[offset + 7], vertices[offset + 8])).toBeGreaterThan(0.99);
       expect(vertices[offset + 9]).toBeGreaterThan(0);
+      const x = vertices[offset], y = vertices[offset + 1], z = vertices[offset + 2];
+      const px = Math.min(data.fields.navigation.width - 1, Math.max(0,
+        Math.floor(((x % data.world.width) + data.world.width) % data.world.width / data.world.width * data.fields.navigation.width)));
+      const pz = Math.min(data.fields.navigation.height - 1, Math.max(0,
+        Math.floor(z / data.world.height * data.fields.navigation.height)));
+      if (provinceIds[pz * data.fields.navigation.width + px] !== 0) {
+        const lift = y - sampleTerrainHeight(x, z);
+        // Stored float32 X/Z values can shift the resampled height slightly on
+        // the steepest cells; the authored lift itself is 0.14-0.155.
+        expect(lift).toBeGreaterThanOrEqual(0.12);
+        expect(lift).toBeLessThanOrEqual(0.18);
+        drapedLandVertices += 1;
+      }
     }
+    expect(drapedLandVertices).toBeGreaterThan(100);
     for (let vertex = 0; vertex < data.buffers.waterwayVertices.count; vertex += 1) {
       const offset = vertex * 10;
       if (vertices[offset + 5] > 0.01) continue;
@@ -197,6 +245,7 @@ describe('generated v12 world package', () => {
     for (let index = 0; index < indices.length; index += 127) expect(indices[index]).toBeLessThan(data.buffers.waterwayVertices.count);
     expect(data.infrastructureChunks.waterways).toHaveLength(512);
     expect(data.infrastructureChunks.waterways.reduce((sum, range) => sum + range.indexCount, 0)).toBe(indices.length);
+    expect(data.counts.waterwayTriangles).toBeLessThan(700_000);
   });
 
   it('emits finite capped topography without terrain-class spikes', async () => {
@@ -301,6 +350,8 @@ describe('generated v12 world package', () => {
     expect(data.politics.countries).toHaveLength(200);
     expect(new Set(data.politics.countries.map((country) => country.id)).size).toBe(200);
     expect(data.politics.countries.every((country) => /^#[0-9A-F]{6}$/i.test(country.color))).toBe(true);
+    expect(new Set(data.politics.countries.map((country) => country.color)).size).toBe(200);
+    expect(data.politics.countries.every((country) => country.colorFamily >= 0 && country.colorFamily < 6)).toBe(true);
     expect(owners.length).toBe(data.politics.owners.count);
     expect(adjacency.length).toBe(data.politics.adjacency.count * 2);
     expect(labels.length).toBe(data.politics.labelData.count * 3);
@@ -321,6 +372,11 @@ describe('generated v12 world package', () => {
     for (let edge = 0; edge < adjacency.length; edge += 2) {
       expect(owners[adjacency[edge]]).toBeGreaterThan(0);
       expect(owners[adjacency[edge + 1]]).toBeGreaterThan(0);
+      const countryA = data.politics.countries.find((country) => country.id === owners[adjacency[edge]]);
+      const countryB = data.politics.countries.find((country) => country.id === owners[adjacency[edge + 1]]);
+      if (countryA && countryB && countryA.id !== countryB.id) {
+        expect(countryA.colorFamily).not.toBe(countryB.colorFamily);
+      }
     }
   });
 

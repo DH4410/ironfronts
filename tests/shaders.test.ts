@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { WgslReflect } from 'wgsl_reflect/wgsl_reflect.module.js';
 import { create, globals } from 'webgpu';
 import {
-  countryLabelShader, infrastructureShader, lineShader, polarCapShader, propShader, terrainShader, waterShader,
-  waterwayShader,
+  cityLightShader, countryLabelShader, infrastructureShader, lineShader, polarCapShader, propShader, rainShader,
+  terrainShader, waterShader, waterwayShader,
 } from '../src/shaders';
 
 describe('WGSL programs', () => {
@@ -14,13 +14,14 @@ describe('WGSL programs', () => {
     expect(terrainShader).not.toContain('if (elevation < 12.0)');
   });
 
-  it('clips terrain around widened visual-only channels without replacing movement-river ribbons', () => {
-    expect(terrainShader).toContain('riverField.r > 0.45 || riverField.g > 0.45');
-    expect(waterShader).toContain('if (riverField.r > 0.45)');
-    expect(waterShader).toContain('landAt(input.mapUv) >= 0.5 && riverField.g <= 0.45');
+  it('clips only the guarded river core while explicit water covers the wider contour', () => {
+    const terrainFragment = terrainShader.slice(terrainShader.indexOf('@fragment\nfn terrainFragment'));
+    expect(terrainFragment).toContain('riverField.r > 0.60 || riverField.g > 0.60');
+    expect(waterShader).toContain('riverField.r > 0.45 || riverField.g > 0.45');
+    expect(waterShader).toContain('if (landAt(input.mapUv) >= 0.5)');
     expect(terrainShader).toContain('bankField.g');
-    expect(waterShader).toContain('mix(waterDepthAt(input.mapUv), 0.08, visualRiver)');
-    expect(waterShader).toContain('(1.0 - visualRiver * 0.80)');
+    expect(terrainShader).toContain('shoreline * 0.72');
+    expect(waterShader).toContain('oceanSurfaceColor(input.worldPosition');
     expect(waterShader).not.toContain('if (provinceAt(input.mapUv)');
   });
 
@@ -31,14 +32,23 @@ describe('WGSL programs', () => {
     expect(infrastructureShader).not.toContain('corridorId');
   });
 
-  it('advects supplied waterways along dense flow vectors and gives canals the ocean palette', () => {
-    expect(waterwayShader).toContain('uniforms.sunTime.w');
+  it('renders supplied waterways with subtle flow-aligned motion and gives canals the ocean palette', () => {
+    const fragment = waterwayShader.slice(waterwayShader.indexOf('@fragment\nfn waterwayFragment'));
+    expect(fragment).toContain('uniforms.sunTime.w * input.speed');
+    expect(fragment).toContain('let flowShimmer =');
     expect(waterwayShader).toContain('let flow = normalize(input.flow');
-    expect(waterwayShader).toContain('brokenStreak');
+    expect(waterwayShader).toContain('let visualRiver = input.kind > 0.1 && input.kind < 0.5');
+    expect(waterwayShader).toContain('visualRiverAt(mapUv)');
+    expect(waterwayShader).toContain('fwidth(visualSignal)');
+    expect(fragment).not.toContain('brokenStreak');
     expect(waterwayShader).toContain('let canal = input.kind > 0.5');
-    expect(waterwayShader).toContain('oceanDeep');
-    expect(terrainShader).toContain('riverField.r > 0.45');
-    expect(terrainShader).toContain('riverField.g > 0.45');
+    expect(waterwayShader).toContain('let coastShallow = vec3f(0.12, 0.48, 0.52)');
+    expect(waterwayShader).toContain('let coastDeep = vec3f(0.025, 0.16, 0.255)');
+    expect(waterwayShader).toContain('normalize(cross(screenDy, screenDx))');
+    expect(waterwayShader).toContain('!canal && uniforms.interaction.w > 0.5');
+    expect(waterwayShader).toContain('leftCountry.a > 0.0 && rightCountry.a > 0.0');
+    expect(waterwayShader).toContain('let dashVisible = fract(input.waterUv.x) < 0.54');
+    expect(terrainShader).toContain('let riverField = navigation.ba');
     expect(terrainShader).toContain('debugMode == 6u');
     expect(terrainShader).toContain('debugMode == 9u');
     expect(lineShader).toContain('lineParams.mode == 2u');
@@ -56,6 +66,8 @@ describe('WGSL programs', () => {
   it('uses precomputed terrain normals, faithful mipmapped albedo, prop AO, and packed navigation', () => {
     expect(terrainShader).toContain('let navigation = navigationAt(input.mapUv)');
     expect(terrainShader).toContain('let bakedSurface = textureSample(terrainAlbedoTexture');
+    expect(terrainShader).toContain('fn surfaceTransitionAt');
+    expect(terrainShader).toContain('surfaceTransition * 0.92');
     expect(terrainShader).toContain('baseColor *= bakedSurface.a');
     expect(terrainShader).toContain('smoothstep(3000.0, 4500.0');
     expect(terrainShader).not.toContain('textureSampleLevel(terrainAlbedoTexture');
@@ -63,11 +75,30 @@ describe('WGSL programs', () => {
 
   it('derives political tint and country borders from mutable province ownership', () => {
     expect(terrainShader).toContain('let politicalColor = politicalColorAt(input.mapUv)');
+    expect(terrainShader).toContain('diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode');
+    expect(terrainShader).toContain('diplomacyColor.rgb * 1.30');
+    expect(terrainShader).toContain('overlayStrength = max(overlayStrength, 0.30)');
+    expect(terrainShader).toContain('let isPlayer = diplomacyColor.a > 0.25 && diplomacyColor.a < 0.75');
+    expect(terrainShader).toContain('select(0.45, 0.85, uniforms.interaction.z > 1.5)');
+    expect(terrainShader).toContain('overlayColor * (terrainLuminance / tintLuminance)');
+    expect(terrainShader).toContain('var preservation = 1.0 - overview');
+    expect(terrainShader).toContain('let biomeRetention = 0.20 * preservation');
+    expect(terrainShader).toContain('preservation *= 0.70');
+    expect(terrainShader).toContain('preservation *= 0.45');
+    expect(terrainShader).toContain('overlayStrength = 0.85');
     expect(terrainShader).not.toContain('let provinceId = provinceAt(input.mapUv)');
-    expect(terrainShader).toContain('let overlayStrength = mix(0.26, 0.38');
-    expect(lineShader).toContain('let countryBoundary = line.b.z < 0.0');
+    expect(terrainShader).toContain('smoothstep(\n        3000.0,\n        6500.0,\n        uniforms.camera.y');
+    expect(terrainShader).toContain('let balancedStrength = mix(\n        0.10,\n        0.82,\n        overview');
+    expect(terrainShader).toContain('balancedStrength,\n        0.85,\n        uniforms.interaction.z > 1.5');
+    expect(terrainShader).toContain('fog * 0.39');
+    expect(terrainShader).toContain('* select(overview * 0.82, 1.0, politicalMode || diplomacyMode)');
+    expect(lineShader).toContain('let countryBoundary = line.b.z < 0.0 && line.b.y > 0.5');
     expect(lineShader).toContain('height0 = abs(line.b.z) + 0.8');
     expect(lineShader).toContain('(lineParams.enabled & 2u) != 0u');
+    expect(lineShader).toContain('mix(0.60, 0.94, nearFactor)');
+    expect(lineShader).toContain('if (riverSignal >= 0.15) { discard; }');
+    expect(lineShader).toContain('styledColor = mix(input.outerColor, input.innerColor, centerCoverage)');
+    expect(lineShader).toContain('mix(0.30, 0.10, nearFactor)');
   });
 
   it('builds purely visual periodic polar shelves with water gaps and an outer fog', () => {
@@ -79,6 +110,20 @@ describe('WGSL programs', () => {
     expect(polarCapShader).not.toContain('navigationAt(input');
   });
 
+  it('generates bounded world-space rain and terrain impacts without particle buffers or CPU state', () => {
+    expect(rainShader).toContain('@builtin(instance_index) instanceIndex: u32');
+    expect(rainShader).toContain('uniforms.sunTime.w * speed');
+    expect(rainShader).toContain('uniforms.sky.w * strategicReadability');
+    expect(rainShader).toContain('let ground = heightAt(mapUv)');
+    expect(rainShader).toContain('uniforms.viewProjection * vec4f(topWorld');
+    expect(rainShader).toContain('let impact = instanceIndex % 9u == 0u');
+    expect(rainShader).toContain('output.landSurface = landAt(mapUv)');
+    expect(rainShader).toContain('let ringRadius = mix(0.18, 0.78, input.impactAge)');
+    expect(rainShader).toContain('let strategicLengthScale = clamp(uniforms.camera.y / 275.0, 1.0, 12.0)');
+    expect(rainShader).toContain('let columnHeight = clamp(uniforms.camera.y * 0.90, 125.0, 6000.0)');
+    expect(rainShader).not.toContain('@group(1)');
+  });
+
   it.each([
     ['terrain', terrainShader, ['terrainVertex'], ['terrainFragment']],
     ['polar caps', polarCapShader, ['polarCapVertex'], ['polarCapFragment']],
@@ -86,6 +131,8 @@ describe('WGSL programs', () => {
     ['waterways', waterwayShader, ['waterwayVertex'], ['waterwayFragment']],
     ['infrastructure', infrastructureShader, ['infrastructureVertex'], ['infrastructureFragment']],
     ['props', propShader, ['propVertex'], ['propFragment']],
+    ['city lights', cityLightShader, ['cityLightVertex'], ['cityLightFragment']],
+    ['rain', rainShader, ['rainVertex'], ['rainFragment']],
     ['lines', lineShader, ['lineVertex'], ['lineFragment']],
     ['country labels', countryLabelShader, ['countryLabelVertex'], ['countryLabelFragment']],
   ])('parses the %s shader and exposes its render entry points', (_name, source, vertexNames, fragmentNames) => {
@@ -104,7 +151,7 @@ describe('WGSL programs', () => {
     const device = await adapter.requestDevice();
     const modules = new Map<string, GPUShaderModule>();
     for (const [label, source] of [
-      ['terrain', terrainShader], ['polar caps', polarCapShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['lines', lineShader], ['country labels', countryLabelShader],
+      ['terrain', terrainShader], ['polar caps', polarCapShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['city lights', cityLightShader], ['rain', rainShader], ['lines', lineShader], ['country labels', countryLabelShader],
     ] as const) {
       const module = device.createShaderModule({ label, code: source });
       modules.set(label, module);
@@ -125,6 +172,7 @@ describe('WGSL programs', () => {
       { binding: 8, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 9, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d-array' } },
       { binding: 10, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 11, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 12, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       { binding: 13, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ] });
@@ -193,6 +241,20 @@ describe('WGSL programs', () => {
     })).resolves.toBeDefined();
     await expect(device.createRenderPipelineAsync({
       layout: device.createPipelineLayout({ bindGroupLayouts: [common, layer] }),
+      vertex: { module: modules.get('city lights')!, entryPoint: 'cityLightVertex' },
+      fragment: { module: modules.get('city lights')!, entryPoint: 'cityLightFragment', targets: [{ format: 'bgra8unorm' }] },
+      primitive: { topology: 'triangle-list' },
+      depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'less-equal' },
+    })).resolves.toBeDefined();
+    await expect(device.createRenderPipelineAsync({
+      layout: device.createPipelineLayout({ bindGroupLayouts: [common] }),
+      vertex: { module: modules.get('rain')!, entryPoint: 'rainVertex' },
+      fragment: { module: modules.get('rain')!, entryPoint: 'rainFragment', targets: [{ format: 'bgra8unorm' }] },
+      primitive: { topology: 'triangle-list' },
+      depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'less-equal' },
+    })).resolves.toBeDefined();
+    await expect(device.createRenderPipelineAsync({
+      layout: device.createPipelineLayout({ bindGroupLayouts: [common, layer] }),
       vertex: { module: modules.get('lines')!, entryPoint: 'lineVertex' },
       fragment: { module: modules.get('lines')!, entryPoint: 'lineFragment', targets: [{ format: 'bgra8unorm' }] },
       primitive: { topology: 'triangle-list' }, depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'less-equal' },
@@ -205,5 +267,5 @@ describe('WGSL programs', () => {
       depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'always' },
     })).resolves.toBeDefined();
     device.destroy();
-  }, 10_000);
+  }, 20_000);
 });

@@ -38,9 +38,9 @@ fn waterVertex(input: WaterVertexInput, @builtin(instance_index) instanceIndex: 
 @fragment
 fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
   let riverField = waterwayFieldAt(input.mapUv);
-  if (riverField.r > 0.45) { discard; }
-  if (landAt(input.mapUv) >= 0.5 && riverField.g <= 0.45) { discard; }
-  let visualRiver = smoothstep(0.18, 0.72, riverField.g);
+  if (riverField.r > 0.45 || riverField.g > 0.45) { discard; }
+  if (landAt(input.mapUv) >= 0.5) { discard; }
+  let visualRiver = 0.0;
   let debugMode = u32(uniforms.map.w + 0.5);
   if (debugMode == 6u) {
     return vec4f(mix(vec3f(0.012, 0.025, 0.032), vec3f(0.18, 0.48, 0.98), visualRiver), 1.0);

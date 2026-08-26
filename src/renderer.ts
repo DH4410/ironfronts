@@ -4,6 +4,7 @@ import { buildPropVisibility, buildTerrainVisibility } from './chunk-visibility'
 import { buildCountryColorBuffer, CountryLabelLayer } from './country-overlay';
 import { loadCountryLabelFont } from './country-labels/atlas';
 import { isValidCountryLabelPoint } from './country-labels/territory';
+import { buildDiplomacyColorData, findCountryByName } from './diplomacy';
 import { align4, fetchBinary, fetchJson, uploadMipmappedTexture, uploadTexture } from './gpu-utils';
 import { createMaterialTexture, createTreeMaterialTexture } from './material-texture';
 import {
@@ -15,20 +16,37 @@ import { PoliticalCache } from './political-cache';
 import { createRendererLayouts, createRendererPipelines } from './renderer-pipelines';
 import { beginWorldFrame, submitWorldFrame } from './renderer-frame';
 import type { InstanceLayer, PerformanceLayerVisibility } from './renderer-types';
+import { COUNTRY_LABEL_FADE_END_ALTITUDE } from './shaders/country-labels';
 import {
   createBarrierMesh, createBuildingArchetypeMesh, createLampMesh, createSignMesh, createTerrainMesh,
   createTreeFamilyMesh, uploadIndexedMesh,
 } from './scene-meshes';
 import type { Mesh } from './scene-meshes';
-import type { CountryRecord, FrameStats, HoverInfo, ProgressReporter, PropChunkRange, ProvinceRecord, WorldManifest } from './types';
+import type {
+  CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo, ProgressReporter, PropChunkRange,
+  ProvinceRecord, WorldManifest,
+} from './types';
 import {
   extractFrustumPlanes, sphereIntersectsFrustum, sphereIntersectsHorizontalWorldWindow, WORLD_COPY_INDICES,
 } from './visibility';
 import { sampleWrappedField } from './world-sampling';
 import { loadWorldAssetBuffers } from './world-assets';
+import {
+  advanceHour, calculateTimeOfDay, clampTimeMultiplier, DEFAULT_START_HOUR, formatClock, wrapHour,
+  type TimeOfDayLighting,
+} from './time-of-day';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
-const COUNTRY_LABEL_MIN_ALTITUDE = 600;
+const RAIN_TRANSITION_SECONDS = 1.5;
+const MIN_RAIN_PARTICLES = 400;
+const MAX_RAIN_PARTICLES = 1_400;
+
+export type MapMode = 'political' | 'diplomacy' | 'clear' | 'balanced';
+
+export interface TimeOfDayState extends TimeOfDayLighting {
+  clock: string;
+  multiplier: number;
+}
 
 export class WorldRenderer {
   readonly camera = new StrategyCamera();
@@ -36,6 +54,9 @@ export class WorldRenderer {
   manifest!: WorldManifest;
   onHover?: (info: HoverInfo | null, x: number, y: number) => void;
   onStats?: (stats: FrameStats) => void;
+  onDiplomacyChange?: (state: DiplomacyState) => void;
+  onProvinceCaptured?: (provinceId: number, previousCountry: CountryRecord, player: CountryRecord) => void;
+  onTimeOfDayChange?: (state: TimeOfDayState) => void;
 
   private readonly canvas: HTMLCanvasElement;
   private readonly countryLabelCanvas?: HTMLCanvasElement;
@@ -56,6 +77,8 @@ export class WorldRenderer {
   private waterwayPipeline!: GPURenderPipeline;
   private infrastructurePipeline!: GPURenderPipeline;
   private propPipeline!: GPURenderPipeline;
+  private cityLightPipeline!: GPURenderPipeline;
+  private rainPipeline!: GPURenderPipeline;
   private linePipeline!: GPURenderPipeline;
   private countryLabelPipeline!: GPURenderPipeline;
   private countryLabelBuffer?: GPUBuffer;
@@ -91,6 +114,7 @@ export class WorldRenderer {
   private materialTexture!: GPUTexture;
   private treeMaterialTexture!: GPUTexture;
   private provincePoliticalColorTexture!: GPUTexture;
+  private diplomacyColorTexture!: GPUTexture;
   private politicalCache!: PoliticalCache;
   private countryColors!: Float32Array;
   private visibleTerrainBuffer!: GPUBuffer;
@@ -104,11 +128,20 @@ export class WorldRenderer {
   private provinceOwners!: Uint32Array;
   private provinceById = new Map<number, ProvinceRecord>();
   private countryById = new Map<number, CountryRecord>();
+  private playerCountryId = 0;
+  private readonly diplomaticRelations = new Map<number, DiplomaticRelation>();
   private countryLabels?: CountryLabelLayer;
   private running = false;
   private frameHandle = 0;
   private previousTime = performance.now();
   private elapsed = 0;
+  private timeOfDayHour = DEFAULT_START_HOUR;
+  private timeMultiplier = 1;
+  private timeLighting = calculateTimeOfDay(DEFAULT_START_HOUR);
+  private reportedClock = '';
+  private rainEnabled = false;
+  private rainIntensity = 0;
+  private frameSkyColor: [number, number, number] = [...calculateTimeOfDay(DEFAULT_START_HOUR).skyColor];
   private performanceMonitor = new PerformanceMonitor(false);
   private frameWorkload = createEmptyRenderWorkload();
   private statsFrameCountdown = 0;
@@ -124,6 +157,7 @@ export class WorldRenderer {
   private showWaterwayNetwork = false;
   private showBorders = true;
   private showCountryOverlay = true;
+  private mapMode: MapMode = 'balanced';
   private showProps = true;
   private showRoads = true;
   private showHiddenConnections = true;
@@ -144,6 +178,7 @@ export class WorldRenderer {
   private lastPickedCameraRevision = -1;
   private lastPickTime = -Infinity;
   private readonly pickPoint = vec3.create();
+  private clickStart?: { pointerId: number; x: number; y: number };
   private resizeObserver?: ResizeObserver;
 
   constructor(canvas: HTMLCanvasElement, countryLabelCanvas?: HTMLCanvasElement) {
@@ -157,6 +192,13 @@ export class WorldRenderer {
     this.manifest = await fetchJson<WorldManifest>('/world/world.json');
     this.provinceById = new Map(this.manifest.provinces.map((province) => [province.id, province]));
     this.countryById = new Map(this.manifest.politics.countries.map((country) => [country.id, country]));
+    if (this.manifest.politics.countries.some((country) => country.id > 255)) {
+      throw new Error('Diplomacy rendering supports country ids up to 255');
+    }
+    const defaultPlayer = findCountryByName(this.manifest.politics.countries, 'Spain')
+      ?? this.manifest.politics.countries[0];
+    if (!defaultPlayer) throw new Error('The world has no countries');
+    this.playerCountryId = defaultPlayer.id;
     this.camera.configureWorld(this.manifest.world.width, this.manifest.world.height);
     this.camera.minimumAltitude = this.manifest.terrain.maxHeight + 82;
 
@@ -248,6 +290,15 @@ export class WorldRenderer {
       'province political colors', this.politicalCache.width, this.politicalCache.height,
       'rgba8unorm', this.politicalCache.colors, this.politicalCache.width * 4,
     );
+    const diplomacyColors = buildDiplomacyColorData(
+      this.manifest.politics.countries,
+      this.diplomaticRelations,
+      this.playerCountryId,
+    );
+    this.diplomacyColorTexture = uploadTexture(this.device,
+      'diplomacy country colors', diplomacyColors.length / 4, 1,
+      'rgba8unorm', diplomacyColors, diplomacyColors.length,
+    );
 
     report('Preparing terrain and tree materials', 0.49);
     [this.materialTexture, this.treeMaterialTexture] = await Promise.all([
@@ -279,6 +330,7 @@ export class WorldRenderer {
         { binding: 8, resource: this.terrainNormalTexture.createView() },
         { binding: 9, resource: this.treeMaterialTexture.createView({ dimension: '2d-array' }) },
         { binding: 10, resource: this.provincePoliticalColorTexture.createView() },
+        { binding: 11, resource: this.diplomacyColorTexture.createView() },
         { binding: 12, resource: { buffer: this.visibleTerrainBuffer } },
         { binding: 13, resource: this.terrainAlbedoTexture.createView() },
       ],
@@ -330,6 +382,11 @@ export class WorldRenderer {
           this.manifest.world.width / this.manifest.fields.provinceIds.width,
           this.manifest.world.height / this.manifest.fields.provinceIds.height,
         ),
+        (x, z) => this.sampleHeight(x, z),
+        Math.min(
+          this.manifest.world.width / this.manifest.fields.height.width,
+          this.manifest.world.height / this.manifest.fields.height.height,
+        ) * 0.5,
       );
       this.createCountryLabelResources();
     }
@@ -341,6 +398,7 @@ export class WorldRenderer {
     this.resize();
     this.camera.update(0);
     report('World ready', 1);
+    this.notifyDiplomacyChange();
   }
 
   start(): void {
@@ -361,6 +419,38 @@ export class WorldRenderer {
     this.debugView = mode;
   }
 
+  setTimeOfDay(hour: number): void {
+    this.timeOfDayHour = wrapHour(hour);
+    this.timeLighting = calculateTimeOfDay(this.timeOfDayHour);
+    this.notifyTimeOfDayChange(true);
+  }
+
+  setTimeMultiplier(multiplier: number): number {
+    this.timeMultiplier = clampTimeMultiplier(multiplier);
+    this.notifyTimeOfDayChange(true);
+    return this.timeMultiplier;
+  }
+
+  setRainEnabled(enabled: boolean): void {
+    this.rainEnabled = enabled;
+  }
+
+  isRainEnabled(): boolean {
+    return this.rainEnabled;
+  }
+
+  getRainIntensity(): number {
+    return this.rainIntensity;
+  }
+
+  getTimeOfDay(): TimeOfDayState {
+    return {
+      ...this.timeLighting,
+      clock: formatClock(this.timeOfDayHour),
+      multiplier: this.timeMultiplier,
+    };
+  }
+
   setWireframe(enabled: boolean): void {
     this.showWireframe = enabled;
   }
@@ -374,6 +464,54 @@ export class WorldRenderer {
     this.showCountryOverlay = enabled;
     this.countryLabels?.setVisible(enabled && this.performanceLayers.countryLabels && this.debugView === 0);
     this.updateBorderVisibility();
+  }
+
+  setMapMode(mode: MapMode): void {
+    this.mapMode = mode;
+  }
+
+  getCountries(): readonly CountryRecord[] {
+    return this.manifest.politics.countries;
+  }
+
+  findCountry(name: string): CountryRecord | undefined {
+    return findCountryByName(this.manifest.politics.countries, name);
+  }
+
+  getDiplomacyState(): DiplomacyState {
+    const player = this.countryById.get(this.playerCountryId);
+    if (!player) throw new Error('The player country is not initialized');
+    const countriesFor = (relation: DiplomaticRelation) => [...this.diplomaticRelations]
+      .filter(([, value]) => value === relation)
+      .map(([countryId]) => this.countryById.get(countryId))
+      .filter((country): country is CountryRecord => Boolean(country))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return { player, allies: countriesFor('allied'), enemies: countriesFor('war') };
+  }
+
+  setPlayerCountryByName(name: string): CountryRecord | undefined {
+    const country = this.findCountry(name);
+    if (!country) return undefined;
+    this.playerCountryId = country.id;
+    this.diplomaticRelations.clear();
+    this.refreshDiplomacyTexture();
+    this.notifyDiplomacyChange();
+    return country;
+  }
+
+  setDiplomaticRelationByName(name: string, relation: Exclude<DiplomaticRelation, 'neutral'>): CountryRecord | undefined {
+    const country = this.findCountry(name);
+    if (!country || country.id === this.playerCountryId) return undefined;
+    this.diplomaticRelations.set(country.id, relation);
+    this.refreshDiplomacyTexture();
+    this.notifyDiplomacyChange();
+    return country;
+  }
+
+  clearDiplomaticRelation(countryId: number): void {
+    if (!this.diplomaticRelations.delete(countryId)) return;
+    this.refreshDiplomacyTexture();
+    this.notifyDiplomacyChange();
   }
 
   setProvinceOwner(provinceId: number, countryId: number): void {
@@ -469,6 +607,8 @@ export class WorldRenderer {
     this.waterwayPipeline = pipelines.waterways;
     this.infrastructurePipeline = pipelines.infrastructure;
     this.propPipeline = pipelines.props;
+    this.cityLightPipeline = pipelines.cityLights;
+    this.rainPipeline = pipelines.rain;
     this.linePipeline = pipelines.lines;
     this.countryLabelPipeline = pipelines.countryLabels;
   }
@@ -551,6 +691,17 @@ export class WorldRenderer {
   }
 
   private attachInteraction(): void {
+    this.canvas.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      this.clickStart = { pointerId: event.pointerId, x: event.clientX, y: event.clientY };
+    });
+    window.addEventListener('pointerup', (event) => {
+      const start = this.clickStart;
+      this.clickStart = undefined;
+      if (!start || start.pointerId !== event.pointerId || event.button !== 0) return;
+      if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 5) return;
+      this.captureProvinceAt(event.clientX, event.clientY);
+    });
     this.canvas.addEventListener('pointermove', (event) => {
       this.pointer.x = event.clientX;
       this.pointer.y = event.clientY;
@@ -589,6 +740,10 @@ export class WorldRenderer {
     const deltaMs = Math.min(50, frameMs);
     this.previousTime = time;
     this.elapsed += deltaMs / 1000;
+    this.timeOfDayHour = advanceHour(this.timeOfDayHour, Math.min(frameMs, 250) / 1000, this.timeMultiplier);
+    this.timeLighting = calculateTimeOfDay(this.timeOfDayHour);
+    this.updateWeather(deltaMs / 1000);
+    this.notifyTimeOfDayChange();
 
     let phaseStarted = performance.now();
     this.camera.update(deltaMs / 1000);
@@ -602,9 +757,9 @@ export class WorldRenderer {
 
     phaseStarted = performance.now();
     this.countryLabels?.setVisible(this.showCountryOverlay && this.performanceLayers.countryLabels && this.debugView === 0);
-    const labelsAboveMinimumAltitude = this.camera.position[1] >= COUNTRY_LABEL_MIN_ALTITUDE;
-    const visibleLabels = labelsAboveMinimumAltitude ? this.countryLabels?.visibleLabelCount ?? 0 : 0;
-    const visibleLabelGlyphs = labelsAboveMinimumAltitude ? this.countryLabels?.visibleGlyphCount ?? 0 : 0;
+    const labelsAboveFadeEnd = this.camera.position[1] > COUNTRY_LABEL_FADE_END_ALTITUDE;
+    const visibleLabels = labelsAboveFadeEnd ? this.countryLabels?.visibleLabelCount ?? 0 : 0;
+    const visibleLabelGlyphs = labelsAboveFadeEnd ? this.countryLabels?.visibleGlyphCount ?? 0 : 0;
     if (this.countryLabels
       && this.countryLabelBuffer
       && this.countryLabelParamsBuffer
@@ -655,11 +810,19 @@ export class WorldRenderer {
     values.set(this.camera.viewProjection, 0);
     values.set(this.camera.inverseViewProjection, 16);
     values.set([this.camera.position[0], this.camera.position[1], this.camera.position[2], this.camera.target[0]], 32);
-    values.set([0.42, 0.83, 0.36, this.elapsed], 36);
+    values.set([...this.timeLighting.sunDirection, this.elapsed], 36);
     values.set([this.canvas.width, this.canvas.height, 1 / this.canvas.width, 1 / this.canvas.height], 40);
     values.set([this.manifest.world.width, this.manifest.world.height, this.manifest.terrain.maxHeight, this.debugView], 44);
-    values.set([this.hoveredId, this.camera.distance, this.showCountryOverlay && this.performanceLayers.countryTint ? 1 : 0, 0], 48);
+    const tintMode = this.showCountryOverlay && this.performanceLayers.countryTint
+      ? this.mapMode === 'diplomacy' ? 3 : this.mapMode === 'political' ? 2 : this.mapMode === 'balanced' ? 1 : 0
+      : 0;
+    const countryBordersEnabled = this.showCountryOverlay && this.performanceLayers.countryBorders ? 1 : 0;
+    values.set([this.hoveredId, this.camera.distance, tintMode, countryBordersEnabled], 48);
     values.set([this.manifest.terrain.chunksX, this.manifest.terrain.chunksY, this.manifest.terrain.gridResolution, this.showWireframe ? 1 : 0], 52);
+    values.set([
+      this.timeLighting.daylight, this.timeLighting.twilight, this.timeLighting.night, this.timeOfDayHour / 24,
+    ], 56);
+    values.set([...this.frameSkyColor, this.rainIntensity], 60);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, values);
   }
 
@@ -673,6 +836,7 @@ export class WorldRenderer {
       this.device,
       this.context,
       this.depthTexture,
+      this.frameSkyColor,
       collectGpuTiming ? this.gpuQuerySet : undefined,
     );
     const pass = frame.pass;
@@ -742,8 +906,10 @@ export class WorldRenderer {
         this.drawPropChunks(pass, this.barriers, this.manifest.propChunks.barriers, [[this.barrierMesh]], 'roadFurniture', 1_900, [1_900, 1_900]);
         this.drawPropChunks(pass, this.signs, this.manifest.propChunks.signs, [[this.signMesh]], 'roadFurniture', 1_900, [1_900, 1_900]);
       }
+      if (this.performanceLayers.buildings) this.drawCityLights(pass);
     }
 
+    this.drawRain(pass);
     if (labelsAboveProps) this.drawCountryLabels(pass, visibleLabelGlyphs);
 
     pass.setPipeline(this.linePipeline);
@@ -771,6 +937,90 @@ export class WorldRenderer {
       collectGpuTiming ? this.gpuReadBuffer : undefined,
     );
     if (collectGpuTiming) this.readGpuTiming(gpuTimingEpoch);
+  }
+
+  private notifyTimeOfDayChange(force = false): void {
+    const clock = formatClock(this.timeOfDayHour);
+    if (!force && clock === this.reportedClock) return;
+    this.reportedClock = clock;
+    this.onTimeOfDayChange?.(this.getTimeOfDay());
+  }
+
+  private updateWeather(deltaSeconds: number): void {
+    const target = this.rainEnabled ? 1 : 0;
+    const step = Math.min(1, deltaSeconds / RAIN_TRANSITION_SECONDS);
+    if (this.rainIntensity < target) this.rainIntensity = Math.min(target, this.rainIntensity + step);
+    else if (this.rainIntensity > target) this.rainIntensity = Math.max(target, this.rainIntensity - step);
+
+    const nightOvercast: [number, number, number] = [0.045, 0.062, 0.10];
+    const dayOvercast: [number, number, number] = [0.29, 0.35, 0.38];
+    const overcast = mixRgb(nightOvercast, dayOvercast, this.timeLighting.daylight);
+    this.frameSkyColor = mixRgb(this.timeLighting.skyColor, overcast, this.rainIntensity * 0.78);
+  }
+
+  private drawRain(pass: GPURenderPassEncoder): void {
+    if (this.rainIntensity < 0.005 || this.debugView !== 0) return;
+    const viewportParticles = Math.ceil(this.canvas.width * this.canvas.height / 2_200);
+    const particles = Math.min(MAX_RAIN_PARTICLES, Math.max(MIN_RAIN_PARTICLES, viewportParticles));
+    pass.setPipeline(this.rainPipeline);
+    pass.draw(6, particles);
+    this.recordTriangleDraw('weather', particles * 2, particles);
+  }
+
+  private drawCityLights(pass: GPURenderPassEncoder): void {
+    if (!this.buildings.views) throw new Error('Missing visible-instance storage for city lights');
+    const viewKey = 'cityLights';
+    let view = this.buildings.views.get(viewKey);
+    if (!view) {
+      const buffer = this.device.createBuffer({
+        label: 'city light visible instances', size: Math.max(4, this.buildings.count * 3 * 4),
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+      });
+      const bindGroup = this.device.createBindGroup({
+        label: 'city light visible bind group', layout: this.instanceLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.buildings.buffer } },
+          { binding: 1, resource: { buffer: this.buildings.params } },
+          { binding: 2, resource: { buffer } },
+        ],
+      });
+      view = { buffer, bindGroup, revision: -1, draws: [], visibleChunks: 0 };
+      this.buildings.views.set(viewKey, view);
+    }
+    if (view.revision !== this.camera.revision) {
+      const visibility = buildPropVisibility(
+        this.manifest,
+        this.manifest.propChunks.buildings,
+        this.buildingMeshes.map((group) => [group[group.length - 1]]),
+        this.buildings.count,
+        this.camera.position,
+        Math.max(24_000, this.manifest.world.width * 1.2),
+        [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY],
+        (centerX, centerZ, radius) => this.chunkIntersectsView(centerX, centerZ, radius),
+      );
+      view.visibleChunks = visibility.visibleChunks;
+      view.draws = visibility.draws;
+      if (visibility.instances.length) {
+        this.device.queue.writeBuffer(
+          view.buffer,
+          0,
+          visibility.instances.buffer as ArrayBuffer,
+          visibility.instances.byteOffset,
+          visibility.instances.byteLength,
+        );
+      }
+      view.revision = this.camera.revision;
+    }
+    this.frameWorkload.visibleChunks.buildings = Math.max(
+      this.frameWorkload.visibleChunks.buildings,
+      view.visibleChunks,
+    );
+    pass.setPipeline(this.cityLightPipeline);
+    pass.setBindGroup(1, view.bindGroup);
+    for (const draw of view.draws) {
+      pass.draw(6, draw.instanceCount, 0, draw.firstInstance);
+      this.recordTriangleDraw('buildings', draw.instanceCount * 2, draw.instanceCount);
+    }
   }
 
   private drawPropChunks(
@@ -1001,6 +1251,11 @@ export class WorldRenderer {
 
   private pickProvince(clientX: number, clientY: number): { raycastMs: number; hoverUiMs: number } {
     const started = performance.now();
+    const id = this.provinceAtScreenPoint(clientX, clientY);
+    return this.finishPicking(id, started);
+  }
+
+  private provinceAtScreenPoint(clientX: number, clientY: number): number {
     const point = pickTerrainPoint(
       this.camera,
       clientX,
@@ -1010,8 +1265,19 @@ export class WorldRenderer {
       (x, z) => this.sampleHeight(x, z),
       this.pickPoint,
     );
-    const id = point ? this.sampleProvince(point[0], point[2]) : 0;
-    return this.finishPicking(id, started);
+    return point ? this.sampleProvince(point[0], point[2]) : 0;
+  }
+
+  private captureProvinceAt(clientX: number, clientY: number): void {
+    const encodedId = this.provinceAtScreenPoint(clientX, clientY);
+    if (!encodedId) return;
+    const previousCountryId = this.provinceOwners[encodedId];
+    if (this.diplomaticRelations.get(previousCountryId) !== 'war') return;
+    const previousCountry = this.countryById.get(previousCountryId);
+    const player = this.countryById.get(this.playerCountryId);
+    if (!previousCountry || !player) return;
+    this.setProvinceOwner(encodedId - 1, this.playerCountryId);
+    this.onProvinceCaptured?.(encodedId - 1, previousCountry, player);
   }
 
   private finishPicking(encodedId: number, started: number): { raycastMs: number; hoverUiMs: number } {
@@ -1064,6 +1330,24 @@ export class WorldRenderer {
     return (this.waterwayMask[index >>> 3] & (1 << (index & 7))) !== 0;
   }
 
+  private refreshDiplomacyTexture(): void {
+    const data = buildDiplomacyColorData(
+      this.manifest.politics.countries,
+      this.diplomaticRelations,
+      this.playerCountryId,
+    );
+    this.device.queue.writeTexture(
+      { texture: this.diplomacyColorTexture },
+      data.buffer as ArrayBuffer,
+      { bytesPerRow: data.length, rowsPerImage: 1 },
+      [data.length / 4, 1],
+    );
+  }
+
+  private notifyDiplomacyChange(): void {
+    this.onDiplomacyChange?.(this.getDiplomacyState());
+  }
+
   private updateStats(): void {
     if (!this.onStats) {
       this.statsFrameCountdown = 0;
@@ -1102,6 +1386,14 @@ function clamp(value: number, min: number, max: number): number {
 
 function wrap(value: number, size: number): number {
   return ((value % size) + size) % size;
+}
+
+function mixRgb(
+  a: [number, number, number],
+  b: [number, number, number],
+  amount: number,
+): [number, number, number] {
+  return a.map((value, index) => value + (b[index] - value) * amount) as [number, number, number];
 }
 
 function buildWaterwayMask(navigationData: Uint8Array, pixelCount: number): Uint8Array {

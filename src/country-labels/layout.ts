@@ -2,6 +2,7 @@ import type { CountryLabelGlyph } from './atlas';
 import type { CountryAnchor } from './topology';
 
 export const LABEL_GLYPH_STRIDE = 12;
+export const LABEL_TERRAIN_HEIGHT_OFFSET = 0.6;
 
 export interface CountryLabelMetrics {
   readonly lineHeightAtMeasurementSize: number;
@@ -117,6 +118,50 @@ export function layoutCountryLabelWithinTerritory(
     }
   }
   return new Float32Array(0);
+}
+
+/**
+ * Replaces the layout-only ink bounds with a render elevation for each glyph.
+ * Every letter gets its own flat plane at the highest terrain sample beneath
+ * its visible ink, keeping long labels close to the landscape without letting
+ * a ridge pass through a character.
+ */
+export function placeCountryLabelOnTerrain(
+  data: Float32Array,
+  sampleHeight: (x: number, z: number) => number,
+  sampleSpacing: number,
+): Float32Array {
+  const placed = data.slice();
+  const spacing = Math.max(0.01, sampleSpacing);
+  for (let offset = 0; offset < placed.length; offset += LABEL_GLYPH_STRIDE) {
+    const centerX = placed[offset];
+    const centerZ = placed[offset + 1];
+    const tangentX = placed[offset + 2];
+    const tangentZ = placed[offset + 3];
+    const inkWidth = placed[offset + 10];
+    const inkHeight = placed[offset + 11];
+    const crossX = -tangentZ;
+    const crossZ = tangentX;
+    const alongSamples = Math.max(2, Math.ceil(inkWidth / spacing) + 1);
+    const acrossSamples = Math.max(2, Math.ceil(inkHeight / spacing) + 1);
+    let maximumHeight = -Infinity;
+    for (let alongIndex = 0; alongIndex < alongSamples; alongIndex += 1) {
+      const along = -0.5 + alongIndex / (alongSamples - 1);
+      for (let acrossIndex = 0; acrossIndex < acrossSamples; acrossIndex += 1) {
+        const across = -0.5 + acrossIndex / (acrossSamples - 1);
+        maximumHeight = Math.max(maximumHeight, sampleHeight(
+          centerX + tangentX * inkWidth * along + crossX * inkHeight * across,
+          centerZ + tangentZ * inkWidth * along + crossZ * inkHeight * across,
+        ));
+      }
+    }
+    // These two values were only needed while validating the layout. The GPU
+    // uses c.z for the per-letter elevation and leaves c.w reserved.
+    placed[offset + 10] = (Number.isFinite(maximumHeight) ? maximumHeight : 0)
+      + LABEL_TERRAIN_HEIGHT_OFFSET;
+    placed[offset + 11] = 0;
+  }
+  return placed;
 }
 
 function glyphsStayWithinTerritory(

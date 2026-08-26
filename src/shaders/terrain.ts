@@ -1,5 +1,12 @@
 import { commonWgsl } from './common';
 
+export const POLITICAL_OVERVIEW_START_ALTITUDE = 3_000;
+export const POLITICAL_OVERVIEW_FULL_ALTITUDE = 6_500;
+export const POLITICAL_CLOSE_TINT_STRENGTH = 0.1;
+export const POLITICAL_OVERVIEW_MAX_STRENGTH = 0.82;
+export const POLITICAL_MAP_TINT_STRENGTH = 0.85;
+export const DIPLOMACY_CLOSE_TINT_STRENGTH = 0.3;
+
 export const terrainShader = commonWgsl + /* wgsl */ `
 struct TerrainVertexInput {
   @location(0) grid: vec2f,
@@ -54,13 +61,43 @@ fn sampleMaterial(layer: i32, worldPosition: vec3f, scale: f32) -> vec3f {
   return mix(detail, broadDetail, 0.18);
 }
 
+fn sameSurfaceMaterial(a: vec4u, b: vec4u) -> bool {
+  return a.r == b.r && a.g == b.g;
+}
+
+fn surfaceTransitionAt(mapUv: vec2f, center: vec4u) -> f32 {
+  let dimensions = vec2f(textureDimensions(surfaceTexture));
+  let texel = 1.0 / dimensions;
+  let cellUv = fract(wrappedUv(mapUv) * dimensions);
+  let left = surfaceAt(mapUv - vec2f(texel.x, 0.0));
+  let right = surfaceAt(mapUv + vec2f(texel.x, 0.0));
+  let up = surfaceAt(mapUv - vec2f(0.0, texel.y));
+  let down = surfaceAt(mapUv + vec2f(0.0, texel.y));
+  var transition = 0.0;
+  if (!sameSurfaceMaterial(center, left)) {
+    transition = max(transition, 1.0 - smoothstep(0.0, 0.82, cellUv.x));
+  }
+  if (!sameSurfaceMaterial(center, right)) {
+    transition = max(transition, 1.0 - smoothstep(0.0, 0.82, 1.0 - cellUv.x));
+  }
+  if (!sameSurfaceMaterial(center, up)) {
+    transition = max(transition, 1.0 - smoothstep(0.0, 0.82, cellUv.y));
+  }
+  if (!sameSurfaceMaterial(center, down)) {
+    transition = max(transition, 1.0 - smoothstep(0.0, 0.82, 1.0 - cellUv.y));
+  }
+  return transition;
+}
+
 @fragment
 fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let bankField = bankFieldAt(input.mapUv);
   if (bankField.r <= 0.5) { discard; }
   let navigation = navigationAt(input.mapUv);
   let riverField = navigation.ba;
-  if (riverField.r > 0.45 || riverField.g > 0.45) { discard; }
+  // Water owns only the inner channel. Its wider 0.45 coverage contour keeps
+  // this conservative 0.60 terrain cut hidden even on coarse terrain LODs.
+  if (riverField.r > 0.60 || riverField.g > 0.60) { discard; }
 
   let surface = surfaceAt(input.mapUv);
   let terrain = surface.r;
@@ -71,6 +108,8 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let elevation = input.worldPosition.y;
   let bakedSurface = textureSample(terrainAlbedoTexture, materialSampler, wrappedUv(input.mapUv));
   var baseColor = bakedSurface.rgb;
+  var nightMapColor = vec3f(0.0);
+  var nightMapCompensation = 0.0;
   if (uniforms.interaction.y < 4500.0) {
     baseColor = sampleMaterial(0, input.worldPosition, 92.0);
     if (biome == 1u || biome == 7u) {
@@ -95,8 +134,12 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     }
 
     let shoreline = bankField.g * smoothstep(0.50, 0.72, bankField.r);
-    let beachElevation = 1.0 - smoothstep(5.0, 10.0, elevation);
-    baseColor = mix(baseColor, sampleMaterial(7, input.worldPosition, 52.0), shoreline * beachElevation * 0.92);
+    baseColor = mix(baseColor, sampleMaterial(7, input.worldPosition, 52.0), shoreline * 0.72);
+    // The baked albedo is linearly filtered, so using it only in the narrow
+    // categorical boundary band removes square terrain/biome texel edges while
+    // retaining full-resolution tiled material detail everywhere else.
+    let surfaceTransition = surfaceTransitionAt(input.mapUv, surface);
+    baseColor = mix(baseColor, bakedSurface.rgb, surfaceTransition * 0.92);
     baseColor = mix(baseColor, bakedSurface.rgb, smoothstep(3000.0, 4500.0, uniforms.interaction.y));
   }
   if (terrain == 3u) {
@@ -107,11 +150,71 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
 
   if (uniforms.interaction.z > 0.5 && uniforms.map.w < 0.5) {
     let politicalColor = politicalColorAt(input.mapUv);
-    if (politicalColor.a > 0.5) {
+    let owner = u32(round(politicalColor.a * 255.0));
+    if (owner > 0u) {
+      let diplomacyMode = uniforms.interaction.z > 2.5;
+      let diplomacyColor = diplomacyColorFor(owner);
+      let isPlayer = diplomacyColor.a > 0.25 && diplomacyColor.a < 0.75;
+      let hasRelationship = diplomacyColor.a > 0.75;
+      var overlayColor = select(politicalColor.rgb, diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode);
+      if (hasRelationship) {
+        overlayColor = min(diplomacyColor.rgb * 1.30, vec3f(1.0));
+      }
+      let overview = smoothstep(
+        ${POLITICAL_OVERVIEW_START_ALTITUDE.toFixed(1)},
+        ${POLITICAL_OVERVIEW_FULL_ALTITUDE.toFixed(1)},
+        uniforms.camera.y
+      );
       let terrainLuminance = dot(baseColor, vec3f(0.24, 0.68, 0.08));
-      let coloredSurface = mix(baseColor, politicalColor.rgb * (0.58 + terrainLuminance * 0.72), 0.72);
-      let overlayStrength = mix(0.26, 0.38, smoothstep(1300.0, 6200.0, uniforms.interaction.y));
+      let tintLuminance = max(0.06, dot(overlayColor, vec3f(0.24, 0.68, 0.08)));
+      let luminanceMatchedTint = overlayColor * (terrainLuminance / tintLuminance);
+      let originalTint = overlayColor * (0.62 + terrainLuminance * 0.70);
+      var preservation = 1.0 - overview;
+      let politicalMode = uniforms.interaction.z > 1.5 && uniforms.interaction.z < 2.5;
+      if (politicalMode) {
+        preservation *= 0.70;
+      }
+      if (isPlayer) {
+        preservation *= 0.45;
+      }
+      let biomeRetention = 0.20 * preservation;
+      var coloredSurface = mix(originalTint, luminanceMatchedTint, preservation);
+      coloredSurface = mix(coloredSurface, baseColor, biomeRetention);
+      let balancedStrength = mix(
+        ${POLITICAL_CLOSE_TINT_STRENGTH.toFixed(2)},
+        ${POLITICAL_OVERVIEW_MAX_STRENGTH.toFixed(2)},
+        overview
+      );
+      var overlayStrength = select(
+        balancedStrength,
+        ${POLITICAL_MAP_TINT_STRENGTH.toFixed(2)},
+        uniforms.interaction.z > 1.5
+      );
+      if (hasRelationship && !diplomacyMode && uniforms.interaction.z < 1.5) {
+        overlayStrength = max(overlayStrength, ${DIPLOMACY_CLOSE_TINT_STRENGTH.toFixed(2)});
+      }
+      if (diplomacyMode) {
+        overlayStrength = mix(
+          ${DIPLOMACY_CLOSE_TINT_STRENGTH.toFixed(2)},
+          ${POLITICAL_OVERVIEW_MAX_STRENGTH.toFixed(2)},
+          overview
+        );
+      }
+      if (isPlayer) {
+        let playerMinimumStrength = select(0.45, 0.85, uniforms.interaction.z > 1.5);
+        overlayStrength = max(overlayStrength, playerMinimumStrength);
+      }
+      if (hasRelationship) {
+        overlayStrength = ${POLITICAL_MAP_TINT_STRENGTH.toFixed(2)};
+      }
       baseColor = mix(baseColor, coloredSurface, overlayStrength);
+      // Political and diplomacy modes are ownership-first at every zoom.
+      // Balanced mode only becomes ownership-first at strategic altitude. At
+      // night, lift those presentations toward a controlled-luminance version
+      // of their selected country/relationship color.
+      nightMapColor = overlayColor;
+      nightMapCompensation = uniforms.lighting.z
+        * select(overview * 0.82, 1.0, politicalMode || diplomacyMode);
     }
   }
 
@@ -128,11 +231,17 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   baseColor *= bakedSurface.a;
 
   baseColor *= 0.92 + variation * 0.14;
+  baseColor = mix(baseColor, baseColor * vec3f(0.74, 0.79, 0.83), uniforms.sky.w * 0.42);
   let sunDirection = normalize(uniforms.sunTime.xyz);
-  let diffuse = max(dot(normal, sunDirection), 0.0);
-  let hemi = 0.46 + normal.y * 0.22;
-  var lit = baseColor * (hemi + diffuse * 0.62);
-  lit += vec3f(0.12, 0.15, 0.13) * pow(max(dot(normal, normalize(sunDirection + normalize(uniforms.camera.xyz - input.worldPosition))), 0.0), 24.0) * 0.08;
+  var lit = baseColor * surfaceLight(normal);
+  lit += vec3f(0.12, 0.15, 0.13) * pow(max(dot(normal, normalize(sunDirection + normalize(uniforms.camera.xyz - input.worldPosition))), 0.0), 24.0) * 0.08 * uniforms.lighting.x;
+  lit += wetSurfaceSheen(normal, input.worldPosition);
+  if (nightMapCompensation > 0.001) {
+    let countryLuminance = max(0.08, dot(nightMapColor, vec3f(0.24, 0.68, 0.08)));
+    let targetLuminance = mix(0.36, 0.52, smoothstep(0.10, 0.72, countryLuminance));
+    let readableCountryColor = min(nightMapColor * (targetLuminance / countryLuminance), vec3f(1.0));
+    lit = mix(lit, readableCountryColor, nightMapCompensation * 0.52);
+  }
 
   let debugMode = u32(uniforms.map.w + 0.5);
   if (debugMode == 1u) {
@@ -178,8 +287,8 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
 
   let distanceToCamera = distance(uniforms.camera.xyz, input.worldPosition);
   let fog = smoothstep(3600.0, 11500.0, distanceToCamera);
-  let fogColor = vec3f(0.58, 0.69, 0.72);
-  let distanceFogged = mix(lit, fogColor, fog * 0.78);
+  let fogColor = distanceFogColor();
+  let distanceFogged = mix(lit, fogColor, fog * 0.39);
   return vec4f(mix(distanceFogged, worldFogColor(), horizontalWorldFog(input.worldPosition.x)), 1.0);
 }
 `;

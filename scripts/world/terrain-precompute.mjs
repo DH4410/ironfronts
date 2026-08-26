@@ -131,7 +131,10 @@ export async function buildBakedTerrainAlbedo({
 
       sampleRgField(coastField, coastWidth, coastHeight, (x + 0.5) / width, (y + 0.5) / height, landBank);
       const shoreline = landBank[1] * smoothstep(0.5, 0.72, landBank[0]);
-      const beachAmount = shoreline * (1 - smoothstep(5, 10, elevation)) * 0.92;
+      // The bank field includes both coasts and river edges. River banks may
+      // occur at any elevation, so keep this a restrained material fade rather
+      // than limiting it to sea-level terrain.
+      const beachAmount = shoreline * 0.72;
       if (beachAmount > 0.001) {
         sampleMaterial(7, worldX, worldZ, 52, first);
         mixRgb(base, first, beachAmount, base);

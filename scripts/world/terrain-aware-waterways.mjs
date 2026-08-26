@@ -1,6 +1,5 @@
 import { buildWaterways as buildMovementWaterways } from './waterways.mjs';
 import { buildVisualWaterways } from './visual-waterways.mjs';
-import { smoothMovementWaterwayGrades } from './waterway-smoothing.mjs';
 
 function mergeChunkedIndices(movement, visual) {
   const vertexOffset = movement.vertices.length / 10;
@@ -23,23 +22,21 @@ function mergeChunkedIndices(movement, visual) {
   return { indices, ranges };
 }
 
-function normalizeVisualVertexSemantics(visual) {
-  // Runtime kind remains the existing binary river/canal signal. Visual-only
-  // semantics stay in the G mask and reports rather than expanding the vertex ABI.
+function preserveVisualVertexSemantics(visual) {
+  // Keep the fractional kind so the shared shader can apply the interpolated
+  // visual-river mask only to topology-derived water surfaces.
   for (let vertex = 0; vertex < visual.vertices.length / 10; vertex += 1) {
     const offset = vertex * 10;
-    visual.vertices[offset + 6] = 0;
     // Existing generated-data checks reserve exact edgeFactor=0 for authored
     // movement-river centerlines. Keep the visual center effectively central
     // while making that distinction stable without adding another attribute.
     if (visual.vertices[offset + 5] < 0.01) visual.vertices[offset + 5] = 0.02;
   }
-  visual.report.renderKind = 0;
+  visual.report.renderKind = 0.25;
 }
 
 export function buildTerrainAwareWaterways({ visualMask, ...movementArgs }) {
   const movement = buildMovementWaterways(movementArgs);
-  const movementSmoothing = smoothMovementWaterwayGrades(movement.vertices);
   const visual = buildVisualWaterways({
     visualMask,
     provinceIds: movementArgs.provinceIds,
@@ -51,7 +48,7 @@ export function buildTerrainAwareWaterways({ visualMask, ...movementArgs }) {
     heightWidth: movementArgs.heightWidth,
     heightHeight: movementArgs.heightHeight,
   });
-  normalizeVisualVertexSemantics(visual);
+  preserveVisualVertexSemantics(visual);
   const vertices = new Float32Array(movement.vertices.length + visual.vertices.length);
   vertices.set(movement.vertices, 0);
   vertices.set(visual.vertices, movement.vertices.length);
@@ -61,7 +58,11 @@ export function buildTerrainAwareWaterways({ visualMask, ...movementArgs }) {
     vertices,
     indices: merged.indices,
     chunkRanges: merged.ranges,
-    report: { ...movement.report, surfaceSmoothing: movementSmoothing, visualSurface: visual.report },
+    report: {
+      ...movement.report,
+      surfaceDraping: 'independent terrain sample per vertex',
+      visualSurface: visual.report,
+    },
     stats: {
       ...movement.stats,
       visualWaterwayTriangles: visual.indices.length / 3,

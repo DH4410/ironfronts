@@ -7,6 +7,7 @@ export function beginWorldFrame(
   device: GPUDevice,
   context: GPUCanvasContext,
   depthTexture: GPUTexture,
+  clearColor: [number, number, number],
   timestampQuerySet?: GPUQuerySet,
 ): WorldFrame {
   const encoder = device.createCommandEncoder({ label: 'world frame' });
@@ -14,7 +15,7 @@ export function beginWorldFrame(
     label: 'world render pass',
     colorAttachments: [{
       view: context.getCurrentTexture().createView(),
-      clearValue: { r: 0.45, g: 0.57, b: 0.61, a: 1 },
+      clearValue: { r: clearColor[0], g: clearColor[1], b: clearColor[2], a: 1 },
       loadOp: 'clear',
       storeOp: 'store',
     }],

@@ -3,8 +3,9 @@ import '@fontsource/bitter/latin-ext-800.css';
 import '@fontsource/special-elite/latin-ext-400.css';
 import '@fontsource/cinzel-decorative/latin-ext-700.css';
 import { mountMenu } from './menu/menu';
-import { WorldRenderer } from './renderer';
-import type { FrameStats, HoverInfo } from './types';
+import { WorldRenderer, type MapMode, type TimeOfDayState } from './renderer';
+import { parseClock } from './time-of-day';
+import type { CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo } from './types';
 import { LOADING_QUOTES } from './loadingQuotes';
 
 const canvas = required<HTMLCanvasElement>('world');
@@ -22,6 +23,11 @@ const tooltipTerrain = required<HTMLElement>('tooltip-terrain');
 const diagnostics = required<HTMLElement>('diagnostics');
 const diagnosticsStats = required<HTMLElement>('diagnostics-stats');
 const diagnosticsPerformance = required<HTMLElement>('diagnostics-performance');
+const debugTime = required<HTMLInputElement>('debug-time');
+const debugTimeState = required<HTMLOutputElement>('debug-time-state');
+const debugTimeMultiplier = required<HTMLInputElement>('debug-time-multiplier');
+const debugTimePresets = [...document.querySelectorAll<HTMLButtonElement>('[data-debug-time]')];
+const debugRain = required<HTMLInputElement>('debug-rain');
 const debugView = required<HTMLSelectElement>('debug-view');
 const debugConnections = required<HTMLInputElement>('debug-connections');
 const debugRivers = required<HTMLInputElement>('debug-rivers');
@@ -34,6 +40,21 @@ const debugWaterways = required<HTMLInputElement>('debug-waterways');
 const debugProps = required<HTMLInputElement>('debug-props');
 const debugDescription = required<HTMLElement>('debug-description');
 const debugLegend = required<HTMLElement>('debug-legend');
+const debugTabs = [...document.querySelectorAll<HTMLButtonElement>('[data-debug-tab]')];
+const debugPanels = [...document.querySelectorAll<HTMLElement>('[data-debug-panel]')];
+const debugPlayerCountry = required<HTMLElement>('debug-player-country');
+const debugCountryFlag = required<HTMLElement>('debug-country-flag');
+const debugPlayerForm = required<HTMLFormElement>('debug-player-form');
+const debugPlayerInput = required<HTMLInputElement>('debug-player-input');
+const debugWarForm = required<HTMLFormElement>('debug-war-form');
+const debugWarInput = required<HTMLInputElement>('debug-at-war');
+const debugAlliedForm = required<HTMLFormElement>('debug-allied-form');
+const debugAlliedInput = required<HTMLInputElement>('debug-allied');
+const debugWarList = required<HTMLElement>('debug-war-list');
+const debugAlliedList = required<HTMLElement>('debug-allied-list');
+const debugDiplomacyStatus = required<HTMLElement>('debug-diplomacy-status');
+const debugCountryNames = required<HTMLDataListElement>('debug-country-names');
+const mapModeInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="map-mode"]')];
 const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
@@ -77,19 +98,78 @@ async function start(): Promise<void> {
     (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
   }
   renderer.onHover = updateTooltip;
+  renderer.onDiplomacyChange = (state) => renderDiplomacyState(renderer, state);
+  renderer.onProvinceCaptured = (provinceId, previousCountry, player) => {
+    setDiplomacyStatus(`Province ${provinceId} taken from ${previousCountry.name} by ${player.name}.`);
+  };
+  renderer.onTimeOfDayChange = (state) => updateTimeControls(state);
+
+  debugTime.addEventListener('change', () => {
+    const hour = parseClock(debugTime.value);
+    if (hour !== undefined) renderer.setTimeOfDay(hour);
+  });
+  for (const preset of debugTimePresets) {
+    preset.addEventListener('click', () => renderer.setTimeOfDay(Number(preset.dataset.debugTime)));
+  }
+  const applyTimeMultiplier = () => {
+    if (debugTimeMultiplier.value === '') return;
+    const multiplier = renderer.setTimeMultiplier(Number(debugTimeMultiplier.value));
+    debugTimeMultiplier.value = multiplier.toFixed(1);
+  };
+  debugTimeMultiplier.addEventListener('change', applyTimeMultiplier);
+  debugTimeMultiplier.addEventListener('blur', applyTimeMultiplier);
+  debugRain.addEventListener('change', () => renderer.setRainEnabled(debugRain.checked));
+
+  for (const tab of debugTabs) {
+    tab.addEventListener('click', () => {
+      const selected = tab.dataset.debugTab;
+      for (const candidate of debugTabs) candidate.setAttribute('aria-selected', String(candidate === tab));
+      for (const panel of debugPanels) panel.hidden = panel.dataset.debugPanel !== selected;
+    });
+  }
+
+  debugPlayerForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const country = renderer.setPlayerCountryByName(debugPlayerInput.value);
+    if (!country) {
+      setDiplomacyStatus(`No country exactly matches “${debugPlayerInput.value.trim()}”.`, true);
+      return;
+    }
+    debugPlayerInput.value = '';
+    setDiplomacyStatus(`Country flag switched to ${country.name}. Diplomatic placeholders were cleared.`);
+  });
+
+  const bindRelationForm = (
+    form: HTMLFormElement,
+    input: HTMLInputElement,
+    relation: Exclude<DiplomaticRelation, 'neutral'>,
+  ) => {
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const country = renderer.setDiplomaticRelationByName(input.value, relation);
+      if (!country) {
+        setDiplomacyStatus(`“${input.value.trim()}” is unknown or is your current country.`, true);
+        return;
+      }
+      input.value = '';
+      setDiplomacyStatus(relation === 'war'
+        ? `${country.name} is now at war with you. Click its provinces to take them.`
+        : `${country.name} is now allied with you.`);
+    });
+  };
+  bindRelationForm(debugWarForm, debugWarInput, 'war');
+  bindRelationForm(debugAlliedForm, debugAlliedInput, 'allied');
 
   const applyDebugView = () => {
     const mode = Number(debugView.value);
     renderer.setDebugView(mode);
     updateDebugHelp(mode);
   };
+  const applyMapMode = () => {
+    const selected = mapModeInputs.find((input) => input.checked)?.value;
+    if (selected && isMapMode(selected)) renderer.setMapMode(selected);
+  };
   window.addEventListener('keydown', (event) => {
-    if (event.code === 'KeyC' && !(event.target instanceof HTMLInputElement) && !(event.target instanceof HTMLSelectElement)) {
-      event.preventDefault();
-      debugCountries.checked = !debugCountries.checked;
-      renderer.setCountryOverlayVisible(debugCountries.checked);
-      return;
-    }
     if (event.code === 'F3') {
       event.preventDefault();
       diagnostics.hidden = !diagnostics.hidden;
@@ -103,6 +183,8 @@ async function start(): Promise<void> {
     debugView.selectedIndex = (debugView.selectedIndex + direction + count) % count;
     applyDebugView();
   });
+  for (const input of mapModeInputs) input.addEventListener('change', applyMapMode);
+  applyMapMode();
   debugView.addEventListener('change', applyDebugView);
   debugWireframe.addEventListener('change', () => renderer.setWireframe(debugWireframe.checked));
   debugCountries.addEventListener('change', () => renderer.setCountryOverlayVisible(debugCountries.checked));
@@ -134,6 +216,14 @@ async function start(): Promise<void> {
       loadingValue.textContent = `${percentage}%`;
       loadingBar.style.width = `${percentage}%`;
     });
+    debugCountryNames.replaceChildren(...renderer.getCountries()
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((country) => {
+        const option = document.createElement('option');
+        option.value = country.name;
+        return option;
+      }));
     applyDebugView();
     loading.classList.add('is-done');
     stopQuotes();
@@ -149,6 +239,55 @@ async function start(): Promise<void> {
     if (title) title.textContent = 'The world could not be rendered.';
     if (message) message.textContent = error instanceof Error ? error.message : String(error);
   }
+}
+
+function updateTimeControls(state: TimeOfDayState): void {
+  debugTimeState.textContent = `${state.stage} · ${state.clock}`;
+  if (document.activeElement !== debugTime) debugTime.value = state.clock;
+  if (document.activeElement !== debugTimeMultiplier) debugTimeMultiplier.value = state.multiplier.toFixed(1);
+}
+
+function renderDiplomacyState(renderer: WorldRenderer, state: DiplomacyState): void {
+  debugPlayerCountry.textContent = state.player.name;
+  debugCountryFlag.style.setProperty('--player-country-color', state.player.color);
+  renderRelationList(renderer, debugWarList, state.enemies, 'No wars');
+  renderRelationList(renderer, debugAlliedList, state.allies, 'No allies');
+}
+
+function renderRelationList(
+  renderer: WorldRenderer,
+  container: HTMLElement,
+  countries: CountryRecord[],
+  emptyLabel: string,
+): void {
+  if (!countries.length) {
+    const empty = document.createElement('span');
+    empty.className = 'relation-list__empty';
+    empty.textContent = emptyLabel;
+    container.replaceChildren(empty);
+    return;
+  }
+  container.replaceChildren(...countries.map((country) => {
+    const chip = document.createElement('span');
+    chip.className = 'relation-chip';
+    chip.append(country.name);
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.title = `Remove ${country.name}`;
+    remove.setAttribute('aria-label', `Remove ${country.name}`);
+    remove.textContent = '×';
+    remove.addEventListener('click', () => {
+      renderer.clearDiplomaticRelation(country.id);
+      setDiplomacyStatus(`${country.name} is neutral again.`);
+    });
+    chip.append(remove);
+    return chip;
+  }));
+}
+
+function setDiplomacyStatus(message: string, error = false): void {
+  debugDiplomacyStatus.textContent = message;
+  debugDiplomacyStatus.classList.toggle('is-error', error);
 }
 
 function updateTooltip(info: HoverInfo | null, x: number, y: number): void {
@@ -227,7 +366,7 @@ const DEBUG_HELP: Record<number, { description: string; legend: Array<[string, s
   3: { description: 'Deterministic color per province for geometry and adjacency inspection.', legend: [['province', '#c880d4']] },
   4: { description: 'Final heightfield normals; abrupt color changes reveal terrain discontinuities.', legend: [['normal XYZ', '#8ab9dc']] },
   5: { description: 'Terrain steepness heatmap for finding cliffs, harsh passes, and topology artifacts.', legend: [['gentle', '#145038'], ['steep', '#f43814']] },
-  6: { description: 'Exact dense waterway corridor used to clip terrain and seat river geometry.', legend: [['river', '#05efff'], ['canal', '#f9b71a']] },
+  6: { description: 'Waterway overlay mask used for draped rivers, placement clearance, and border routing.', legend: [['river', '#05efff'], ['canal', '#f9b71a']] },
   7: { description: 'Static land/coast classification and open-water depth.', legend: [['land', '#299e4c'], ['coast', '#bd6b29'], ['deep water', '#041c47']] },
   8: { description: 'Full dirt-road core and verge footprint independent of nearby 3D geometry.', legend: [['verge', '#ef9e1a'], ['core', '#f22e14']] },
   9: { description: 'Navigation composite for comparing roads, static water, rivers, and canals.', legend: [['road', '#f59c1e'], ['river', '#05c7f9'], ['canal', '#c46bf5'], ['ocean/lake', '#062e66']] },
@@ -249,4 +388,8 @@ function required<T extends HTMLElement>(id: string): T {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing required element #${id}`);
   return element as T;
+}
+
+function isMapMode(value: string): value is MapMode {
+  return value === 'political' || value === 'diplomacy' || value === 'clear' || value === 'balanced';
 }

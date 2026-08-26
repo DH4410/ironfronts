@@ -1,6 +1,8 @@
 import type { CountryRecord } from './types';
 import { CountryLabelAtlas } from './country-labels/atlas';
-import { LABEL_GLYPH_STRIDE, layoutCountryLabelWithinTerritory } from './country-labels/layout';
+import {
+  LABEL_GLYPH_STRIDE, layoutCountryLabelWithinTerritory, placeCountryLabelOnTerrain,
+} from './country-labels/layout';
 import { createCountryAnchor, type CountryAnchor } from './country-labels/topology';
 
 export { buildCountryColorBuffer } from './country-labels/colors';
@@ -35,6 +37,8 @@ export class CountryLabelLayer {
     private readonly worldWidth: number,
     private readonly ownsPoint: (countryId: number, x: number, z: number) => boolean,
     private readonly territorySampleSpacing: number,
+    private readonly sampleHeight: (x: number, z: number) => number,
+    private readonly heightSampleSpacing: number,
   ) {
     // Retain the old DOM element for API compatibility, but labels now render
     // as world-space WebGPU glyphs rather than a composited screen overlay.
@@ -175,7 +179,13 @@ export class CountryLabelLayer {
         (x, z) => this.ownsPoint(countryId, x, z),
         this.territorySampleSpacing,
       );
-      if (glyphs.length) this.glyphsByCountry.set(countryId, glyphs);
+      if (glyphs.length) {
+        this.glyphsByCountry.set(countryId, placeCountryLabelOnTerrain(
+          glyphs,
+          this.sampleHeight,
+          this.heightSampleSpacing,
+        ));
+      }
       else this.glyphsByCountry.delete(countryId);
     } else {
       this.anchors.delete(countryId);

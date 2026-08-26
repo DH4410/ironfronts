@@ -8,8 +8,13 @@ struct LineParams { count: u32, mode: u32, enabled: u32, padding: u32 };
 
 struct LineOutput {
   @builtin(position) position: vec4f,
-  @location(0) color: vec4f,
+  @location(0) outerColor: vec4f,
   @location(1) fogVisibility: f32,
+  @location(2) innerColor: vec4f,
+  @location(3) lineSide: f32,
+  @location(4) @interpolate(flat) countryCasing: f32,
+  @location(5) mapUv: vec2f,
+  @location(6) @interpolate(flat) borderMode: f32,
 };
 
 @vertex
@@ -50,21 +55,29 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   let hovered = hoverId > 0.5 && (abs(line.b.x - hoverId) < 0.5 || abs(line.b.y - hoverId) < 0.5);
   let nearFactor = 1.0 - smoothstep(700.0, 8200.0, uniforms.interaction.y);
   var widthPixels = 0.72 + nearFactor * 0.8;
-  var color = vec4f(0.055, 0.085, 0.077, 0.15 + nearFactor * 0.40);
+  var color = vec4f(0.055, 0.085, 0.077, mix(0.30, 0.10, nearFactor));
+  var innerColor = color;
+  var countryCasing = 0.0;
   if (line.b.y < 0.5) { color.a *= 0.46; }
   if (lineParams.mode == 0u) {
     let provinceBordersVisible = (lineParams.enabled & 1u) != 0u;
     let countryBordersVisible = (lineParams.enabled & 2u) != 0u;
-    let countryBoundary = line.b.z < 0.0;
+    // A coastline has no province on its far side. Do not promote it to a
+    // political boundary merely because its implicit owner differs.
+    let countryBoundary = line.b.z < 0.0 && line.b.y > 0.5;
     if (countryBoundary && countryBordersVisible) {
       widthPixels = 2.65 - nearFactor * 0.58;
-      color = vec4f(0.052, 0.067, 0.059, select(0.48, 0.72, line.b.y > 0.5));
+      color = vec4f(0.035, 0.047, 0.043, mix(0.60, 0.94, nearFactor));
+      innerColor = vec4f(0.77, 0.71, 0.57, mix(0.52, 0.86, nearFactor));
+      countryCasing = 1.0;
     } else if (!provinceBordersVisible) {
       color.a = 0.0;
     }
     if (hovered && (provinceBordersVisible || countryBordersVisible)) {
       widthPixels = max(widthPixels, 2.8);
       color = vec4f(0.96, 0.78, 0.35, 0.96);
+      innerColor = color;
+      countryCasing = 0.0;
     }
   } else if (lineParams.mode == 1u) {
     widthPixels = 1.1;
@@ -78,14 +91,32 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   let pixelOffset = normal * side * widthPixels * 2.0 / uniforms.viewport.xy;
   var output: LineOutput;
   output.position = clip + vec4f(pixelOffset * clip.w, 0.0, 0.0);
-  output.color = color;
+  output.outerColor = color;
   output.fogVisibility = 1.0 - horizontalWorldFog(select(world0.x, world1.x, endpoint == 1u));
+  output.innerColor = innerColor;
+  output.lineSide = side;
+  output.countryCasing = countryCasing;
+  output.mapUv = select(uv0, uv1, endpoint == 1u);
+  output.borderMode = select(0.0, 1.0, lineParams.mode == 0u);
   return output;
 }
 
 @fragment
 fn lineFragment(input: LineOutput) -> @location(0) vec4f {
-  let color = vec4f(input.color.rgb, input.color.a * input.fogVisibility);
+  let distanceFromCenter = abs(input.lineSide);
+  let centerCoverage = 1.0 - smoothstep(0.43, 0.55, distanceFromCenter);
+  let edgeCoverage = 1.0 - smoothstep(0.88, 1.0, distanceFromCenter);
+  if (input.borderMode > 0.5) {
+    let riverSignal = max(waterwayAt(input.mapUv), visualRiverAt(input.mapUv));
+    // The river surface owns political boundaries over water. Suppressing the
+    // ordinary geometry prevents a separate line from appearing on each bank.
+    if (riverSignal >= 0.15) { discard; }
+  }
+  var styledColor = input.outerColor;
+  if (input.countryCasing > 0.5) {
+    styledColor = mix(input.outerColor, input.innerColor, centerCoverage);
+  }
+  let color = vec4f(styledColor.rgb, styledColor.a * input.fogVisibility * edgeCoverage);
   if (color.a < 0.002) { discard; }
   return color;
 }

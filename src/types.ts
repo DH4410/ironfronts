@@ -23,7 +23,16 @@ export interface CountryRecord {
   id: number;
   name: string;
   color: string;
+  colorFamily: number;
   capitalProvinceId: number;
+}
+
+export type DiplomaticRelation = 'neutral' | 'allied' | 'war';
+
+export interface DiplomacyState {
+  player: CountryRecord;
+  allies: CountryRecord[];
+  enemies: CountryRecord[];
 }
 
 export interface WorldManifest {
