@@ -121,14 +121,19 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     }
 
     if (terrain == 1u) {
-      baseColor = mix(baseColor, sampleMaterial(4, input.worldPosition, 65.0), clamp(slope * 3.4 + 0.12, 0.0, 0.7));
+      // Lift the exposed-rock material off near-black so steep hills stay a
+      // readable slate rather than a dark blob.
+      let hillRock = sampleMaterial(4, input.worldPosition, 65.0) * 1.2 + vec3f(0.055, 0.055, 0.05);
+      baseColor = mix(baseColor, hillRock, clamp(slope * 3.4 + 0.12, 0.0, 0.7));
     } else if (terrain == 2u) {
-      let rock = sampleMaterial(4, input.worldPosition, 58.0);
+      let rock = sampleMaterial(4, input.worldPosition, 58.0) * 1.25 + vec3f(0.07, 0.07, 0.065);
       let snow = sampleMaterial(5, input.worldPosition, 80.0);
       let snowAmount = smoothstep(120.0, 205.0, elevation) * smoothstep(0.58, 0.92, normal.y);
       baseColor = mix(rock, snow, snowAmount);
     } else if (terrain == 3u) {
-      baseColor = sampleMaterial(3, input.worldPosition, 70.0);
+      // Forest floor was a very dark brown; between and under the canopy it
+      // read as burnt ground. Lift it to a shaded earth / moss tone.
+      baseColor = sampleMaterial(3, input.worldPosition, 70.0) * 1.5 + vec3f(0.06, 0.085, 0.05);
     } else if (terrain == 4u) {
       baseColor = mix(sampleMaterial(6, input.worldPosition, 54.0), sampleMaterial(1, input.worldPosition, 68.0), 0.22);
     }
@@ -144,8 +149,8 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   }
   if (terrain == 3u) {
     let forestDistance = distance(uniforms.camera.xyz, input.worldPosition);
-    let canopySignal = vec3f(0.115, 0.31, 0.14) * (0.86 + variation * 0.24);
-    baseColor = mix(baseColor, canopySignal, smoothstep(1750.0, 3150.0, forestDistance) * 0.78);
+    let canopySignal = vec3f(0.17, 0.34, 0.18) * (0.86 + variation * 0.24);
+    baseColor = mix(baseColor, canopySignal, smoothstep(1750.0, 3150.0, forestDistance) * 0.5);
   }
 
   if (uniforms.interaction.z > 0.5 && uniforms.map.w < 0.5) {
@@ -165,7 +170,11 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
         ${POLITICAL_OVERVIEW_FULL_ALTITUDE.toFixed(1)},
         uniforms.camera.y
       );
-      let terrainLuminance = dot(baseColor, vec3f(0.24, 0.68, 0.08));
+      // Floor the terrain luminance the tint is matched against. Steep rock and
+      // dense forest land near-black here, and without a floor the
+      // luminance-matched political colour inherits that blackness, so overview
+      // zoom cannot recover an owned mountain or forest province.
+      let terrainLuminance = max(0.16, dot(baseColor, vec3f(0.24, 0.68, 0.08)));
       let tintLuminance = max(0.06, dot(overlayColor, vec3f(0.24, 0.68, 0.08)));
       let luminanceMatchedTint = overlayColor * (terrainLuminance / tintLuminance);
       let originalTint = overlayColor * (0.62 + terrainLuminance * 0.70);
@@ -233,7 +242,13 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   baseColor *= 0.92 + variation * 0.14;
   baseColor = mix(baseColor, baseColor * vec3f(0.74, 0.79, 0.83), uniforms.weather.x * 0.42);
   let sunDirection = normalize(uniforms.sunTime.xyz);
-  var lit = baseColor * surfaceLight(normal);
+  // Directional hillshade that grows with slope, so ridges and valleys read as
+  // 3D relief instead of a flat patch. Flat terrain (plains, forest floor) is
+  // untouched; the floor keeps shadowed steep faces lit, never the old black.
+  let sunFacing = clamp(dot(normal, sunDirection) * 0.5 + 0.5, 0.0, 1.0);
+  let reliefStrength = smoothstep(0.05, 0.36, slope) * uniforms.lighting.x;
+  let relief = mix(1.0, mix(0.55, 1.4, sunFacing), reliefStrength);
+  var lit = baseColor * max(surfaceLight(normal) * relief, vec3f(0.4));
   lit += vec3f(0.12, 0.15, 0.13) * pow(max(dot(normal, normalize(sunDirection + normalize(uniforms.camera.xyz - input.worldPosition))), 0.0), 24.0) * 0.08 * uniforms.lighting.x;
   lit += wetSurfaceSheen(normal, input.worldPosition);
   if (nightMapCompensation > 0.001) {
