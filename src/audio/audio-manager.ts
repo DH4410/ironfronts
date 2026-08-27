@@ -15,7 +15,6 @@ type AmbienceKey = 'rain' | 'wind' | 'ocean';
 
 const UI_SAMPLE_URLS: Partial<Record<UiAudioCue, string>> = {
   hover: '/audio/sfx/ui-hover.wav',
-  select: '/audio/sfx/ui-click.wav',
   'dossier-open': '/audio/sfx/dossier-open.wav',
   'dossier-close': '/audio/sfx/dossier-close.wav',
   confirm: '/audio/sfx/order-confirm.wav',
@@ -157,7 +156,10 @@ export class AudioManager {
           this.playTone(uiGain, 520, 470, 0.026, 0.020, 'sine');
           break;
         case 'select':
-          this.playTone(uiGain, 240, 205, 0.045, 0.045, 'triangle');
+          // Muted mechanical command click: short, low and dry rather than a
+          // bright/high-pitched UI chirp. Better suited to the war-room tone.
+          this.playNoise(uiGain, 0.045, 0.018, 120, 680);
+          this.playTone(uiGain, 155, 108, 0.050, 0.034, 'triangle');
           break;
         case 'dossier-open':
           this.playNoise(uiGain, 0.16, 0.026, 850, 3600);
