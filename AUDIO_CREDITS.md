@@ -196,21 +196,22 @@ ready.
 
 ### jasinski / qubodup — coastal waves — CC0 1.0
 
-`public/audio/ambience/ocean-waves.wav` is a 24-second seamless surf bed
-derived from the four **Beach Ocean Waves** CC0 recordings by jasinski,
-submitted to OpenGameArt by qubodup.
+`public/audio/ambience/ocean-waves.wav` is the first **Beach Ocean Waves**
+recording by jasinski, submitted to OpenGameArt by qubodup. The source pack
+contains four short beach-wave recordings and is published under CC0.
 
 License: **Creative Commons Zero (CC0 1.0 Universal)**  
 Original source: https://opengameart.org/content/beach-ocean-waves
 
-The game-ready loop was vendored from `ythere-y/corner-fishing-idle` at
-commit `b68f9b0f29edb90d05f4467f586d7e3bd149d681`. Its documented build
-process downmixes/softens the four real wave clips and scatters six swells into
-a 24-second ring buffer so the loop boundary is seamless.
+The WAV copy was vendored from `AdamSmif/Goonie-Golf` at commit
+`d51cfa36096caf45fd1a7c161ca8ce61472e082a`, where it is stored as
+`wave_01_cc0-18363__jasinski__alkaibeach.wav`. Its source blob SHA is
+`f73ce52739ba332e01a2c0a6aa90bbdec2bdaafb`.
 
-Ironfronts currently fades this coast bed in only when the camera target is
-open water and the camera is below regional overview distance. A later spatial
-pass can replace that binary trigger with distance-to-coast HRTF emitters.
+Ironfronts currently fades this coast recording in only when the camera target
+is open water and the camera is below regional overview distance. A later
+spatial pass can replace that binary trigger with distance-to-coast HRTF
+emitters and a richer multi-wave bed.
 
 ### rubberduck — thunder — CC0 1.0
 
