@@ -150,3 +150,81 @@ the listener rather than sound like a single point emitter. Localized effects
 such as thunder, battles, cities and coastlines can use HRTF spatialization
 later.
 
+### Spring Spring — map/paper movement — CC0 1.0
+
+The dossier movement now uses the two **Opening and Closing a Map Sounds**
+recordings published by Spring Spring (Julie Damsgaard / Spring Enterprises):
+
+- `public/audio/sfx/dossier-open.wav` — original `snd_use_map.wav`
+- `public/audio/sfx/dossier-close.wav` — original `snd_close_map.wav`
+
+License: **Creative Commons Zero (CC0 1.0 Universal)**  
+Original source: https://opengameart.org/content/opening-and-closing-a-map-sounds
+
+The copies were vendored from `Brandon-Valley/NationalParkAfterDark` at
+commit `3380da9e4bdcc86c52b70e36e205260f1139ba71`.
+
+### Kenney Interface Sounds — order confirmation — CC0 1.0
+
+`public/audio/sfx/order-confirm.wav` is Kenney's
+`confirmation_002.wav` from the **Interface Sounds** pack.
+
+Author: **Kenney Vleugels (Kenney.nl)**  
+License: **Creative Commons Zero (CC0 1.0 Universal)**  
+Original source: https://kenney.nl/assets/interface-sounds
+
+The file was vendored from `Calinou/kenney-interface-sounds` at commit
+`4596a49eaf5a533948d49a47467f606bcdea70ff`.
+
+Ironfronts layers a very quiet low-frequency generated thump underneath this
+sample for the Begin/Resume/confirm action so an order feels mechanical and
+weighty rather than like a generic web-button click.
+
+### SketchMan3 — wind whoosh loop — CC0 1.0
+
+`public/audio/ambience/wind.ogg` is **wind whoosh loop** by SketchMan3.
+
+License: **Creative Commons Zero (CC0 1.0 Universal)**  
+Original source: https://opengameart.org/content/wind-whoosh-loop
+
+The author describes it as a looped/EQ'd section of the CC0
+`Loopable Dungeon Ambience` recording. The copy used here was vendored from
+`pacsui/grapple_thing` at commit
+`b659aacd272b09db090b0d53ee80a5102cbb2e45`.
+
+Wind is a quiet non-spatial world bed and begins when the rendered world is
+ready.
+
+### jasinski / qubodup — coastal waves — CC0 1.0
+
+`public/audio/ambience/ocean-waves.wav` is a 24-second seamless surf bed
+derived from the four **Beach Ocean Waves** CC0 recordings by jasinski,
+submitted to OpenGameArt by qubodup.
+
+License: **Creative Commons Zero (CC0 1.0 Universal)**  
+Original source: https://opengameart.org/content/beach-ocean-waves
+
+The game-ready loop was vendored from `ythere-y/corner-fishing-idle` at
+commit `b68f9b0f29edb90d05f4467f586d7e3bd149d681`. Its documented build
+process downmixes/softens the four real wave clips and scatters six swells into
+a 24-second ring buffer so the loop boundary is seamless.
+
+Ironfronts currently fades this coast bed in only when the camera target is
+open water and the camera is below regional overview distance. A later spatial
+pass can replace that binary trigger with distance-to-coast HRTF emitters.
+
+### rubberduck — thunder — CC0 1.0
+
+`public/audio/sfx/weather-thunder.ogg` is
+`sfx100v2_thunder_01.ogg` from rubberduck's **100 CC0 SFX #2** pack.
+
+License: **Creative Commons Zero (CC0 1.0 Universal)**  
+Original source: https://opengameart.org/content/100-cc0-sfx-2
+
+The file was vendored from `pegross/card-crafter` at commit
+`82c11e0a3bae1fbd8ed741c00dba91d3afc078e6`.
+
+Thunder is the first sampled effect routed through an HRTF `PannerNode`.
+The weather diagnostics panel exposes a Thunder Preview button so headphone
+users can verify the directional effect independently of the rain toggle.
+
