@@ -84,9 +84,24 @@ export function mountMenu(handlers: MenuHandlers): void {
     transitionPage = page;
     page.style.transform = 'none';
     riseDistance = page.getBoundingClientRect().height;
-    update(direction === 1 ? 0 : 1);
-    await runChoreo(OPEN_DURATION, direction, update);
-    transitionPage = null;
+    const target = direction === 1 ? 1 : 0;
+
+    try {
+      update(direction === 1 ? 0 : 1);
+      await runChoreo(OPEN_DURATION, direction, update);
+    } catch (error) {
+      // A menu transition must never leave the interface permanently frozen.
+      // If animation work fails, snap to the requested final state and keep
+      // the control flow moving.
+      console.error('Menu dossier transition failed; snapping to end state.', error);
+      try {
+        update(target);
+      } catch (snapError) {
+        console.error('Unable to snap dossier transition to end state.', snapError);
+      }
+    } finally {
+      transitionPage = null;
+    }
   }
 
   async function openDossier(card: HTMLButtonElement): Promise<void> {
@@ -102,10 +117,13 @@ export function mountMenu(handlers: MenuHandlers): void {
 
     page.hidden = false;
     page.style.pointerEvents = 'none';
-    await playTransition(page, 1);
-    page.style.pointerEvents = '';
-    main.style.pointerEvents = 'none';
-    busy = false;
+    try {
+      await playTransition(page, 1);
+    } finally {
+      page.style.pointerEvents = '';
+      main.style.pointerEvents = 'none';
+      busy = false;
+    }
   }
 
   async function closeDossier(): Promise<void> {
@@ -118,11 +136,14 @@ export function mountMenu(handlers: MenuHandlers): void {
     playCue('dossier-close');
     main.style.pointerEvents = '';
     page.style.pointerEvents = 'none';
-    await playTransition(page, -1);
-    page.hidden = true;
-    page.style.pointerEvents = '';
-    openScreen = null;
-    busy = false;
+    try {
+      await playTransition(page, -1);
+    } finally {
+      page.hidden = true;
+      page.style.pointerEvents = '';
+      openScreen = null;
+      busy = false;
+    }
   }
 
   root.querySelectorAll<HTMLButtonElement>('[data-open]').forEach((card) => {
