@@ -29,6 +29,21 @@ export function pickTerrainPoint(
   return result[2] < 0 || result[2] >= worldHeight ? null : result;
 }
 
+export type PrimaryClickAction =
+  | { readonly kind: 'select'; readonly encodedProvinceId: number }
+  | { readonly kind: 'clear-selection' };
+
+/**
+ * Resolve a normal left-click / tap on the map. This is selection only: it never
+ * changes province ownership. Ownership mutation goes through an explicit
+ * gameplay/debug pathway (see WorldRenderer.forceCaptureProvinceAt).
+ */
+export function resolvePrimaryClick(encodedProvinceId: number): PrimaryClickAction {
+  return encodedProvinceId > 0
+    ? { kind: 'select', encodedProvinceId }
+    : { kind: 'clear-selection' };
+}
+
 export function createHoverInfo(
   encodedId: number,
   provinces: ReadonlyMap<number, ProvinceRecord>,
