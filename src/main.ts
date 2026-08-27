@@ -6,7 +6,7 @@ import { AudioManager } from './audio/audio-manager';
 import { MusicDirector } from './audio/music-director';
 import { TRACK_BY_ID, trackSources } from './audio/music-catalog';
 import { mountMenu } from './menu/menu';
-import { WorldRenderer, type MapMode, type TimeOfDayState } from './renderer';
+import type { WorldRenderer, MapMode, TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
 import type { CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo } from './types';
 import { LOADING_QUOTES } from './loadingQuotes';
@@ -93,10 +93,20 @@ mountMenu({
     if (rendererStarted) return;
     rendererStarted = true;
     void music.setState('opening');
+
+    // The lobby is deliberately lightweight. The world canvas, loading scene,
+    // renderer module graph, WebGPU device and world assets are all deferred
+    // until the player actually commits to an operation.
     if (!navigator.gpu) {
       loading.hidden = true;
+      canvas.hidden = true;
       unsupported.hidden = false;
     } else {
+      canvas.hidden = false;
+      loading.hidden = false;
+      loadingStage.textContent = 'Loading renderer';
+      loadingValue.textContent = '0%';
+      loadingBar.style.width = '0%';
       debugToggle.hidden = false;
       mapModes.hidden = false;
       void start();
@@ -125,6 +135,10 @@ function startLoadingQuotes(): () => void {
 
 async function start(): Promise<void> {
   const stopQuotes = startLoadingQuotes();
+
+  // Keep the complete renderer/world module graph out of the lobby bundle.
+  // This import is the first point at which world rendering code is loaded.
+  const { WorldRenderer } = await import('./renderer');
   const renderer = new WorldRenderer(canvas, countryLabels);
   window.addEventListener('pagehide', (event) => {
     if (!event.persisted) renderer.dispose();
