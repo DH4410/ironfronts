@@ -17,6 +17,49 @@ function pointProvince(ids, x, y) {
   return ids[py * ID_WIDTH + px];
 }
 
+// Local (unit-mesh) footprint half-extents per building archetype. The base box
+// spans +/-0.5 in x and z; archetype 3 adds a wider ground skirt (see
+// createBuildingArchetypeMesh). A small coastline setback is added for the two
+// largest archetypes so they sit further back from the shore.
+const ARCHETYPE_FOOTPRINT_HALF = {
+  0: { x: 0.56, z: 0.56 }, 1: { x: 0.62, z: 0.56 }, 2: { x: 0.56, z: 0.56 },
+  3: { x: 0.7, z: 0.5 }, 4: { x: 0.5, z: 0.5 },
+};
+const LARGE_ARCHETYPE_COAST_SETBACK = 3.0;
+const SMALL_ARCHETYPE_COAST_SETBACK = 0.75;
+// Province-id texel size in world units; the footprint is sampled at roughly
+// half this spacing so no interior water texel can slip between samples.
+const ID_TEXEL_WORLD = WORLD_WIDTH / ID_WIDTH;
+
+// The center point is already validated against the province id. This adds a
+// full-footprint check so buildings on narrow coastal provinces and islands
+// cannot spill onto open water. Ocean and static-water lakes/canals are
+// province 0; any footprint sample landing there (plus a small setback for the
+// largest archetypes) rejects the building. Footprint samples that merely cross
+// into an adjacent *land* province are left alone - that is normal for a city
+// built against its border.
+function footprintClearsWater(provinceIds, x, y, angle, archetype, sx, sz) {
+  const half = ARCHETYPE_FOOTPRINT_HALF[archetype] ?? ARCHETYPE_FOOTPRINT_HALF[0];
+  const setback = archetype === 3 || archetype === 4
+    ? LARGE_ARCHETYPE_COAST_SETBACK : SMALL_ARCHETYPE_COAST_SETBACK;
+  const halfX = sx * half.x + setback;
+  const halfZ = sz * half.z + setback;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const stepsX = Math.max(1, Math.ceil(halfX / (ID_TEXEL_WORLD * 0.5)));
+  const stepsZ = Math.max(1, Math.ceil(halfZ / (ID_TEXEL_WORLD * 0.5)));
+  for (let ix = -stepsX; ix <= stepsX; ix += 1) {
+    const localX = (ix / stepsX) * halfX;
+    for (let iz = -stepsZ; iz <= stepsZ; iz += 1) {
+      const localZ = (iz / stepsZ) * halfZ;
+      const worldX = x + localX * cos - localZ * sin;
+      const worldY = y + localX * sin + localZ * cos;
+      if (pointProvince(provinceIds, worldX, worldY) === 0) return false;
+    }
+  }
+  return true;
+}
+
 function pickTreeVariant(rng, visual, isPlain) {
   const roll = rng();
   if (isPlain) {
@@ -38,6 +81,8 @@ function pickTreePalette(rng, visual, isPlain) {
 export function buildInstances(provinces, geometryById, provinceIds, areaCounts, roadClearance, cityPlans) {
   const trees = [];
   const buildings = [];
+  let rejectedCoastalFootprints = 0;
+  const coastalProvincesAffected = new Set();
 
   for (const province of provinces) {
     const geometry = geometryById.get(province.province_id);
@@ -116,6 +161,11 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
       const sx = archetype === 3 ? 5.4 + rng() * 5.2 : 2.8 + rng() * 4.2;
       const sz = archetype === 3 ? 4.8 + rng() * 5.8 : 2.8 + rng() * 4.4;
       if (placedBuildings.some((other) => Math.hypot(other.x - x, other.y - y) < (other.radius + Math.max(sx, sz)) * 0.34)) continue;
+      if (!footprintClearsWater(provinceIds, x, y, angle, archetype, sx, sz)) {
+        rejectedCoastalFootprints += 1;
+        coastalProvincesAffected.add(province.province_id);
+        continue;
+      }
       let sy = 4.2 + rng() * 7.5 + Math.max(0, centerBias) * Math.max(0, populationScale - 4) * 3.6;
       if (archetype === 4) sy *= 1.55;
       if (archetype === 3) sy *= 0.68;
@@ -126,5 +176,12 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
     }
   }
 
-  return { trees: new Float32Array(trees), buildings: new Float32Array(buildings) };
+  return {
+    trees: new Float32Array(trees),
+    buildings: new Float32Array(buildings),
+    audit: {
+      rejectedCoastalFootprints,
+      coastalProvincesAffected: coastalProvincesAffected.size,
+    },
+  };
 }
