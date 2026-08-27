@@ -47,8 +47,13 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   let visualAntialias = max(fwidth(visualSignal) * 0.85, 0.012);
   var visualCoverage = 1.0;
   if (visualRiver) {
-    if (visualSignal < 0.45 - visualAntialias) { discard; }
-    visualCoverage = smoothstep(0.45 - visualAntialias, 0.45 + visualAntialias, visualSignal);
+    // The visual-river ribbon is a per-mask-texel quilt (buildVisualWaterways
+    // emits one quad per active mask cell). A tight 0.45 gate here re-clipped
+    // every tile, so a diagonally running river read as a chain of detached
+    // blocks. Gate low and fade over a wide band so adjacent tiles visually
+    // merge into one continuous channel; the ribbon geometry still bounds it.
+    if (visualSignal < 0.16 - visualAntialias) { discard; }
+    visualCoverage = smoothstep(0.16 - visualAntialias, 0.38 + visualAntialias, visualSignal);
   }
   // Once an authored channel has entered broad static water, the ocean/lake
   // pass owns the surface. This removes distant source-graph tails while the
