@@ -337,6 +337,61 @@ describe('generated v12 world package', () => {
     expect(data.infrastructureChunks.hiddenConnections.reduce((sum, range) => sum + range.indexCount, 0)).toBe(indices.length);
   });
 
+  it('keeps every city building footprint clear of open water', async () => {
+    const data = await manifest();
+    const [buildingBytes, provinceIdBytes, reportBytes] = await Promise.all([
+      readFile(`public/world/${data.buffers.buildings.url}`),
+      readFile(`public/world/${data.fields.provinceIds.url}`),
+      readFile('public/world/world-generation-report.json', 'utf8'),
+    ]);
+    const buildings = viewF32(buildingBytes);
+    const provinceIds = new Uint16Array(
+      provinceIdBytes.buffer, provinceIdBytes.byteOffset, provinceIdBytes.byteLength / 2,
+    );
+    const report = JSON.parse(reportBytes);
+    const idWidth = data.fields.provinceIds.width;
+    const idHeight = data.fields.provinceIds.height;
+    const provinceAt = (x: number, z: number): number => {
+      const wrapped = ((x % data.world.width) + data.world.width) % data.world.width;
+      const px = Math.min(idWidth - 1, Math.floor(wrapped / data.world.width * idWidth));
+      const pz = Math.min(idHeight - 1, Math.max(0, Math.floor(z / data.world.height * idHeight)));
+      return provinceIds[pz * idWidth + px];
+    };
+
+    expect(buildings.length).toBe(data.buffers.buildings.count * 8);
+    expect(report.props.rejectedCoastalFootprints).toBeGreaterThan(0);
+    expect(report.props.coastalProvincesAffected).toBeGreaterThan(0);
+
+    const texelWorld = data.world.width / idWidth;
+    let checked = 0;
+    let overWater = 0;
+    for (let building = 0; building < data.buffers.buildings.count; building += 1) {
+      const offset = building * 8;
+      const x = buildings[offset];
+      const z = buildings[offset + 1];
+      // The actual base building box spans +/-0.5 of the instance scale; the
+      // generator guards a wider region still, so this is a strict subset.
+      const halfX = buildings[offset + 2] * 0.5;
+      const halfZ = buildings[offset + 4] * 0.5;
+      const cos = Math.cos(buildings[offset + 5]);
+      const sin = Math.sin(buildings[offset + 5]);
+      const stepsX = Math.max(1, Math.ceil(halfX / (texelWorld * 0.5)));
+      const stepsZ = Math.max(1, Math.ceil(halfZ / (texelWorld * 0.5)));
+      for (let ix = -stepsX; ix <= stepsX; ix += 1) {
+        const localX = (ix / stepsX) * halfX;
+        for (let iz = -stepsZ; iz <= stepsZ; iz += 1) {
+          const localZ = (iz / stepsZ) * halfZ;
+          const worldX = x + localX * cos - localZ * sin;
+          const worldZ = z + localX * sin + localZ * cos;
+          if (provinceAt(worldX, worldZ) === 0) overWater += 1;
+        }
+      }
+      checked += 1;
+    }
+    expect(checked).toBe(data.buffers.buildings.count);
+    expect(overWater).toBe(0);
+  });
+
   it('packages complete mutable country ownership and label topology', async () => {
     const data = await manifest();
     const [ownerBytes, adjacencyBytes, labelBytes] = await Promise.all([
