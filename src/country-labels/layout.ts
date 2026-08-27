@@ -4,6 +4,17 @@ import type { CountryAnchor } from './topology';
 export const LABEL_GLYPH_STRIDE = 12;
 export const LABEL_TERRAIN_HEIGHT_OFFSET = 0.6;
 
+/**
+ * Absolute map-space ceiling on a country label's rendered size. Label scale is
+ * otherwise derived only from territory span, so a continent-sized country
+ * produced glyphs thousands of world units tall that stretched across terrain
+ * and clipped the viewport at regional zoom. Capping here keeps big countries
+ * readable without letting the name become the dominant element on screen; the
+ * territory-fitting shrink loop still applies on top of the cap.
+ */
+export const MAX_LABEL_WORLD_HEIGHT = 300;
+export const MAX_LABEL_WORLD_WIDTH = 2800;
+
 export interface CountryLabelMetrics {
   readonly lineHeightAtMeasurementSize: number;
   readonly trackingAtMeasurementSize: number;
@@ -31,10 +42,15 @@ export function layoutCountryLabel(
 
   const availableWidth = anchor.span * 0.7;
   const availableHeight = anchor.crossSpan * 0.5;
-  const scale = Math.min(
+  const territoryScale = Math.min(
     availableWidth / measuredWidth,
     availableHeight / atlas.lineHeightAtMeasurementSize,
   ) * sizeMultiplier;
+  const cappedScale = Math.min(
+    MAX_LABEL_WORLD_WIDTH / measuredWidth,
+    MAX_LABEL_WORLD_HEIGHT / atlas.lineHeightAtMeasurementSize,
+  );
+  const scale = Math.min(territoryScale, cappedScale);
   if (!Number.isFinite(scale) || scale <= 0) return new Float32Array(0);
 
   const labelWidth = measuredWidth * scale;
