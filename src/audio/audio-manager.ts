@@ -46,6 +46,12 @@ interface LoopingAmbience {
   gain: GainNode;
 }
 
+interface PreparedMusic {
+  objectUrl?: string;
+  discard: boolean;
+  loading: Promise<void>;
+}
+
 export class AudioManager {
   private readonly storage?: AudioStorage;
   private preferences: AudioPreferences;
@@ -55,7 +61,7 @@ export class AudioManager {
   private currentMusic?: MusicPlayback;
   private musicRequest = 0;
   private readonly sampleBuffers = new Map<string, Promise<AudioBuffer | null>>();
-  private readonly preparedMusic = new Map<string, HTMLAudioElement>();
+  private readonly preparedMusic = new Map<string, PreparedMusic>();
   private readonly pendingUiCues = new Set<UiAudioCue>();
   private readonly uiCueTimes = new Map<UiAudioCue, number>();
   private readonly ambience = new Map<AmbienceKey, LoopingAmbience>();
@@ -110,13 +116,33 @@ export class AudioManager {
   }
 
   prepareMusic(url: string): void {
-    if (!url || typeof Audio === 'undefined' || this.preparedMusic.has(url)) return;
-    const element = new Audio();
-    element.preload = 'auto';
-    element.crossOrigin = 'anonymous';
-    element.src = url;
-    element.load();
-    this.preparedMusic.set(url, element);
+    if (!url || typeof fetch === 'undefined' || typeof URL === 'undefined' || this.preparedMusic.has(url)) return;
+
+    // Do not use an <audio preload="auto"> element here. A media-element preload
+    // can keep the browser tab's loading spinner alive and competes with the menu.
+    // A background fetch warms the file without blocking document load; if it
+    // finishes before the first click we play from an object URL immediately.
+    const prepared: PreparedMusic = {
+      discard: false,
+      loading: Promise.resolve(),
+    };
+    prepared.loading = fetch(url, { cache: 'force-cache' })
+      .then((response) => {
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+        return response.blob();
+      })
+      .then((blob) => {
+        const objectUrl = URL.createObjectURL(blob);
+        if (prepared.discard) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        prepared.objectUrl = objectUrl;
+      })
+      .catch(() => {
+        // Playback will fall back to normal streaming on the first interaction.
+      });
+    this.preparedMusic.set(url, prepared);
   }
 
   async playUiCue(cue: UiAudioCue): Promise<void> {
@@ -221,12 +247,25 @@ export class AudioManager {
     const fadeSeconds = Math.max(0.05, options.fadeSeconds ?? 1.2);
     const previous = this.currentMusic;
 
-    const element = this.preparedMusic.get(url) ?? new Audio();
+    const prepared = this.preparedMusic.get(url);
     this.preparedMusic.delete(url);
+
+    let playbackUrl = url;
+    let objectUrl: string | undefined;
+    if (prepared?.objectUrl) {
+      objectUrl = prepared.objectUrl;
+      playbackUrl = objectUrl;
+    } else if (prepared) {
+      // Never wait for a preload on the user's first click. Start normal
+      // streaming immediately and discard the background fetch when it lands.
+      prepared.discard = true;
+    }
+
+    const element = new Audio();
     element.preload = 'auto';
     element.loop = options.loop ?? false;
     element.crossOrigin = 'anonymous';
-    if (element.src !== url && !element.src.endsWith(url)) element.src = url;
+    element.src = playbackUrl;
 
     const source = context.createMediaElementSource(element);
     const gain = context.createGain();
@@ -234,7 +273,7 @@ export class AudioManager {
     source.connect(gain);
     gain.connect(musicGain);
 
-    const playback: MusicPlayback = { element, source, gain, url };
+    const playback: MusicPlayback & { objectUrl?: string } = { element, source, gain, url, objectUrl };
     if (options.onEnded) {
       const onEnded = () => {
         if (this.currentMusic === playback) {
@@ -325,10 +364,9 @@ export class AudioManager {
     this.ambience.clear();
 
     const context = this.context;
-    for (const element of this.preparedMusic.values()) {
-      element.pause();
-      element.removeAttribute('src');
-      element.load();
+    for (const prepared of this.preparedMusic.values()) {
+      prepared.discard = true;
+      if (prepared.objectUrl) URL.revokeObjectURL(prepared.objectUrl);
     }
     this.preparedMusic.clear();
     this.pendingUiCues.clear();
@@ -572,12 +610,16 @@ export class AudioManager {
     source.stop(now + duration + 0.01);
   }
 
-  private destroyMusic(playback: MusicPlayback): void {
+  private destroyMusic(playback: MusicPlayback & { objectUrl?: string }): void {
     playback.cleanup?.();
     playback.cleanup = undefined;
     playback.element.pause();
     playback.element.removeAttribute('src');
     playback.element.load();
+    if (playback.objectUrl) {
+      URL.revokeObjectURL(playback.objectUrl);
+      playback.objectUrl = undefined;
+    }
     try {
       playback.source.disconnect();
       playback.gain.disconnect();
