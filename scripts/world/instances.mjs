@@ -122,11 +122,15 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
 
     if (province.terrain_type_id !== 14) continue;
     const populationScale = Math.log10(Math.max(1_000, province.population ?? 1_000));
-    const target = clamp(Math.round((populationScale - 3) * 17), 12, 54);
+    // Fewer, more spaced-out buildings read better as a map-scale town than a
+    // dense box pile. Small provinces (islands like Taiwan) are scaled down
+    // hard so they get a hamlet, not a metropolis.
+    const areaFactor = clamp(Math.sqrt(area) / 24, 0.3, 1);
+    const target = Math.max(3, Math.round(clamp(Math.round((populationScale - 3) * 10), 5, 30) * areaFactor));
     const plan = cityPlans.get(province.province_id);
-    const radius = plan?.radius ?? clamp(Math.sqrt(Math.max(30, area)) * 1.9, 9, 38);
+    const radius = plan?.radius ?? clamp(Math.sqrt(Math.max(30, area)) * 1.7, 7, 30);
     const placedBuildings = [];
-    for (let attempt = 0, placed = 0; attempt < target * 56 && placed < target; attempt += 1) {
+    for (let attempt = 0, placed = 0; attempt < target * 90 && placed < target; attempt += 1) {
       const street = plan?.streets[Math.floor(rng() * plan.streets.length)];
       let angle;
       let x;
@@ -158,9 +162,11 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
       else if (rng() < 0.10) archetype = 3;
       else if (visual === 'Desert' || visual === 'Sand Dunes' || visual === 'Mediterranean') archetype = rng() < 0.72 ? 2 : 1;
       else archetype = rng() < 0.46 ? 0 : rng() < 0.72 ? 1 : 2;
-      const sx = archetype === 3 ? 5.4 + rng() * 5.2 : 2.8 + rng() * 4.2;
-      const sz = archetype === 3 ? 4.8 + rng() * 5.8 : 2.8 + rng() * 4.4;
-      if (placedBuildings.some((other) => Math.hypot(other.x - x, other.y - y) < (other.radius + Math.max(sx, sz)) * 0.34)) continue;
+      const sx = archetype === 3 ? 5.4 + rng() * 5.2 : 2.5 + rng() * 5.6;
+      const sz = archetype === 3 ? 4.8 + rng() * 5.8 : 2.5 + rng() * 5.8;
+      // Real gap between buildings instead of near-overlap, so the cluster
+      // reads as spaced structures rather than one merged mass.
+      if (placedBuildings.some((other) => Math.hypot(other.x - x, other.y - y) < (other.radius + Math.max(sx, sz)) * 0.62)) continue;
       if (!footprintClearsWater(provinceIds, x, y, angle, archetype, sx, sz)) {
         rejectedCoastalFootprints += 1;
         coastalProvincesAffected.add(province.province_id);
