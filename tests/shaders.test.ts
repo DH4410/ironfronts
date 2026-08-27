@@ -101,6 +101,16 @@ describe('WGSL programs', () => {
     expect(lineShader).toContain('mix(0.30, 0.10, nearFactor)');
   });
 
+  it('ranks national over province borders at overview zoom without touching hover or other modes', () => {
+    expect(lineShader).toContain('if (lineParams.mode == 0u && !hovered) {');
+    expect(lineShader).toContain('let overviewFade = smoothstep(3200.0, 7600.0, uniforms.interaction.y)');
+    expect(lineShader).toContain('color.a = mix(color.a, 0.92, overviewFade * 0.6)');
+    expect(lineShader).toContain('color.a *= mix(1.0, 0.22, overviewFade)');
+    // The pre-existing near-zoom weights are still the baseline the fade builds on.
+    expect(lineShader).toContain('mix(0.60, 0.94, nearFactor)');
+    expect(lineShader).toContain('mix(0.30, 0.10, nearFactor)');
+  });
+
   it('builds purely visual periodic polar shelves with water gaps and an outer fog', () => {
     expect(polarCapShader).toContain('const POLAR_CAP_DEPTH');
     expect(polarCapShader).toContain('let angle = mapX / uniforms.map.x * TAU');

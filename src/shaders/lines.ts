@@ -87,6 +87,22 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
     color = select(vec4f(0.05, 0.91, 1.0, 0.94), vec4f(0.98, 0.71, 0.12, 0.96), line.b.z > 0.5);
   }
 
+  // Line hierarchy at overview zoom (uniforms.interaction.y is the camera
+  // orbit distance). National borders must stay legible when zoomed out;
+  // province borders are secondary and should recede so political structure
+  // reads at a glance, then return progressively toward regional zoom.
+  // Hovered lines and non-border modes keep their own styling.
+  if (lineParams.mode == 0u && !hovered) {
+    let overviewFade = smoothstep(3200.0, 7600.0, uniforms.interaction.y);
+    if (countryCasing > 0.5) {
+      widthPixels += overviewFade * 0.5;
+      color.a = mix(color.a, 0.92, overviewFade * 0.6);
+      innerColor.a = mix(innerColor.a, 0.95, overviewFade * 0.6);
+    } else {
+      color.a *= mix(1.0, 0.22, overviewFade);
+    }
+  }
+
   let clip = select(clip0, clip1, endpoint == 1u);
   let pixelOffset = normal * side * widthPixels * 2.0 / uniforms.viewport.xy;
   var output: LineOutput;
