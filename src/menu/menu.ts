@@ -1,9 +1,11 @@
 import './menu.css';
+import type { AudioManager, UiAudioCue } from '../audio/audio-manager';
 import { phase, runChoreo, smooth } from './choreo';
 
 export interface MenuHandlers {
   /** Called once the player commits to entering the world (campaign, continue, or sandbox). */
   onLaunch: () => void;
+  audio?: AudioManager;
 }
 
 const OPEN_DURATION = 1250;
@@ -16,11 +18,30 @@ export function mountMenu(handlers: MenuHandlers): void {
   const brand = document.querySelector<HTMLElement>('.brand');
   const main = requiredId<HTMLElement>('ifm-main');
   const map = requiredChild<HTMLElement>(root, '.ifm__map');
+  const masterVolume = document.getElementById('ifm-master-volume') as HTMLInputElement | null;
 
   let busy = false;
   let openScreen: string | null = null;
   let transitionPage: HTMLElement | null = null;
   let riseDistance = 0;
+
+  const playCue = (cue: UiAudioCue): void => {
+    if (handlers.audio) void handlers.audio.playUiCue(cue);
+  };
+
+  if (handlers.audio) {
+    root.addEventListener('pointerdown', () => void handlers.audio?.unlock(), { capture: true, once: true });
+    if (masterVolume) {
+      masterVolume.value = String(Math.round(handlers.audio.getVolume('master') * 100));
+      masterVolume.addEventListener('input', () => {
+        handlers.audio?.setVolume('master', Number(masterVolume.value) / 100);
+      });
+    }
+
+    root.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
+      button.addEventListener('pointerenter', () => playCue('hover'));
+    });
+  }
 
   /**
    * One update() drives every sub-motion from the same t (0=on the menu,
@@ -66,11 +87,11 @@ export function mountMenu(handlers: MenuHandlers): void {
     const name = card.dataset.open;
     if (!name) return;
     const page = document.getElementById(`ifm-${name}`);
-    const fileEl = page?.querySelector<HTMLElement>('.ifm__file');
-    if (!page || !fileEl) return;
+    if (!page?.querySelector<HTMLElement>('.ifm__file')) return;
 
     busy = true;
     openScreen = name;
+    playCue('dossier-open');
 
     page.hidden = false;
     page.style.pointerEvents = 'none';
@@ -84,10 +105,10 @@ export function mountMenu(handlers: MenuHandlers): void {
     if (busy || !openScreen) return;
     const name = openScreen;
     const page = document.getElementById(`ifm-${name}`);
-    const fileEl = page?.querySelector<HTMLElement>('.ifm__file');
-    if (!page || !fileEl) return;
+    if (!page?.querySelector<HTMLElement>('.ifm__file')) return;
 
     busy = true;
+    playCue('dossier-close');
     main.style.pointerEvents = '';
     page.style.pointerEvents = 'none';
     await playTransition(page, -1);
@@ -133,11 +154,13 @@ export function mountMenu(handlers: MenuHandlers): void {
       const list = row.parentElement;
       list?.querySelectorAll('.ifm__row').forEach((sibling) => sibling.classList.remove('is-selected'));
       row.classList.add('is-selected');
+      playCue('select');
       if (row.dataset.objective) updateBriefing(row);
     });
   });
 
   function launch(): void {
+    playCue('confirm');
     root.style.transition = 'opacity .5s ease';
     root.style.opacity = '0';
     window.setTimeout(() => {
@@ -150,6 +173,7 @@ export function mountMenu(handlers: MenuHandlers): void {
   document.getElementById('ifm-start-operation')?.addEventListener('click', launch);
   document.getElementById('ifm-resume-operation')?.addEventListener('click', launch);
   document.getElementById('ifm-enter-sandbox')?.addEventListener('click', launch);
+  document.getElementById('ifm-apply-settings')?.addEventListener('click', () => playCue('confirm'));
 }
 
 function requiredId<T extends HTMLElement>(id: string): T {
