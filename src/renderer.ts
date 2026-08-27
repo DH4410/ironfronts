@@ -777,7 +777,8 @@ export class WorldRenderer {
   }
 
   private resize(): void {
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    // Keep HiDPI sharp without paying the full 2x full-screen fragment cost.
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
     const width = Math.max(1, Math.floor(this.canvas.clientWidth * pixelRatio));
     const height = Math.max(1, Math.floor(this.canvas.clientHeight * pixelRatio));
     if (this.canvas.width === width && this.canvas.height === height) return;
