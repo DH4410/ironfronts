@@ -25,6 +25,13 @@ describe('WGSL programs', () => {
     expect(waterShader).not.toContain('if (provinceAt(input.mapUv)');
   });
 
+  it('collapses the shallow shelf and shoreline foam toward a clean edge at overview zoom', () => {
+    expect(waterShader).toContain('let overview = smoothstep(2400.0, 6800.0, uniforms.interaction.y)');
+    expect(waterShader).toContain('smoothstep(0.0, mix(0.44, 0.12, overview), depth)');
+    expect(waterShader).toContain('color = mix(color, deep, overview * 0.45)');
+    expect(waterShader).toContain('mix(1.0, 0.15, overview)');
+  });
+
   it('renders suppressed-road geometry as floating dotted connectors', () => {
     expect(infrastructureShader).toContain('dotted && fract(input.roadUv.x / 6.4) > 0.40');
     expect(infrastructureShader).toContain('vec3f(0.96, 0.73, 0.25)');
