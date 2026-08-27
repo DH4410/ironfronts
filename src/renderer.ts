@@ -774,7 +774,12 @@ export class WorldRenderer {
   }
 
   private resize(): void {
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    // Cap the backing-store scale below the full device pixel ratio. Every
+    // world pass is full-screen, so a 2x buffer on a HiDPI / 4K panel is ~4x
+    // the fragment work of a 1x buffer; 1.5 keeps the map crisp while giving
+    // roughly 44% of that cost back as headroom for weaker GPUs and for other
+    // subsystems (audio, UI) sharing the frame.
+    const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5);
     const width = Math.max(1, Math.floor(this.canvas.clientWidth * pixelRatio));
     const height = Math.max(1, Math.floor(this.canvas.clientHeight * pixelRatio));
     if (this.canvas.width === width && this.canvas.height === height) return;
