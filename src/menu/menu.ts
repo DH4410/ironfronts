@@ -25,9 +25,13 @@ export function mountMenu(handlers: MenuHandlers): void {
   let openScreen: string | null = null;
   let transitionPage: HTMLElement | null = null;
   let riseDistance = 0;
+  let panOffsetPx = 0;
 
   const playCue = (cue: UiAudioCue): void => {
-    if (handlers.audio) void handlers.audio.playUiCue(cue);
+    if (!handlers.audio) return;
+    void handlers.audio.playUiCue(cue).catch((error) => {
+      console.warn(`Ignoring non-critical UI audio failure for "${cue}".`, error);
+    });
   };
 
   if (handlers.audio) {
@@ -64,11 +68,8 @@ export function mountMenu(handlers: MenuHandlers): void {
   function update(t: number): void {
     const panT = smooth(phase(t, 0, 0.92));
 
-    const box = map.getBoundingClientRect();
-    const renderedHeight = box.width * MAP_ASPECT;
-    const excess = Math.max(0, renderedHeight - box.height);
     const posY = panT * 62;
-    const offsetPx = excess * (posY / 100);
+    const offsetPx = panOffsetPx * panT;
 
     map.style.backgroundPosition = `center ${posY.toFixed(2)}%`;
     map.style.filter = `brightness(${(.86 + panT * .09).toFixed(3)}) saturate(.92) contrast(1.02)`;
@@ -83,7 +84,17 @@ export function mountMenu(handlers: MenuHandlers): void {
   async function playTransition(page: HTMLElement, direction: 1 | -1): Promise<void> {
     transitionPage = page;
     page.style.transform = 'none';
-    riseDistance = page.getBoundingClientRect().height;
+
+    // Measure once before animation. The previous implementation called
+    // getBoundingClientRect() every frame, forcing repeated layout work while
+    // moving large full-screen menu layers.
+    const pageBox = page.getBoundingClientRect();
+    const mapBox = map.getBoundingClientRect();
+    riseDistance = pageBox.height;
+    const renderedHeight = mapBox.width * MAP_ASPECT;
+    const excess = Math.max(0, renderedHeight - mapBox.height);
+    panOffsetPx = excess * 0.62;
+
     const target = direction === 1 ? 1 : 0;
 
     try {
