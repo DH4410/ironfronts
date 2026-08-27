@@ -12,11 +12,18 @@ export type UiAudioCue = 'hover' | 'select' | 'dossier-open' | 'dossier-close' |
 type GainMap = Record<AudioBus, GainNode>;
 type AudioContextConstructor = new () => AudioContext;
 
+export interface MusicPlaybackOptions {
+  loop?: boolean;
+  fadeSeconds?: number;
+  onEnded?: () => void;
+}
+
 interface MusicPlayback {
   element: HTMLAudioElement;
   source: MediaElementAudioSourceNode;
   gain: GainNode;
   url: string;
+  cleanup?: () => void;
 }
 
 export class AudioManager {
@@ -93,20 +100,20 @@ export class AudioManager {
     }
   }
 
-  async playMusic(url: string, options: { loop?: boolean; fadeSeconds?: number } = {}): Promise<boolean> {
+  async playMusic(url: string, options: MusicPlaybackOptions = {}): Promise<boolean> {
     if (!url || !await this.unlock()) return false;
     const context = this.context;
     const musicGain = this.gains?.music;
     if (!context || !musicGain) return false;
-    if (this.currentMusic?.url === url) return true;
 
     const fadeSeconds = Math.max(0.05, options.fadeSeconds ?? 1.2);
     const previous = this.currentMusic;
 
-    const element = new Audio(url);
+    const element = new Audio();
     element.preload = 'auto';
     element.loop = options.loop ?? false;
     element.crossOrigin = 'anonymous';
+    element.src = url;
 
     const source = context.createMediaElementSource(element);
     const gain = context.createGain();
@@ -115,8 +122,26 @@ export class AudioManager {
     gain.connect(musicGain);
 
     const playback: MusicPlayback = { element, source, gain, url };
-    this.currentMusic = playback;
+    if (options.onEnded) {
+      const onEnded = () => {
+        if (this.currentMusic === playback) {
+          this.currentMusic = undefined;
+          options.onEnded?.();
+        }
+        this.destroyMusic(playback);
+      };
+      element.addEventListener('ended', onEnded, { once: true });
+      playback.cleanup = () => element.removeEventListener('ended', onEnded);
+    }
 
+    try {
+      await element.play();
+    } catch {
+      this.destroyMusic(playback);
+      return false;
+    }
+
+    this.currentMusic = playback;
     const now = context.currentTime;
     gain.gain.setValueAtTime(0, now);
     gain.gain.linearRampToValueAtTime(1, now + fadeSeconds);
@@ -128,14 +153,7 @@ export class AudioManager {
       window.setTimeout(() => this.destroyMusic(previous), Math.ceil(fadeSeconds * 1000) + 80);
     }
 
-    try {
-      await element.play();
-      return true;
-    } catch {
-      if (this.currentMusic === playback) this.currentMusic = undefined;
-      this.destroyMusic(playback);
-      return false;
-    }
+    return true;
   }
 
   stopMusic(fadeSeconds = 0.8): void {
@@ -279,6 +297,8 @@ export class AudioManager {
   }
 
   private destroyMusic(playback: MusicPlayback): void {
+    playback.cleanup?.();
+    playback.cleanup = undefined;
     playback.element.pause();
     playback.element.removeAttribute('src');
     playback.element.load();
