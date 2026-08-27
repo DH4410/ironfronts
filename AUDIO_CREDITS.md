@@ -145,10 +145,9 @@ other modification. It was copied from
 `7cca20a30a271a1386041a5381622ae46ab0f26d`, which preserves the original
 source and CC0 license notice.
 
-The rain loop is intentionally non-spatial for now: weather should surround
-the listener rather than sound like a single point emitter. Localized effects
-such as thunder, battles, cities and coastlines can use HRTF spatialization
-later.
+The rain loop is intentionally non-spatial: rainfall should surround the
+listener rather than sound like a single point emitter. Directional events such
+as thunder are routed separately and can use HRTF spatialization.
 
 ### Spring Spring — map/paper movement — CC0 1.0
 
