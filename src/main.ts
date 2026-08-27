@@ -4,6 +4,7 @@ import '@fontsource/special-elite/latin-ext-400.css';
 import '@fontsource/cinzel-decorative/latin-ext-700.css';
 import { AudioManager } from './audio/audio-manager';
 import { MusicDirector } from './audio/music-director';
+import { TRACK_BY_ID, trackSources } from './audio/music-catalog';
 import { mountMenu } from './menu/menu';
 import { WorldRenderer, type MapMode, type TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
@@ -65,6 +66,8 @@ const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximum
 
 const audio = new AudioManager(safeLocalStorage());
 const music = new MusicDirector(audio);
+const firstMenuTrack = TRACK_BY_ID.get('honor-bound');
+audio.prime(firstMenuTrack ? trackSources(firstMenuTrack).slice(0, 1) : []);
 audio.installLifecycle();
 
 let menuMusicStarted = false;
