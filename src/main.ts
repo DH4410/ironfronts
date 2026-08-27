@@ -31,6 +31,7 @@ const debugTimeState = required<HTMLOutputElement>('debug-time-state');
 const debugTimeMultiplier = required<HTMLInputElement>('debug-time-multiplier');
 const debugTimePresets = [...document.querySelectorAll<HTMLButtonElement>('[data-debug-time]')];
 const debugRain = required<HTMLInputElement>('debug-rain');
+const debugThunder = required<HTMLButtonElement>('debug-thunder');
 const debugView = required<HTMLSelectElement>('debug-view');
 const debugConnections = required<HTMLInputElement>('debug-connections');
 const debugRivers = required<HTMLInputElement>('debug-rivers');
@@ -129,6 +130,15 @@ async function start(): Promise<void> {
     (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
   }
   renderer.onHover = updateTooltip;
+  let oceanAudible = false;
+  renderer.onStats = (stats) => {
+    const shouldHearOcean = stats.targetProvince === null && stats.distance < 2_800;
+    if (shouldHearOcean !== oceanAudible) {
+      oceanAudible = shouldHearOcean;
+      void audio.setOceanEnabled(oceanAudible);
+    }
+    if (!diagnostics.hidden) updateDiagnostics(stats);
+  };
   renderer.onDiplomacyChange = (state) => {
     renderDiplomacyState(renderer, state);
     if (state.enemies.length > 0 && music.getState() !== 'victory') {
@@ -159,6 +169,9 @@ async function start(): Promise<void> {
   debugRain.addEventListener('change', () => {
     renderer.setRainEnabled(debugRain.checked);
     void audio.setRainEnabled(debugRain.checked);
+  });
+  debugThunder.addEventListener('click', () => {
+    void audio.playThunder();
   });
 
   for (const tab of debugTabs) {
@@ -213,7 +226,6 @@ async function start(): Promise<void> {
   const toggleDiagnostics = () => {
     diagnostics.hidden = !diagnostics.hidden;
     debugToggle.setAttribute('aria-expanded', String(!diagnostics.hidden));
-    renderer.onStats = diagnostics.hidden ? undefined : updateDiagnostics;
   };
   debugToggle.addEventListener('click', toggleDiagnostics);
   window.addEventListener('keydown', (event) => {
@@ -271,12 +283,15 @@ async function start(): Promise<void> {
         return option;
       }));
     applyDebugView();
+    void audio.setWindEnabled(true);
     loading.classList.add('is-done');
     stopQuotes();
     window.setTimeout(() => { loading.hidden = true; }, 500);
     renderer.start();
   } catch (error) {
     stopQuotes();
+    void audio.setWindEnabled(false);
+    void audio.setOceanEnabled(false);
     console.error(error);
     loading.hidden = true;
     unsupported.hidden = false;
