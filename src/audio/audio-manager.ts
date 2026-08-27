@@ -109,10 +109,13 @@ export class AudioManager {
    * not also pay the network/decode cost.
    */
   prime(musicUrls: readonly string[] = []): void {
-    for (const url of new Set(Object.values(UI_SAMPLE_URLS).filter((value): value is string => Boolean(value)))) {
-      void this.loadBuffer(url);
-    }
+    // Lobby music gets first claim on bandwidth. The two large paper samples
+    // are intentionally left lazy so they cannot delay the first soundtrack.
     for (const url of musicUrls) this.prepareMusic(url);
+    for (const cue of ['hover', 'confirm', 'back'] as const) {
+      const url = UI_SAMPLE_URLS[cue];
+      if (url) void this.loadBuffer(url);
+    }
   }
 
   prepareMusic(url: string): void {
