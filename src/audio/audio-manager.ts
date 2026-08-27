@@ -14,10 +14,8 @@ type AudioContextConstructor = new () => AudioContext;
 type AmbienceKey = 'rain' | 'wind' | 'ocean';
 
 const UI_SAMPLE_URLS: Partial<Record<UiAudioCue, string>> = {
-  hover: '/audio/sfx/ui-hover.wav',
   'dossier-open': '/audio/sfx/dossier-open.wav',
   'dossier-close': '/audio/sfx/dossier-close.wav',
-  confirm: '/audio/sfx/order-confirm.wav',
   back: '/audio/sfx/ui-switch.wav',
 };
 
@@ -182,7 +180,10 @@ export class AudioManager {
       // Asset loading failures degrade to generated cues rather than muting UI feedback.
       switch (cue) {
         case 'hover':
-          this.playTone(uiGain, 520, 470, 0.026, 0.020, 'sine');
+          // Soft war-room hover: a subdued low mechanical tick, never a
+          // bright app-style chirp.
+          this.playNoise(uiGain, 0.028, 0.010, 90, 420);
+          this.playTone(uiGain, 138, 112, 0.032, 0.018, 'triangle');
           break;
         case 'select':
           // Muted mechanical command click: short, low and dry rather than a
@@ -199,7 +200,10 @@ export class AudioManager {
           this.playTone(uiGain, 132, 178, 0.085, 0.070, 'triangle');
           break;
         case 'confirm':
-          this.playTone(uiGain, 205, 150, 0.080, 0.060, 'triangle');
+          // Starting/resuming an operation should feel like committing an
+          // order: low, weighty and mechanical rather than high-pitched.
+          this.playNoise(uiGain, 0.065, 0.022, 95, 520);
+          this.playTone(uiGain, 118, 82, 0.105, 0.050, 'triangle');
           break;
         case 'back':
           this.playTone(uiGain, 185, 145, 0.060, 0.050, 'triangle');
