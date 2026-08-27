@@ -75,8 +75,10 @@ export class MusicDirector {
     if (next === 'menu') {
       this.recentIds = [];
       const firstMenuTrack = TRACK_BY_ID.get(this.menuPlayed ? 'calm-before-the-storm' : 'honor-bound');
-      this.menuPlayed = true;
-      if (firstMenuTrack) await this.playTrack(firstMenuTrack, next, generation, 0.35);
+      if (firstMenuTrack) {
+        const played = await this.playTrack(firstMenuTrack, next, generation, 0.35);
+        if (played) this.menuPlayed = true;
+      }
       return;
     }
 
