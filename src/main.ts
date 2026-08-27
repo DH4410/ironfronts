@@ -2,6 +2,7 @@ import './styles.css';
 import '@fontsource/bitter/latin-ext-800.css';
 import '@fontsource/special-elite/latin-ext-400.css';
 import '@fontsource/cinzel-decorative/latin-ext-700.css';
+import { AudioManager } from './audio/audio-manager';
 import { mountMenu } from './menu/menu';
 import { WorldRenderer, type MapMode, type TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
@@ -60,8 +61,15 @@ const mapModeInputs = [...document.querySelectorAll<HTMLInputElement>('input[nam
 const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
+const audio = new AudioManager(safeLocalStorage());
+audio.installLifecycle();
+window.addEventListener('pagehide', (event) => {
+  if (!event.persisted) audio.dispose();
+});
+
 let rendererStarted = false;
 mountMenu({
+  audio,
   onLaunch: () => {
     if (rendererStarted) return;
     rendererStarted = true;
@@ -394,6 +402,14 @@ function updateDebugHelp(mode: number): void {
     item.append(swatch, label);
     return item;
   }));
+}
+
+function safeLocalStorage(): Storage | undefined {
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
 }
 
 function required<T extends HTMLElement>(id: string): T {
