@@ -8,7 +8,7 @@ export interface MenuHandlers {
   audio?: AudioManager;
 }
 
-const OPEN_DURATION = 1250;
+const OPEN_DURATION = 760;
 
 /** Natural aspect (height/width) of public/menu/desk-scene.jpg, for computing its cover-fit pixel size. */
 const MAP_ASPECT = 2620 / 2402;
@@ -35,7 +35,6 @@ export function mountMenu(handlers: MenuHandlers): void {
   };
 
   if (handlers.audio) {
-    root.addEventListener('pointerdown', () => void handlers.audio?.unlock(), { capture: true, once: true });
     if (masterVolume) {
       masterVolume.value = String(Math.round(handlers.audio.getVolume('master') * 100));
       masterVolume.addEventListener('input', () => {
@@ -67,23 +66,24 @@ export function mountMenu(handlers: MenuHandlers): void {
    */
   function update(t: number): void {
     const panT = smooth(phase(t, 0, 0.92));
-
-    const posY = panT * 62;
     const offsetPx = panOffsetPx * panT;
 
-    map.style.backgroundPosition = `center ${posY.toFixed(2)}%`;
-    map.style.filter = `brightness(${(.86 + panT * .09).toFixed(3)}) saturate(.92) contrast(1.02)`;
-
-    main.style.transform = `translateY(${(-offsetPx).toFixed(2)}px)`;
+    // Keep transitions compositor-only. Animating background-position and
+    // CSS filters on the full-screen desk image forced expensive repaints on
+    // every frame and could stall/crash the browser GPU process.
+    main.style.transform = `translate3d(0, ${(-offsetPx).toFixed(2)}px, 0)`;
 
     if (transitionPage) {
-      transitionPage.style.transform = `translateY(${((1 - panT) * riseDistance).toFixed(2)}px)`;
+      transitionPage.style.transform =
+        `translate3d(0, ${((1 - panT) * riseDistance).toFixed(2)}px, 0)`;
     }
   }
 
   async function playTransition(page: HTMLElement, direction: 1 | -1): Promise<void> {
     transitionPage = page;
     page.style.transform = 'none';
+    main.style.willChange = 'transform';
+    page.style.willChange = 'transform';
 
     // Measure once before animation. The previous implementation called
     // getBoundingClientRect() every frame, forcing repeated layout work while
@@ -111,6 +111,8 @@ export function mountMenu(handlers: MenuHandlers): void {
         console.error('Unable to snap dossier transition to end state.', snapError);
       }
     } finally {
+      main.style.willChange = '';
+      page.style.willChange = '';
       transitionPage = null;
     }
   }
