@@ -20,8 +20,8 @@ describe('war-room UI audio profile', () => {
   });
 
   it('uses low mechanical synthesized cues for campaign interaction', () => {
-    expect(audioManager).toContain("this.playTone(uiGain, 138, 112");
-    expect(audioManager).toContain("this.playTone(uiGain, 155, 108");
-    expect(audioManager).toContain("this.playTone(uiGain, 118, 82");
+    expect(audioManager).toContain("this.playTone(uiGain, 126, 104");
+    expect(audioManager).toContain("this.playTone(uiGain, 118, 76");
+    expect(audioManager).toContain("this.playTone(uiGain, 104, 68");
   });
 });
