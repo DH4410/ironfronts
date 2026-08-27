@@ -213,7 +213,10 @@ export class StrategyCamera {
         const dy = centerY - this.pinchCenter[1];
         if (this.pinchDistance > 0) this.zoomAt(centerX, centerY, this.pinchDistance / distance);
         const panScale = this.distance * 0.00145;
-        this.pan(-dx * panScale, -dy * panScale);
+        // Grab-and-drag: the point under the cursor should follow it on both
+        // axes. `pan`'s forward axis points up-screen, so dragging down must
+        // pan forward (+dy), not backward.
+        this.pan(-dx * panScale, dy * panScale);
         this.pinchCenter = [centerX, centerY];
         this.pinchDistance = distance;
         return;
@@ -223,7 +226,7 @@ export class StrategyCamera {
       const dy = event.clientY - this.lastPointer[1];
       this.lastPointer = [event.clientX, event.clientY];
       const scale = this.distance * 0.00145;
-      this.pan(-dx * scale, -dy * scale);
+      this.pan(-dx * scale, dy * scale);
       return;
     }
     if (!this.dragMode) return;
@@ -235,7 +238,8 @@ export class StrategyCamera {
       this.pitch = clamp(this.pitch + dy * 0.0035, 0.43, 1.23);
     } else {
       const scale = this.distance * 0.00145;
-      this.pan(-dx * scale, -dy * scale);
+      // Grab-and-drag: dragging down pulls the map down, so pan forward (+dy).
+      this.pan(-dx * scale, dy * scale);
     }
   };
 
