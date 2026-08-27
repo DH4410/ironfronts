@@ -156,7 +156,10 @@ async function start(): Promise<void> {
   };
   debugTimeMultiplier.addEventListener('change', applyTimeMultiplier);
   debugTimeMultiplier.addEventListener('blur', applyTimeMultiplier);
-  debugRain.addEventListener('change', () => renderer.setRainEnabled(debugRain.checked));
+  debugRain.addEventListener('change', () => {
+    renderer.setRainEnabled(debugRain.checked);
+    void audio.setRainEnabled(debugRain.checked);
+  });
 
   for (const tab of debugTabs) {
     tab.addEventListener('click', () => {
