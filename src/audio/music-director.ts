@@ -91,16 +91,27 @@ export class MusicDirector {
     this.player.stopMusic(fadeSeconds);
   }
 
-  private async playNextFromPool(state: Extract<MusicState, 'menu' | 'peace' | 'war'>, generation: number): Promise<void> {
+  private async playNextFromPool(
+    state: Extract<MusicState, 'menu' | 'peace' | 'war'>,
+    generation: number,
+    attemptedIds: ReadonlySet<string> = new Set(),
+  ): Promise<void> {
     if (!this.isCurrent(state, generation)) return;
     const pool = tracksForState(state);
-    const candidate = chooseTrack(pool, this.recentIds, this.random);
-    if (!candidate) return;
+    const remaining = pool.filter((candidate) => !attemptedIds.has(candidate.id));
+    const candidate = chooseTrack(remaining, this.recentIds, this.random);
+    if (!candidate) {
+      // Do not recurse forever when every source is temporarily unavailable.
+      this.scheduleRetry(state, generation);
+      return;
+    }
 
     const played = await this.playTrack(candidate, state, generation, state === 'war' ? 0.55 : 1.35);
     if (!played && this.isCurrent(state, generation)) {
       this.remember(candidate.id);
-      await this.playNextFromPool(state, generation);
+      const attempted = new Set(attemptedIds);
+      attempted.add(candidate.id);
+      await this.playNextFromPool(state, generation, attempted);
     }
   }
 
@@ -147,6 +158,16 @@ export class MusicDirector {
     // Keep TypeScript aware that this callback belongs to the track that ended,
     // and make debugging state transitions easier in devtools.
     void candidate;
+  }
+
+  private scheduleRetry(state: Extract<MusicState, 'menu' | 'peace' | 'war'>, generation: number): void {
+    this.cancelTimer();
+    const delaySeconds = 15 + this.random() * 15;
+    this.timer = this.setTimer(() => {
+      this.timer = undefined;
+      if (!this.isCurrent(state, generation)) return;
+      void this.playNextFromPool(state, generation);
+    }, Math.round(delaySeconds * 1000));
   }
 
   private remember(id: string): void {
