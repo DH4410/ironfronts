@@ -3,6 +3,7 @@ import '@fontsource/bitter/latin-ext-800.css';
 import '@fontsource/special-elite/latin-ext-400.css';
 import '@fontsource/cinzel-decorative/latin-ext-700.css';
 import { AudioManager } from './audio/audio-manager';
+import { MusicDirector } from './audio/music-director';
 import { mountMenu } from './menu/menu';
 import { WorldRenderer, type MapMode, type TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
@@ -62,9 +63,23 @@ const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
 const audio = new AudioManager(safeLocalStorage());
+const music = new MusicDirector(audio);
 audio.installLifecycle();
+
+let menuMusicStarted = false;
+const startMenuMusic = (): void => {
+  if (menuMusicStarted) return;
+  menuMusicStarted = true;
+  void music.setState('menu');
+};
+document.addEventListener('pointerdown', startMenuMusic, { capture: true, once: true });
+document.addEventListener('keydown', startMenuMusic, { capture: true, once: true });
+
 window.addEventListener('pagehide', (event) => {
-  if (!event.persisted) audio.dispose();
+  if (!event.persisted) {
+    music.stop(0.05);
+    audio.dispose();
+  }
 });
 
 let rendererStarted = false;
@@ -73,6 +88,7 @@ mountMenu({
   onLaunch: () => {
     if (rendererStarted) return;
     rendererStarted = true;
+    void music.setState('opening');
     if (!navigator.gpu) {
       loading.hidden = true;
       unsupported.hidden = false;
@@ -113,7 +129,14 @@ async function start(): Promise<void> {
     (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
   }
   renderer.onHover = updateTooltip;
-  renderer.onDiplomacyChange = (state) => renderDiplomacyState(renderer, state);
+  renderer.onDiplomacyChange = (state) => {
+    renderDiplomacyState(renderer, state);
+    if (state.enemies.length > 0 && music.getState() !== 'victory') {
+      void music.setState('war');
+    } else if (state.enemies.length === 0 && music.getState() === 'war') {
+      void music.setState('peace');
+    }
+  };
   renderer.onProvinceCaptured = (provinceId, previousCountry, player) => {
     setDiplomacyStatus(`Province ${provinceId} taken from ${previousCountry.name} by ${player.name}.`);
   };
