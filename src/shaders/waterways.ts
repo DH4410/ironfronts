@@ -44,16 +44,18 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   let mapUv = input.worldPosition.xz / uniforms.map.xy;
   let visualRiver = input.kind > 0.1 && input.kind < 0.5;
   let visualSignal = visualRiverAt(mapUv);
-  let visualAntialias = max(fwidth(visualSignal) * 0.85, 0.012);
+  let visualAntialias = clamp(fwidth(visualSignal) * 0.6, 0.008, 0.05);
   var visualCoverage = 1.0;
   if (visualRiver) {
     // The visual-river ribbon is a per-mask-texel quilt (buildVisualWaterways
-    // emits one quad per active mask cell). A tight 0.45 gate here re-clipped
-    // every tile, so a diagonally running river read as a chain of detached
-    // blocks. Gate low and fade over a wide band so adjacent tiles visually
-    // merge into one continuous channel; the ribbon geometry still bounds it.
-    if (visualSignal < 0.16 - visualAntialias) { discard; }
-    visualCoverage = smoothstep(0.16 - visualAntialias, 0.38 + visualAntialias, visualSignal);
+    // emits one quad per active mask cell). A tight 0.45 gate re-clipped every
+    // tile, so a diagonally running river read as a chain of detached blocks.
+    // Gate at a fixed 0.24 (no per-pixel fwidth term - that was dithering the
+    // edge into visible speckle) and fade over a wide 0.24..0.52 band so
+    // adjacent tiles merge into one continuous channel; the ribbon geometry
+    // still bounds it.
+    if (visualSignal < 0.24) { discard; }
+    visualCoverage = smoothstep(0.24, 0.52, visualSignal + visualAntialias * 0.5);
   }
   // Once an authored channel has entered broad static water, the ocean/lake
   // pass owns the surface. This removes distant source-graph tails while the
@@ -85,12 +87,18 @@ fn waterwayFragment(input: WaterwayOutput) -> @location(0) vec4f {
   let alongFlow = dot(input.worldPosition.xz, flow);
   let acrossFlow = dot(input.worldPosition.xz, across);
   let flowTime = uniforms.sunTime.w * input.speed;
-  let rippleA = sin(alongFlow * 0.11 - flowTime * 0.78 + sin(acrossFlow * 0.16) * 0.32);
-  let rippleB = sin(alongFlow * 0.23 - flowTime * 1.31 - acrossFlow * 0.07);
-  let flowShimmer = clamp(0.5 + rippleA * 0.31 + rippleB * 0.19, 0.0, 1.0);
+  // Per-river variation: input.speed shifts wave frequency and phase so no
+  // two rivers pulse in lockstep. A slow swell rides under the two ripple
+  // bands to give a streaming feel without a noisy surface.
+  let riverPhase = input.speed * 11.3;
+  let waveScale = 0.085 + input.speed * 0.06;
+  let rippleA = sin(alongFlow * waveScale - flowTime * 0.78 + riverPhase + sin(acrossFlow * 0.16) * 0.40);
+  let rippleB = sin(alongFlow * waveScale * 2.1 - flowTime * 1.31 - acrossFlow * 0.07 + riverPhase * 1.7);
+  let swell = sin(alongFlow * 0.032 - flowTime * 0.34 + riverPhase);
+  let flowShimmer = clamp(0.5 + rippleA * 0.30 + rippleB * 0.18 + swell * 0.12, 0.0, 1.0);
   let calmEdge = 1.0 - input.edgeFactor * 0.35;
-  color *= 0.97 + flowShimmer * calmEdge * 0.045;
-  color += vec3f(0.035, 0.055, 0.06) * smoothstep(0.76, 1.0, flowShimmer) * calmEdge;
+  color *= 0.95 + flowShimmer * calmEdge * 0.085;
+  color += vec3f(0.05, 0.075, 0.085) * smoothstep(0.70, 1.0, flowShimmer) * calmEdge;
   let viewDirection = normalize(uniforms.camera.xyz - input.worldPosition);
   let fresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 4.5);
   let sun = pow(max(dot(reflect(-normalize(uniforms.sunTime.xyz), normal), viewDirection), 0.0), 112.0);

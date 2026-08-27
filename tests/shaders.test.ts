@@ -40,8 +40,9 @@ describe('WGSL programs', () => {
     expect(waterwayShader).toContain('let visualRiver = input.kind > 0.1 && input.kind < 0.5');
     expect(waterwayShader).toContain('visualRiverAt(mapUv)');
     expect(waterwayShader).toContain('fwidth(visualSignal)');
-    expect(waterwayShader).toContain('if (visualSignal < 0.16 - visualAntialias) { discard; }');
-    expect(waterwayShader).toContain('smoothstep(0.16 - visualAntialias, 0.38 + visualAntialias, visualSignal)');
+    expect(waterwayShader).toContain('if (visualSignal < 0.24) { discard; }');
+    expect(waterwayShader).toContain('smoothstep(0.24, 0.52, visualSignal + visualAntialias * 0.5)');
+    expect(waterwayShader).toContain('let swell = sin(alongFlow * 0.032');
     expect(fragment).not.toContain('brokenStreak');
     expect(waterwayShader).toContain('let canal = input.kind > 0.5');
     expect(waterwayShader).toContain('let coastShallow = vec3f(0.12, 0.48, 0.52)');
