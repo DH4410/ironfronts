@@ -56,6 +56,9 @@ export class AudioManager {
   private currentMusic?: MusicPlayback;
   private musicRequest = 0;
   private readonly sampleBuffers = new Map<string, Promise<AudioBuffer | null>>();
+  private readonly preparedMusic = new Map<string, HTMLAudioElement>();
+  private readonly pendingUiCues = new Set<UiAudioCue>();
+  private readonly uiCueTimes = new Map<UiAudioCue, number>();
   private readonly ambience = new Map<AmbienceKey, LoopingAmbience>();
   private readonly requestedAmbience = new Set<AmbienceKey>();
   private visibilityCleanup?: () => void;
@@ -94,15 +97,46 @@ export class AudioManager {
     }
   }
 
-  async playUiCue(cue: UiAudioCue): Promise<void> {
-    if (!await this.unlock()) return;
-    const uiGain = this.gains?.ui;
-    if (!uiGain) return;
+  /**
+   * Warm the first-interaction audio path while the menu is idle. Browsers
+   * still require a user gesture before playback, but fetching/decoding can
+   * happen beforehand so the first legitimate pointer/keyboard gesture does
+   * not also pay the network/decode cost.
+   */
+  prime(musicUrls: readonly string[] = []): void {
+    for (const url of new Set(Object.values(UI_SAMPLE_URLS).filter((value): value is string => Boolean(value)))) {
+      void this.loadBuffer(url);
+    }
+    for (const url of musicUrls) this.prepareMusic(url);
+  }
 
-    const sample = UI_SAMPLE_URLS[cue];
-    if (sample) {
-      const sampled = await this.playSample(sample, uiGain, cue === 'hover' ? 0.34 : cue === 'confirm' ? 0.64 : 0.58);
-      if (sampled) {
+  prepareMusic(url: string): void {
+    if (!url || typeof Audio === 'undefined' || this.preparedMusic.has(url)) return;
+    const element = new Audio();
+    element.preload = 'auto';
+    element.crossOrigin = 'anonymous';
+    element.src = url;
+    element.load();
+    this.preparedMusic.set(url, element);
+  }
+
+  async playUiCue(cue: UiAudioCue): Promise<void> {
+    const now = typeof performance === 'undefined' ? Date.now() : performance.now();
+    const minimumGap = cue === 'hover' ? 70 : 28;
+    if (now - (this.uiCueTimes.get(cue) ?? -Infinity) < minimumGap) return;
+    if (this.pendingUiCues.has(cue)) return;
+    this.uiCueTimes.set(cue, now);
+    this.pendingUiCues.add(cue);
+
+    try {
+      if (!await this.unlock()) return;
+      const uiGain = this.gains?.ui;
+      if (!uiGain) return;
+
+      const sample = UI_SAMPLE_URLS[cue];
+      if (sample) {
+        const sampled = await this.playSample(sample, uiGain, cue === 'hover' ? 0.34 : cue === 'confirm' ? 0.64 : 0.58);
+        if (sampled) {
         if (cue === 'confirm') {
           // A very small low-frequency thump underneath the mechanical sample
           // makes orders feel weightier without turning the UI into an arcade sound.
@@ -131,9 +165,12 @@ export class AudioManager {
       case 'confirm':
         this.playTone(uiGain, 205, 150, 0.080, 0.060, 'triangle');
         break;
-      case 'back':
-        this.playTone(uiGain, 185, 145, 0.060, 0.050, 'triangle');
-        break;
+        case 'back':
+          this.playTone(uiGain, 185, 145, 0.060, 0.050, 'triangle');
+          break;
+      }
+    } finally {
+      this.pendingUiCues.delete(cue);
     }
   }
 
@@ -177,11 +214,12 @@ export class AudioManager {
     const fadeSeconds = Math.max(0.05, options.fadeSeconds ?? 1.2);
     const previous = this.currentMusic;
 
-    const element = new Audio();
+    const element = this.preparedMusic.get(url) ?? new Audio();
+    this.preparedMusic.delete(url);
     element.preload = 'auto';
     element.loop = options.loop ?? false;
     element.crossOrigin = 'anonymous';
-    element.src = url;
+    if (element.src !== url && !element.src.endsWith(url)) element.src = url;
 
     const source = context.createMediaElementSource(element);
     const gain = context.createGain();
@@ -280,6 +318,15 @@ export class AudioManager {
     this.ambience.clear();
 
     const context = this.context;
+    for (const element of this.preparedMusic.values()) {
+      element.pause();
+      element.removeAttribute('src');
+      element.load();
+    }
+    this.preparedMusic.clear();
+    this.pendingUiCues.clear();
+    this.uiCueTimes.clear();
+
     this.context = undefined;
     this.gains = undefined;
     this.sampleBuffers.clear();
