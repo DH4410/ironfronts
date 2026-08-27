@@ -146,6 +146,10 @@ describe('WGSL programs', () => {
     Object.assign(globalThis, globals);
     const gpu = create([]);
     const adapter = await gpu.requestAdapter();
+    if (!adapter && process.env.CI) {
+      console.warn('Skipping Dawn semantic compilation: CI runner has no compatible Vulkan/Dawn adapter.');
+      return;
+    }
     expect(adapter).not.toBeNull();
     if (!adapter) return;
     const device = await adapter.requestDevice();
