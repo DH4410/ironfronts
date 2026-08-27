@@ -75,6 +75,10 @@ export class AudioManager {
     return this.preferences[bus];
   }
 
+  isMusicPlaying(): boolean {
+    return Boolean(this.currentMusic && !this.currentMusic.element.paused);
+  }
+
   setVolume(bus: AudioBus, value: number): number {
     const volume = clampVolume(value);
     this.preferences = { ...this.preferences, [bus]: volume };
