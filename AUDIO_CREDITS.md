@@ -108,3 +108,45 @@ The current archived mirror no longer contains **First Sighting** or
 MP3 files under `public/audio/music/`. Once the May 2015 archive is vendored,
 those two tracks (and optionally all tracks) should be served locally rather
 than depending on an external mirror.
+
+## Sound effects and ambience
+
+### Kenney UI Audio — CC0 1.0
+
+Ironfronts currently uses three UI samples from **Kenney's UI SFX Set**:
+
+- `public/audio/sfx/ui-click.wav` — original `click1.wav`
+- `public/audio/sfx/ui-hover.wav` — original `rollover2.wav`
+- `public/audio/sfx/ui-switch.wav` — original `switch14.wav`
+
+Original author: **Kenney Vleugels (Kenney.nl)**  
+License: **Creative Commons Zero (CC0 1.0 Universal)**  
+Original source: https://kenney.nl/assets/ui-audio
+
+The WAV copies were vendored from the CC0 mirror
+`Calinou/kenney-ui-audio` at commit
+`8c3d81b9159d058c444f89d12d518276b0b09345`. That mirror documents the
+WAVs as lossless conversions of Kenney's original OGG files.
+
+Attribution is not required by CC0, but is preserved here.
+
+### Ylmir — Rain (loopable) — CC0 1.0
+
+`public/audio/ambience/rain.ogg` is from **Rain (loopable)** by **Ylmir**,
+published on OpenGameArt.org.
+
+License: **Creative Commons Zero (CC0 1.0 Universal)**  
+Original source: https://opengameart.org/content/rain-loopable
+
+The vendored file is the 45-second `3.ogg` variant from the original
+`Rain OGG.zip` pack, re-encoded from 160 kbps to 96 kbps Vorbis with no
+other modification. It was copied from
+`halogenandtoast/ArkhamHorror` at commit
+`7cca20a30a271a1386041a5381622ae46ab0f26d`, which preserves the original
+source and CC0 license notice.
+
+The rain loop is intentionally non-spatial for now: weather should surround
+the listener rather than sound like a single point emitter. Localized effects
+such as thunder, battles, cities and coastlines can use HRTF spatialization
+later.
+
