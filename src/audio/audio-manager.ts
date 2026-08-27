@@ -180,16 +180,15 @@ export class AudioManager {
       // Asset loading failures degrade to generated cues rather than muting UI feedback.
       switch (cue) {
         case 'hover':
-          // Soft war-room hover: a subdued low mechanical tick, never a
-          // bright app-style chirp.
-          this.playNoise(uiGain, 0.028, 0.010, 90, 420);
-          this.playTone(uiGain, 138, 112, 0.032, 0.018, 'triangle');
+          // Keep routine menu navigation extremely cheap and low-pitched.
+          // A single short oscillator avoids allocating a noise buffer for
+          // every pointer movement.
+          this.playTone(uiGain, 126, 104, 0.028, 0.014, 'triangle');
           break;
         case 'select':
-          // Muted mechanical command click: short, low and dry rather than a
-          // bright/high-pitched UI chirp. Better suited to the war-room tone.
-          this.playNoise(uiGain, 0.045, 0.018, 120, 680);
-          this.playTone(uiGain, 155, 108, 0.050, 0.034, 'triangle');
+          // Campaign selection: one low, dry mechanical thunk. No sampled
+          // chirp and no per-click noise-buffer allocation.
+          this.playTone(uiGain, 118, 76, 0.060, 0.040, 'triangle');
           break;
         case 'dossier-open':
           this.playNoise(uiGain, 0.16, 0.026, 850, 3600);
@@ -200,15 +199,18 @@ export class AudioManager {
           this.playTone(uiGain, 132, 178, 0.085, 0.070, 'triangle');
           break;
         case 'confirm':
-          // Starting/resuming an operation should feel like committing an
-          // order: low, weighty and mechanical rather than high-pitched.
-          this.playNoise(uiGain, 0.065, 0.022, 95, 520);
-          this.playTone(uiGain, 118, 82, 0.105, 0.050, 'triangle');
+          // Starting/resuming an operation: a deeper two-stage command thump.
+          this.playTone(uiGain, 104, 68, 0.105, 0.050, 'triangle');
+          this.playTone(uiGain, 82, 58, 0.085, 0.026, 'triangle', 0.035);
           break;
         case 'back':
           this.playTone(uiGain, 185, 145, 0.060, 0.050, 'triangle');
           break;
       }
+    } catch (error) {
+      // UI audio is non-critical. It must never be able to break or strand
+      // menu interaction if a browser rejects a Web Audio operation.
+      console.warn(`UI audio cue "${cue}" failed and was ignored.`, error);
     } finally {
       this.pendingUiCues.delete(cue);
     }
