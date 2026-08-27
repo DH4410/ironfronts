@@ -33,6 +33,20 @@ describe('music director', () => {
     expect(player.calls[0].url).toContain('Honor_Bound.ogg');
   });
 
+
+  it('retries the same first menu track when autoplay was blocked', async () => {
+    const player = new FakeMusicPlayer();
+    player.failedFragments.add('Honor_Bound.ogg');
+    player.failedFragments.add('Honor_Bound.mp3');
+    const director = new MusicDirector(player, { random: () => 0 });
+
+    await director.setState('menu');
+    player.failedFragments.clear();
+    await director.setState('menu', { force: true });
+
+    expect(player.calls.at(-1)?.url).toContain('Honor_Bound.ogg');
+  });
+
   it('falls back gracefully when First Sighting has not been vendored yet', async () => {
     const player = new FakeMusicPlayer();
     player.failedFragments.add('First_Sighting.mp3');
