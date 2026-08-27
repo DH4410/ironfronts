@@ -244,13 +244,16 @@ function bakePropAo(output, width, height, worldWidth, worldHeight, trees, build
       }
     }
   };
+  // Contact darkening only. Higher strengths baked a hard near-black ring into
+  // the terrain albedo around every forest and city that read as scorched
+  // ground once terrain shading and canopy tint stacked on top.
   for (let offset = 0; offset < trees.length; offset += 8) {
     const radius = Math.max(6.5, trees[offset + 2] * 5.2);
-    splat(trees[offset], trees[offset + 1], radius, radius, 0.22);
+    splat(trees[offset], trees[offset + 1], radius, radius, 0.13);
   }
   for (let offset = 0; offset < buildings.length; offset += 8) {
     splat(buildings[offset], buildings[offset + 1], Math.max(5, buildings[offset + 2] * 0.72),
-      Math.max(5, buildings[offset + 4] * 0.72), 0.28);
+      Math.max(5, buildings[offset + 4] * 0.72), 0.17);
   }
 }
 
