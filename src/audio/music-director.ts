@@ -125,7 +125,7 @@ export class MusicDirector {
       if (!this.isCurrent(state, generation)) return false;
       const played = await this.player.playMusic(source, {
         fadeSeconds,
-        onEnded: () => this.onTrackEnded(candidate, state, generation),
+        onEnded: () => this.onTrackEnded(state, generation),
       });
       if (played) {
         this.remember(candidate.id);
@@ -135,7 +135,7 @@ export class MusicDirector {
     return false;
   }
 
-  private onTrackEnded(candidate: MusicTrack, state: MusicState, generation: number): void {
+  private onTrackEnded(state: MusicState, generation: number): void {
     if (!this.isCurrent(state, generation)) return;
 
     if (state === 'victory') return;
@@ -154,10 +154,6 @@ export class MusicDirector {
       if (!this.isCurrent(state, generation)) return;
       void this.playNextFromPool(state, generation);
     }, Math.round(delaySeconds * 1000));
-
-    // Keep TypeScript aware that this callback belongs to the track that ended,
-    // and make debugging state transitions easier in devtools.
-    void candidate;
   }
 
   private scheduleRetry(state: Extract<MusicState, 'menu' | 'peace' | 'war'>, generation: number): void {
