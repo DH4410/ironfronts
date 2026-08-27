@@ -290,6 +290,7 @@ async function main() {
     placementClearance[index] = Math.max(placementClearance[index], waterways.clearance[index], visualRivers.clearance[index]);
   }
   const generatedInstances = buildInstances(metadata.provinces, geometryById, provinceIds, areaCounts, placementClearance, infrastructure.cityPlans);
+  console.log(`Rejected ${generatedInstances.audit.rejectedCoastalFootprints} building footprints overlapping open water across ${generatedInstances.audit.coastalProvincesAffected} coastal provinces.`);
   const treeChunks = chunkInstanceRecords(generatedInstances.trees, (data, offset) => data[offset + 3] === 2 ? 1 : 0, 2);
   const buildingChunks = chunkInstanceRecords(generatedInstances.buildings, (data, offset) => Math.round(data[offset + 7]), 5);
   const lampChunks = chunkInstanceRecords(infrastructure.lamps);
@@ -338,6 +339,10 @@ async function main() {
     waterways: waterways.report,
     visualRivers: visualRivers.report,
     roads: infrastructure.roadReport,
+    props: {
+      rejectedCoastalFootprints: generatedInstances.audit.rejectedCoastalFootprints,
+      coastalProvincesAffected: generatedInstances.audit.coastalProvincesAffected,
+    },
   };
 
   const manifest = {
