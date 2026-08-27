@@ -106,6 +106,17 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let normal = terrainNormal(input.mapUv);
   let slope = 1.0 - normal.y;
   let elevation = input.worldPosition.y;
+  // The heightfield is nearly flat (max ~60 world units across a 13k-wide
+  // map), so rock terrain shades as a flat grey plateau. Perturb the shading
+  // normal with world-space noise on mountain/hill terrain to fake rugged
+  // relief - geometry and gameplay heights are untouched.
+  var shadeNormal = normal;
+  if (terrain == 1u || terrain == 2u || biome == 6u || biome == 8u) {
+    let bx = valueNoise(input.worldPosition.xz / 21.0) - 0.5;
+    let bz = valueNoise(input.worldPosition.xz / 13.0 + vec2f(19.3, 7.1)) - 0.5;
+    let amp = mix(0.6, 1.45, slope);
+    shadeNormal = normalize(normal + vec3f(bx * 1.3 - bz * 0.4, 0.0, bz * 1.3 + bx * 0.4) * amp);
+  }
   let bakedSurface = textureSample(terrainAlbedoTexture, materialSampler, wrappedUv(input.mapUv));
   var baseColor = bakedSurface.rgb;
   var nightMapColor = vec3f(0.0);
@@ -245,10 +256,10 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   // Directional hillshade that grows with slope, so ridges and valleys read as
   // 3D relief instead of a flat patch. Flat terrain (plains, forest floor) is
   // untouched; the floor keeps shadowed steep faces lit, never the old black.
-  let sunFacing = clamp(dot(normal, sunDirection) * 0.5 + 0.5, 0.0, 1.0);
+  let sunFacing = clamp(dot(shadeNormal, sunDirection) * 0.5 + 0.5, 0.0, 1.0);
   let reliefStrength = smoothstep(0.05, 0.36, slope) * uniforms.lighting.x;
-  let relief = mix(1.0, mix(0.55, 1.4, sunFacing), reliefStrength);
-  var lit = baseColor * max(surfaceLight(normal) * relief, vec3f(0.4));
+  let relief = mix(1.0, mix(0.5, 1.45, sunFacing), reliefStrength);
+  var lit = baseColor * max(surfaceLight(shadeNormal) * relief, vec3f(0.4));
   lit += vec3f(0.12, 0.15, 0.13) * pow(max(dot(normal, normalize(sunDirection + normalize(uniforms.camera.xyz - input.worldPosition))), 0.0), 24.0) * 0.08 * uniforms.lighting.x;
   lit += wetSurfaceSheen(normal, input.worldPosition);
   if (nightMapCompensation > 0.001) {
