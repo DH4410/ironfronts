@@ -63,6 +63,16 @@ describe('WGSL programs', () => {
     expect(propShader).not.toContain('input.materialPart > 8.5');
   });
 
+  it('thins and flattens city buildings at regional zoom while keeping the landmark archetype', () => {
+    expect(propShader).toContain('var buildingLod = 1.0;');
+    expect(propShader).toContain('let regionalLod = smoothstep(1400.0, 2800.0, uniforms.interaction.y)');
+    expect(propShader).toContain('if (archetype != 4u) {');
+    expect(propShader).toContain('local.y *= mix(1.0, 0.5, regionalLod)');
+    expect(propShader).toContain('let lodHash = noiseHash(vec2f(f32(visibleInstance % count), 7.31))');
+    expect(propShader).toContain('buildingLod = 1.0 - smoothstep(lodStart, lodStart + 0.25, regionalLod) * 0.6');
+    expect(propShader).toContain(') * buildingLod;');
+  });
+
   it('uses precomputed terrain normals, faithful mipmapped albedo, prop AO, and packed navigation', () => {
     expect(terrainShader).toContain('let navigation = navigationAt(input.mapUv)');
     expect(terrainShader).toContain('let bakedSurface = textureSample(terrainAlbedoTexture');
