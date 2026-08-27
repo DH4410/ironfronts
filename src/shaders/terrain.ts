@@ -124,7 +124,12 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   if (uniforms.interaction.y < 4500.0) {
     baseColor = sampleMaterial(0, input.worldPosition, 92.0);
     if (biome == 1u || biome == 7u) {
-      baseColor = sampleMaterial(2, input.worldPosition, 76.0);
+      // Desert sand read as a harsh saturated orange against the greens. Pull
+      // it toward a paler khaki so the contrast with neighbouring biomes is
+      // less of a jump.
+      let sand = sampleMaterial(2, input.worldPosition, 76.0);
+      let sandGrey = vec3f(dot(sand, vec3f(0.34, 0.40, 0.26)));
+      baseColor = mix(sand, mix(sandGrey, vec3f(0.70, 0.64, 0.49), 0.62), 0.34);
     } else if (biome == 2u && terrain != 3u) {
       baseColor = mix(sampleMaterial(0, input.worldPosition, 90.0), sampleMaterial(1, input.worldPosition, 74.0), 0.48);
     } else if (biome == 6u || biome == 8u) {
