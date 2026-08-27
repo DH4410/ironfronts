@@ -253,7 +253,12 @@ fn propFragment(input: PropVertexOutput) -> @location(0) vec4f {
   }
   var wetSheen = vec3f(0.0);
   if (input.treeMaterialLayer < -0.5) { wetSheen = wetSurfaceSheen(normal, input.worldPosition); }
-  let color = mix(mix(albedo * surfaceLight(normal) + emission + wetSheen, distanceFogColor(), fog * 0.39), worldFogColor(), worldFog);
+  // Floor the lighting term for buildings (treeMaterialLayer < -0.5) so faces
+  // turned away from the sun keep fill light. Dark roof palettes on a shaded
+  // side were rendering whole cities as flat black. Trees keep full shading.
+  let litShade = surfaceLight(normal);
+  let shade = select(litShade, max(litShade, vec3f(0.46)), input.treeMaterialLayer < -0.5);
+  let color = mix(mix(albedo * shade + emission + wetSheen, distanceFogColor(), fog * 0.39), worldFogColor(), worldFog);
   return vec4f(color, input.visibility * input.opacity * (1.0 - worldFog));
 }
 `;
