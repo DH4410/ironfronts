@@ -25,6 +25,7 @@ The supplied `0-AD-Music_updated_May2015.zip` contains:
 - 31 MP3 tracks
 - approximately 89.63 MiB total audio
 - approximately 97.2 minutes total runtime
+- archive SHA-256: `b04049a17fe33ff5ff87bf243dd81d4b2790e9d68e76f44cf459a1ce63407cea`
 - 128 kbps MP3 for 30 tracks
 - 160 kbps MP3 for `Cisalpine_Gaul.mp3`
 
