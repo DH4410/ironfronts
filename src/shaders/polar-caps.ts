@@ -81,11 +81,15 @@ fn polarCapFragment(input: PolarCapOutput) -> @location(0) vec4f {
   let shoreline = mix(bankAt(boundaryUv), 0.0, deepWaterBlend);
   let water = oceanSurfaceColor(input.worldPosition, waterDepth, shoreline, 0.0);
 
-  let iceGrain = valueNoise(input.worldPosition.xz / 31.0 + vec2f(input.side * 11.0, 0.0));
+  // Grain and crevasse noise were sampled at 31 and 16 world units - finer
+  // than a screen pixel at overview zoom, so the ice cap read as salt-and-
+  // pepper static. Widen both to feature scale so they show as broad shading
+  // and occasional cracks instead of per-pixel noise.
+  let iceGrain = valueNoise(input.worldPosition.xz / 96.0 + vec2f(input.side * 11.0, 0.0));
   let broadIce = valueNoise(input.worldPosition.xz / 230.0 + vec2f(0.0, input.side * 9.0));
-  let crevasse = smoothstep(0.70, 0.91, valueNoise(input.worldPosition.xz / 16.0));
+  let crevasse = smoothstep(0.74, 0.93, valueNoise(input.worldPosition.xz / 150.0));
   var iceColor = mix(vec3f(0.57, 0.72, 0.76), vec3f(0.88, 0.93, 0.92), broadIce * 0.72 + iceGrain * 0.18);
-  iceColor = mix(iceColor, vec3f(0.32, 0.54, 0.63), crevasse * 0.28);
+  iceColor = mix(iceColor, vec3f(0.32, 0.54, 0.63), crevasse * 0.24);
   let iceLight = surfaceLight(vec3f(0.0, 1.0, 0.0));
   var color = mix(water, iceColor * iceLight, ice);
   color = mix(color, color * vec3f(0.74, 0.80, 0.83), uniforms.weather.x * 0.30);
