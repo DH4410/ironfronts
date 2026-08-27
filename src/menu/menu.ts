@@ -19,6 +19,7 @@ export function mountMenu(handlers: MenuHandlers): void {
   const main = requiredId<HTMLElement>('ifm-main');
   const map = requiredChild<HTMLElement>(root, '.ifm__map');
   const masterVolume = document.getElementById('ifm-master-volume') as HTMLInputElement | null;
+  const musicVolume = document.getElementById('ifm-music-volume') as HTMLInputElement | null;
 
   let busy = false;
   let openScreen: string | null = null;
@@ -35,6 +36,12 @@ export function mountMenu(handlers: MenuHandlers): void {
       masterVolume.value = String(Math.round(handlers.audio.getVolume('master') * 100));
       masterVolume.addEventListener('input', () => {
         handlers.audio?.setVolume('master', Number(masterVolume.value) / 100);
+      });
+    }
+    if (musicVolume) {
+      musicVolume.value = String(Math.round(handlers.audio.getVolume('music') * 100));
+      musicVolume.addEventListener('input', () => {
+        handlers.audio?.setVolume('music', Number(musicVolume.value) / 100);
       });
     }
 
