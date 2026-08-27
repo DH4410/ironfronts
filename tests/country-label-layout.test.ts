@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { CountryLabelGlyph } from '../src/country-labels/atlas';
 import {
   LABEL_GLYPH_STRIDE, LABEL_TERRAIN_HEIGHT_OFFSET, layoutCountryLabel,
-  layoutCountryLabelWithinTerritory, placeCountryLabelOnTerrain, type CountryLabelMetrics,
+  layoutCountryLabelWithinTerritory, MAX_LABEL_WORLD_HEIGHT, MAX_LABEL_WORLD_WIDTH,
+  placeCountryLabelOnTerrain, type CountryLabelMetrics,
 } from '../src/country-labels/layout';
 import type { CountryAnchor } from '../src/country-labels/topology';
 import { isValidCountryLabelPoint } from '../src/country-labels/territory';
@@ -44,6 +45,31 @@ describe('country label layout', () => {
     expect(data.length).toBe(6 * LABEL_GLYPH_STRIDE);
     expect(data.every(Number.isFinite)).toBe(true);
     expect(data[10]).toBeGreaterThan(0);
+  });
+
+  it('caps a huge country label at the map-space size ceiling instead of scaling with span', () => {
+    const huge = layoutCountryLabel('ABCDEF', anchor({ span: 20_000, crossSpan: 10_000 }), metrics);
+    for (let offset = 0; offset < huge.length; offset += LABEL_GLYPH_STRIDE) {
+      expect(huge[offset + 5]).toBeLessThanOrEqual(MAX_LABEL_WORLD_HEIGHT + 1e-6);
+    }
+    // Height cap binds first for a short name: glyph height sits right at the ceiling.
+    expect(huge[5]).toBeCloseTo(MAX_LABEL_WORLD_HEIGHT);
+  });
+
+  it('caps total label width for a long name in a wide country', () => {
+    const name = 'A'.repeat(40);
+    const wide = layoutCountryLabel(name, anchor({ span: 40_000, crossSpan: 20_000 }), metrics);
+    const scale = wide[5] / glyph.heightAtMeasurementSize;
+    const labelWidth = metrics.measureLabel(name) * scale;
+    expect(labelWidth).toBeLessThanOrEqual(MAX_LABEL_WORLD_WIDTH + 1e-6);
+  });
+
+  it('leaves labels that already fit well within the cap untouched', () => {
+    const before = layoutCountryLabel('ABC', anchor({ span: 900, crossSpan: 400 }), metrics);
+    expect(before[5]).toBeLessThan(MAX_LABEL_WORLD_HEIGHT);
+    // Territory sizing, not the cap, is what set this size.
+    const scale = before[5] / glyph.heightAtMeasurementSize;
+    expect(scale).toBeCloseTo(Math.min((900 * 0.7) / (3 * 10), (400 * 0.5) / 20));
   });
 
   it('adds a gentle curve only when the country has spare cross-axis room', () => {
