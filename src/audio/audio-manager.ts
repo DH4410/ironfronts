@@ -125,6 +125,7 @@ export class AudioManager {
     const minimumGap = cue === 'hover' ? 70 : 28;
     if (now - (this.uiCueTimes.get(cue) ?? -Infinity) < minimumGap) return;
     if (this.pendingUiCues.has(cue)) return;
+
     this.uiCueTimes.set(cue, now);
     this.pendingUiCues.add(cue);
 
@@ -135,36 +136,40 @@ export class AudioManager {
 
       const sample = UI_SAMPLE_URLS[cue];
       if (sample) {
-        const sampled = await this.playSample(sample, uiGain, cue === 'hover' ? 0.34 : cue === 'confirm' ? 0.64 : 0.58);
+        const sampled = await this.playSample(
+          sample,
+          uiGain,
+          cue === 'hover' ? 0.34 : cue === 'confirm' ? 0.64 : 0.58,
+        );
         if (sampled) {
-        if (cue === 'confirm') {
-          // A very small low-frequency thump underneath the mechanical sample
-          // makes orders feel weightier without turning the UI into an arcade sound.
-          this.playTone(uiGain, 128, 92, 0.10, 0.026, 'triangle');
+          if (cue === 'confirm') {
+            // A very small low-frequency thump underneath the mechanical sample
+            // makes orders feel weightier without turning the UI into an arcade sound.
+            this.playTone(uiGain, 128, 92, 0.10, 0.026, 'triangle');
+          }
+          return;
         }
-        return;
       }
-    }
 
-    // Asset loading failures degrade to generated cues rather than muting UI feedback.
-    switch (cue) {
-      case 'hover':
-        this.playTone(uiGain, 520, 470, 0.026, 0.020, 'sine');
-        break;
-      case 'select':
-        this.playTone(uiGain, 240, 205, 0.045, 0.045, 'triangle');
-        break;
-      case 'dossier-open':
-        this.playNoise(uiGain, 0.16, 0.026, 850, 3600);
-        this.playTone(uiGain, 155, 112, 0.10, 0.085, 'triangle');
-        break;
-      case 'dossier-close':
-        this.playNoise(uiGain, 0.13, 0.022, 720, 2800);
-        this.playTone(uiGain, 132, 178, 0.085, 0.070, 'triangle');
-        break;
-      case 'confirm':
-        this.playTone(uiGain, 205, 150, 0.080, 0.060, 'triangle');
-        break;
+      // Asset loading failures degrade to generated cues rather than muting UI feedback.
+      switch (cue) {
+        case 'hover':
+          this.playTone(uiGain, 520, 470, 0.026, 0.020, 'sine');
+          break;
+        case 'select':
+          this.playTone(uiGain, 240, 205, 0.045, 0.045, 'triangle');
+          break;
+        case 'dossier-open':
+          this.playNoise(uiGain, 0.16, 0.026, 850, 3600);
+          this.playTone(uiGain, 155, 112, 0.10, 0.085, 'triangle');
+          break;
+        case 'dossier-close':
+          this.playNoise(uiGain, 0.13, 0.022, 720, 2800);
+          this.playTone(uiGain, 132, 178, 0.085, 0.070, 'triangle');
+          break;
+        case 'confirm':
+          this.playTone(uiGain, 205, 150, 0.080, 0.060, 'triangle');
+          break;
         case 'back':
           this.playTone(uiGain, 185, 145, 0.060, 0.050, 'triangle');
           break;
