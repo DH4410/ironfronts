@@ -9,15 +9,24 @@ import {
 
 export type UiAudioCue = 'hover' | 'select' | 'dossier-open' | 'dossier-close' | 'confirm' | 'back';
 
+type GainMap = Record<AudioBus, GainNode>;
+type AudioContextConstructor = new () => AudioContext;
+type AmbienceKey = 'rain' | 'wind' | 'ocean';
+
 const UI_SAMPLE_URLS: Partial<Record<UiAudioCue, string>> = {
   hover: '/audio/sfx/ui-hover.wav',
   select: '/audio/sfx/ui-click.wav',
-  confirm: '/audio/sfx/ui-switch.wav',
+  'dossier-open': '/audio/sfx/dossier-open.wav',
+  'dossier-close': '/audio/sfx/dossier-close.wav',
+  confirm: '/audio/sfx/order-confirm.wav',
   back: '/audio/sfx/ui-switch.wav',
 };
 
-type GainMap = Record<AudioBus, GainNode>;
-type AudioContextConstructor = new () => AudioContext;
+const AMBIENCE_CONFIG: Record<AmbienceKey, { url: string; volume: number; fadeSeconds: number }> = {
+  rain: { url: '/audio/ambience/rain.ogg', volume: 0.48, fadeSeconds: 1.35 },
+  wind: { url: '/audio/ambience/wind.ogg', volume: 0.15, fadeSeconds: 2.4 },
+  ocean: { url: '/audio/ambience/ocean-waves.wav', volume: 0.32, fadeSeconds: 1.8 },
+};
 
 export interface MusicPlaybackOptions {
   loop?: boolean;
@@ -47,8 +56,8 @@ export class AudioManager {
   private currentMusic?: MusicPlayback;
   private musicRequest = 0;
   private readonly sampleBuffers = new Map<string, Promise<AudioBuffer | null>>();
-  private rain?: LoopingAmbience;
-  private rainRequested = false;
+  private readonly ambience = new Map<AmbienceKey, LoopingAmbience>();
+  private readonly requestedAmbience = new Set<AmbienceKey>();
   private visibilityCleanup?: () => void;
 
   constructor(storage?: AudioStorage) {
@@ -91,10 +100,19 @@ export class AudioManager {
     if (!uiGain) return;
 
     const sample = UI_SAMPLE_URLS[cue];
-    if (sample && await this.playSample(sample, uiGain, cue === 'hover' ? 0.34 : 0.58)) return;
+    if (sample) {
+      const sampled = await this.playSample(sample, uiGain, cue === 'hover' ? 0.34 : cue === 'confirm' ? 0.64 : 0.58);
+      if (sampled) {
+        if (cue === 'confirm') {
+          // A very small low-frequency thump underneath the mechanical sample
+          // makes orders feel weightier without turning the UI into an arcade sound.
+          this.playTone(uiGain, 128, 92, 0.10, 0.026, 'triangle');
+        }
+        return;
+      }
+    }
 
-    // Dossier movement keeps a procedural paper/mechanical layer for now;
-    // sampled UI assets are used for the common hover/click/confirm actions.
+    // Asset loading failures degrade to generated cues rather than muting UI feedback.
     switch (cue) {
       case 'hover':
         this.playTone(uiGain, 520, 470, 0.026, 0.020, 'sine');
@@ -111,7 +129,7 @@ export class AudioManager {
         this.playTone(uiGain, 132, 178, 0.085, 0.070, 'triangle');
         break;
       case 'confirm':
-        this.playTone(uiGain, 205, 205, 0.055, 0.060, 'triangle');
+        this.playTone(uiGain, 205, 150, 0.080, 0.060, 'triangle');
         break;
       case 'back':
         this.playTone(uiGain, 185, 145, 0.060, 0.050, 'triangle');
@@ -119,33 +137,34 @@ export class AudioManager {
     }
   }
 
-  async setRainEnabled(enabled: boolean): Promise<void> {
-    this.rainRequested = enabled;
-    if (!enabled) {
-      this.fadeOutRain();
-      return;
-    }
-    if (this.rain || !await this.unlock()) return;
+  setRainEnabled(enabled: boolean): Promise<void> {
+    return this.setAmbienceEnabled('rain', enabled);
+  }
 
-    const context = this.context;
-    const ambienceGain = this.gains?.ambience;
-    if (!context || !ambienceGain) return;
+  setWindEnabled(enabled: boolean): Promise<void> {
+    return this.setAmbienceEnabled('wind', enabled);
+  }
 
-    const buffer = await this.loadBuffer('/audio/ambience/rain.ogg');
-    if (!buffer || !this.rainRequested || this.rain) return;
+  setOceanEnabled(enabled: boolean): Promise<void> {
+    return this.setAmbienceEnabled('ocean', enabled);
+  }
 
-    const source = context.createBufferSource();
-    const gain = context.createGain();
-    source.buffer = buffer;
-    source.loop = true;
-    source.connect(gain);
-    gain.connect(ambienceGain);
+  async playThunder(): Promise<boolean> {
+    if (!await this.unlock()) return false;
+    const effectsGain = this.gains?.effects;
+    if (!effectsGain) return false;
 
-    const now = context.currentTime;
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.48, now + 1.35);
-    source.start();
-    this.rain = { source, gain };
+    // A first HRTF proof-of-concept: thunder is placed somewhere around the
+    // listener so headphones receive a convincing direction cue. World-space
+    // camera/listener synchronization can reuse the same path later.
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 7 + Math.random() * 5;
+    return this.playSpatialSample(
+      '/audio/sfx/weather-thunder.ogg',
+      effectsGain,
+      0.78,
+      [Math.cos(angle) * radius, 2.5 + Math.random() * 2.5, Math.sin(angle) * radius],
+    );
   }
 
   async playMusic(url: string, options: MusicPlaybackOptions = {}): Promise<boolean> {
@@ -242,12 +261,24 @@ export class AudioManager {
 
   dispose(): void {
     this.musicRequest += 1;
-    this.rainRequested = false;
-    this.fadeOutRain();
+    this.requestedAmbience.clear();
     this.visibilityCleanup?.();
     this.visibilityCleanup = undefined;
+
     if (this.currentMusic) this.destroyMusic(this.currentMusic);
     this.currentMusic = undefined;
+
+    for (const active of this.ambience.values()) {
+      try {
+        active.source.stop();
+      } catch {
+        // Source may already have stopped.
+      }
+      active.source.disconnect();
+      active.gain.disconnect();
+    }
+    this.ambience.clear();
+
     const context = this.context;
     this.context = undefined;
     this.gains = undefined;
@@ -288,6 +319,60 @@ export class AudioManager {
     return context;
   }
 
+  private async setAmbienceEnabled(key: AmbienceKey, enabled: boolean): Promise<void> {
+    if (!enabled) {
+      this.requestedAmbience.delete(key);
+      this.fadeOutAmbience(key);
+      return;
+    }
+
+    this.requestedAmbience.add(key);
+    if (this.ambience.has(key) || !await this.unlock()) return;
+
+    const context = this.context;
+    const ambienceGain = this.gains?.ambience;
+    const config = AMBIENCE_CONFIG[key];
+    if (!context || !ambienceGain) return;
+
+    const buffer = await this.loadBuffer(config.url);
+    if (!buffer || !this.requestedAmbience.has(key) || this.ambience.has(key)) return;
+
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(gain);
+    gain.connect(ambienceGain);
+
+    const now = context.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(config.volume, now + config.fadeSeconds);
+    source.start();
+    this.ambience.set(key, { source, gain });
+  }
+
+  private fadeOutAmbience(key: AmbienceKey): void {
+    const active = this.ambience.get(key);
+    const context = this.context;
+    if (!active || !context) return;
+    this.ambience.delete(key);
+
+    const fadeSeconds = Math.min(1.2, AMBIENCE_CONFIG[key].fadeSeconds);
+    const now = context.currentTime;
+    active.gain.gain.cancelScheduledValues(now);
+    active.gain.gain.setValueAtTime(Math.max(0.0001, active.gain.gain.value), now);
+    active.gain.gain.exponentialRampToValueAtTime(0.0001, now + fadeSeconds);
+    window.setTimeout(() => {
+      try {
+        active.source.stop();
+      } catch {
+        // Source may already have stopped during teardown.
+      }
+      active.source.disconnect();
+      active.gain.disconnect();
+    }, Math.ceil(fadeSeconds * 1000) + 60);
+  }
+
   private async playSample(url: string, destination: AudioNode, volume: number): Promise<boolean> {
     const context = this.context;
     if (!context) return false;
@@ -303,6 +388,43 @@ export class AudioManager {
     source.addEventListener('ended', () => {
       source.disconnect();
       gain.disconnect();
+    }, { once: true });
+    source.start();
+    return true;
+  }
+
+  private async playSpatialSample(
+    url: string,
+    destination: AudioNode,
+    volume: number,
+    position: readonly [number, number, number],
+  ): Promise<boolean> {
+    const context = this.context;
+    if (!context) return false;
+    const buffer = await this.loadBuffer(url);
+    if (!buffer || !this.unlocked) return false;
+
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    const panner = context.createPanner();
+    gain.gain.value = Math.max(0, volume);
+    panner.panningModel = 'HRTF';
+    panner.distanceModel = 'inverse';
+    panner.refDistance = 2;
+    panner.maxDistance = 40;
+    panner.rolloffFactor = 0.55;
+    panner.positionX.value = position[0];
+    panner.positionY.value = position[1];
+    panner.positionZ.value = position[2];
+
+    source.buffer = buffer;
+    source.connect(gain);
+    gain.connect(panner);
+    panner.connect(destination);
+    source.addEventListener('ended', () => {
+      source.disconnect();
+      gain.disconnect();
+      panner.disconnect();
     }, { once: true });
     source.start();
     return true;
@@ -327,27 +449,6 @@ export class AudioManager {
       });
     this.sampleBuffers.set(url, loading);
     return loading;
-  }
-
-  private fadeOutRain(): void {
-    const rain = this.rain;
-    const context = this.context;
-    if (!rain || !context) return;
-    this.rain = undefined;
-
-    const now = context.currentTime;
-    rain.gain.gain.cancelScheduledValues(now);
-    rain.gain.gain.setValueAtTime(Math.max(0.0001, rain.gain.gain.value), now);
-    rain.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.75);
-    window.setTimeout(() => {
-      try {
-        rain.source.stop();
-      } catch {
-        // Source may already have stopped during teardown.
-      }
-      rain.source.disconnect();
-      rain.gain.disconnect();
-    }, 800);
   }
 
   private playTone(
