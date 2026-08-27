@@ -70,14 +70,19 @@ const firstMenuTrack = TRACK_BY_ID.get('honor-bound');
 audio.prime(firstMenuTrack ? trackSources(firstMenuTrack).slice(0, 1) : []);
 audio.installLifecycle();
 
-let menuMusicStarted = false;
-const startMenuMusic = (): void => {
-  if (menuMusicStarted) return;
-  menuMusicStarted = true;
-  void music.setState('menu');
+// Try to start the lobby soundtrack immediately when the page opens. Browsers
+// may still block audible autoplay, so the first user gesture retries only if
+// playback did not actually begin.
+void music.setState('menu');
+
+let autoplayRetryDone = false;
+const retryMenuMusicAfterAutoplayBlock = (): void => {
+  if (autoplayRetryDone || audio.isMusicPlaying()) return;
+  autoplayRetryDone = true;
+  void music.setState('menu', { force: true });
 };
-document.addEventListener('pointerdown', startMenuMusic, { capture: true, once: true });
-document.addEventListener('keydown', startMenuMusic, { capture: true, once: true });
+document.addEventListener('pointerdown', retryMenuMusicAfterAutoplayBlock, { capture: true, once: true });
+document.addEventListener('keydown', retryMenuMusicAfterAutoplayBlock, { capture: true, once: true });
 
 window.addEventListener('pagehide', (event) => {
   if (!event.persisted) {
