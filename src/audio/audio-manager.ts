@@ -56,6 +56,7 @@ export class AudioManager {
   private context?: AudioContext;
   private gains?: GainMap;
   private unlocked = false;
+  private unlockInFlight?: Promise<boolean>;
   private currentMusic?: MusicPlayback;
   private musicRequest = 0;
   private readonly sampleBuffers = new Map<string, Promise<AudioBuffer | null>>();
@@ -93,15 +94,24 @@ export class AudioManager {
   }
 
   async unlock(): Promise<boolean> {
-    try {
-      const context = this.ensureContext();
-      if (!context) return false;
-      if (context.state === 'suspended') await context.resume();
-      this.unlocked = context.state === 'running';
-      return this.unlocked;
-    } catch {
-      return false;
-    }
+    if (this.unlocked && this.context?.state === 'running') return true;
+    if (this.unlockInFlight) return this.unlockInFlight;
+
+    this.unlockInFlight = (async () => {
+      try {
+        const context = this.ensureContext();
+        if (!context) return false;
+        if (context.state === 'suspended') await context.resume();
+        this.unlocked = context.state === 'running';
+        return this.unlocked;
+      } catch {
+        return false;
+      } finally {
+        this.unlockInFlight = undefined;
+      }
+    })();
+
+    return this.unlockInFlight;
   }
 
   /**
@@ -151,6 +161,11 @@ export class AudioManager {
   }
 
   async playUiCue(cue: UiAudioCue): Promise<void> {
+    // Do not poke the AudioContext on passive pointer movement before the
+    // browser has granted audio. The first real click/key interaction owns
+    // activation; hover sounds begin only after that.
+    if (cue === 'hover' && !this.unlocked) return;
+
     const now = typeof performance === 'undefined' ? Date.now() : performance.now();
     const minimumGap = cue === 'hover' ? 70 : 28;
     if (now - (this.uiCueTimes.get(cue) ?? -Infinity) < minimumGap) return;
@@ -388,6 +403,7 @@ export class AudioManager {
     this.context = undefined;
     this.gains = undefined;
     this.sampleBuffers.clear();
+    this.unlockInFlight = undefined;
     this.unlocked = false;
     if (context && context.state !== 'closed') void context.close().catch(() => undefined);
   }
