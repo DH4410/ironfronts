@@ -13,7 +13,7 @@ import {
   createEmptyRenderWorkload, PerformanceMonitor,
   type PerformancePhases, type PerformanceSnapshot, type RenderCategory,
 } from './performance-monitor';
-import { createHoverInfo, pickTerrainPoint } from './picking';
+import { createHoverInfo, pickTerrainPoint, resolvePrimaryClick } from './picking';
 import { PoliticalCache } from './political-cache';
 import { createRendererLayouts, createRendererPipelines } from './renderer-pipelines';
 import { beginWorldFrame, submitWorldFrame } from './renderer-frame';
@@ -51,6 +51,7 @@ export class WorldRenderer {
   onStats?: (stats: FrameStats) => void;
   onDiplomacyChange?: (state: DiplomacyState) => void;
   onProvinceCaptured?: (provinceId: number, previousCountry: CountryRecord, player: CountryRecord) => void;
+  onProvinceSelected?: (info: HoverInfo | null) => void;
   onTimeOfDayChange?: (state: TimeOfDayState) => void;
 
   private readonly canvas: HTMLCanvasElement;
@@ -170,6 +171,7 @@ export class WorldRenderer {
   };
   private pointer = { x: 0, y: 0, inside: false };
   private hoveredId = 0;
+  private selectedId = 0;
   private pickingDirty = false;
   private lastPickedCameraRevision = -1;
   private lastPickTime = -Infinity;
@@ -426,6 +428,7 @@ export class WorldRenderer {
     this.onStats = undefined;
     this.onDiplomacyChange = undefined;
     this.onProvinceCaptured = undefined;
+    this.onProvinceSelected = undefined;
     this.onTimeOfDayChange = undefined;
     if (!this.deviceReady) return;
     this.device.removeEventListener('uncapturederror', this.onUncapturedError);
@@ -754,7 +757,7 @@ export class WorldRenderer {
         this.pointer.inside = true;
         this.finishPicking(this.provinceAtScreenPoint(event.clientX, event.clientY), performance.now());
       }
-      this.captureProvinceAt(event.clientX, event.clientY);
+      this.selectProvinceAt(event.clientX, event.clientY);
     }, { signal });
     window.addEventListener('pointercancel', () => {
       this.clickStart = undefined;
@@ -1259,16 +1262,41 @@ export class WorldRenderer {
     return point ? this.sampleProvince(point[0], point[2]) : 0;
   }
 
-  private captureProvinceAt(clientX: number, clientY: number): void {
+  private selectProvinceAt(clientX: number, clientY: number): void {
+    const action = resolvePrimaryClick(this.provinceAtScreenPoint(clientX, clientY));
+    const encodedId = action.kind === 'select' ? action.encodedProvinceId : 0;
+    if (encodedId === this.selectedId) return;
+    this.selectedId = encodedId;
+    this.onProvinceSelected?.(encodedId ? this.toHoverInfo(encodedId) : null);
+  }
+
+  /** Encoded (1-based) id of the selected province, or 0 when nothing is selected. */
+  get selectedProvinceId(): number {
+    return this.selectedId;
+  }
+
+  clearProvinceSelection(): void {
+    if (!this.selectedId) return;
+    this.selectedId = 0;
+    this.onProvinceSelected?.(null);
+  }
+
+  /**
+   * Explicit developer/gameplay pathway for transferring ownership of the
+   * province under a screen point to the player. A normal map click never
+   * reaches this; it must be invoked deliberately (e.g. a diagnostics tool).
+   */
+  forceCaptureProvinceAt(clientX: number, clientY: number): boolean {
     const encodedId = this.provinceAtScreenPoint(clientX, clientY);
-    if (!encodedId) return;
+    if (!encodedId) return false;
     const previousCountryId = this.provinceOwners[encodedId];
-    if (this.diplomaticRelations.get(previousCountryId) !== 'war') return;
+    if (this.diplomaticRelations.get(previousCountryId) !== 'war') return false;
     const previousCountry = this.countryById.get(previousCountryId);
     const player = this.countryById.get(this.playerCountryId);
-    if (!previousCountry || !player) return;
+    if (!previousCountry || !player) return false;
     this.setProvinceOwner(encodedId - 1, this.playerCountryId);
     this.onProvinceCaptured?.(encodedId - 1, previousCountry, player);
+    return true;
   }
 
   private finishPicking(encodedId: number, started: number): { raycastMs: number; hoverUiMs: number } {
