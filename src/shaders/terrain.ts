@@ -121,9 +121,12 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     }
 
     if (terrain == 1u) {
-      baseColor = mix(baseColor, sampleMaterial(4, input.worldPosition, 65.0), clamp(slope * 3.4 + 0.12, 0.0, 0.7));
+      // Lift the exposed-rock material off near-black so steep hills stay a
+      // readable slate rather than a dark blob.
+      let hillRock = sampleMaterial(4, input.worldPosition, 65.0) * 1.2 + vec3f(0.055, 0.055, 0.05);
+      baseColor = mix(baseColor, hillRock, clamp(slope * 3.4 + 0.12, 0.0, 0.7));
     } else if (terrain == 2u) {
-      let rock = sampleMaterial(4, input.worldPosition, 58.0);
+      let rock = sampleMaterial(4, input.worldPosition, 58.0) * 1.25 + vec3f(0.07, 0.07, 0.065);
       let snow = sampleMaterial(5, input.worldPosition, 80.0);
       let snowAmount = smoothstep(120.0, 205.0, elevation) * smoothstep(0.58, 0.92, normal.y);
       baseColor = mix(rock, snow, snowAmount);
@@ -165,7 +168,11 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
         ${POLITICAL_OVERVIEW_FULL_ALTITUDE.toFixed(1)},
         uniforms.camera.y
       );
-      let terrainLuminance = dot(baseColor, vec3f(0.24, 0.68, 0.08));
+      // Floor the terrain luminance the tint is matched against. Steep rock and
+      // dense forest land near-black here, and without a floor the
+      // luminance-matched political colour inherits that blackness, so overview
+      // zoom cannot recover an owned mountain or forest province.
+      let terrainLuminance = max(0.16, dot(baseColor, vec3f(0.24, 0.68, 0.08)));
       let tintLuminance = max(0.06, dot(overlayColor, vec3f(0.24, 0.68, 0.08)));
       let luminanceMatchedTint = overlayColor * (terrainLuminance / tintLuminance);
       let originalTint = overlayColor * (0.62 + terrainLuminance * 0.70);
@@ -233,7 +240,9 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   baseColor *= 0.92 + variation * 0.14;
   baseColor = mix(baseColor, baseColor * vec3f(0.74, 0.79, 0.83), uniforms.weather.x * 0.42);
   let sunDirection = normalize(uniforms.sunTime.xyz);
-  var lit = baseColor * surfaceLight(normal);
+  // Floor the lighting term so slopes that face away from the sun keep some
+  // fill light instead of crushing steep mountains and hills to black.
+  var lit = baseColor * max(surfaceLight(normal), vec3f(0.4));
   lit += vec3f(0.12, 0.15, 0.13) * pow(max(dot(normal, normalize(sunDirection + normalize(uniforms.camera.xyz - input.worldPosition))), 0.0), 24.0) * 0.08 * uniforms.lighting.x;
   lit += wetSurfaceSheen(normal, input.worldPosition);
   if (nightMapCompensation > 0.001) {
