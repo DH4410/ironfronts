@@ -111,11 +111,13 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   // normal with world-space noise on mountain/hill terrain to fake rugged
   // relief - geometry and gameplay heights are untouched.
   var shadeNormal = normal;
-  if (terrain == 1u || terrain == 2u || biome == 6u || biome == 8u) {
-    let bx = valueNoise(input.worldPosition.xz / 21.0) - 0.5;
-    let bz = valueNoise(input.worldPosition.xz / 13.0 + vec2f(19.3, 7.1)) - 0.5;
-    let amp = mix(0.6, 1.45, slope);
-    shadeNormal = normalize(normal + vec3f(bx * 1.3 - bz * 0.4, 0.0, bz * 1.3 + bx * 0.4) * amp);
+  // Only near the ground, where the relief is actually visible - at overview
+  // rock covers most of the screen and this would just burn fill rate.
+  if ((terrain == 1u || terrain == 2u || biome == 6u || biome == 8u) && uniforms.interaction.y < 3200.0) {
+    let n = valueNoise(input.worldPosition.xz / 18.0) - 0.5;
+    let w = sin(input.worldPosition.x * 0.13 + input.worldPosition.z * 0.09) * 0.5;
+    let amp = mix(0.55, 1.4, slope);
+    shadeNormal = normalize(normal + vec3f(n * 1.2 + w * 0.4, 0.0, w * 1.2 - n * 0.4) * amp);
   }
   let bakedSurface = textureSample(terrainAlbedoTexture, materialSampler, wrappedUv(input.mapUv));
   var baseColor = bakedSurface.rgb;
