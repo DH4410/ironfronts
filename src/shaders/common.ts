@@ -194,11 +194,16 @@ fn oceanSurfaceColor(worldPosition: vec3f, depth: f32, shoreline: f32, visualRiv
   let shallow = vec3f(0.12, 0.48, 0.52);
   let deep = vec3f(0.025, 0.16, 0.255);
   var color = mix(shallow, deep, shelf);
+  // Even at ground level the shallow band + shoreline foam hug the coast too
+  // widely and read as a glowing cyan rim. Pull near-shore water a step toward
+  // the deep colour and take some strength out of the foam at every zoom;
+  // the overview term then finishes collapsing both as the camera pulls back.
+  color = mix(color, deep, 0.22);
   color = mix(color, deep, overview * 0.45);
   color = mix(color, vec3f(0.40, 0.60, 0.63), fresnel * 0.64);
   let foamBreak = valueNoise(world / 11.0 + warp * 2.4 + vec2f(time * 0.15, -time * 0.09));
   let foam = shoreline * (1.0 - visualRiver * 0.80)
-    * smoothstep(0.54, 0.82, foamBreak + waveA * 0.12) * mix(1.0, 0.15, overview);
+    * smoothstep(0.54, 0.82, foamBreak + waveA * 0.12) * mix(0.55, 0.12, overview);
   color = mix(color, vec3f(0.73, 0.82, 0.77), foam * 0.52);
   color += vec3f(1.0, 0.86, 0.61) * sun * (0.34 + ripple * 0.05) * uniforms.lighting.x;
   color *= mix(vec3f(0.27, 0.36, 0.56), vec3f(1.0), uniforms.lighting.x);
