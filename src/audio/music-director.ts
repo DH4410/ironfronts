@@ -44,8 +44,8 @@ export class MusicDirector {
     return this.state;
   }
 
-  async setState(next: MusicState): Promise<void> {
-    if (this.state === next && next !== 'victory') return;
+  async setState(next: MusicState, options: { force?: boolean } = {}): Promise<void> {
+    if (this.state === next && next !== 'victory' && !options.force) return;
 
     this.state = next;
     this.generation += 1;
