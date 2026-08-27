@@ -9,6 +9,13 @@ import {
 
 export type UiAudioCue = 'hover' | 'select' | 'dossier-open' | 'dossier-close' | 'confirm' | 'back';
 
+const UI_SAMPLE_URLS: Partial<Record<UiAudioCue, string>> = {
+  hover: '/audio/sfx/ui-hover.wav',
+  select: '/audio/sfx/ui-click.wav',
+  confirm: '/audio/sfx/ui-switch.wav',
+  back: '/audio/sfx/ui-switch.wav',
+};
+
 type GainMap = Record<AudioBus, GainNode>;
 type AudioContextConstructor = new () => AudioContext;
 
@@ -26,6 +33,11 @@ interface MusicPlayback {
   cleanup?: () => void;
 }
 
+interface LoopingAmbience {
+  source: AudioBufferSourceNode;
+  gain: GainNode;
+}
+
 export class AudioManager {
   private readonly storage?: AudioStorage;
   private preferences: AudioPreferences;
@@ -34,6 +46,9 @@ export class AudioManager {
   private unlocked = false;
   private currentMusic?: MusicPlayback;
   private musicRequest = 0;
+  private readonly sampleBuffers = new Map<string, Promise<AudioBuffer | null>>();
+  private rain?: LoopingAmbience;
+  private rainRequested = false;
   private visibilityCleanup?: () => void;
 
   constructor(storage?: AudioStorage) {
@@ -72,10 +87,14 @@ export class AudioManager {
 
   async playUiCue(cue: UiAudioCue): Promise<void> {
     if (!await this.unlock()) return;
-    const context = this.context;
     const uiGain = this.gains?.ui;
-    if (!context || !uiGain) return;
+    if (!uiGain) return;
 
+    const sample = UI_SAMPLE_URLS[cue];
+    if (sample && await this.playSample(sample, uiGain, cue === 'hover' ? 0.34 : 0.58)) return;
+
+    // Dossier movement keeps a procedural paper/mechanical layer for now;
+    // sampled UI assets are used for the common hover/click/confirm actions.
     switch (cue) {
       case 'hover':
         this.playTone(uiGain, 520, 470, 0.026, 0.020, 'sine');
@@ -93,12 +112,40 @@ export class AudioManager {
         break;
       case 'confirm':
         this.playTone(uiGain, 205, 205, 0.055, 0.060, 'triangle');
-        this.playTone(uiGain, 310, 345, 0.070, 0.038, 'sine', 0.025);
         break;
       case 'back':
         this.playTone(uiGain, 185, 145, 0.060, 0.050, 'triangle');
         break;
     }
+  }
+
+  async setRainEnabled(enabled: boolean): Promise<void> {
+    this.rainRequested = enabled;
+    if (!enabled) {
+      this.fadeOutRain();
+      return;
+    }
+    if (this.rain || !await this.unlock()) return;
+
+    const context = this.context;
+    const ambienceGain = this.gains?.ambience;
+    if (!context || !ambienceGain) return;
+
+    const buffer = await this.loadBuffer('/audio/ambience/rain.ogg');
+    if (!buffer || !this.rainRequested || this.rain) return;
+
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    source.buffer = buffer;
+    source.loop = true;
+    source.connect(gain);
+    gain.connect(ambienceGain);
+
+    const now = context.currentTime;
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.48, now + 1.35);
+    source.start();
+    this.rain = { source, gain };
   }
 
   async playMusic(url: string, options: MusicPlaybackOptions = {}): Promise<boolean> {
@@ -195,6 +242,8 @@ export class AudioManager {
 
   dispose(): void {
     this.musicRequest += 1;
+    this.rainRequested = false;
+    this.fadeOutRain();
     this.visibilityCleanup?.();
     this.visibilityCleanup = undefined;
     if (this.currentMusic) this.destroyMusic(this.currentMusic);
@@ -202,6 +251,7 @@ export class AudioManager {
     const context = this.context;
     this.context = undefined;
     this.gains = undefined;
+    this.sampleBuffers.clear();
     this.unlocked = false;
     if (context && context.state !== 'closed') void context.close().catch(() => undefined);
   }
@@ -236,6 +286,68 @@ export class AudioManager {
     this.context = context;
     this.gains = { master, music, ui, ambience, effects };
     return context;
+  }
+
+  private async playSample(url: string, destination: AudioNode, volume: number): Promise<boolean> {
+    const context = this.context;
+    if (!context) return false;
+    const buffer = await this.loadBuffer(url);
+    if (!buffer || !this.unlocked) return false;
+
+    const source = context.createBufferSource();
+    const gain = context.createGain();
+    gain.gain.value = Math.max(0, volume);
+    source.buffer = buffer;
+    source.connect(gain);
+    gain.connect(destination);
+    source.addEventListener('ended', () => {
+      source.disconnect();
+      gain.disconnect();
+    }, { once: true });
+    source.start();
+    return true;
+  }
+
+  private loadBuffer(url: string): Promise<AudioBuffer | null> {
+    const cached = this.sampleBuffers.get(url);
+    if (cached) return cached;
+
+    const context = this.ensureContext();
+    if (!context) return Promise.resolve(null);
+    const loading = fetch(url)
+      .then((response) => {
+        if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+        return response.arrayBuffer();
+      })
+      .then((bytes) => context.decodeAudioData(bytes))
+      .catch((error) => {
+        console.warn(`Unable to load audio asset ${url}`, error);
+        this.sampleBuffers.delete(url);
+        return null;
+      });
+    this.sampleBuffers.set(url, loading);
+    return loading;
+  }
+
+  private fadeOutRain(): void {
+    const rain = this.rain;
+    const context = this.context;
+    if (!rain || !context) return;
+    this.rain = undefined;
+
+    const now = context.currentTime;
+    rain.gain.gain.cancelScheduledValues(now);
+    rain.gain.gain.setValueAtTime(Math.max(0.0001, rain.gain.gain.value), now);
+    rain.gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.75);
+    window.setTimeout(() => {
+      try {
+        rain.source.stop();
+      } catch {
+        // Source may already have stopped during teardown.
+      }
+      rain.source.disconnect();
+      rain.gain.disconnect();
+    }, 800);
   }
 
   private playTone(
