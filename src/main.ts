@@ -2,6 +2,7 @@ import './styles.css';
 import '@fontsource/bitter/latin-ext-800.css';
 import '@fontsource/special-elite/latin-ext-400.css';
 import '@fontsource/cinzel-decorative/latin-ext-700.css';
+import { loadQuality } from './graphics/quality';
 import { mountMenu } from './menu/menu';
 import { WorldRenderer, type MapMode, type TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
@@ -61,6 +62,7 @@ const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
 let rendererStarted = false;
+let activeRenderer: WorldRenderer | undefined;
 mountMenu({
   onLaunch: () => {
     if (rendererStarted) return;
@@ -74,6 +76,8 @@ mountMenu({
       void start();
     }
   },
+  // In the lobby this only persists; once the renderer exists it applies live.
+  onGraphicsQuality: (level) => activeRenderer?.setQuality(level),
 });
 
 function startLoadingQuotes(): () => void {
@@ -97,7 +101,8 @@ function startLoadingQuotes(): () => void {
 
 async function start(): Promise<void> {
   const stopQuotes = startLoadingQuotes();
-  const renderer = new WorldRenderer(canvas, countryLabels);
+  const renderer = new WorldRenderer(canvas, countryLabels, loadQuality());
+  activeRenderer = renderer;
   window.addEventListener('pagehide', (event) => {
     if (!event.persisted) renderer.dispose();
   });
@@ -322,6 +327,9 @@ function updateDiagnostics(stats: FrameStats): void {
     `alt  ${stats.camera[2].toFixed(0).padStart(5)}   zoom ${stats.distance.toFixed(0)}`,
     `target    ${stats.targetProvince ?? 'water'} @ ${stats.targetElevation.toFixed(2)}`,
     `province  ${stats.hoveredProvince ?? '—'}`,
+    activeRenderer
+      ? `graphics  ${activeRenderer.graphicsQuality} @ ${activeRenderer.effectiveRenderScale.toFixed(2)}x  ${canvas.width}x${canvas.height}`
+      : 'graphics  —',
     `trees     ${stats.trees.toLocaleString()}`,
     `buildings ${stats.buildings.toLocaleString()}`,
     `roads     ${stats.emittedRoads.toLocaleString()} + ${stats.hiddenRoads} dotted`,

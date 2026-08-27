@@ -1,6 +1,10 @@
 import { vec3 } from 'gl-matrix';
 import { StrategyCamera } from './camera';
-import { buildPropVisibility, buildTerrainVisibility } from './chunk-visibility';
+import { buildPropVisibility, buildTerrainVisibility, capVisibleInstances } from './chunk-visibility';
+import {
+  DEFAULT_QUALITY, QUALITY_LEVELS, QUALITY_PRESETS, resolveRenderPixelRatio,
+  type QualityLevel, type QualityPreset,
+} from './graphics/quality';
 import { buildCountryColorBuffer, CountryLabelLayer } from './country-overlay';
 import { loadCountryLabelFont } from './country-labels/atlas';
 import { isValidCountryLabelPoint } from './country-labels/territory';
@@ -136,6 +140,7 @@ export class WorldRenderer {
   private frameHandle = 0;
   private previousTime = performance.now();
   private elapsed = 0;
+  private quality: QualityLevel = DEFAULT_QUALITY;
   private readonly environment = new EnvironmentController();
   private reportedClock = '';
   private performanceMonitor = new PerformanceMonitor(false);
@@ -181,9 +186,45 @@ export class WorldRenderer {
     console.error(`WebGPU validation error: ${message}`);
   };
 
-  constructor(canvas: HTMLCanvasElement, countryLabelCanvas?: HTMLCanvasElement) {
+  constructor(
+    canvas: HTMLCanvasElement,
+    countryLabelCanvas?: HTMLCanvasElement,
+    quality: QualityLevel = DEFAULT_QUALITY,
+  ) {
     this.canvas = canvas;
     this.countryLabelCanvas = countryLabelCanvas;
+    this.quality = QUALITY_PRESETS[quality] ? quality : DEFAULT_QUALITY;
+  }
+
+  private get qualityPreset(): QualityPreset {
+    return QUALITY_PRESETS[this.quality];
+  }
+
+  /** Current graphics preset id. */
+  get graphicsQuality(): QualityLevel {
+    return this.quality;
+  }
+
+  /** Backing-store scale actually in use (× CSS pixels). */
+  get effectiveRenderScale(): number {
+    return resolveRenderPixelRatio(this.quality);
+  }
+
+  /**
+   * Switch graphics preset at runtime. Triggers one safe resize /
+   * swap-chain + depth reconfigure and invalidates the visible-instance
+   * caches so the new draw distances and budgets take effect next frame.
+   * No GPU pipelines or world buffers are recreated.
+   */
+  setQuality(level: QualityLevel): void {
+    if (!QUALITY_PRESETS[level] || level === this.quality) return;
+    this.quality = level;
+    if (this.deviceReady) {
+      this.resize();
+      this.camera.revision += 1;
+      this.lastTerrainVisibilityRevision = -1;
+      this.performanceMonitor.reset();
+    }
   }
 
   async initialize(report: ProgressReporter): Promise<void> {
@@ -774,7 +815,11 @@ export class WorldRenderer {
   }
 
   private resize(): void {
-    const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+    // Backing-store scale is the graphics-quality preset (0.75 / 1.0 / 1.25 /
+    // 1.5), applied absolutely and capped at 1.5 so a 2x/3x HiDPI panel never
+    // forces an oversized buffer. devicePixelRatio is deliberately not a
+    // multiplier here.
+    const pixelRatio = resolveRenderPixelRatio(this.quality);
     const width = Math.max(1, Math.floor(this.canvas.clientWidth * pixelRatio));
     const height = Math.max(1, Math.floor(this.canvas.clientHeight * pixelRatio));
     if (this.canvas.width === width && this.canvas.height === height) return;
@@ -880,7 +925,15 @@ export class WorldRenderer {
       terrainInfo: [this.manifest.terrain.chunksX, this.manifest.terrain.chunksY, this.manifest.terrain.gridResolution, this.showWireframe ? 1 : 0],
       lighting: [lighting.daylight, lighting.twilight, lighting.night, this.environment.dayPhase],
       sky: [...skyColor, 0],
-      weather: [this.environment.rainIntensity, 0, 0, 0],
+      // weather.y = quality index (0 low .. 3 ultra), weather.z = 0..1 detail
+      // factor. Shaders can scale purely-decorative expensive work by these
+      // without a struct change.
+      weather: [
+        this.environment.rainIntensity,
+        QUALITY_LEVELS.indexOf(this.quality),
+        this.qualityPreset.detailFactor,
+        0,
+      ],
     });
     this.device.queue.writeBuffer(this.uniformBuffer, 0, values);
   }
@@ -954,16 +1007,20 @@ export class WorldRenderer {
 
     if (this.showProps) {
       pass.setPipeline(this.propPipeline);
+      // Graphics-quality scales prop draw + LOD distances down; low/medium
+      // drop decorative road furniture entirely.
+      const s = this.qualityPreset.propDistanceScale;
+      const d2 = (a: number, b: number): [number, number] => [a * s, b * s];
       if (this.performanceLayers.trees) {
-        this.drawPropChunks(pass, this.trees, this.manifest.propChunks.trees, this.treeMeshes, 'trees', 3_200, [900, 1_850]);
+        this.drawPropChunks(pass, this.trees, this.manifest.propChunks.trees, this.treeMeshes, 'trees', 3_200 * s, d2(900, 1_850));
       }
       if (this.performanceLayers.buildings) {
-        this.drawPropChunks(pass, this.buildings, this.manifest.propChunks.buildings, this.buildingMeshes, 'buildings', 2_600, [850, 1_650]);
+        this.drawPropChunks(pass, this.buildings, this.manifest.propChunks.buildings, this.buildingMeshes, 'buildings', 2_600 * s, d2(850, 1_650));
       }
-      if (this.performanceLayers.roadFurniture) {
-        this.drawPropChunks(pass, this.lamps, this.manifest.propChunks.lamps, [[this.lampMesh]], 'roadFurniture', 1_900, [1_900, 1_900]);
-        this.drawPropChunks(pass, this.barriers, this.manifest.propChunks.barriers, [[this.barrierMesh]], 'roadFurniture', 1_900, [1_900, 1_900]);
-        this.drawPropChunks(pass, this.signs, this.manifest.propChunks.signs, [[this.signMesh]], 'roadFurniture', 1_900, [1_900, 1_900]);
+      if (this.performanceLayers.roadFurniture && this.qualityPreset.furniture) {
+        this.drawPropChunks(pass, this.lamps, this.manifest.propChunks.lamps, [[this.lampMesh]], 'roadFurniture', 1_900 * s, d2(1_900, 1_900));
+        this.drawPropChunks(pass, this.barriers, this.manifest.propChunks.barriers, [[this.barrierMesh]], 'roadFurniture', 1_900 * s, d2(1_900, 1_900));
+        this.drawPropChunks(pass, this.signs, this.manifest.propChunks.signs, [[this.signMesh]], 'roadFurniture', 1_900 * s, d2(1_900, 1_900));
       }
       if (this.performanceLayers.buildings) this.drawCityLights(pass);
     }
@@ -1007,7 +1064,9 @@ export class WorldRenderer {
 
   private drawRain(pass: GPURenderPassEncoder): void {
     if (this.environment.rainIntensity < 0.005 || this.debugView !== 0) return;
-    const viewportParticles = Math.ceil(this.canvas.width * this.canvas.height / 2_200);
+    const viewportParticles = Math.ceil(
+      this.canvas.width * this.canvas.height / 2_200 * this.qualityPreset.rainScale,
+    );
     const particles = Math.min(MAX_RAIN_PARTICLES, Math.max(MIN_RAIN_PARTICLES, viewportParticles));
     pass.setPipeline(this.rainPipeline);
     pass.draw(6, particles);
@@ -1055,7 +1114,12 @@ export class WorldRenderer {
     const viewKey = String(category);
     const view = getVisibleInstanceView(this.device, this.instanceLayout, layer, viewKey, category);
     if (view.revision !== this.camera.revision) {
-      const visibility = buildPropVisibility(
+      const budget = category === 'trees'
+        ? this.qualityPreset.treeInstanceBudget
+        : category === 'buildings'
+          ? this.qualityPreset.buildingInstanceBudget
+          : Number.POSITIVE_INFINITY;
+      const visibility = capVisibleInstances(buildPropVisibility(
         this.manifest,
         ranges,
         groupMeshes,
@@ -1064,7 +1128,7 @@ export class WorldRenderer {
         maximumDistance,
         lodDistances,
         (centerX, centerZ, radius) => this.chunkIntersectsView(centerX, centerZ, radius),
-      );
+      ), budget);
       updateVisibleInstanceView(this.device.queue, view, this.camera.revision, visibility);
     }
     if (category === 'trees') this.frameWorkload.visibleChunks.trees += view.visibleChunks;
@@ -1109,6 +1173,7 @@ export class WorldRenderer {
       this.camera.position,
       (x, z) => this.sampleHeight(x, z),
       (centerX, centerZ, radius) => this.chunkIntersectsView(centerX, centerZ, radius),
+      this.qualityPreset.terrainLodScale,
     );
     this.terrainLodDraws = visibility.draws;
     if (visibility.instances.length) {

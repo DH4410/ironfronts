@@ -232,6 +232,23 @@
 .ifm__row input[type="range"] { width: 9em; accent-color: var(--hud-gold); }
 .ifm__row input[type="checkbox"] { width: 1.1em; height: 1.1em; accent-color: var(--hud-gold); }
 
+/* Graphics-quality segmented control: label on top, four field buttons below. */
+.ifm__row--stack { grid-template-columns: 1fr; gap: .55em; cursor: default; }
+.ifm__row--stack:hover { border-left-color: transparent; background-image: linear-gradient(#332a1c, #1e1810), url('/menu/paper.jpg'); }
+.ifm__seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: .4em; }
+.ifm__seg button {
+  padding: .5em .2em; border: 1px solid rgba(201,164,99,.28);
+  background: linear-gradient(#2b2317, #171207); background-blend-mode: multiply;
+  color: var(--hud-text-dim); cursor: pointer;
+  font: 700 .62em/1 var(--ifm-sans); letter-spacing: .12em; text-transform: uppercase;
+  transition: border-color .18s ease, color .18s ease, background .18s ease;
+}
+.ifm__seg button:hover { color: var(--hud-text); border-color: rgba(201,164,99,.5); }
+.ifm__seg button.is-selected {
+  color: var(--hud-gold-bright); border-color: var(--hud-gold-bright);
+  background: linear-gradient(#5a4522, #3a2c15);
+}
+
 /* operation rows (Campaign): OP-code + insignia + readiness dots */
 .ifm__row-code { display: block; margin-bottom: .3em; font: 700 .64em/1 var(--ifm-sans); letter-spacing: .1em; color: var(--hud-text-dim); opacity: .8; }
 .ifm__row-meta { display: flex; flex-direction: column; align-items: flex-end; gap: .5em; }
