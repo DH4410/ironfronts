@@ -33,6 +33,7 @@ export class AudioManager {
   private gains?: GainMap;
   private unlocked = false;
   private currentMusic?: MusicPlayback;
+  private musicRequest = 0;
   private visibilityCleanup?: () => void;
 
   constructor(storage?: AudioStorage) {
@@ -102,6 +103,7 @@ export class AudioManager {
 
   async playMusic(url: string, options: MusicPlaybackOptions = {}): Promise<boolean> {
     if (!url || !await this.unlock()) return false;
+    const request = ++this.musicRequest;
     const context = this.context;
     const musicGain = this.gains?.music;
     if (!context || !musicGain) return false;
@@ -141,6 +143,11 @@ export class AudioManager {
       return false;
     }
 
+    if (request !== this.musicRequest) {
+      this.destroyMusic(playback);
+      return false;
+    }
+
     this.currentMusic = playback;
     const now = context.currentTime;
     gain.gain.setValueAtTime(0, now);
@@ -157,6 +164,7 @@ export class AudioManager {
   }
 
   stopMusic(fadeSeconds = 0.8): void {
+    this.musicRequest += 1;
     const playback = this.currentMusic;
     const context = this.context;
     if (!playback || !context) return;
@@ -186,6 +194,7 @@ export class AudioManager {
   }
 
   dispose(): void {
+    this.musicRequest += 1;
     this.visibilityCleanup?.();
     this.visibilityCleanup = undefined;
     if (this.currentMusic) this.destroyMusic(this.currentMusic);
