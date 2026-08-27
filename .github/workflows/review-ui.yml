@@ -1,0 +1,74 @@
+name: Review Claude UI stack
+
+on:
+  push:
+    branches:
+      - review/claude-ui-stack
+  workflow_dispatch:
+
+jobs:
+  ui-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out review stack
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate world assets
+        run: npm run build:world
+
+      - name: Run full checks
+        run: npm run check
+
+      - name: Find Chrome
+        shell: bash
+        run: |
+          BROWSER="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          if [ -z "$BROWSER" ]; then
+            echo "No Chrome/Chromium executable found" >&2
+            exit 1
+          fi
+          echo "IRONFRONTS_BROWSER=$BROWSER" >> "$GITHUB_ENV"
+          echo "IRONFRONTS_HEADLESS=true" >> "$GITHUB_ENV"
+
+      - name: Start Vite
+        shell: bash
+        run: |
+          npm run dev:fast -- --host 0.0.0.0 > /tmp/ironfronts-vite.log 2>&1 &
+          echo $! > /tmp/ironfronts-vite.pid
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:5173/ >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/ironfronts-vite.log
+          exit 1
+
+      - name: Capture and exercise UI
+        run: node scripts/review-ui-check.mjs http://127.0.0.1:5173/
+
+      - name: Collect Vite log
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/review-ui
+          cp /tmp/ironfronts-vite.log artifacts/review-ui/vite.log || true
+
+      - name: Upload review captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-ui-review
+          path: artifacts/review-ui/
+          if-no-files-found: warn
+          retention-days: 7
