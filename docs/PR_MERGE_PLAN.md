@@ -2,6 +2,43 @@
 
 For Zoande, tomorrow. **Nothing here has been merged or closed.**
 
+---
+
+## Status — re-verified 2026-08-28
+
+Checked against live GitHub, no changes made to any PR branch:
+
+- `upstream/main` is **still `7ff1e2eca7f4ace722fb2da1d727b83f73d10e0e`**
+  ("improved phone contrls"). No batch merge has happened.
+- **PRs #29–#43 are all still OPEN**, all authored by `DH4410`, all target
+  `Zoande:main`, all report `MERGEABLE`. GitHub shows `mergeStateStatus:
+  UNSTABLE` on every one — that is the CI checks state (the combined-review
+  workflow), **not** a merge conflict.
+- **`feat/graphics-quality-settings` is now upstream PR #43** (it was
+  "opening now" when this file was first written). PR #43 `MERGEABLE`.
+- The recommended order below is **unchanged and still valid**. #36 is still
+  superseded by #43; #32 and #40 are still the only world-rebuild PRs.
+- **No new overlaps.** #30 introduces `WorldRenderer.selectedProvinceId` /
+  `onProvinceSelected`; #43 does not touch selection. They stay independent
+  upstream.
+
+### Conflict set proven on the downstream integration branch
+
+`feat/in-game-command-ui-v2` = `review/claude-ui-stack` (PRs #29–#42 + audio
++ menu-stability) **+** PR #43, merged for continued UI work while Zoande is
+away. That merge produced exactly three conflicts, all resolved there:
+
+| File | Conflict | Resolution |
+|---|---|---|
+| `src/renderer.ts` | `resize()` — #36's `Math.min(dpr, 1.5)` vs #43's `resolveRenderPixelRatio(this.quality)` | keep #43's preset scale, drop #36's line (this is the #36→#43 supersession in practice) |
+| `src/main.ts` | #43's 3-arg `new WorldRenderer(..., loadQuality())` + `activeRenderer` vs the review stack's deferred `await import('./renderer')` and audio imports | keep both — dynamic import **and** the quality arg |
+| `src/menu/menu.ts` | `MenuHandlers` gains `onGraphicsQuality?` (#43) next to `audio?` (audio branch) | keep both fields |
+
+So when Zoande merges #43 after the stack, expect the same three — the
+`renderer.ts` one only if #36 was merged rather than closed.
+
+---
+
 ## Summary
 
 - All 14 open PRs (#29–#42) are authored by `DH4410`, target `Zoande:main`,
