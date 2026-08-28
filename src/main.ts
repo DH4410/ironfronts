@@ -68,10 +68,11 @@ const mapModeInputs = [...document.querySelectorAll<HTMLInputElement>('input[nam
 const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
-// Debug / world-inspector affordances are opt-in: dev server, ?debug, or the
-// ?benchmark hook automation needs. Production gameplay never shows them.
 const urlParams = new URLSearchParams(window.location.search);
-const debugEnabled = import.meta.env.DEV || urlParams.has('debug') || urlParams.has('benchmark');
+// Debug / world-inspector affordances are opt-in only: ?debug (or the
+// ?benchmark automation hook). They are NOT auto-enabled by the dev server, so
+// `npm run dev` shows the real player experience by default.
+const debugEnabled = urlParams.has('debug') || urlParams.has('benchmark');
 
 // The single typed channel between renderer/game systems and the player HUD.
 const uiStore = createUiStore(createInitialState({ quality: loadQuality(), debugEnabled }));
@@ -167,7 +168,9 @@ async function start(): Promise<void> {
   window.addEventListener('pagehide', (event) => {
     if (!event.persisted) renderer.dispose();
   });
-  if (import.meta.env.DEV || new URLSearchParams(window.location.search).has('benchmark')) {
+  if (import.meta.env.DEV || debugEnabled) {
+    // Invisible automation handle (QA capture / perf scripts). Not a player-
+    // facing affordance.
     (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
   }
   renderer.onHover = updateTooltip;
@@ -319,6 +322,7 @@ async function start(): Promise<void> {
   debugToggle.addEventListener('click', toggleDiagnostics);
   window.addEventListener('keydown', (event) => {
     if (event.code === 'F3') {
+      if (!debugEnabled) return;
       event.preventDefault();
       toggleDiagnostics();
       return;
