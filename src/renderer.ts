@@ -930,12 +930,13 @@ export class WorldRenderer {
       sky: [...skyColor, 0],
       // weather.y = quality index (0 low .. 3 ultra), weather.z = 0..1 detail
       // factor. Shaders can scale purely-decorative expensive work by these
-      // without a struct change.
+      // without a struct change. weather.w = encoded (1-based) selected
+      // province id, 0 when nothing is selected (border shader outline).
       weather: [
         this.environment.rainIntensity,
         QUALITY_LEVELS.indexOf(this.quality),
         this.qualityPreset.detailFactor,
-        0,
+        this.selectedId,
       ],
     });
     this.device.queue.writeBuffer(this.uniformBuffer, 0, values);

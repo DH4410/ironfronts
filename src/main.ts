@@ -5,8 +5,11 @@ import '@fontsource/cinzel-decorative/latin-ext-700.css';
 import { AudioManager } from './audio/audio-manager';
 import { MusicDirector } from './audio/music-director';
 import { TRACK_BY_ID, trackSources } from './audio/music-catalog';
-import { loadQuality } from './graphics/quality';
+import { loadQuality, saveQuality } from './graphics/quality';
 import { mountMenu } from './menu/menu';
+import { mountGameUi, type GameUiActions } from './ui/game-ui';
+import { createInitialState, createUiStore, type GameNotification } from './ui/ui-state';
+import { DEMO_ARMY } from './ui/army';
 import type { WorldRenderer, MapMode, TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
 import type { CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo } from './types';
@@ -65,6 +68,14 @@ const mapModeInputs = [...document.querySelectorAll<HTMLInputElement>('input[nam
 const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
+// Debug / world-inspector affordances are opt-in: dev server, ?debug, or the
+// ?benchmark hook automation needs. Production gameplay never shows them.
+const urlParams = new URLSearchParams(window.location.search);
+const debugEnabled = import.meta.env.DEV || urlParams.has('debug') || urlParams.has('benchmark');
+
+// The single typed channel between renderer/game systems and the player HUD.
+const uiStore = createUiStore(createInitialState({ quality: loadQuality(), debugEnabled }));
+
 const audio = new AudioManager(safeLocalStorage());
 const music = new MusicDirector(audio);
 const firstMenuTrack = TRACK_BY_ID.get('honor-bound');
@@ -114,8 +125,11 @@ mountMenu({
       loadingStage.textContent = 'Loading renderer';
       loadingValue.textContent = '0%';
       loadingBar.style.width = '0%';
-      debugToggle.hidden = false;
-      mapModes.hidden = false;
+      debugToggle.hidden = !debugEnabled;
+      // The legacy MAP OVERLAY fieldset stays in the DOM (main.ts reads its
+      // radios) but is superseded by the in-game map-mode toolbar.
+      mapModes.hidden = true;
+      uiStore.patch({ phase: 'loading' });
       void start();
     }
   },
@@ -168,6 +182,7 @@ async function start(): Promise<void> {
   };
   renderer.onDiplomacyChange = (state) => {
     renderDiplomacyState(renderer, state);
+    uiStore.patch({ playerCountry: { name: state.player.name, color: state.player.color } });
     if (state.enemies.length > 0 && music.getState() !== 'victory') {
       void music.setState('war');
     } else if (state.enemies.length === 0 && music.getState() === 'war') {
@@ -177,7 +192,53 @@ async function start(): Promise<void> {
   renderer.onProvinceCaptured = (provinceId, previousCountry, player) => {
     setDiplomacyStatus(`Province ${provinceId} taken from ${previousCountry.name} by ${player.name}.`);
   };
-  renderer.onTimeOfDayChange = (state) => updateTimeControls(state);
+  renderer.onProvinceSelected = (info) => {
+    uiStore.patch({
+      selectedProvince: info
+        ? {
+            id: info.id,
+            name: info.name,
+            owner: info.country,
+            ownerColor: info.countryColor,
+            terrain: info.terrain,
+          }
+        : null,
+    });
+  };
+  renderer.onTimeOfDayChange = (state) => {
+    updateTimeControls(state);
+    uiStore.patch({ clock: { label: `${capitalize(state.stage)} · ${state.clock}`, phase: state.stage } });
+  };
+
+  // ---- Player HUD: typed state in, typed actions out -----------------
+  const setMapModeUnified = (mode: MapMode): void => {
+    const input = mapModeInputs.find((candidate) => candidate.value === mode);
+    if (input && !input.checked) input.checked = true;
+    renderer.setMapMode(mode);
+    uiStore.patch({ mapMode: mode });
+  };
+  const gameUiActions: GameUiActions = {
+    setMapMode: (mode) => setMapModeUnified(mode as MapMode),
+    clearSelection: () => renderer.clearProvinceSelection(),
+    setQuality: (level) => {
+      renderer.setQuality(level);
+      saveQuality(level);
+      uiStore.patch({ quality: level, effectiveRenderScale: renderer.effectiveRenderScale });
+    },
+    navSelect: () => { /* No player-facing system is implemented yet. */ },
+    dismissNotification: (id) => uiStore.patch({
+      notifications: uiStore.get().notifications.filter((entry) => entry.id !== id),
+    }),
+    togglePause: (open) => uiStore.patch({ paused: open }),
+    returnToMenu: () => { /* Disabled in the UI until a safe menu-return path exists. */ },
+    openDebugInspector: () => {
+      if (debugEnabled) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3', key: 'F3' }));
+    },
+  };
+  const gameUi = mountGameUi(uiStore, gameUiActions);
+  window.addEventListener('pagehide', (event) => {
+    if (!event.persisted) gameUi.destroy();
+  });
 
   debugTime.addEventListener('change', () => {
     const hour = parseClock(debugTime.value);
@@ -196,6 +257,7 @@ async function start(): Promise<void> {
   debugRain.addEventListener('change', () => {
     renderer.setRainEnabled(debugRain.checked);
     void audio.setRainEnabled(debugRain.checked);
+    uiStore.patch({ weather: { raining: debugRain.checked, label: debugRain.checked ? 'Rain' : 'Clear' } });
   });
   debugThunder.addEventListener('click', () => {
     void audio.playThunder();
@@ -248,7 +310,7 @@ async function start(): Promise<void> {
   };
   const applyMapMode = () => {
     const selected = mapModeInputs.find((input) => input.checked)?.value;
-    if (selected && isMapMode(selected)) renderer.setMapMode(selected);
+    if (selected && isMapMode(selected)) setMapModeUnified(selected);
   };
   const toggleDiagnostics = () => {
     diagnostics.hidden = !diagnostics.hidden;
@@ -315,6 +377,21 @@ async function start(): Promise<void> {
     stopQuotes();
     window.setTimeout(() => { loading.hidden = true; }, 500);
     renderer.start();
+
+    // Hand the HUD its opening state from real renderer/game values.
+    const clock = renderer.getTimeOfDay();
+    uiStore.patch({
+      phase: 'in-game',
+      clock: { label: `${capitalize(clock.stage)} · ${clock.clock}`, phase: clock.stage },
+      quality: renderer.graphicsQuality,
+      effectiveRenderScale: renderer.effectiveRenderScale,
+      weather: { raining: renderer.isRainEnabled(), label: renderer.isRainEnabled() ? 'Rain' : 'Clear' },
+    });
+    if (debugEnabled) {
+      // Dev-only fixtures so screenshots / component tests have content. Never
+      // shown in production gameplay.
+      uiStore.patch({ notifications: DEMO_NOTIFICATIONS, selectedArmy: DEMO_ARMY });
+    }
   } catch (error) {
     stopQuotes();
     void audio.setWindEnabled(false);
@@ -492,3 +569,13 @@ function required<T extends HTMLElement>(id: string): T {
 function isMapMode(value: string): value is MapMode {
   return value === 'political' || value === 'diplomacy' || value === 'clear' || value === 'balanced';
 }
+
+function capitalize(value: string): string {
+  return value ? value[0].toUpperCase() + value.slice(1) : value;
+}
+
+const DEMO_NOTIFICATIONS: readonly GameNotification[] = [
+  { id: 'demo-info', kind: 'information', title: 'Operation underway', body: 'Command HUD preview build.', at: 0 },
+  { id: 'demo-diplo', kind: 'diplomacy', title: 'Diplomatic channel open', body: 'Placeholder event fixture.', at: 0 },
+  { id: 'demo-warn', kind: 'warning', title: 'Supply line exposed', at: 0 },
+];
