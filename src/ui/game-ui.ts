@@ -123,7 +123,8 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     button.dataset.nav = entry.id;
     button.disabled = true;
     button.title = `${entry.label} — not available yet`;
-    button.innerHTML = `<span class="ifg-rail__glyph" aria-hidden="true">${entry.glyph}</span><span class="ifg-rail__label">${entry.label}</span>`;
+    button.setAttribute('aria-label', `${entry.label} (not available yet)`);
+    button.innerHTML = `<span class="ifg-rail__glyph" aria-hidden="true">${entry.glyph}</span><span class="ifg-rail__tip">${entry.label}</span>`;
     button.addEventListener('click', () => actions.navSelect(entry.id));
     navButtons.set(entry.id, button);
     rail.append(button);
@@ -283,6 +284,12 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     root.hidden = state.phase !== 'in-game';
     root.dataset.phase = state.phase;
     inspectorButton.hidden = !state.debugEnabled;
+    // The lobby reveals the "WORLD RENDERER" brand mark on launch; in-game the
+    // command UI owns the presentation. `.brand { display:flex }` beats the
+    // [hidden] attribute, so override inline. Re-asserted every render so it
+    // outlasts the menu launch transition.
+    const brand = document.querySelector<HTMLElement>('.brand');
+    if (brand) brand.style.display = state.phase === 'in-game' ? 'none' : '';
 
     // Country
     if (state.playerCountry) {
@@ -335,17 +342,20 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
 
     // Selected context
     const { selectedProvince: province, selectedArmy: army } = state;
-    contextEmpty.hidden = Boolean(province || army);
+    // Province selection takes the context slot; the army component shows only
+    // when nothing else is selected.
+    const showArmy = Boolean(army) && !province;
+    contextEmpty.hidden = Boolean(province) || showArmy;
     provincePanel.hidden = !province;
-    context.classList.toggle('is-open', Boolean(province || army));
+    context.classList.toggle('is-open', Boolean(province) || showArmy);
     if (province) {
       pvName.textContent = province.name;
       pvOwner.textContent = province.owner;
       pvOwnerSwatch.style.setProperty('--swatch', province.ownerColor);
       pvTerrain.textContent = province.terrain;
     }
-    armyPanel.hidden = !army;
-    if (army) {
+    armyPanel.hidden = !showArmy;
+    if (showArmy && army) {
       armyPanel.replaceChildren(
         (() => { const h = el('div', 'ifg-context__head'); h.append(el('small', undefined, 'FIELD FORCE')); h.append(el('strong', 'ifg-context__title', army.name)); return h; })(),
         createArmyCounter(army),

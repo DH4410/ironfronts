@@ -29,6 +29,8 @@
   font-size: 14px;
 }
 .ifg[hidden] { display: none; }
+/* `hidden` must always win over the component display rules below. */
+.ifg [hidden] { display: none !important; }
 .ifg * { box-sizing: border-box; }
 .ifg button { font: inherit; color: inherit; cursor: pointer; }
 .ifg button:disabled { cursor: not-allowed; }
@@ -134,22 +136,39 @@
   border-right: 1px solid var(--ifg-line);
 }
 .ifg-rail__item {
+  position: relative;
   border: 0;
   background: transparent;
   color: var(--ifg-text);
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 9px 2px;
+  justify-content: center;
+  height: 42px;
   border-left: 2px solid transparent;
   opacity: 0.9;
 }
-.ifg-rail__glyph { font-size: 16px; line-height: 1; color: var(--ifg-gold-bright); }
-.ifg-rail__label { font-size: 8.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ifg-dim); }
+.ifg-rail__glyph { font-size: 17px; line-height: 1; color: var(--ifg-gold-bright); }
+/* Label is a hover tooltip, not laid-out text — keeps the rail narrow. */
+.ifg-rail__tip {
+  position: absolute;
+  left: calc(100% + 6px);
+  white-space: nowrap;
+  padding: 3px 8px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ifg-text);
+  background: var(--ifg-panel-2);
+  border: 1px solid var(--ifg-line);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.1s ease;
+  z-index: 1;
+}
+.ifg-rail__item:hover .ifg-rail__tip { opacity: 1; }
 .ifg-rail__item:not(:disabled):hover { background: rgba(201, 164, 99, 0.1); border-left-color: var(--ifg-gold); }
 .ifg-rail__item.is-active { border-left-color: var(--ifg-gold-bright); background: rgba(201, 164, 99, 0.14); }
-.ifg-rail__item:disabled { opacity: 0.4; }
+.ifg-rail__item:disabled { opacity: 0.38; }
 .ifg-rail__item:disabled .ifg-rail__glyph { color: var(--ifg-dim); }
 
 /* ---------------- map-mode toolbar ---------------- */
@@ -232,13 +251,15 @@
   right: 0;
   bottom: 0;
   min-height: 30px;
-  padding: 0 16px;
+  padding: 0 16px 12px;
   background: linear-gradient(0deg, var(--ifg-panel-2), var(--ifg-panel));
   border-top: 1px solid var(--ifg-line);
   box-shadow: 0 -10px 26px rgba(0, 0, 0, 0.4);
   transform: translateY(calc(100% - 30px));
   transition: transform 0.16s var(--ifm-ease, ease);
 }
+.ifg-context__army { display: flex; flex-direction: column; gap: 6px; padding-top: 6px; }
+.ifg-context__army .ifg-counter { margin: 2px 0; }
 .ifg-context.is-open { transform: translateY(0); }
 .ifg-context__empty { margin: 0; padding: 8px 2px; font-size: 11px; color: var(--ifg-dim); }
 .ifg-context.is-open .ifg-context__empty { display: none; }
@@ -254,7 +275,8 @@
   text-transform: uppercase;
   padding: 4px 9px;
 }
-.ifg-context__focus:hover { border-color: var(--ifg-gold); color: var(--ifg-gold-bright); }
+.ifg-context__focus:not(:disabled):hover { border-color: var(--ifg-gold); color: var(--ifg-gold-bright); }
+.ifg-context__focus:disabled { opacity: 0.4; }
 .ifg-context__close {
   margin-left: auto;
   border: 0;
