@@ -6,21 +6,18 @@
  * loop, no `getBoundingClientRect` in rAF, no MutationObserver, no
  * Unicode/emoji icons. Map/renderer effects go through typed `GameUiActions`.
  *
- * The resource-marker overlay is the one imperative surface: it is a transient
- * projection layer (like RTS unit blips), fed positions by the host's existing
- * per-frame `onStats` callback via `updateResourceMarkers`, never through the
- * store.
+ * The on-map resource / junction markers are a GPU instanced layer inside the
+ * renderer — this module never projects or positions them.
  */
 
 import './game-ui.css';
 import { QUALITY_LEVELS, QUALITY_PRESETS, type QualityLevel } from '../graphics/quality';
 import { createArmyCounter, describeArmy } from './army';
 import { createFlag } from './flags';
-import { createIcon, iconMarkup, type IconName } from './icons';
+import { createIcon, type IconName } from './icons';
 import type {
-  GameNotification, MapMode, NavId, NotificationKind, StrategicUiState, UiStore,
+  GameNotification, MapMode, NavId, NotificationKind, ProvinceResourceTotals, StrategicUiState, UiStore,
 } from './ui-state';
-import type { ResourceKind } from '../resource-nodes';
 
 export interface GameUiActions {
   setMapMode(mode: MapMode): void;
@@ -35,17 +32,8 @@ export interface GameUiActions {
   focusSelected?: () => void;
 }
 
-export interface ResourceMarker {
-  readonly id: number;
-  readonly kind: ResourceKind;
-  readonly x: number;
-  readonly y: number;
-}
-
 export interface GameUiHandle {
   destroy(): void;
-  /** Replace the projected resource markers (called from the host frame loop). */
-  updateResourceMarkers(markers: readonly ResourceMarker[]): void;
 }
 
 const MAP_MODES: ReadonlyArray<{ mode: MapMode; label: string; icon: IconName }> = [
@@ -70,6 +58,12 @@ const NOTE_ICON: Record<NotificationKind, IconName> = {
   diplomacy: 'note-diplomacy',
   information: 'note-information',
 };
+
+const RESOURCE_CHIPS: ReadonlyArray<{ key: keyof ProvinceResourceTotals; label: string; icon: IconName }> = [
+  { key: 'stone', label: 'Stone', icon: 'node-stone' },
+  { key: 'metal', label: 'Metal', icon: 'node-metal' },
+  { key: 'oil', label: 'Oil', icon: 'node-oil' },
+];
 
 const PROVINCE_ACTIONS = ['Build', 'Produce', 'Rally', 'Inspect'] as const;
 const RESERVED_FIELDS = ['Morale', 'Population', 'Supply', 'Victory pts'] as const;
@@ -226,6 +220,24 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       `<small>${label}</small><b>--</b>`));
   }
 
+  // RESOURCES — deposit abundance in the province (not production/day). Hidden
+  // when the province holds no known deposits.
+  const pvResources = el('div', 'ifg-card__resources');
+  pvResources.hidden = true;
+  pvResources.append(el('small', 'ifg-card__restitle', 'Resources'));
+  const pvResChips = el('div', 'ifg-card__reschips');
+  const pvResChipByKey = new Map<keyof ProvinceResourceTotals, { chip: HTMLElement; value: HTMLElement }>();
+  for (const { key, label, icon } of RESOURCE_CHIPS) {
+    const chip = el('span', 'ifg-rchip');
+    chip.title = `${label} deposits (strategic abundance)`;
+    chip.append(createIcon(icon, 'ifg-rchip__icon'));
+    const value = el('b', 'ifg-rchip__value', '0');
+    chip.append(value);
+    pvResChipByKey.set(key, { chip, value });
+    pvResChips.append(chip);
+  }
+  pvResources.append(pvResChips);
+
   const pvActions = el('div', 'ifg-card__actions');
   for (const label of PROVINCE_ACTIONS) {
     const b = el('button', 'ifg-card__act');
@@ -235,16 +247,11 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     b.title = `${label} — not available yet`;
     pvActions.append(b);
   }
-  provinceCard.append(pvHead, pvGrid, pvActions);
+  provinceCard.append(pvHead, pvGrid, pvResources, pvActions);
 
   // ---------------- army card (dev fixture only) ----------------
   const armyCard = el('section', 'ifg-card ifg-card--army');
   armyCard.hidden = true;
-
-  // ---------------- resource marker overlay ----------------
-  const rnodes = el('div', 'ifg-rnodes');
-  rnodes.setAttribute('aria-hidden', 'true');
-  const markerPool: HTMLElement[] = [];
 
   // ---------------- pause / system overlay ----------------
   const overlay = el('div', 'ifg-overlay');
@@ -298,7 +305,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     if (event.target === overlay) actions.togglePause(false);
   });
 
-  root.append(rnodes, topbar, dock, modeCluster, notifyStack, provinceCard, armyCard, overlay);
+  root.append(topbar, dock, modeCluster, notifyStack, provinceCard, armyCard, overlay);
   document.body.append(root);
 
   const onKey = (event: KeyboardEvent): void => {
@@ -309,9 +316,15 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   window.addEventListener('keydown', onKey);
 
   // ---------------- render (store-coalesced) ----------------
+  // Cache keys so a patch that did not change a given slice does no DOM work
+  // (the clock patches on every in-game minute; nothing below it should churn).
   let resourceSlots = '';
   let notifyKey = '';
   let armyKey = '';
+  let flagKey = '';
+  let weatherKey = '';
+  let pvFlagKey = '';
+  let pvResourceKey = '';
 
   const render = (state: StrategicUiState): void => {
     root.hidden = state.phase !== 'in-game';
@@ -326,10 +339,14 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     // Country identity — real flag, colour standard only as fallback.
     const pc = state.playerCountry;
     countryName.textContent = pc ? pc.name : 'Unassigned Command';
-    const nextFlag = createFlag(pc?.name ?? null, pc?.color ?? '#8a8f88', 'command');
-    flagHost.replaceWith(nextFlag);
-    nextFlag.classList.add('ifg-topbar__flag');
-    flagHost = nextFlag;
+    const nextFlagKey = `${pc?.name ?? ''}|${pc?.color ?? ''}`;
+    if (nextFlagKey !== flagKey) {
+      flagKey = nextFlagKey;
+      const nextFlag = createFlag(pc?.name ?? null, pc?.color ?? '#8a8f88', 'command');
+      flagHost.replaceWith(nextFlag);
+      nextFlag.classList.add('ifg-topbar__flag');
+      flagHost = nextFlag;
+    }
 
     // Resources — icon + value chips.
     const slots = state.resources.map((r) => r.id).join(',');
@@ -359,9 +376,13 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
 
     // Clock + weather.
     clockValue.textContent = state.clock?.label ?? '--';
-    weatherChip.replaceChildren(createIcon(state.weather.raining ? 'weather-rain' : 'weather-clear'));
-    weatherChip.title = `Weather — ${state.weather.label}`;
-    weatherChip.classList.toggle('is-rain', state.weather.raining);
+    const nextWeatherKey = `${state.weather.raining}|${state.weather.label}`;
+    if (nextWeatherKey !== weatherKey) {
+      weatherKey = nextWeatherKey;
+      weatherChip.replaceChildren(createIcon(state.weather.raining ? 'weather-rain' : 'weather-clear'));
+      weatherChip.title = `Weather — ${state.weather.label}`;
+      weatherChip.classList.toggle('is-rain', state.weather.raining);
+    }
 
     // Map modes.
     for (const [mode, button] of modeButtons) {
@@ -373,7 +394,6 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     // Resource overlay toggle state.
     overlayToggle.classList.toggle('is-on', state.resourceOverlay);
     overlayToggle.setAttribute('aria-pressed', String(state.resourceOverlay));
-    rnodes.classList.toggle('is-on', state.resourceOverlay);
 
     // Selected province card.
     const province = state.selectedProvince;
@@ -382,8 +402,25 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     if (province) {
       pvName.textContent = province.name;
       pvSub.textContent = `${province.owner} · ${province.terrain}`;
-      const f = createFlag(province.owner, province.ownerColor, 'inline');
-      pvFlagHost.replaceChildren(f);
+      const nextPvFlagKey = `${province.owner}|${province.ownerColor}`;
+      if (nextPvFlagKey !== pvFlagKey) {
+        pvFlagKey = nextPvFlagKey;
+        pvFlagHost.replaceChildren(createFlag(province.owner, province.ownerColor, 'inline'));
+      }
+      const res = province.resources;
+      const nextPvResourceKey = res ? `${res.stone}/${res.metal}/${res.oil}` : '';
+      if (nextPvResourceKey !== pvResourceKey) {
+        pvResourceKey = nextPvResourceKey;
+        pvResources.hidden = !res;
+        if (res) {
+          for (const { key } of RESOURCE_CHIPS) {
+            const slot = pvResChipByKey.get(key)!;
+            const amount = res[key];
+            slot.chip.hidden = amount <= 0;
+            slot.value.textContent = numberFormat.format(amount);
+          }
+        }
+      }
     }
 
     // Army card — dev fixture, and only when no province is selected.
@@ -430,27 +467,6 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       unsubscribe();
       window.removeEventListener('keydown', onKey);
       root.remove();
-    },
-    updateResourceMarkers(markers) {
-      // Grow / shrink the pool; write transforms only (no layout reads).
-      for (let i = markerPool.length; i < markers.length; i += 1) {
-        const m = el('div', 'ifg-rnode');
-        markerPool.push(m);
-        rnodes.append(m);
-      }
-      for (let i = 0; i < markerPool.length; i += 1) {
-        const node = markerPool[i];
-        const m = markers[i];
-        if (!m) { node.hidden = true; continue; }
-        node.hidden = false;
-        if (node.dataset.kind !== m.kind) {
-          node.dataset.kind = m.kind;
-          node.innerHTML = iconMarkup(
-            m.kind === 'stone' ? 'node-stone' : m.kind === 'metal' ? 'node-metal' : 'node-oil',
-          );
-        }
-        node.style.transform = `translate3d(${m.x.toFixed(1)}px, ${m.y.toFixed(1)}px, 0)`;
-      }
     },
   };
 }

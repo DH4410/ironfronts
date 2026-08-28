@@ -24,6 +24,51 @@ export interface ResourceNode {
   readonly z: number;
   /** Terrain height sampled at (x, z). */
   readonly y: number;
+  /**
+   * Deposit quantity in abstract strategic units — how much of the mineral the
+   * ground holds, NOT a production/day rate. Deterministic from position.
+   * Ranges: stone 40–300, metal 20–180, oil 50–500.
+   */
+  readonly amount: number;
+  /** `amount` mapped to 0..1 within its kind's range (marker sizing / tint). */
+  readonly richness: number;
+}
+
+/** Per-kind deposit-quantity range (abstract strategic units, not per-day). */
+export const RESOURCE_AMOUNT_RANGE: Record<ResourceKind, readonly [number, number]> = {
+  stone: [40, 300],
+  metal: [20, 180],
+  oil: [50, 500],
+};
+
+/**
+ * Deposit quantities aggregated over every resource node inside one province.
+ * Precomputed once at renderer init and looked up by province id — the tooltip
+ * / province card never scans the node list.
+ */
+export interface ProvinceResources {
+  readonly stone: number;
+  readonly metal: number;
+  readonly oil: number;
+}
+
+/** Sum deposit `amount` per kind for each province a node falls in. */
+export function aggregateProvinceResources(
+  nodes: readonly ResourceNode[],
+  provinceOf: (x: number, z: number) => number,
+): Map<number, ProvinceResources> {
+  const totals = new Map<number, { stone: number; metal: number; oil: number }>();
+  for (const node of nodes) {
+    const provinceId = provinceOf(node.x, node.z);
+    if (!provinceId) continue;
+    let entry = totals.get(provinceId);
+    if (!entry) {
+      entry = { stone: 0, metal: 0, oil: 0 };
+      totals.set(provinceId, entry);
+    }
+    entry[node.kind] += node.amount;
+  }
+  return totals as Map<number, ProvinceResources>;
 }
 
 export interface ResourceFieldInput {
@@ -49,6 +94,15 @@ function hash2(gx: number, gy: number): number {
   return h / 0xffffffff;
 }
 
+/** Deterministic deposit quantity for a node, from a position hash. */
+function depositAmount(kind: ResourceKind, x: number, z: number): { amount: number; richness: number } {
+  const [lo, hi] = RESOURCE_AMOUNT_RANGE[kind];
+  // Bias the distribution toward the low end so rich deposits stay uncommon.
+  const raw = hash2(Math.round(x * 0.5) | 0, (Math.round(z * 0.5) | 0) ^ 0x51ed);
+  const richness = raw * raw;
+  return { amount: Math.round(lo + (hi - lo) * richness), richness };
+}
+
 function sampleHeight(input: ResourceFieldInput, x: number, z: number): number {
   const f = input.heightField;
   const px = ((Math.floor(x / input.world.width * f.width) % f.width) + f.width) % f.width;
@@ -69,7 +123,8 @@ export function generateResourceNodes(input: ResourceFieldInput): ResourceNode[]
     if (counts[kind] >= CAP[kind]) return;
     const wx = ((x % world.width) + world.width) % world.width;
     const wz = Math.min(world.height, Math.max(0, z));
-    nodes.push({ id: id++, kind, x: wx, z: wz, y: sampleHeight(input, wx, wz) });
+    const { amount, richness } = depositAmount(kind, wx, wz);
+    nodes.push({ id: id++, kind, x: wx, z: wz, y: sampleHeight(input, wx, wz), amount, richness });
     counts[kind] += 1;
   };
 

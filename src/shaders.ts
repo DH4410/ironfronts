@@ -3,6 +3,7 @@ export { cityLightShader } from './shaders/city-lights';
 export { countryLabelShader } from './shaders/country-labels';
 export { infrastructureShader } from './shaders/infrastructure';
 export { lineShader } from './shaders/lines';
+export { mapMarkerShader } from './shaders/map-markers';
 export { polarCapShader } from './shaders/polar-caps';
 export { propShader } from './shaders/props';
 export { rainShader } from './shaders/rain';

@@ -49,6 +49,17 @@ export interface WeatherState {
   readonly label: string;
 }
 
+/**
+ * Deposit quantities held in a province's ground — abstract strategic
+ * abundance, NOT production/day. Precomputed by the renderer; `null` when the
+ * province has no known deposits.
+ */
+export interface ProvinceResourceTotals {
+  readonly stone: number;
+  readonly metal: number;
+  readonly oil: number;
+}
+
 export interface SelectedProvince {
   /** 0-based province id (matches FrameStats.hoveredProvince / renderer ids). */
   readonly id: number;
@@ -56,6 +67,8 @@ export interface SelectedProvince {
   readonly owner: string;
   readonly ownerColor: string;
   readonly terrain: string;
+  /** Aggregated deposit quantities, or `null` when none are known. */
+  readonly resources: ProvinceResourceTotals | null;
 }
 
 export type NavId =

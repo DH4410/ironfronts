@@ -18,8 +18,14 @@ const svgRaw = import.meta.glob('./assets/icons/ironfronts/*.svg', {
   eager: true, query: '?raw', import: 'default',
 }) as Record<string, string>;
 
+// User-provided Ironfronts raster icons (see docs/ASSET_CREDITS.md).
+const ironfrontsPngUrls = import.meta.glob('./assets/icons/ironfronts/*.png', {
+  eager: true, query: '?url', import: 'default',
+}) as Record<string, string>;
+
 const png = (name: string): string => pngUrls[`./assets/icons/0ad/${name}.png`];
 const svg = (name: string): string => svgRaw[`./assets/icons/ironfronts/${name}.svg`];
+const ironfrontsPng = (name: string): string => ironfrontsPngUrls[`./assets/icons/ironfronts/${name}.png`];
 
 export type IconName =
   | 'funds' | 'manpower' | 'food' | 'metal' | 'oil' | 'industry'
@@ -28,7 +34,7 @@ export type IconName =
   | 'resource-overlay' | 'close' | 'focus' | 'expand' | 'system'
   | 'weather-clear' | 'weather-rain'
   | 'note-warning' | 'note-combat' | 'note-completed' | 'note-diplomacy' | 'note-information'
-  | 'node-stone' | 'node-metal' | 'node-oil';
+  | 'node-stone' | 'node-metal' | 'node-oil' | 'resource-water';
 
 interface IconDef { readonly kind: 'img' | 'svg'; readonly value: string; }
 
@@ -63,6 +69,7 @@ const ICONS: Record<IconName, IconDef> = {
   'node-stone': { kind: 'img', value: png('stone') },
   'node-metal': { kind: 'img', value: png('metal') },
   'node-oil': { kind: 'svg', value: svg('oil') },
+  'resource-water': { kind: 'img', value: ironfrontsPng('water') },
 };
 
 export function createIcon(name: IconName, className = ''): HTMLElement {

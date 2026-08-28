@@ -37,7 +37,6 @@
 .ifg button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
 .ifg button:disabled { cursor: default; }
 .ifg > * { pointer-events: auto; }
-.ifg-rnodes { pointer-events: none; }
 
 .ifg-icon { display: inline-flex; width: 1em; height: 1em; flex: none; }
 .ifg-icon[data-kind="img"] img { width: 100%; height: 100%; object-fit: contain; display: block; }
@@ -362,28 +361,32 @@
 
 .ifg-card--army .ifg-counter { margin: 10px 0; }
 
-/* ================= resource marker overlay ================= */
-.ifg-rnodes {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  opacity: 0;
-  transition: opacity 0.16s ease;
+/* ---- province card: deposit abundance (not production/day) ---- */
+.ifg-card__resources {
+  margin: 0 0 11px;
+  padding-top: 9px;
+  border-top: 1px solid var(--ifg-rule-soft);
 }
-.ifg-rnodes.is-on { opacity: 1; }
-.ifg-rnode {
-  position: absolute;
-  top: 0; left: 0;
-  width: 26px; height: 26px;
-  margin: -13px 0 0 -13px;
-  display: flex; align-items: center; justify-content: center;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 40%, rgba(12, 13, 10, 0.86), rgba(12, 13, 10, 0.32) 72%, transparent);
-  will-change: transform;
+.ifg-card__restitle {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ifg-dim);
 }
-.ifg-rnode .ifg-icon { width: 19px; height: 19px; }
-.ifg-rnode[data-kind="oil"] { color: #d8c48a; }
-.ifg-rnode[data-kind="oil"] .ifg-icon { width: 16px; height: 16px; }
+.ifg-card__reschips { display: flex; gap: 8px; }
+.ifg-rchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  background: var(--ifg-chip);
+  border: 1px solid var(--ifg-rule-soft);
+  border-radius: 2px;
+}
+.ifg-rchip__icon { width: 14px; height: 14px; }
+.ifg-rchip__value { font-size: 12px; font-weight: 700; color: var(--ifg-text); }
 
 /* ================= pause / system overlay ================= */
 .ifg-overlay {

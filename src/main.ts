@@ -7,9 +7,11 @@ import { MusicDirector } from './audio/music-director';
 import { TRACK_BY_ID, trackSources } from './audio/music-catalog';
 import { loadQuality, saveQuality } from './graphics/quality';
 import { mountMenu } from './menu/menu';
-import { mountGameUi, type GameUiActions, type ResourceMarker } from './ui/game-ui';
+import { mountGameUi, type GameUiActions } from './ui/game-ui';
 import { createInitialState, createUiStore, type GameNotification } from './ui/ui-state';
 import { DEMO_ARMY } from './ui/army';
+import { iconMarkup } from './ui/icons';
+import type { ProvinceResources } from './resource-nodes';
 import type { WorldRenderer, MapMode, TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
 import type { CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo } from './types';
@@ -27,6 +29,7 @@ const loadingQuoteSource = required<HTMLElement>('loading-quote-source');
 const tooltip = required<HTMLElement>('tooltip');
 const tooltipName = required<HTMLElement>('tooltip-name');
 const tooltipTerrain = required<HTMLElement>('tooltip-terrain');
+const tooltipResources = required<HTMLElement>('tooltip-resources');
 const debugToggle = required<HTMLButtonElement>('debug-toggle');
 const diagnostics = required<HTMLElement>('diagnostics');
 const diagnosticsStats = required<HTMLElement>('diagnostics-stats');
@@ -173,7 +176,8 @@ async function start(): Promise<void> {
     // facing affordance.
     (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
   }
-  renderer.onHover = updateTooltip;
+  renderer.onHover = (info, x, y) =>
+    updateTooltip(info, x, y, info ? renderer.getProvinceResources(info.id) : null);
 
   // ---- Player HUD: typed state in, typed actions out -----------------
   const setMapModeUnified = (mode: MapMode): void => {
@@ -195,7 +199,10 @@ async function start(): Promise<void> {
       notifications: uiStore.get().notifications.filter((entry) => entry.id !== id),
     }),
     togglePause: (open) => uiStore.patch({ paused: open }),
-    toggleResourceOverlay: (on) => uiStore.patch({ resourceOverlay: on }),
+    toggleResourceOverlay: (on) => {
+      renderer.setResourceOverlay(on);
+      uiStore.patch({ resourceOverlay: on });
+    },
     returnToMenu: () => { /* Disabled in the UI until a safe menu-return path exists. */ },
     openDebugInspector: () => {
       if (debugEnabled) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3', key: 'F3' }));
@@ -207,32 +214,14 @@ async function start(): Promise<void> {
   });
 
   let oceanAudible = false;
-  // Resource markers ride the existing per-frame stats callback — no second
-  // loop. Only projected while the overlay is on and the camera is at
-  // regional / close zoom; the overview stays clutter-free.
-  const RESOURCE_MARKER_ZOOM = 3_600;
-  const RESOURCE_MARKER_CAP = 140;
-  let resourceMarkersActive = false;
+  // The resource overlay is a GPU instanced layer inside the renderer now, so
+  // this slow-cadence callback only drives audio + the debug readout. No
+  // per-frame projection, no DOM marker writes.
   renderer.onStats = (stats) => {
     const shouldHearOcean = stats.targetProvince === null && stats.distance < 2_800;
     if (shouldHearOcean !== oceanAudible) {
       oceanAudible = shouldHearOcean;
       void audio.setOceanEnabled(oceanAudible);
-    }
-    const wantMarkers = uiStore.get().resourceOverlay && stats.distance < RESOURCE_MARKER_ZOOM;
-    if (wantMarkers) {
-      const markers: ResourceMarker[] = [];
-      for (const node of renderer.resourceNodes) {
-        const p = renderer.projectGroundToScreen(node.x, node.z);
-        if (!p) continue;
-        markers.push({ id: node.id, kind: node.kind, x: p.x, y: p.y });
-        if (markers.length >= RESOURCE_MARKER_CAP) break;
-      }
-      gameUi.updateResourceMarkers(markers);
-      resourceMarkersActive = true;
-    } else if (resourceMarkersActive) {
-      gameUi.updateResourceMarkers([]);
-      resourceMarkersActive = false;
     }
     if (!diagnostics.hidden) updateDiagnostics(stats);
   };
@@ -257,6 +246,7 @@ async function start(): Promise<void> {
             owner: info.country,
             ownerColor: info.countryColor,
             terrain: info.terrain,
+            resources: renderer.getProvinceResources(info.id),
           }
         : null,
     });
@@ -482,13 +472,29 @@ function setDiplomacyStatus(message: string, error = false): void {
   debugDiplomacyStatus.classList.toggle('is-error', error);
 }
 
-function updateTooltip(info: HoverInfo | null, x: number, y: number): void {
+// Deposit abundance, not production/day. Icon art only, at most three chips,
+// row hidden when the province holds nothing.
+const RESOURCE_TOOLTIP_CHIPS = [
+  ['stone', 'node-stone'], ['metal', 'node-metal'], ['oil', 'node-oil'],
+] as const;
+
+function updateTooltip(
+  info: HoverInfo | null, x: number, y: number, resources: ProvinceResources | null,
+): void {
   if (!info) {
     tooltip.hidden = true;
     return;
   }
   tooltipName.textContent = info.name;
   tooltipTerrain.textContent = `${info.country} · ${info.terrain}`;
+  const chips = resources
+    ? RESOURCE_TOOLTIP_CHIPS
+        .filter(([key]) => resources[key] > 0)
+        .map(([key, icon]) =>
+          `<span class="tooltip-rchip">${iconMarkup(icon)}${compactNumber.format(resources[key])}</span>`)
+    : [];
+  tooltipResources.hidden = chips.length === 0;
+  tooltipResources.innerHTML = chips.join('');
   tooltip.style.setProperty('--country-color', info.countryColor);
   tooltip.style.left = `${x}px`;
   tooltip.style.top = `${y}px`;

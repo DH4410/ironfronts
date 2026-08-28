@@ -66,3 +66,10 @@ as the Ironfronts repository). Used where no suitable 0 A.D. artwork exists:
 `oil.svg` (Oil resource), `strategic.svg` / `political.svg` / `terrain.svg`
 (map modes), `pickaxe.svg` (resource overlay toggle), `provinces.svg`,
 `event.svg`, `close.svg`, `focus.svg`.
+
+### `water.png`
+
+**Source: User-provided Ironfronts asset.** A painterly water-drop-in-a-bowl
+raster supplied by the project owner for the `water` / `resource-water` icon
+slot (`src/ui/icons.ts`). It is **not** from 0 A.D. or any other third party
+and carries the same licence as the Ironfronts repository.
