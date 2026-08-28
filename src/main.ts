@@ -5,6 +5,7 @@ import '@fontsource/cinzel-decorative/latin-ext-700.css';
 import { AudioManager } from './audio/audio-manager';
 import { MusicDirector } from './audio/music-director';
 import { TRACK_BY_ID, trackSources } from './audio/music-catalog';
+import { loadQuality } from './graphics/quality';
 import { mountMenu } from './menu/menu';
 import type { WorldRenderer, MapMode, TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
@@ -92,6 +93,7 @@ window.addEventListener('pagehide', (event) => {
 });
 
 let rendererStarted = false;
+let activeRenderer: WorldRenderer | undefined;
 mountMenu({
   audio,
   onLaunch: () => {
@@ -117,6 +119,8 @@ mountMenu({
       void start();
     }
   },
+  // In the lobby this only persists; once the renderer exists it applies live.
+  onGraphicsQuality: (level) => activeRenderer?.setQuality(level),
 });
 
 function startLoadingQuotes(): () => void {
@@ -144,7 +148,8 @@ async function start(): Promise<void> {
   // Keep the complete renderer/world module graph out of the lobby bundle.
   // This import is the first point at which world rendering code is loaded.
   const { WorldRenderer } = await import('./renderer');
-  const renderer = new WorldRenderer(canvas, countryLabels);
+  const renderer = new WorldRenderer(canvas, countryLabels, loadQuality());
+  activeRenderer = renderer;
   window.addEventListener('pagehide', (event) => {
     if (!event.persisted) renderer.dispose();
   });
@@ -393,6 +398,9 @@ function updateDiagnostics(stats: FrameStats): void {
     `alt  ${stats.camera[2].toFixed(0).padStart(5)}   zoom ${stats.distance.toFixed(0)}`,
     `target    ${stats.targetProvince ?? 'water'} @ ${stats.targetElevation.toFixed(2)}`,
     `province  ${stats.hoveredProvince ?? '—'}`,
+    activeRenderer
+      ? `graphics  ${activeRenderer.graphicsQuality} @ ${activeRenderer.effectiveRenderScale.toFixed(2)}x  ${canvas.width}x${canvas.height}`
+      : 'graphics  —',
     `trees     ${stats.trees.toLocaleString()}`,
     `buildings ${stats.buildings.toLocaleString()}`,
     `roads     ${stats.emittedRoads.toLocaleString()} + ${stats.hiddenRoads} dotted`,

@@ -185,6 +185,15 @@
                 <label class="ifm__row" style="cursor:default" for="ifm-master-volume"><span><b>Master volume</b><small>Overall audio output.</small></span><input id="ifm-master-volume" type="range" min="0" max="100" value="74"></label>
                 <label class="ifm__row" style="cursor:default" for="ifm-music-volume"><span><b>Music volume</b><small>Strategic soundtrack level.</small></span><input id="ifm-music-volume" type="range" min="0" max="100" value="42"></label>
                 <label class="ifm__row" style="cursor:default"><span><b>Render scale</b><small>World renderer resolution.</small></span><input type="range" min="70" max="100" value="100"></label>
+                <div class="ifm__row ifm__row--stack">
+                  <span><b>Graphics quality</b><small id="ifm-graphics-blurb">High-quality strategic map</small></span>
+                  <div class="ifm__seg" id="ifm-graphics-quality" role="group" aria-label="Graphics quality">
+                    <button type="button" data-graphics-quality="low">Low</button>
+                    <button type="button" data-graphics-quality="medium">Medium</button>
+                    <button type="button" data-graphics-quality="high" aria-pressed="true" class="is-selected">High</button>
+                    <button type="button" data-graphics-quality="ultra">Ultra</button>
+                  </div>
+                </div>
                 <button class="ifm__primary" id="ifm-apply-settings">Apply Preferences <span>&rarr;</span></button>
               </div>
             </div>

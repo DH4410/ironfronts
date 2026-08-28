@@ -18,6 +18,7 @@ export function buildTerrainVisibility(
   cameraPosition: ArrayLike<number>,
   sampleHeight: (x: number, z: number) => number,
   intersectsView: (centerX: number, centerZ: number, radius: number) => boolean,
+  lodScale = 1,
 ): TerrainVisibility {
   const chunksX = manifest.terrain.chunksX;
   const chunksY = manifest.terrain.chunksY;
@@ -37,7 +38,9 @@ export function buildTerrainVisibility(
           centerX - cameraPosition[0], centerY - cameraPosition[1], centerZ - cameraPosition[2],
         );
         if (!intersectsView(centerX, centerZ, chunkRadius)) continue;
-        const lod = distance < 1_050 ? 0 : distance < 2_350 ? 1 : distance < 5_000 ? 2 : 3;
+        const lod = distance < 1_050 * lodScale ? 0
+          : distance < 2_350 * lodScale ? 1
+          : distance < 5_000 * lodScale ? 2 : 3;
         lodEntries[lod].push(copy * chunksPerWorld + chunkY * chunksX + chunkX);
       }
     }
@@ -111,4 +114,35 @@ export function buildPropVisibility(
     }
   }
   return { instances, draws, visibleChunks };
+}
+
+/**
+ * Hard visible-instance budget. When a frame's culled prop set still exceeds
+ * `budget`, keep a stride-sampled subset within every draw (so each LOD /
+ * mesh group is thinned proportionally and the spatial spread is preserved).
+ * This is real submitted-instance reduction, not a shader-side fade.
+ */
+export function capVisibleInstances(visibility: PropVisibility, budget: number): PropVisibility {
+  const total = visibility.instances.length;
+  if (!Number.isFinite(budget) || total <= budget || total === 0) return visibility;
+
+  const keepRatio = budget / total;
+  const kept: number[] = [];
+  const draws: PropVisibility['draws'] = [];
+  for (const draw of visibility.draws) {
+    const target = Math.max(1, Math.round(draw.instanceCount * keepRatio));
+    const stride = draw.instanceCount / target;
+    const firstInstance = kept.length;
+    for (let step = 0; step < target; step += 1) {
+      const local = Math.min(draw.instanceCount - 1, Math.floor(step * stride));
+      kept.push(visibility.instances[draw.firstInstance + local]);
+    }
+    draws.push({
+      mesh: draw.mesh,
+      lod: draw.lod,
+      firstInstance,
+      instanceCount: kept.length - firstInstance,
+    });
+  }
+  return { instances: Uint32Array.from(kept), draws, visibleChunks: visibility.visibleChunks };
 }

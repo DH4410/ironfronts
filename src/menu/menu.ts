@@ -1,11 +1,20 @@
 import './menu.css';
 import type { AudioManager, UiAudioCue } from '../audio/audio-manager';
 import { phase, runChoreo, smooth } from './choreo';
+import {
+  isQualityLevel, loadQuality, QUALITY_PRESETS, saveQuality, type QualityLevel,
+} from '../graphics/quality';
 
 export interface MenuHandlers {
   /** Called once the player commits to entering the world (campaign, continue, or sandbox). */
   onLaunch: () => void;
   audio?: AudioManager;
+  /**
+   * Fired when the player changes the graphics-quality preset in Settings.
+   * In the lobby this only persists the choice; once a WorldRenderer exists
+   * (after launch) main.ts forwards it to renderer.setQuality.
+   */
+  onGraphicsQuality?: (level: QualityLevel) => void;
 }
 
 const OPEN_DURATION = 760;
@@ -199,6 +208,32 @@ export function mountMenu(handlers: MenuHandlers): void {
       if (row.dataset.objective) updateBriefing(row);
     });
   });
+
+  // Graphics quality selector. Reads/persists the choice locally and only
+  // notifies handlers - it never initializes the world renderer from the lobby.
+  const graphicsGroup = document.getElementById('ifm-graphics-quality');
+  const graphicsBlurb = document.getElementById('ifm-graphics-blurb');
+  if (graphicsGroup) {
+    const buttons = [...graphicsGroup.querySelectorAll<HTMLButtonElement>('[data-graphics-quality]')];
+    const paint = (level: QualityLevel): void => {
+      for (const button of buttons) {
+        const active = button.dataset.graphicsQuality === level;
+        button.setAttribute('aria-pressed', String(active));
+        button.classList.toggle('is-selected', active);
+      }
+      if (graphicsBlurb) graphicsBlurb.textContent = QUALITY_PRESETS[level].blurb;
+    };
+    paint(loadQuality());
+    for (const button of buttons) {
+      button.addEventListener('click', () => {
+        const level = button.dataset.graphicsQuality;
+        if (!isQualityLevel(level)) return;
+        saveQuality(level);
+        paint(level);
+        handlers.onGraphicsQuality?.(level);
+      });
+    }
+  }
 
   function launch(): void {
     playCue('confirm');
