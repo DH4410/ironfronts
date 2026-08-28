@@ -7,6 +7,7 @@
  * demo fixture is gated to dev / `?debug` by the caller.
  */
 
+import { iconMarkup } from './icons';
 import type { ArmyStackView, CombatStatus } from './ui-state';
 
 export type { ArmyStackView, CombatStatus } from './ui-state';
@@ -36,7 +37,7 @@ export function createArmyCounter(army: ArmyStackView): HTMLElement {
     <span class="ifg-counter__corner ifg-counter__corner--tl"></span>
     <span class="ifg-counter__corner ifg-counter__corner--br"></span>
     <b class="ifg-counter__count">${army.unitCount}</b>
-    <span class="ifg-counter__glyph" aria-hidden="true">&#9876;</span>
+    ${iconMarkup('note-combat', 'ifg-counter__glyph')}
     <span class="ifg-counter__bar"><i style="width:${Math.round(army.health * 100)}%"></i></span>
   `;
   return el;

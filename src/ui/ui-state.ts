@@ -106,6 +106,8 @@ export interface StrategicUiState {
   /** Backing-store scale actually in use (diagnostics / verification). */
   readonly effectiveRenderScale: number;
   readonly paused: boolean;
+  /** Resource-deposit marker overlay toggle (off by default). */
+  readonly resourceOverlay: boolean;
   /** Whether the debug/world-inspector affordances are exposed at all. */
   readonly debugEnabled: boolean;
 }
@@ -134,6 +136,7 @@ export function createInitialState(overrides: Partial<StrategicUiState> = {}): S
     quality: 'high',
     effectiveRenderScale: 1,
     paused: false,
+    resourceOverlay: false,
     debugEnabled: false,
     ...overrides,
   };

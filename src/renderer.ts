@@ -19,6 +19,7 @@ import {
 } from './performance-monitor';
 import { createHoverInfo, pickTerrainPoint, resolvePrimaryClick } from './picking';
 import { PoliticalCache } from './political-cache';
+import { generateResourceNodes, type ResourceNode } from './resource-nodes';
 import { createRendererLayouts, createRendererPipelines } from './renderer-pipelines';
 import { beginWorldFrame, submitWorldFrame } from './renderer-frame';
 import type { InstanceLayer, PerformanceLayerVisibility } from './renderer-types';
@@ -126,6 +127,7 @@ export class WorldRenderer {
   private frustumPlanesRevision = -1;
   private heightData!: Float32Array;
   private provinceData!: Uint16Array;
+  private resourceNodeList: readonly ResourceNode[] = [];
   private waterwayMask!: Uint8Array;
   private provinceOwners!: Uint32Array;
   private provinceById = new Map<number, ProvinceRecord>();
@@ -212,6 +214,33 @@ export class WorldRenderer {
     return resolveRenderPixelRatio(this.quality);
   }
 
+  /** Deterministic visual resource-deposit layer (no economy wiring). */
+  get resourceNodes(): readonly ResourceNode[] {
+    return this.resourceNodeList;
+  }
+
+  /**
+   * Project a ground point to CSS-pixel screen space for HUD overlays.
+   * Returns null when the point is behind the camera or well off-screen.
+   * Pure read of the current view-projection — safe to call per frame.
+   */
+  projectGroundToScreen(x: number, z: number): { x: number; y: number } | null {
+    if (!this.deviceReady) return null;
+    const y = this.sampleHeight(x, z);
+    const m = this.camera.viewProjection;
+    const cx = m[0] * x + m[4] * y + m[8] * z + m[12];
+    const cy = m[1] * x + m[5] * y + m[9] * z + m[13];
+    const cw = m[3] * x + m[7] * y + m[11] * z + m[15];
+    if (cw <= 0.0001) return null;
+    const ndcX = cx / cw;
+    const ndcY = cy / cw;
+    if (ndcX < -1.25 || ndcX > 1.25 || ndcY < -1.25 || ndcY > 1.25) return null;
+    return {
+      x: (ndcX * 0.5 + 0.5) * this.canvas.clientWidth,
+      y: (1 - (ndcY * 0.5 + 0.5)) * this.canvas.clientHeight,
+    };
+  }
+
   /**
    * Switch graphics preset at runtime. Triggers one safe resize /
    * swap-chain + depth reconfigure and invalidates the visible-instance
@@ -291,6 +320,13 @@ export class WorldRenderer {
     } = await loadWorldAssetBuffers(this.manifest);
     this.heightData = new Float32Array(heightBuffer);
     this.provinceData = new Uint16Array(provinceBuffer);
+    this.resourceNodeList = generateResourceNodes({
+      surface: new Uint8Array(surfaceBuffer),
+      surfaceField: this.manifest.fields.surface,
+      height: this.heightData,
+      heightField: this.manifest.fields.height,
+      world: this.manifest.world,
+    });
     this.waterwayMask = buildWaterwayMask(new Uint8Array(navigationBuffer), this.provinceData.length);
     this.provinceOwners = new Uint32Array(provinceOwnerData);
     this.countryColors = buildCountryColorBuffer(this.manifest.politics.countries);

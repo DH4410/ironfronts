@@ -7,7 +7,7 @@ import { MusicDirector } from './audio/music-director';
 import { TRACK_BY_ID, trackSources } from './audio/music-catalog';
 import { loadQuality, saveQuality } from './graphics/quality';
 import { mountMenu } from './menu/menu';
-import { mountGameUi, type GameUiActions } from './ui/game-ui';
+import { mountGameUi, type GameUiActions, type ResourceMarker } from './ui/game-ui';
 import { createInitialState, createUiStore, type GameNotification } from './ui/ui-state';
 import { DEMO_ARMY } from './ui/army';
 import type { WorldRenderer, MapMode, TimeOfDayState } from './renderer';
@@ -174,12 +174,65 @@ async function start(): Promise<void> {
     (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
   }
   renderer.onHover = updateTooltip;
+
+  // ---- Player HUD: typed state in, typed actions out -----------------
+  const setMapModeUnified = (mode: MapMode): void => {
+    const input = mapModeInputs.find((candidate) => candidate.value === mode);
+    if (input && !input.checked) input.checked = true;
+    renderer.setMapMode(mode);
+    uiStore.patch({ mapMode: mode });
+  };
+  const gameUiActions: GameUiActions = {
+    setMapMode: (mode) => setMapModeUnified(mode as MapMode),
+    clearSelection: () => renderer.clearProvinceSelection(),
+    setQuality: (level) => {
+      renderer.setQuality(level);
+      saveQuality(level);
+      uiStore.patch({ quality: level, effectiveRenderScale: renderer.effectiveRenderScale });
+    },
+    navSelect: () => { /* No player-facing system is implemented yet. */ },
+    dismissNotification: (id) => uiStore.patch({
+      notifications: uiStore.get().notifications.filter((entry) => entry.id !== id),
+    }),
+    togglePause: (open) => uiStore.patch({ paused: open }),
+    toggleResourceOverlay: (on) => uiStore.patch({ resourceOverlay: on }),
+    returnToMenu: () => { /* Disabled in the UI until a safe menu-return path exists. */ },
+    openDebugInspector: () => {
+      if (debugEnabled) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3', key: 'F3' }));
+    },
+  };
+  const gameUi = mountGameUi(uiStore, gameUiActions);
+  window.addEventListener('pagehide', (event) => {
+    if (!event.persisted) gameUi.destroy();
+  });
+
   let oceanAudible = false;
+  // Resource markers ride the existing per-frame stats callback — no second
+  // loop. Only projected while the overlay is on and the camera is at
+  // regional / close zoom; the overview stays clutter-free.
+  const RESOURCE_MARKER_ZOOM = 3_600;
+  const RESOURCE_MARKER_CAP = 140;
+  let resourceMarkersActive = false;
   renderer.onStats = (stats) => {
     const shouldHearOcean = stats.targetProvince === null && stats.distance < 2_800;
     if (shouldHearOcean !== oceanAudible) {
       oceanAudible = shouldHearOcean;
       void audio.setOceanEnabled(oceanAudible);
+    }
+    const wantMarkers = uiStore.get().resourceOverlay && stats.distance < RESOURCE_MARKER_ZOOM;
+    if (wantMarkers) {
+      const markers: ResourceMarker[] = [];
+      for (const node of renderer.resourceNodes) {
+        const p = renderer.projectGroundToScreen(node.x, node.z);
+        if (!p) continue;
+        markers.push({ id: node.id, kind: node.kind, x: p.x, y: p.y });
+        if (markers.length >= RESOURCE_MARKER_CAP) break;
+      }
+      gameUi.updateResourceMarkers(markers);
+      resourceMarkersActive = true;
+    } else if (resourceMarkersActive) {
+      gameUi.updateResourceMarkers([]);
+      resourceMarkersActive = false;
     }
     if (!diagnostics.hidden) updateDiagnostics(stats);
   };
@@ -212,36 +265,6 @@ async function start(): Promise<void> {
     updateTimeControls(state);
     uiStore.patch({ clock: { label: `${capitalize(state.stage)} · ${state.clock}`, phase: state.stage } });
   };
-
-  // ---- Player HUD: typed state in, typed actions out -----------------
-  const setMapModeUnified = (mode: MapMode): void => {
-    const input = mapModeInputs.find((candidate) => candidate.value === mode);
-    if (input && !input.checked) input.checked = true;
-    renderer.setMapMode(mode);
-    uiStore.patch({ mapMode: mode });
-  };
-  const gameUiActions: GameUiActions = {
-    setMapMode: (mode) => setMapModeUnified(mode as MapMode),
-    clearSelection: () => renderer.clearProvinceSelection(),
-    setQuality: (level) => {
-      renderer.setQuality(level);
-      saveQuality(level);
-      uiStore.patch({ quality: level, effectiveRenderScale: renderer.effectiveRenderScale });
-    },
-    navSelect: () => { /* No player-facing system is implemented yet. */ },
-    dismissNotification: (id) => uiStore.patch({
-      notifications: uiStore.get().notifications.filter((entry) => entry.id !== id),
-    }),
-    togglePause: (open) => uiStore.patch({ paused: open }),
-    returnToMenu: () => { /* Disabled in the UI until a safe menu-return path exists. */ },
-    openDebugInspector: () => {
-      if (debugEnabled) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3', key: 'F3' }));
-    },
-  };
-  const gameUi = mountGameUi(uiStore, gameUiActions);
-  window.addEventListener('pagehide', (event) => {
-    if (!event.persisted) gameUi.destroy();
-  });
 
   debugTime.addEventListener('change', () => {
     const hour = parseClock(debugTime.value);

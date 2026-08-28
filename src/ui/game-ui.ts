@@ -1,19 +1,26 @@
 /**
  * In-game strategic command UI (v2).
  *
- * Builds the player HUD once, then updates cached text nodes from a single
+ * Builds the player HUD once, then updates cached nodes from a single
  * coalesced `render(state)` driven by `UiStore` subscription. No animation
- * loop, no `getBoundingClientRect` in rAF, no MutationObserver. All map /
- * renderer effects go through the typed `GameUiActions` the host wires to the
- * renderer.
+ * loop, no `getBoundingClientRect` in rAF, no MutationObserver, no
+ * Unicode/emoji icons. Map/renderer effects go through typed `GameUiActions`.
+ *
+ * The resource-marker overlay is the one imperative surface: it is a transient
+ * projection layer (like RTS unit blips), fed positions by the host's existing
+ * per-frame `onStats` callback via `updateResourceMarkers`, never through the
+ * store.
  */
 
 import './game-ui.css';
 import { QUALITY_LEVELS, QUALITY_PRESETS, type QualityLevel } from '../graphics/quality';
 import { createArmyCounter, describeArmy } from './army';
+import { createFlag } from './flags';
+import { createIcon, iconMarkup, type IconName } from './icons';
 import type {
   GameNotification, MapMode, NavId, NotificationKind, StrategicUiState, UiStore,
 } from './ui-state';
+import type { ResourceKind } from '../resource-nodes';
 
 export interface GameUiActions {
   setMapMode(mode: MapMode): void;
@@ -21,48 +28,51 @@ export interface GameUiActions {
   setQuality(level: QualityLevel): void;
   navSelect(id: NavId): void;
   dismissNotification(id: string): void;
-  /** Open (true) / close (false) the pause overlay. */
   togglePause(open: boolean): void;
-  /** Currently disabled in the UI; wired for when a menu return path is safe. */
+  toggleResourceOverlay(on: boolean): void;
   returnToMenu(): void;
   openDebugInspector(): void;
-  /** Fired when the "Centre map" action would run — not yet supported. */
   focusSelected?: () => void;
+}
+
+export interface ResourceMarker {
+  readonly id: number;
+  readonly kind: ResourceKind;
+  readonly x: number;
+  readonly y: number;
 }
 
 export interface GameUiHandle {
   destroy(): void;
+  /** Replace the projected resource markers (called from the host frame loop). */
+  updateResourceMarkers(markers: readonly ResourceMarker[]): void;
 }
 
-interface NavEntry { id: NavId; label: string; glyph: string; }
-
-const NAV_ENTRIES: readonly NavEntry[] = [
-  { id: 'armies', label: 'Armies', glyph: '⚔' },
-  { id: 'provinces', label: 'Provinces', glyph: '◉' },
-  { id: 'production', label: 'Production', glyph: '⚙' },
-  { id: 'research', label: 'Research', glyph: '☷' },
-  { id: 'diplomacy', label: 'Diplomacy', glyph: '✍' },
-  { id: 'economy', label: 'Economy', glyph: '▰' },
-  { id: 'intelligence', label: 'Intelligence', glyph: '◈' },
-  { id: 'events', label: 'Events', glyph: '✉' },
+const MAP_MODES: ReadonlyArray<{ mode: MapMode; label: string; icon: IconName }> = [
+  { mode: 'balanced', label: 'Strategic', icon: 'mode-strategic' },
+  { mode: 'political', label: 'Political', icon: 'mode-political' },
+  { mode: 'diplomacy', label: 'Diplomacy', icon: 'mode-diplomacy' },
+  { mode: 'clear', label: 'Terrain', icon: 'mode-terrain' },
 ];
 
-const MAP_MODES: ReadonlyArray<{ mode: MapMode; label: string; glyph: string }> = [
-  { mode: 'balanced', label: 'Strategic', glyph: '◆' },
-  { mode: 'political', label: 'Political', glyph: '▣' },
-  { mode: 'diplomacy', label: 'Diplomacy', glyph: '✥' },
-  { mode: 'clear', label: 'Terrain', glyph: '▲' },
+// Only near-term-meaningful sections. A finished game should not advertise a
+// wall of unavailable systems; the rest arrive with their subsystems.
+const DOCK_SECTIONS: ReadonlyArray<{ id: NavId; label: string; icon: IconName }> = [
+  { id: 'diplomacy', label: 'Diplomacy', icon: 'diplomacy' },
+  { id: 'economy', label: 'Economy', icon: 'economy' },
+  { id: 'events', label: 'Objectives', icon: 'objectives' },
 ];
 
-const NOTIFICATION_GLYPH: Record<NotificationKind, string> = {
-  warning: '⚠',
-  combat: '⚔',
-  completed: '✔',
-  diplomacy: '✍',
-  information: 'ℹ',
+const NOTE_ICON: Record<NotificationKind, IconName> = {
+  warning: 'note-warning',
+  combat: 'note-combat',
+  completed: 'note-completed',
+  diplomacy: 'note-diplomacy',
+  information: 'note-information',
 };
 
 const PROVINCE_ACTIONS = ['Build', 'Produce', 'Rally', 'Inspect'] as const;
+const RESERVED_FIELDS = ['Morale', 'Population', 'Supply', 'Victory pts'] as const;
 
 const numberFormat = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
@@ -79,156 +89,181 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   const root = el('div', 'ifg');
   root.hidden = true;
 
-  // ---- Top strategic bar -------------------------------------------------
+  // ---------------- top strategic bar ----------------
   const topbar = el('header', 'ifg-topbar');
   topbar.setAttribute('aria-label', 'Strategic command bar');
 
   const countryBlock = el('div', 'ifg-topbar__country');
-  const flagSwatch = el('i', 'ifg-topbar__flag');
-  flagSwatch.setAttribute('aria-hidden', 'true');
+  let flagHost = el('span', 'ifg-topbar__flag');
   const countryName = el('strong', 'ifg-topbar__country-name', 'Unassigned Command');
-  const countryText = el('span', 'ifg-topbar__country-text', '<small>COMMAND</small>');
-  countryText.append(countryName);
-  countryBlock.append(flagSwatch, countryText);
+  countryBlock.append(flagHost, countryName);
 
   const resourceStrip = el('div', 'ifg-topbar__resources');
   resourceStrip.setAttribute('role', 'group');
   resourceStrip.setAttribute('aria-label', 'National resources');
+  const resourceIcon: Partial<Record<string, IconName>> = {
+    money: 'funds', manpower: 'manpower', food: 'food',
+    metal: 'metal', oil: 'oil', industry: 'industry',
+  };
 
   const clockBlock = el('div', 'ifg-topbar__clock');
-  const clockValue = el('b', 'ifg-topbar__clock-value', '--');
-  const clockPhase = el('small', 'ifg-topbar__clock-phase', 'Awaiting orders');
-  clockBlock.append(clockPhase, clockValue);
+  const clockValue = el('b', undefined, '--');
+  clockBlock.append(clockValue);
 
-  const weatherBadge = el('button', 'ifg-topbar__weather', '<i aria-hidden="true">☀</i><span>Clear</span>');
-  weatherBadge.type = 'button';
-  weatherBadge.title = 'Weather';
-  weatherBadge.disabled = true;
+  const weatherChip = el('span', 'ifg-topbar__weather');
+  weatherChip.title = 'Weather';
+  weatherChip.append(createIcon('weather-clear'));
 
-  const pauseButton = el('button', 'ifg-topbar__system', '<i aria-hidden="true">≡</i>');
-  pauseButton.type = 'button';
-  pauseButton.title = 'System menu';
-  pauseButton.setAttribute('aria-label', 'Open system menu');
-  pauseButton.addEventListener('click', () => actions.togglePause(!store.get().paused));
+  const systemButton = el('button', 'ifg-topbar__system');
+  systemButton.type = 'button';
+  systemButton.title = 'System menu';
+  systemButton.setAttribute('aria-label', 'Open system menu');
+  systemButton.append(createIcon('system'));
+  systemButton.addEventListener('click', () => actions.togglePause(!store.get().paused));
 
-  topbar.append(countryBlock, resourceStrip, clockBlock, weatherBadge, pauseButton);
+  topbar.append(countryBlock, resourceStrip, clockBlock, weatherChip, systemButton);
 
-  // ---- Left navigation rail -------------------------------------------------
-  const rail = el('nav', 'ifg-rail');
-  rail.setAttribute('aria-label', 'Command sections');
-  const navButtons = new Map<NavId, HTMLButtonElement>();
-  for (const entry of NAV_ENTRIES) {
-    const button = el('button', 'ifg-rail__item');
-    button.type = 'button';
-    button.dataset.nav = entry.id;
-    button.disabled = true;
-    button.title = `${entry.label} — not available yet`;
-    button.setAttribute('aria-label', `${entry.label} (not available yet)`);
-    button.innerHTML = `<span class="ifg-rail__glyph" aria-hidden="true">${entry.glyph}</span><span class="ifg-rail__tip">${entry.label}</span>`;
-    button.addEventListener('click', () => actions.navSelect(entry.id));
-    navButtons.set(entry.id, button);
-    rail.append(button);
+  // ---------------- floating command dock (top-left, short) ----------------
+  const dock = el('nav', 'ifg-dock');
+  dock.setAttribute('aria-label', 'Command');
+
+  const overlayToggle = el('button', 'ifg-dock__btn ifg-dock__btn--primary');
+  overlayToggle.type = 'button';
+  overlayToggle.title = 'Resource deposits';
+  overlayToggle.setAttribute('aria-label', 'Toggle resource deposits');
+  overlayToggle.append(createIcon('resource-overlay'), el('span', 'ifg-dock__tip', 'Resources'));
+  overlayToggle.addEventListener('click', () => actions.toggleResourceOverlay(!store.get().resourceOverlay));
+
+  const expandBtn = el('button', 'ifg-dock__btn ifg-dock__expand');
+  expandBtn.type = 'button';
+  expandBtn.title = 'More';
+  expandBtn.setAttribute('aria-expanded', 'false');
+  expandBtn.append(createIcon('expand'));
+
+  const dockMore = el('div', 'ifg-dock__more');
+  dockMore.hidden = true;
+  for (const section of DOCK_SECTIONS) {
+    const b = el('button', 'ifg-dock__btn');
+    b.type = 'button';
+    b.disabled = true;
+    b.dataset.nav = section.id;
+    b.title = `${section.label} — not available yet`;
+    b.setAttribute('aria-label', `${section.label} (not available yet)`);
+    b.append(createIcon(section.icon), el('span', 'ifg-dock__tip', section.label));
+    b.addEventListener('click', () => actions.navSelect(section.id));
+    dockMore.append(b);
   }
+  expandBtn.addEventListener('click', () => {
+    const open = dockMore.hidden;
+    dockMore.hidden = !open;
+    expandBtn.setAttribute('aria-expanded', String(open));
+    expandBtn.classList.toggle('is-open', open);
+  });
+  dock.append(overlayToggle, dockMore, expandBtn);
 
-  // ---- Map-mode toolbar (top-right, over map) -----------------------------
-  const modeBar = el('div', 'ifg-modes');
-  modeBar.setAttribute('role', 'group');
-  modeBar.setAttribute('aria-label', 'Map mode');
+  // ---------------- map-mode cluster (top-right) ----------------
+  const modeCluster = el('div', 'ifg-modes');
+  modeCluster.setAttribute('role', 'group');
+  modeCluster.setAttribute('aria-label', 'Map mode');
   const modeButtons = new Map<MapMode, HTMLButtonElement>();
-  for (const { mode, label, glyph } of MAP_MODES) {
+  for (const { mode, label, icon } of MAP_MODES) {
     const button = el('button', 'ifg-modes__item');
     button.type = 'button';
     button.dataset.mode = mode;
     button.title = label;
-    button.innerHTML = `<span aria-hidden="true">${glyph}</span><span class="ifg-modes__label">${label}</span>`;
+    button.append(createIcon(icon), el('span', 'ifg-modes__label', label));
     button.addEventListener('click', () => actions.setMapMode(mode));
     modeButtons.set(mode, button);
-    modeBar.append(button);
+    modeCluster.append(button);
   }
-
   const inspectorButton = el('button', 'ifg-modes__inspector', 'F3');
   inspectorButton.type = 'button';
   inspectorButton.title = 'World inspector';
+  inspectorButton.hidden = true;
   inspectorButton.addEventListener('click', () => actions.openDebugInspector());
-  modeBar.append(inspectorButton);
+  modeCluster.append(inspectorButton);
 
-  // ---- Notifications (top-right, below map modes) ------------------------
+  // ---------------- notifications ----------------
   const notifyStack = el('div', 'ifg-notify');
   notifyStack.setAttribute('aria-live', 'polite');
   notifyStack.setAttribute('aria-label', 'Events');
 
-  // ---- Selected context panel (bottom) --------------------------------
-  const context = el('section', 'ifg-context');
-  context.setAttribute('aria-live', 'polite');
-  const contextEmpty = el('p', 'ifg-context__empty', 'Select a province to open its field report.');
+  // ---------------- selected province card (compact, bottom-left) ----------------
+  const provinceCard = el('section', 'ifg-card ifg-card--province');
+  provinceCard.hidden = true;
+  provinceCard.setAttribute('aria-live', 'polite');
 
-  const provincePanel = el('div', 'ifg-context__province');
-  provincePanel.hidden = true;
-  const pvName = el('strong', 'ifg-context__title', '');
-  const pvClose = el('button', 'ifg-context__close', '×');
+  const pvName = el('strong', 'ifg-card__title', '');
+  const pvSub = el('span', 'ifg-card__sub', '');
+  const pvClose = el('button', 'ifg-card__close');
   pvClose.type = 'button';
   pvClose.title = 'Clear selection';
   pvClose.setAttribute('aria-label', 'Clear selection');
+  pvClose.append(createIcon('close'));
   pvClose.addEventListener('click', () => actions.clearSelection());
-  const pvFocus = el('button', 'ifg-context__focus', 'Centre map');
-  pvFocus.type = 'button';
+
+  const pvFlagHost = el('span', 'ifg-card__flag');
+  const pvHead = el('header', 'ifg-card__head');
+  const pvHeadText = el('span', 'ifg-card__headtext');
+  pvHeadText.append(pvName, pvSub);
+
+  const pvFocusBtn = el('button', 'ifg-card__iconbtn');
+  pvFocusBtn.type = 'button';
+  pvFocusBtn.title = 'Centre map on province';
+  pvFocusBtn.setAttribute('aria-label', 'Centre map on province');
+  pvFocusBtn.append(createIcon('focus'));
   if (actions.focusSelected) {
-    pvFocus.addEventListener('click', () => actions.focusSelected?.());
+    pvFocusBtn.addEventListener('click', () => actions.focusSelected?.());
   } else {
-    pvFocus.disabled = true;
-    pvFocus.title = 'Centre map — not available yet';
+    pvFocusBtn.disabled = true;
+    pvFocusBtn.title = 'Centre map — not available yet';
+  }
+  pvHead.append(pvFlagHost, pvHeadText, pvFocusBtn, pvClose);
+
+  const pvGrid = el('div', 'ifg-card__grid');
+  for (const label of RESERVED_FIELDS) {
+    pvGrid.append(el('span', 'ifg-field is-pending',
+      `<small>${label}</small><b>--</b>`));
   }
 
-  const pvOwner = el('b', 'ifg-field__value', '—');
-  const pvTerrain = el('b', 'ifg-field__value', '—');
-  const pvOwnerSwatch = el('i', 'ifg-field__swatch');
-  pvOwnerSwatch.setAttribute('aria-hidden', 'true');
-  const ownerField = el('span', 'ifg-field');
-  ownerField.append(el('small', undefined, 'CONTROL'), pvOwnerSwatch, pvOwner);
-  const terrainField = el('span', 'ifg-field');
-  terrainField.append(el('small', undefined, 'TERRAIN'), pvTerrain);
-  const pvGrid = el('div', 'ifg-context__grid');
-  pvGrid.append(ownerField, terrainField);
-  // Reserved rows for systems that do not exist yet.
-  const pvReserved = el('div', 'ifg-context__reserved');
-  for (const label of ['Morale', 'Population', 'Supply', 'Victory pts']) {
-    pvReserved.append(el('span', 'ifg-field is-pending',
-      `<small>${label.toUpperCase()}</small><b class="ifg-field__value">--</b>`));
-  }
-  const pvActions = el('div', 'ifg-context__actions');
+  const pvActions = el('div', 'ifg-card__actions');
   for (const label of PROVINCE_ACTIONS) {
-    const button = el('button', 'ifg-context__action');
-    button.type = 'button';
-    button.textContent = label;
-    button.disabled = true;
-    button.title = `${label} — not available yet`;
-    pvActions.append(button);
+    const b = el('button', 'ifg-card__act');
+    b.type = 'button';
+    b.textContent = label;
+    b.disabled = true;
+    b.title = `${label} — not available yet`;
+    pvActions.append(b);
   }
-  const pvHead = el('div', 'ifg-context__head');
-  pvHead.append(el('small', undefined, 'FIELD REPORT'), pvName, pvFocus, pvClose);
-  provincePanel.append(pvHead, pvGrid, pvReserved, pvActions);
+  provinceCard.append(pvHead, pvGrid, pvActions);
 
-  const armyPanel = el('div', 'ifg-context__army');
-  armyPanel.hidden = true;
-  context.append(contextEmpty, provincePanel, armyPanel);
+  // ---------------- army card (dev fixture only) ----------------
+  const armyCard = el('section', 'ifg-card ifg-card--army');
+  armyCard.hidden = true;
 
-  // ---- Pause / system overlay ------------------------------------------
+  // ---------------- resource marker overlay ----------------
+  const rnodes = el('div', 'ifg-rnodes');
+  rnodes.setAttribute('aria-hidden', 'true');
+  const markerPool: HTMLElement[] = [];
+
+  // ---------------- pause / system overlay ----------------
   const overlay = el('div', 'ifg-overlay');
   overlay.hidden = true;
   overlay.setAttribute('role', 'dialog');
   overlay.setAttribute('aria-modal', 'true');
   overlay.setAttribute('aria-label', 'System menu');
   const overlayCard = el('div', 'ifg-overlay__card');
-  overlayCard.innerHTML = '<header class="ifg-overlay__head"><small>Command</small><h2>Operations Paused</h2></header>';
+  overlayCard.innerHTML =
+    '<header class="ifg-overlay__head"><small>Command</small><h2>Operations Paused</h2></header>';
 
   const resumeButton = el('button', 'ifg-overlay__primary', 'Resume');
   resumeButton.type = 'button';
   resumeButton.addEventListener('click', () => actions.togglePause(false));
 
-  const qualityGroup = el('div', 'ifg-overlay__quality');
+  const qualityGroup = el('div', 'ifg-overlay__group');
   qualityGroup.setAttribute('role', 'group');
   qualityGroup.setAttribute('aria-label', 'Graphics quality');
-  qualityGroup.append(el('small', undefined, 'GRAPHICS QUALITY'));
+  qualityGroup.append(el('small', undefined, 'Graphics quality'));
   const qualitySeg = el('div', 'ifg-seg');
   const qualityButtons = new Map<QualityLevel, HTMLButtonElement>();
   for (const level of QUALITY_LEVELS) {
@@ -244,29 +279,26 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   qualityGroup.append(qualitySeg, qualityBlurb);
 
   const secondary = el('div', 'ifg-overlay__secondary');
-  const settingsNote = el('button', 'ifg-overlay__link', 'More settings (main menu)');
-  settingsNote.type = 'button';
-  settingsNote.disabled = true;
-  settingsNote.title = 'Full settings live in the main menu for now';
-  const saveButton = el('button', 'ifg-overlay__link', 'Save');
-  saveButton.type = 'button';
-  saveButton.disabled = true;
-  saveButton.title = 'Saving is not available yet';
-  const menuButton = el('button', 'ifg-overlay__link', 'Return to Main Menu');
-  menuButton.type = 'button';
-  menuButton.disabled = true;
-  menuButton.title = 'Returning to the menu mid-operation is not available yet';
-  menuButton.addEventListener('click', () => actions.returnToMenu());
-  secondary.append(settingsNote, saveButton, menuButton);
-
-  const renderScaleLine = el('p', 'ifg-overlay__diag', '');
-  overlayCard.append(resumeButton, qualityGroup, secondary, renderScaleLine);
+  for (const [label, title] of [
+    ['More settings (main menu)', 'Full settings live in the main menu for now'],
+    ['Save', 'Saving is not available yet'],
+    ['Return to Main Menu', 'Returning to the menu mid-operation is not available yet'],
+  ] as const) {
+    const b = el('button', 'ifg-overlay__link', label);
+    b.type = 'button';
+    b.disabled = true;
+    b.title = title;
+    if (label.startsWith('Return')) b.addEventListener('click', () => actions.returnToMenu());
+    secondary.append(b);
+  }
+  const diagLine = el('p', 'ifg-overlay__diag', '');
+  overlayCard.append(resumeButton, qualityGroup, secondary, diagLine);
   overlay.append(overlayCard);
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay) actions.togglePause(false);
   });
 
-  root.append(topbar, rail, modeBar, notifyStack, context, overlay);
+  root.append(rnodes, topbar, dock, modeCluster, notifyStack, provinceCard, armyCard, overlay);
   document.body.append(root);
 
   const onKey = (event: KeyboardEvent): void => {
@@ -276,107 +308,109 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   };
   window.addEventListener('keydown', onKey);
 
-  // ---- Render (coalesced by the store) ---------------------------------
-  const renderedResourceIds: string[] = [];
-  let renderedNotificationIds = '';
+  // ---------------- render (store-coalesced) ----------------
+  let resourceSlots = '';
+  let notifyKey = '';
+  let armyKey = '';
 
   const render = (state: StrategicUiState): void => {
     root.hidden = state.phase !== 'in-game';
     root.dataset.phase = state.phase;
     inspectorButton.hidden = !state.debugEnabled;
-    // The lobby reveals the "WORLD RENDERER" brand mark on launch; in-game the
-    // command UI owns the presentation. `.brand { display:flex }` beats the
-    // [hidden] attribute, so override inline. Re-asserted every render so it
-    // outlasts the menu launch transition.
+
+    // `.brand { display:flex }` beats [hidden]; override inline, re-asserted so
+    // it outlasts the menu launch transition.
     const brand = document.querySelector<HTMLElement>('.brand');
     if (brand) brand.style.display = state.phase === 'in-game' ? 'none' : '';
 
-    // Country
-    if (state.playerCountry) {
-      countryName.textContent = state.playerCountry.name;
-      flagSwatch.style.setProperty('--flag', state.playerCountry.color);
-    } else {
-      countryName.textContent = 'Unassigned Command';
-      flagSwatch.style.removeProperty('--flag');
-    }
+    // Country identity — real flag, colour standard only as fallback.
+    const pc = state.playerCountry;
+    countryName.textContent = pc ? pc.name : 'Unassigned Command';
+    const nextFlag = createFlag(pc?.name ?? null, pc?.color ?? '#8a8f88', 'command');
+    flagHost.replaceWith(nextFlag);
+    nextFlag.classList.add('ifg-topbar__flag');
+    flagHost = nextFlag;
 
-    // Resources (stable slots; null -> disabled "--")
-    const ids = state.resources.map((r) => r.id).join(',');
-    if (ids !== renderedResourceIds.join(',')) {
+    // Resources — icon + value chips.
+    const slots = state.resources.map((r) => r.id).join(',');
+    if (slots !== resourceSlots) {
       resourceStrip.replaceChildren(...state.resources.map((line) => {
-        const cell = el('span', 'ifg-res');
-        cell.dataset.res = line.id;
-        cell.append(
-          el('small', 'ifg-res__label', line.label),
-          el('b', 'ifg-res__value', ''),
-        );
-        return cell;
+        const chip = el('span', 'ifg-res');
+        chip.dataset.res = line.id;
+        const ic = resourceIcon[line.id];
+        if (ic) chip.append(createIcon(ic, 'ifg-res__icon'));
+        chip.append(el('b', 'ifg-res__value', ''));
+        return chip;
       }));
-      renderedResourceIds.splice(0, renderedResourceIds.length, ...state.resources.map((r) => r.id));
+      resourceSlots = slots;
     }
     for (const line of state.resources) {
-      const cell = resourceStrip.querySelector<HTMLElement>(`[data-res="${line.id}"]`);
-      if (!cell) continue;
-      const value = cell.querySelector('.ifg-res__value')!;
+      const chip = resourceStrip.querySelector<HTMLElement>(`[data-res="${line.id}"]`);
+      if (!chip) continue;
       const pending = line.value === null;
-      cell.classList.toggle('is-pending', pending);
-      cell.classList.toggle('is-demo', Boolean(line.demo));
-      value.textContent = pending ? '--' : numberFormat.format(line.value as number);
-      cell.title = pending
-        ? `${line.label}: economy system not implemented yet`
-        : `${line.label}${line.demo ? ' (demo value)' : ''}`;
+      chip.classList.toggle('is-pending', pending);
+      chip.classList.toggle('is-demo', Boolean(line.demo));
+      chip.querySelector('.ifg-res__value')!.textContent =
+        pending ? '--' : numberFormat.format(line.value as number);
+      chip.title = pending
+        ? `${line.label} — economy not implemented yet`
+        : `${line.label}${line.demo ? ' (demo)' : ''}`;
     }
 
-    // Clock + weather
+    // Clock + weather.
     clockValue.textContent = state.clock?.label ?? '--';
-    clockPhase.textContent = state.clock ? 'World time' : 'Awaiting orders';
-    weatherBadge.querySelector('span')!.textContent = state.weather.label;
-    weatherBadge.querySelector('i')!.textContent = state.weather.raining ? '☂' : '☀';
-    weatherBadge.classList.toggle('is-rain', state.weather.raining);
+    weatherChip.replaceChildren(createIcon(state.weather.raining ? 'weather-rain' : 'weather-clear'));
+    weatherChip.title = `Weather — ${state.weather.label}`;
+    weatherChip.classList.toggle('is-rain', state.weather.raining);
 
-    // Map modes
+    // Map modes.
     for (const [mode, button] of modeButtons) {
-      button.classList.toggle('is-active', mode === state.mapMode);
-      button.setAttribute('aria-pressed', String(mode === state.mapMode));
+      const active = mode === state.mapMode;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-pressed', String(active));
     }
 
-    // Selected context
-    const { selectedProvince: province, selectedArmy: army } = state;
-    // Province selection takes the context slot; the army component shows only
-    // when nothing else is selected.
-    const showArmy = Boolean(army) && !province;
-    contextEmpty.hidden = Boolean(province) || showArmy;
-    provincePanel.hidden = !province;
-    context.classList.toggle('is-open', Boolean(province) || showArmy);
+    // Resource overlay toggle state.
+    overlayToggle.classList.toggle('is-on', state.resourceOverlay);
+    overlayToggle.setAttribute('aria-pressed', String(state.resourceOverlay));
+    rnodes.classList.toggle('is-on', state.resourceOverlay);
+
+    // Selected province card.
+    const province = state.selectedProvince;
+    const army = state.selectedArmy;
+    provinceCard.hidden = !province;
     if (province) {
       pvName.textContent = province.name;
-      pvOwner.textContent = province.owner;
-      pvOwnerSwatch.style.setProperty('--swatch', province.ownerColor);
-      pvTerrain.textContent = province.terrain;
-    }
-    armyPanel.hidden = !showArmy;
-    if (showArmy && army) {
-      armyPanel.replaceChildren(
-        (() => { const h = el('div', 'ifg-context__head'); h.append(el('small', undefined, 'FIELD FORCE')); h.append(el('strong', 'ifg-context__title', army.name)); return h; })(),
-        createArmyCounter(army),
-        (() => {
-          const grid = el('div', 'ifg-context__grid');
-          for (const [label, value] of describeArmy(army)) {
-            grid.append(el('span', 'ifg-field', `<small>${label.toUpperCase()}</small><b class="ifg-field__value">${value}</b>`));
-          }
-          return grid;
-        })(),
-      );
+      pvSub.textContent = `${province.owner} · ${province.terrain}`;
+      const f = createFlag(province.owner, province.ownerColor, 'inline');
+      pvFlagHost.replaceChildren(f);
     }
 
-    // Notifications
-    const notifyKey = state.notifications.map((n) => n.id).join(',');
-    if (notifyKey !== renderedNotificationIds) {
+    // Army card — dev fixture, and only when no province is selected.
+    const showArmy = Boolean(army) && !province;
+    armyCard.hidden = !showArmy;
+    const nextArmyKey = showArmy && army ? army.id + army.combat + army.selected : '';
+    if (nextArmyKey !== armyKey) {
+      armyKey = nextArmyKey;
+      if (showArmy && army) {
+        const head = el('header', 'ifg-card__head');
+        head.append(el('strong', 'ifg-card__title', army.name));
+        const grid = el('div', 'ifg-card__grid');
+        for (const [label, value] of describeArmy(army)) {
+          grid.append(el('span', 'ifg-field', `<small>${label}</small><b>${value}</b>`));
+        }
+        armyCard.replaceChildren(head, createArmyCounter(army), grid);
+      }
+    }
+
+    // Notifications.
+    const nextNotifyKey = state.notifications.map((n) => n.id).join(',');
+    if (nextNotifyKey !== notifyKey) {
       notifyStack.replaceChildren(...state.notifications.map((n) => buildNotification(n, actions)));
-      renderedNotificationIds = notifyKey;
+      notifyKey = nextNotifyKey;
     }
 
-    // Pause overlay
+    // Pause overlay.
     overlay.hidden = !state.paused;
     for (const [level, button] of qualityButtons) {
       const active = level === state.quality;
@@ -384,8 +418,8 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       button.setAttribute('aria-pressed', String(active));
     }
     qualityBlurb.textContent = QUALITY_PRESETS[state.quality].blurb;
-    renderScaleLine.textContent =
-      `Effective render scale ${state.effectiveRenderScale.toFixed(2)}x  ·  ${state.quality.toUpperCase()}`;
+    diagLine.textContent =
+      `Effective render scale ${state.effectiveRenderScale.toFixed(2)}x · ${state.quality.toUpperCase()}`;
   };
 
   render(store.get());
@@ -397,27 +431,42 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       window.removeEventListener('keydown', onKey);
       root.remove();
     },
+    updateResourceMarkers(markers) {
+      // Grow / shrink the pool; write transforms only (no layout reads).
+      for (let i = markerPool.length; i < markers.length; i += 1) {
+        const m = el('div', 'ifg-rnode');
+        markerPool.push(m);
+        rnodes.append(m);
+      }
+      for (let i = 0; i < markerPool.length; i += 1) {
+        const node = markerPool[i];
+        const m = markers[i];
+        if (!m) { node.hidden = true; continue; }
+        node.hidden = false;
+        if (node.dataset.kind !== m.kind) {
+          node.dataset.kind = m.kind;
+          node.innerHTML = iconMarkup(
+            m.kind === 'stone' ? 'node-stone' : m.kind === 'metal' ? 'node-metal' : 'node-oil',
+          );
+        }
+        node.style.transform = `translate3d(${m.x.toFixed(1)}px, ${m.y.toFixed(1)}px, 0)`;
+      }
+    },
   };
 }
 
 function buildNotification(n: GameNotification, actions: GameUiActions): HTMLElement {
   const item = el('article', 'ifg-notify__item');
   item.dataset.kind = n.kind;
-  item.innerHTML = `
-    <span class="ifg-notify__glyph" aria-hidden="true">${NOTIFICATION_GLYPH[n.kind]}</span>
-    <div class="ifg-notify__body">
-      <strong>${escapeHtml(n.title)}</strong>
-      ${n.body ? `<span>${escapeHtml(n.body)}</span>` : ''}
-    </div>
-    <button type="button" class="ifg-notify__dismiss" aria-label="Dismiss">×</button>
-  `;
-  item.querySelector('.ifg-notify__dismiss')!.addEventListener('click', () => actions.dismissNotification(n.id));
+  const icon = createIcon(NOTE_ICON[n.kind], 'ifg-notify__icon');
+  const body = el('div', 'ifg-notify__body');
+  body.append(el('strong', undefined, n.title));
+  if (n.body) body.append(el('span', undefined, n.body));
+  const dismiss = el('button', 'ifg-notify__dismiss');
+  dismiss.type = 'button';
+  dismiss.setAttribute('aria-label', 'Dismiss');
+  dismiss.append(createIcon('close'));
+  dismiss.addEventListener('click', () => actions.dismissNotification(n.id));
+  item.append(icon, body, dismiss);
   return item;
-}
-
-const HTML_ESCAPES: Record<string, string> = {
-  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-};
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (c) => HTML_ESCAPES[c] ?? c);
 }
