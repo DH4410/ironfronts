@@ -97,6 +97,51 @@ export class GameSession {
     return this.state.provinceOwners[provinceId] === this.state.playerCountryId;
   }
 
+  /**
+   * Player-facing summary of a province, fog-aware (§5, §27). Deposit detail is
+   * withheld for provinces the player does not own while fog of war is active.
+   */
+  describeProvince(provinceId: number): {
+    ownerId: number;
+    ownerName: string;
+    ownerColor: string;
+    isOwn: boolean;
+    resources: { stone: number; metal: number; oil: number } | null;
+    controlled: boolean;
+    extracting: boolean;
+  } {
+    const ownerId = this.state.provinceOwners[provinceId] ?? 0;
+    const owner = this.state.countries[ownerId];
+    const isOwn = ownerId === this.state.playerCountryId;
+    const detailVisible = isOwn || !this.state.fogOfWar;
+
+    let resources: { stone: number; metal: number; oil: number } | null = null;
+    let controlled = false;
+    let extracting = false;
+    if (detailVisible) {
+      const totals = { stone: 0, metal: 0, oil: 0 };
+      let any = false;
+      for (const node of Object.values(this.state.resourceNodes)) {
+        if (node.provinceId !== provinceId) continue;
+        any = true;
+        totals[node.kind] += node.remaining;
+        if (node.controllerCountryId === ownerId) controlled = true;
+        if (node.status === 'extracting') extracting = true;
+      }
+      resources = any ? totals : null;
+    }
+
+    return {
+      ownerId,
+      ownerName: owner?.name ?? `Country ${ownerId}`,
+      ownerColor: owner?.color ?? '#888888',
+      isOwn,
+      resources,
+      controlled,
+      extracting,
+    };
+  }
+
   isAtWar(a: number, b: number): boolean {
     return relationOf(this.state, a, b) === 'war';
   }

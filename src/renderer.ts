@@ -45,7 +45,7 @@ import { getVisibleInstanceView, updateVisibleInstanceView } from './visible-ins
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
 // Strategic markers are a regional / close-zoom aid; above this orbit distance
 // the overview map stays clean and the marker draw is skipped entirely.
-const MAP_MARKER_MAX_DISTANCE = 3_600;
+const MAP_MARKER_MAX_DISTANCE = 5_000;
 const MIN_RAIN_PARTICLES = 400;
 const MAX_RAIN_PARTICLES = 1_400;
 
@@ -89,6 +89,7 @@ export class WorldRenderer {
   private rainPipeline!: GPURenderPipeline;
   private linePipeline!: GPURenderPipeline;
   private mapMarkerPipeline!: GPURenderPipeline;
+  private armyMarkerPipeline!: GPURenderPipeline;
   private countryLabelPipeline!: GPURenderPipeline;
   private countryLabelBuffer?: GPUBuffer;
   private countryLabelParamsBuffer?: GPUBuffer;
@@ -137,6 +138,15 @@ export class WorldRenderer {
   private provinceResources = new Map<number, ProvinceResources>();
   private mapMarkers?: InstanceLayer;
   private showResourceOverlay = false;
+  /** Dynamic army-stack markers (§9). Fixed capacity; only the used prefix is
+   *  drawn. Rewritten from authoritative GameState when the army set changes. */
+  private armyMarkers?: InstanceLayer;
+  private static readonly ARMY_MARKER_CAPACITY = 1_024;
+  /** Dynamic resource-deposit markers fed from authoritative GameState (natural
+   *  + scenario-guaranteed). Supplements the static `mapMarkers` layer, which
+   *  only knows the renderer-generated natural nodes + junctions. */
+  private gameResourceMarkers?: InstanceLayer;
+  private static readonly RESOURCE_MARKER_CAPACITY = 4_096;
   /** Flat (ax, az, bx, bz) edges of the movement/road graph — junction input. */
   private connectionGraph?: Float32Array;
   /** World-space centres of the more populous provinces (junction spacing). */
@@ -499,6 +509,7 @@ export class WorldRenderer {
     this.signs = this.createInstanceLayer('road signs', signBuffer, this.manifest.buffers.signs.count, 4, this.instanceLayout, true);
     this.borders = this.createInstanceLayer('borders', borderBuffer, this.manifest.buffers.borders.count, 0, this.lineLayout);
     this.createStrategicMarkerLayer();
+    this.createArmyMarkerLayer();
     this.updateBorderVisibility();
     if (this.countryLabelCanvas) {
       await loadCountryLabelFont();
@@ -764,6 +775,7 @@ export class WorldRenderer {
     this.rainPipeline = pipelines.rain;
     this.linePipeline = pipelines.lines;
     this.mapMarkerPipeline = pipelines.mapMarkers;
+    this.armyMarkerPipeline = pipelines.armyMarkers;
     this.countryLabelPipeline = pipelines.countryLabels;
   }
 
@@ -876,6 +888,56 @@ export class WorldRenderer {
     this.mapMarkers = this.createInstanceLayer(
       'strategic map markers', data.buffer as ArrayBuffer, total, 0, this.lineLayout,
     );
+  }
+
+  /** Allocate the fixed-capacity army-marker instance buffer (2×vec4f per
+   *  stack). `setArmyMarkers` fills only the used prefix each update. */
+  private createArmyMarkerLayer(): void {
+    const zero = new Float32Array(WorldRenderer.ARMY_MARKER_CAPACITY * 8);
+    this.armyMarkers = this.createInstanceLayer(
+      'army stack markers', zero.buffer as ArrayBuffer, 0, 0, this.lineLayout,
+    );
+    const zeroR = new Float32Array(WorldRenderer.RESOURCE_MARKER_CAPACITY * 4);
+    this.gameResourceMarkers = this.createInstanceLayer(
+      'game resource markers', zeroR.buffer as ArrayBuffer, 0, 0, this.lineLayout,
+    );
+  }
+
+  /** Replace the authoritative resource-deposit markers. `records` is 4 floats
+   *  per node: (worldX, worldZ, kind[0 stone/1 metal/2 oil], richness 0..1). */
+  setGameResourceMarkers(records: Float32Array, count: number): void {
+    if (!this.gameResourceMarkers) return;
+    const capped = Math.min(count, WorldRenderer.RESOURCE_MARKER_CAPACITY);
+    if (capped > 0) {
+      this.device.queue.writeBuffer(
+        this.gameResourceMarkers.buffer, 0,
+        records.buffer as ArrayBuffer, records.byteOffset, capped * 4 * 4,
+      );
+    }
+    this.device.queue.writeBuffer(
+      this.gameResourceMarkers.params, 0, new Uint32Array([Math.max(1, capped), 0, 1, 0]),
+    );
+    this.gameResourceMarkers.count = capped;
+  }
+
+  /**
+   * Replace the drawn army markers. `records` is 8 floats per stack — see
+   * `armyMarkerShader`. `count` stacks are drawn; the rest of the capacity is
+   * ignored. Cheap: one buffer write, no pipeline or bind-group churn (§48).
+   */
+  setArmyMarkers(records: Float32Array, count: number): void {
+    if (!this.armyMarkers) return;
+    const capped = Math.min(count, WorldRenderer.ARMY_MARKER_CAPACITY);
+    if (capped > 0) {
+      this.device.queue.writeBuffer(
+        this.armyMarkers.buffer, 0,
+        records.buffer as ArrayBuffer, records.byteOffset, capped * 8 * 4,
+      );
+    }
+    this.device.queue.writeBuffer(
+      this.armyMarkers.params, 0, new Uint32Array([Math.max(1, capped), 0, 1, 0]),
+    );
+    this.armyMarkers.count = capped;
   }
 
   /**
@@ -1222,12 +1284,29 @@ export class WorldRenderer {
     // draw, projected on the GPU — locked to the terrain while panning, no CPU
     // or DOM cost. Only issued below strategic altitude; the shader fades the
     // last stretch so nothing pops.
-    if (this.showResourceOverlay && this.mapMarkers && this.mapMarkers.count > 0
-      && this.camera.distance < MAP_MARKER_MAX_DISTANCE) {
+    if (this.showResourceOverlay && this.camera.distance < MAP_MARKER_MAX_DISTANCE) {
       pass.setPipeline(this.mapMarkerPipeline);
-      pass.setBindGroup(1, this.mapMarkers.bindGroup);
-      const instances = this.mapMarkers.count * WORLD_COPY_INDICES.length;
-      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.mapMarkers.count);
+      if (this.mapMarkers && this.mapMarkers.count > 0) {
+        pass.setBindGroup(1, this.mapMarkers.bindGroup);
+        const instances = this.mapMarkers.count * WORLD_COPY_INDICES.length;
+        pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.mapMarkers.count);
+        this.recordTriangleDraw('debugLines', instances * 2, instances);
+      }
+      if (this.gameResourceMarkers && this.gameResourceMarkers.count > 0) {
+        pass.setBindGroup(1, this.gameResourceMarkers.bindGroup);
+        const instances = this.gameResourceMarkers.count * WORLD_COPY_INDICES.length;
+        pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.gameResourceMarkers.count);
+        this.recordTriangleDraw('debugLines', instances * 2, instances);
+      }
+    }
+    // Army-stack markers: always on (they are gameplay, not an overlay), and
+    // visible further out than the resource overlay. The shader fades the last
+    // stretch before strategic altitude.
+    if (this.armyMarkers && this.armyMarkers.count > 0 && this.camera.distance < 6_400) {
+      pass.setPipeline(this.armyMarkerPipeline);
+      pass.setBindGroup(1, this.armyMarkers.bindGroup);
+      const instances = this.armyMarkers.count * WORLD_COPY_INDICES.length;
+      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.armyMarkers.count);
       this.recordTriangleDraw('debugLines', instances * 2, instances);
     }
     submitWorldFrame(

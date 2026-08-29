@@ -375,7 +375,7 @@
   text-transform: uppercase;
   color: var(--ifg-dim);
 }
-.ifg-card__reschips { display: flex; gap: 8px; }
+.ifg-card__reschips { display: flex; flex-wrap: wrap; gap: 8px; }
 .ifg-rchip {
   display: inline-flex;
   align-items: center;
@@ -387,6 +387,16 @@
 }
 .ifg-rchip__icon { width: 14px; height: 14px; }
 .ifg-rchip__value { font-size: 12px; font-weight: 700; color: var(--ifg-text); }
+.ifg-rchip--coastal .ifg-rchip__value { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ifg-dim); }
+.ifg-card__resstatus {
+  display: block;
+  margin-top: 7px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--ifg-dim);
+}
+.ifg-card__resstatus.is-active { color: #8fce7c; }
+.ifg-card.is-foreign .ifg-card__grid { opacity: 0.55; }
 
 /* ================= pause / system overlay ================= */
 .ifg-overlay {

@@ -67,8 +67,21 @@ export interface SelectedProvince {
   readonly owner: string;
   readonly ownerColor: string;
   readonly terrain: string;
-  /** Aggregated deposit quantities, or `null` when none are known. */
+  /**
+   * Aggregated deposit quantities, or `null` when none are known. Under fog of
+   * war this is `null` for provinces the player does not own — foreign deposit
+   * detail must not leak (§ fog).
+   */
   readonly resources: ProvinceResourceTotals | null;
+  /** True when the player commands this province — unlocks full detail. */
+  readonly isOwn?: boolean;
+  /** Province has sea access (drives the water / naval marker). */
+  readonly coastal?: boolean;
+  /** Deposit control/extraction state, own provinces only. */
+  readonly deposits?: {
+    readonly controlled: boolean;
+    readonly extracting: boolean;
+  } | null;
 }
 
 export type NavId =

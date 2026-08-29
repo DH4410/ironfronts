@@ -21,6 +21,8 @@ import { LOADING_QUOTES } from './loadingQuotes';
 import type { ScenarioSelection } from './game/scenario';
 import { GameSession } from './game/game-session';
 import { buildWorldData } from './game/world-data-loader';
+import { computeArmyVisibility } from './game/visibility';
+import { stackHealthFraction, stackUnitCount } from './game/units/army';
 
 const canvas = required<HTMLCanvasElement>('world');
 const countryLabels = required<HTMLCanvasElement>('country-labels');
@@ -115,6 +117,7 @@ window.addEventListener('pagehide', (event) => {
 let rendererStarted = false;
 let activeRenderer: WorldRenderer | undefined;
 let activeSession: GameSession | undefined;
+let activeWorld: import('./game/world-data').WorldData | undefined;
 mountMenu({
   audio,
   onLaunch: (selection: ScenarioSelection) => {
@@ -244,17 +247,41 @@ async function start(selection: ScenarioSelection): Promise<void> {
     setDiplomacyStatus(`Province ${provinceId} taken from ${previousCountry.name} by ${player.name}.`);
   };
   renderer.onProvinceSelected = (info) => {
+    if (!info) {
+      uiStore.patch({ selectedProvince: null });
+      return;
+    }
+    // Prefer authoritative, fog-aware GameState detail once the session exists.
+    const session = activeSession;
+    if (session) {
+      const summary = session.describeProvince(info.id);
+      const coastal = activeWorld?.provinces.find((p) => p.id === info.id)?.coastal ?? false;
+      uiStore.patch({
+        selectedProvince: {
+          id: info.id,
+          name: info.name,
+          owner: summary.ownerName,
+          ownerColor: summary.ownerColor,
+          terrain: info.terrain,
+          resources: summary.resources,
+          isOwn: summary.isOwn,
+          coastal,
+          deposits: summary.resources
+            ? { controlled: summary.controlled, extracting: summary.extracting }
+            : null,
+        },
+      });
+      return;
+    }
     uiStore.patch({
-      selectedProvince: info
-        ? {
-            id: info.id,
-            name: info.name,
-            owner: info.country,
-            ownerColor: info.countryColor,
-            terrain: info.terrain,
-            resources: renderer.getProvinceResources(info.id),
-          }
-        : null,
+      selectedProvince: {
+        id: info.id,
+        name: info.name,
+        owner: info.country,
+        ownerColor: info.countryColor,
+        terrain: info.terrain,
+        resources: renderer.getProvinceResources(info.id),
+      },
     });
   };
   renderer.onTimeOfDayChange = (state) => {
@@ -480,18 +507,29 @@ async function bootstrapGameSession(
 
   const session = GameSession.create(selection, world);
   activeSession = session;
+  activeWorld = world;
   (window as Window & { __ironfrontsSession?: GameSession }).__ironfrontsSession = session;
 
   // Player identity -> renderer flag/tint + HUD.
   const player = session.state.countries[session.playerCountryId];
   renderer.setPlayerCountryByName(player.name);
-  const { x, z } = session.diagnostics.startCamera;
-  renderer.focus(x, z, 1_100);
+  const { x, z, distance } = session.diagnostics.startCamera;
+  renderer.focus(x, z, distance);
+
+  // Resource deposits are gameplay-relevant from turn 0 — show the overlay by
+  // default so the player can see where stone / metal / oil are (§4), and feed
+  // the renderer the authoritative set (natural + scenario-guaranteed).
+  renderer.setResourceOverlay(true);
+  syncResourceMarkers(session, renderer);
 
   uiStore.patch({
     playerCountry: { name: player.name, color: player.color },
     resources: playerResourceLines(session),
+    resourceOverlay: true,
   });
+
+  // Initial marker upload (before the first sim tick) so armies show at once.
+  syncArmyMarkers(session, world, renderer);
 
   // Fixed-step simulation, decoupled from the render frame (§46).
   let lastSim = performance.now();
@@ -504,6 +542,8 @@ async function bootstrapGameSession(
   }, 1_000 / SIM_HZ);
   const hudTimer = window.setInterval(() => {
     uiStore.patch({ resources: playerResourceLines(session) });
+    syncArmyMarkers(session, world, renderer);
+    syncResourceMarkers(session, renderer);
   }, 500);
   window.addEventListener('pagehide', (event) => {
     if (!event.persisted) {
@@ -518,6 +558,66 @@ async function bootstrapGameSession(
     + `${session.diagnostics.playerProvinces} provinces, `
     + `${session.diagnostics.playerArmies} armies, camera @ ${Math.round(x)},${Math.round(z)}`,
   );
+}
+
+const armyMarkerScratch = new Float32Array(8 * 1_024);
+const resourceMarkerScratch = new Float32Array(4 * 4_096);
+const RESOURCE_KIND_INDEX: Record<'stone' | 'metal' | 'oil', number> = { stone: 0, metal: 1, oil: 2 };
+
+/** Push the authoritative resource-node set (natural + scenario-guaranteed) to
+ *  the renderer's dynamic deposit-marker layer. Depleted nodes shrink; exhausted
+ *  ones drop out. Cheap enough for the HUD cadence. */
+function syncResourceMarkers(session: GameSession, renderer: WorldRenderer): void {
+  let cursor = 0;
+  let count = 0;
+  for (const node of Object.values(session.state.resourceNodes)) {
+    if (count >= 4_096 || node.remaining <= 0) continue;
+    const depletion = node.initialAmount > 0 ? node.remaining / node.initialAmount : 1;
+    const richness = Math.max(0.28, Math.min(1, (node.initialAmount / 260) * depletion));
+    resourceMarkerScratch[cursor] = node.x;
+    resourceMarkerScratch[cursor + 1] = node.z;
+    resourceMarkerScratch[cursor + 2] = RESOURCE_KIND_INDEX[node.kind];
+    resourceMarkerScratch[cursor + 3] = richness;
+    cursor += 4;
+    count += 1;
+  }
+  renderer.setGameResourceMarkers(resourceMarkerScratch, count);
+}
+
+function packRgb(hex: string): number {
+  const value = Number.parseInt(hex.replace('#', ''), 16);
+  if (!Number.isFinite(value)) return 0x888888;
+  return value & 0xffffff;
+}
+
+/**
+ * Rebuild the renderer's army-stack marker buffer from authoritative GameState,
+ * fog-gated (§5, §9): own stacks always shown; foreign stacks only when in
+ * contact/vision; hidden stacks omitted entirely.
+ */
+function syncArmyMarkers(
+  session: GameSession, world: import('./game/world-data').WorldData, renderer: WorldRenderer,
+): void {
+  const visibility = computeArmyVisibility(session.state, world);
+  let cursor = 0;
+  let count = 0;
+  for (const army of Object.values(session.state.armies)) {
+    if (count >= 1_024) break;
+    const level = visibility.get(army.id) ?? 'hidden';
+    if (level === 'hidden') continue;
+    const owner = session.state.countries[army.ownerCountryId];
+    armyMarkerScratch[cursor] = army.x;
+    armyMarkerScratch[cursor + 1] = army.z;
+    armyMarkerScratch[cursor + 2] = packRgb(owner?.color ?? '#888888');
+    armyMarkerScratch[cursor + 3] = level === 'visible' ? 1 : 2;
+    armyMarkerScratch[cursor + 4] = stackUnitCount(army);
+    armyMarkerScratch[cursor + 5] = stackHealthFraction(army);
+    armyMarkerScratch[cursor + 6] = 0; // selection — Phase D
+    armyMarkerScratch[cursor + 7] = 0;
+    cursor += 8;
+    count += 1;
+  }
+  renderer.setArmyMarkers(armyMarkerScratch, count);
 }
 
 /**

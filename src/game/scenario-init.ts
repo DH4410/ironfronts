@@ -19,6 +19,7 @@ import { GAME_STATE_VERSION, emptyStockpile } from './game-state';
 import type { ArmyStack, UnitGroup } from './units/army';
 import { makeGroup } from './units/army';
 import { buildLandGraph, nearestNode, type LandGraph } from './movement/graph';
+import { wrappedDistance } from './geometry';
 import { mulberry32, hashString } from './rng';
 import { resolvePlayableCountries } from './scenario-catalog';
 import { bootstrapResources, type ResourceBootstrapResult } from './resource-bootstrap';
@@ -61,7 +62,7 @@ export interface InitResult {
     readonly guaranteedDeposits: ResourceBootstrapResult['guarantees'];
     readonly playerArmies: number;
     readonly totalArmies: number;
-    readonly startCamera: { readonly x: number; readonly z: number };
+    readonly startCamera: { readonly x: number; readonly z: number; readonly distance: number };
   };
 }
 
@@ -298,9 +299,9 @@ export function initGameState(
     nextEventId: 1,
   };
 
-  const startCamera = capitalProvince
-    ? { x: capitalProvince.center[0], z: capitalProvince.center[1] }
-    : { x: world.width / 2, z: world.height / 2 };
+  const startCamera = computeStartCamera(
+    world, playerProvinces, playerComponent, graph, capitalProvince,
+  );
 
   return {
     state,
@@ -317,6 +318,56 @@ export function initGameState(
       startCamera,
     },
   };
+}
+
+/**
+ * Frame the player's homeland (§2 camera). Uses the population-weighted centroid
+ * of the provinces on the reachable mainland (so far-flung island exclaves do
+ * not drag the view off the country), and an orbit distance sized to the
+ * territory's extent so the nation reads clearly and fills most of the view
+ * without starting zoomed out. Falls back to the capital, then world centre.
+ */
+function computeStartCamera(
+  world: WorldData,
+  playerProvinces: readonly WorldProvince[],
+  playerComponent: number,
+  graph: LandGraph,
+  capitalProvince: WorldProvince | undefined,
+): { x: number; z: number; distance: number } {
+  const onMainland = playerProvinces.filter((province) => {
+    const node = nearestNode(graph, province.center[0], province.center[1], 400);
+    return node >= 0 && graph.component[node] === playerComponent;
+  });
+  const framed = onMainland.length > 0 ? onMainland : playerProvinces;
+  if (framed.length === 0) {
+    return capitalProvince
+      ? { x: capitalProvince.center[0], z: capitalProvince.center[1], distance: 1_400 }
+      : { x: world.width / 2, z: world.height / 2, distance: 3_000 };
+  }
+
+  let weightSum = 0;
+  let cx = 0;
+  let cz = 0;
+  for (const province of framed) {
+    const weight = Math.max(1, province.population);
+    weightSum += weight;
+    cx += province.center[0] * weight;
+    cz += province.center[1] * weight;
+  }
+  cx /= weightSum;
+  cz /= weightSum;
+
+  // Extent = 90th-percentile spread from the centroid, so one stray province
+  // does not blow up the zoom.
+  const spreads = framed
+    .map((p) => wrappedDistance(cx, cz, p.center[0], p.center[1], world.width))
+    .sort((a, b) => a - b);
+  const extent = spreads[Math.floor(spreads.length * 0.9)] ?? spreads[spreads.length - 1] ?? 400;
+
+  // Distance tuned so the homeland occupies most of the frame at the default
+  // orbit pitch. Clamped to sane bounds.
+  const distance = Math.min(3_200, Math.max(620, extent * 2.4 + 260));
+  return { x: cx, z: cz, distance };
 }
 
 function ordinalSuffix(value: number): string {

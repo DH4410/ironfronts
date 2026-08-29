@@ -1,6 +1,6 @@
 import {
-  cityLightShader, countryLabelShader, infrastructureShader, lineShader, mapMarkerShader, polarCapShader, propShader,
-  rainShader, terrainShader, waterShader, waterwayShader,
+  armyMarkerShader, cityLightShader, countryLabelShader, infrastructureShader, lineShader, mapMarkerShader,
+  polarCapShader, propShader, rainShader, terrainShader, waterShader, waterwayShader,
 } from './shaders';
 
 export interface RendererLayouts {
@@ -21,6 +21,7 @@ export interface RendererPipelines {
   rain: GPURenderPipeline;
   lines: GPURenderPipeline;
   mapMarkers: GPURenderPipeline;
+  armyMarkers: GPURenderPipeline;
   countryLabels: GPURenderPipeline;
 }
 
@@ -178,6 +179,15 @@ export function createRendererPipelines(
     primitive: { topology: 'triangle-list', cullMode: 'none' },
     depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
   });
+  const armyMarkerModule = device.createShaderModule({ label: 'army marker shader', code: armyMarkerShader });
+  const armyMarkers = device.createRenderPipeline({
+    label: 'army stack markers pipeline',
+    layout: device.createPipelineLayout({ bindGroupLayouts: [layouts.common, layouts.lines] }),
+    vertex: { module: armyMarkerModule, entryPoint: 'armyMarkerVertex' },
+    fragment: { module: armyMarkerModule, entryPoint: 'armyMarkerFragment', targets: [{ format, blend: alphaBlend }] },
+    primitive: { topology: 'triangle-list', cullMode: 'none' },
+    depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
+  });
   const countryLabels = device.createRenderPipeline({
     label: 'country label pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [layouts.common, layouts.countryLabels] }),
@@ -187,7 +197,8 @@ export function createRendererPipelines(
     depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less-equal' },
   });
   return {
-    terrain, polarCaps, water, waterways, infrastructure, props, cityLights, rain, lines, mapMarkers, countryLabels,
+    terrain, polarCaps, water, waterways, infrastructure, props, cityLights, rain, lines, mapMarkers, armyMarkers,
+    countryLabels,
   };
 }
 

@@ -54,16 +54,18 @@ fn mapMarkerVertex(
   // little at overview, and fade out entirely before strategic altitude so the
   // overview map stays clean.
   let zoom = uniforms.interaction.y;
-  let rangeFade = 1.0 - smoothstep(2600.0, 3600.0, zoom);
-  let zoomScale = mix(0.72, 1.0, smoothstep(3400.0, 1100.0, zoom));
+  // Keep deposit markers legible through normal gameplay zoom; only fade them
+  // approaching strategic altitude so the overview map stays clean (§4).
+  let rangeFade = 1.0 - smoothstep(3800.0, 4900.0, zoom);
+  let zoomScale = mix(0.85, 1.15, smoothstep(3600.0, 1000.0, zoom));
 
   var sizePx = 0.0;
   if (kind < 2.5) {
-    sizePx = mix(10.5, 18.0, clamp(richness, 0.0, 1.0));   // stone / metal / oil
+    sizePx = mix(15.0, 24.0, clamp(richness, 0.0, 1.0));   // stone / metal / oil
   } else if (kind < 3.5) {
-    sizePx = 5.0;                                           // road junction dot
+    sizePx = 5.5;                                           // road junction dot
   } else {
-    sizePx = 11.0;                                          // small town
+    sizePx = 12.0;                                          // small town
   }
   sizePx = sizePx * zoomScale;
 

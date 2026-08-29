@@ -73,3 +73,8 @@ as the Ironfronts repository). Used where no suitable 0 A.D. artwork exists:
 raster supplied by the project owner for the `water` / `resource-water` icon
 slot (`src/ui/icons.ts`). It is **not** from 0 A.D. or any other third party
 and carries the same licence as the Ironfronts repository.
+
+**Modification:** the supplied 1254×1254 source (~1 MB) was box-downsampled to
+128×128 (~16 KB) for runtime — it is only ever drawn as a ~14–24 px icon.
+Regenerate from the original with `scripts/`-style tooling if a larger size is
+ever needed.

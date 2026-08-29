@@ -221,10 +221,10 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   }
 
   // RESOURCES — deposit abundance in the province (not production/day). Hidden
-  // when the province holds no known deposits.
+  // when the province holds no known deposits, or (under fog) for foreign land.
   const pvResources = el('div', 'ifg-card__resources');
   pvResources.hidden = true;
-  pvResources.append(el('small', 'ifg-card__restitle', 'Resources'));
+  pvResources.append(el('small', 'ifg-card__restitle', 'Deposits'));
   const pvResChips = el('div', 'ifg-card__reschips');
   const pvResChipByKey = new Map<keyof ProvinceResourceTotals, { chip: HTMLElement; value: HTMLElement }>();
   for (const { key, label, icon } of RESOURCE_CHIPS) {
@@ -236,7 +236,15 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     pvResChipByKey.set(key, { chip, value });
     pvResChips.append(chip);
   }
+  const pvCoastalChip = el('span', 'ifg-rchip ifg-rchip--coastal');
+  pvCoastalChip.title = 'Sea access';
+  pvCoastalChip.append(createIcon('resource-water', 'ifg-rchip__icon'), el('b', 'ifg-rchip__value', 'Coast'));
+  pvCoastalChip.hidden = true;
+  pvResChips.append(pvCoastalChip);
   pvResources.append(pvResChips);
+  const pvResStatus = el('small', 'ifg-card__resstatus');
+  pvResStatus.hidden = true;
+  pvResources.append(pvResStatus);
 
   const pvActions = el('div', 'ifg-card__actions');
   for (const label of PROVINCE_ACTIONS) {
@@ -400,18 +408,30 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     const army = state.selectedArmy;
     provinceCard.hidden = !province;
     if (province) {
+      const ownTag = province.isOwn === true ? ' · Your territory'
+        : province.isOwn === false ? ' · Foreign' : '';
       pvName.textContent = province.name;
-      pvSub.textContent = `${province.owner} · ${province.terrain}`;
+      pvSub.textContent = `${province.owner} · ${province.terrain}${ownTag}`;
+      provinceCard.classList.toggle('is-foreign', province.isOwn === false);
+      // Command actions only make sense on land the player controls.
+      pvActions.hidden = province.isOwn === false;
       const nextPvFlagKey = `${province.owner}|${province.ownerColor}`;
       if (nextPvFlagKey !== pvFlagKey) {
         pvFlagKey = nextPvFlagKey;
         pvFlagHost.replaceChildren(createFlag(province.owner, province.ownerColor, 'inline'));
       }
       const res = province.resources;
-      const nextPvResourceKey = res ? `${res.stone}/${res.metal}/${res.oil}` : '';
+      const dep = province.deposits ?? null;
+      const nextPvResourceKey = [
+        res ? `${res.stone}/${res.metal}/${res.oil}` : '-',
+        province.coastal ? 'c' : '',
+        dep ? `${dep.controlled ? 'C' : ''}${dep.extracting ? 'E' : ''}` : '',
+        province.isOwn,
+      ].join('|');
       if (nextPvResourceKey !== pvResourceKey) {
         pvResourceKey = nextPvResourceKey;
-        pvResources.hidden = !res;
+        const hasDeposits = Boolean(res && (res.stone > 0 || res.metal > 0 || res.oil > 0));
+        pvResources.hidden = !hasDeposits && !province.coastal;
         if (res) {
           for (const { key } of RESOURCE_CHIPS) {
             const slot = pvResChipByKey.get(key)!;
@@ -419,6 +439,18 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
             slot.chip.hidden = amount <= 0;
             slot.value.textContent = numberFormat.format(amount);
           }
+        } else {
+          for (const { key } of RESOURCE_CHIPS) pvResChipByKey.get(key)!.chip.hidden = true;
+        }
+        pvCoastalChip.hidden = province.coastal !== true;
+        if (dep && hasDeposits) {
+          pvResStatus.hidden = false;
+          pvResStatus.textContent = dep.extracting
+            ? 'Extraction under way'
+            : dep.controlled ? 'Controlled — secure with an army to extract' : 'Uncontrolled';
+          pvResStatus.classList.toggle('is-active', dep.extracting);
+        } else {
+          pvResStatus.hidden = true;
         }
       }
     }
