@@ -1,7 +1,6 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 import { GameSession } from '../../src/game/game-session';
 import { buildScenarioSelection } from '../../src/game/scenario-catalog';
-import { stackUnitCount } from '../../src/game/units/army';
 import { CATALOG_COUNTRY_BY_NAME } from '../../src/game/data/countries.generated';
 import { loadWorld, type LoadedWorld } from './load-world';
 
@@ -144,11 +143,9 @@ describe('gameplay vertical slice', () => {
     };
 
     s.tick(8);
-    // The weak stack loses the field — wiped out, or beaten badly enough that it
-    // breaks off and withdraws. Either way it is no longer defending here.
-    const enemy = s.state.armies['en-weak'];
-    const enemyGone = !enemy || stackUnitCount(enemy) === 0 || enemy.status === 'retreating';
-    expect(enemyGone).toBe(true);
+    // A full-strength militia this outmatched is wiped out before it ever drops
+    // below the retreat threshold while still alive — it does not get to run.
+    expect(s.state.armies['en-weak']).toBeUndefined();
     // give capture a tick with no defender
     s.tick(2);
     expect(s.state.provinceOwners[enemyProvince.id]).toBe(SPAIN);
