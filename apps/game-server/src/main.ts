@@ -1,6 +1,4 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
-import path from 'node:path';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
   GAME_ID, GAME_VERSION, PROTOCOL_VERSION, clientMessageSchema,
@@ -36,12 +34,6 @@ async function body(request: IncomingMessage): Promise<Record<string, unknown>> 
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') as Record<string, unknown>;
 }
 
-const mimeTypes: Record<string, string> = {
-  '.json': 'application/json', '.f32': 'application/octet-stream', '.u32': 'application/octet-stream',
-  '.u16': 'application/octet-stream', '.rgba8': 'application/octet-stream', '.rg8': 'application/octet-stream',
-  '.png': 'image/png', '.webp': 'image/webp', '.svg': 'image/svg+xml',
-};
-
 interface ClientConnection {
   socket: WebSocket;
   accountId: string;
@@ -62,24 +54,6 @@ const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
     if (url.pathname === '/health') {
       sendJson(response, 200, { ok: true, service: 'game-server', gameId: GAME_ID, revision });
-      return;
-    }
-    if (url.pathname.startsWith('/world/')) {
-      const relative = decodeURIComponent(url.pathname.replace(/^\/world\/(?:v\d+\/)?/, ''));
-      const filePath = path.resolve(config.worldDirectory, relative);
-      if (!filePath.startsWith(`${config.worldDirectory}${path.sep}`)) {
-        sendJson(response, 403, { error: 'Invalid asset path.' });
-        return;
-      }
-      const info = await stat(filePath);
-      if (!info.isFile()) throw new Error('Asset not found.');
-      const bytes = await readFile(filePath);
-      response.writeHead(200, {
-        'content-type': mimeTypes[path.extname(filePath)] ?? 'application/octet-stream',
-        'cache-control': 'public, max-age=31536000, immutable',
-        'access-control-allow-origin': config.clientOrigin,
-      });
-      response.end(bytes);
       return;
     }
     if (!url.pathname.startsWith('/internal/v1/')) {
@@ -108,7 +82,7 @@ const server = createServer(async (request, response) => {
     sendJson(response, 404, { error: 'Not found.' });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected server error.';
-    sendJson(response, message === 'Asset not found.' ? 404 : 500, { error: message });
+    sendJson(response, 500, { error: message });
   }
 });
 
@@ -155,7 +129,7 @@ sockets.on('connection', (socket) => {
           world: {
             version: loaded.version,
             hash: loaded.hash,
-            assetBaseUrl: `${config.publicHttpUrl}/world/v${loaded.version}`,
+            assetBaseUrl: config.worldPublicUrl,
           },
           countryId: claims.countryId,
         });

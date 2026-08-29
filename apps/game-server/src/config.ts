@@ -15,7 +15,10 @@ function secret(name: string, fallback: string): string {
 export const config = {
   port: numberEnv('GAME_PORT', 3002),
   clientOrigin: process.env.CLIENT_ORIGIN ?? 'http://127.0.0.1:5173',
-  publicHttpUrl: process.env.GAME_PUBLIC_HTTP_URL ?? 'http://127.0.0.1:3002',
+  /** Browser-visible URL of the map package. This belongs to the client/CDN,
+   * not the game server; each future game version can declare another URL. */
+  worldPublicUrl: (process.env.WORLD_PUBLIC_URL
+    ?? `${process.env.CLIENT_ORIGIN ?? 'http://127.0.0.1:5173'}/world`).replace(/\/$/, ''),
   worldDirectory: path.resolve(process.cwd(), process.env.WORLD_DIRECTORY ?? 'public/world'),
   ticketSecret: secret('TICKET_SECRET', 'ironfronts-local-ticket-secret-change-me'),
   internalSecret: secret('INTERNAL_SERVICE_SECRET', 'ironfronts-local-service-secret-change-me'),
