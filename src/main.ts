@@ -34,6 +34,8 @@ const gameUnitLabel = (typeId: string): string => unitType(typeId).name;
 const unitCostLabel = (typeId: string): string => Object.entries(unitType(typeId).cost)
   .map(([k, v]) => `${v} ${k}`).join(' · ');
 const buildingLabel = (id: BuildingId): string => BUILDINGS[id].label;
+const orderPercent = (o: { progressHours: number; totalHours: number }): number =>
+  o.totalHours > 0 ? Math.min(99, Math.floor((o.progressHours / o.totalHours) * 100)) : 0;
 
 /** Player queues a unit from the selected-province PRODUCE panel. */
 function handleProduce(provinceId: number, unitTypeId: string): void {
@@ -626,6 +628,7 @@ async function bootstrapGameSession(
     syncArmyMarkers(session, world, renderer, visibility);
     syncResourceMarkers(session, world, renderer);
     refreshSelectedArmy(session, visibility);
+    refreshSelectedProvince(session); // keep production / construction % live
     drainSessionEvents(session);
   }, 400);
   const onKey = (event: KeyboardEvent): void => {
@@ -866,8 +869,11 @@ function projectSelectedProvince(
           id, name: gameUnitLabel(id), costLabel: unitCostLabel(id),
         }))
       : [],
+    // Only the head order is being worked; tag it with its % so the player can
+    // see how close the next unit / building is.
     queue: summary.isOwn
-      ? (session.state.productionQueues[provinceId] ?? []).map((o) => gameUnitLabel(o.unitTypeId))
+      ? (session.state.productionQueues[provinceId] ?? []).map((o, i) =>
+          i === 0 ? `${gameUnitLabel(o.unitTypeId)} · ${orderPercent(o)}%` : gameUnitLabel(o.unitTypeId))
       : [],
     buildable: summary.isOwn
       ? session.buildable(provinceId).map(({ id, affordable }) => ({
@@ -875,7 +881,8 @@ function projectSelectedProvince(
         }))
       : [],
     construction: summary.isOwn
-      ? (session.state.constructionQueues[provinceId] ?? []).map((o) => buildingLabel(o.buildingId))
+      ? (session.state.constructionQueues[provinceId] ?? []).map((o, i) =>
+          i === 0 ? `${buildingLabel(o.buildingId)} · ${orderPercent(o)}%` : buildingLabel(o.buildingId))
       : [],
     rally: summary.isOwn ? session.rallyPoint(provinceId) : null,
     awaitingRallyTarget: summary.isOwn && awaitingRallyTarget && selectedProvinceId === provinceId,
