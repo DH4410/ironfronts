@@ -100,6 +100,27 @@ describe('module architecture', () => {
     expect(violations).toEqual([]);
   });
 
+  it('keeps the authoritative game layer independent from renderer, HUD and shaders', () => {
+    // src/game/** owns gameplay state (§1). It must not depend on the renderer,
+    // the entrypoint, the HUD, or any GPU shader module — those are
+    // presentation/cache layers that read a projection of game state.
+    const gameRoot = path.join(sourceRoot, 'game');
+    const forbidden = [
+      path.join(sourceRoot, 'renderer.ts'),
+      path.join(sourceRoot, 'main.ts'),
+      path.join(sourceRoot, 'shaders'),
+      path.join(sourceRoot, 'ui'),
+    ];
+    const violations = sourceFiles
+      .filter((filename) => filename.startsWith(gameRoot))
+      .flatMap((filename) => dependencies(filename)
+        .filter((dependency) => forbidden.some(
+          (bad) => dependency === bad || dependency.startsWith(`${bad}${path.sep}`),
+        ))
+        .map((dependency) => `${relativeName(filename)} -> ${relativeName(dependency)}`));
+    expect(violations).toEqual([]);
+  });
+
   it('keeps country domain modules independent from renderer orchestration', () => {
     const countryRoot = path.join(sourceRoot, 'country-labels');
     const violations = sourceFiles
