@@ -52,6 +52,12 @@ export interface ProvinceBuildings {
 export interface ProductionOrder {
   readonly id: string;
   readonly unitTypeId: string;
+  /**
+   * Country that paid for this order. The completed unit is delivered to this
+   * country, not to whoever owns the province at completion time — so capturing
+   * a factory mid-build does not hand you the previous owner's unit (§ capture).
+   */
+  readonly ownerCountryId: number;
   /** Game-hours of work already applied. */
   progressHours: number;
   /** Total game-hours required (from the unit type, at this building level). */

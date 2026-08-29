@@ -75,10 +75,13 @@ function applyDamage(stack: ArmyStack, amount: number): void {
     g.hp = Math.max(0, g.hp - mitigated);
   }
   remaining = 0;
-  // Collapse dead groups; shed unit count as hp drops.
+  // Shed unit count as pooled hp drops: a group of N units is at full strength
+  // until its pool falls below (N-1)*maxHp, then it is down a man, and so on.
+  // count = "units with any hp left" = ceil(hp / maxHp). For 4 infantry at
+  // 100 maxHp this gives 4/4/3/2/1/0 as the pool drains 400→350→250→150→50→0.
   stack.units = stack.units.filter((g) => {
     const per = unitType(g.typeId).maxHp;
-    g.count = Math.max(0, Math.min(g.count, Math.ceil(g.hp / (per * 0.2))));
+    g.count = Math.max(0, Math.min(g.count, Math.ceil(g.hp / per)));
     return g.count > 0 && g.hp > 0;
   });
 }
@@ -170,14 +173,21 @@ export function stepCapture(session: SimContext): CaptureEvent[] {
 
     session.state.provinceOwners[province.id] = army.ownerCountryId;
     setRelation(session.state, army.ownerCountryId, owner, 'war');
+    // Units the previous owner was building here are forfeit (§ capture).
+    delete session.state.productionQueues[province.id];
     // Resource nodes in the province change controller.
     for (const node of Object.values(session.state.resourceNodes)) {
-      if (node.provinceId === province.id) {
-        node.controllerCountryId = army.ownerCountryId;
-        if (node.extractorArmyId && session.state.armies[node.extractorArmyId]?.ownerCountryId !== army.ownerCountryId) {
-          node.extractorArmyId = null;
-          node.status = node.remaining > 0 ? 'idle' : 'exhausted';
-        }
+      if (node.provinceId !== province.id) continue;
+      node.controllerCountryId = army.ownerCountryId;
+      const extractor = node.extractorArmyId ? session.state.armies[node.extractorArmyId] : undefined;
+      if (extractor && extractor.ownerCountryId !== army.ownerCountryId) {
+        // Mine seized from under an enemy extractor: clear BOTH sides. Once the
+        // node leaves 'extracting', stepExtraction's own cleanup can't reach the
+        // army, so it would otherwise stay pinned in 'extracting' forever (§23).
+        extractor.extractingNodeId = null;
+        if (extractor.status === 'extracting') extractor.status = 'idle';
+        node.extractorArmyId = null;
+        node.status = node.remaining > 0 ? 'idle' : 'exhausted';
       }
     }
     events.push({ provinceId: province.id, fromCountryId: owner, toCountryId: army.ownerCountryId });

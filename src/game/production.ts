@@ -68,6 +68,7 @@ export function queueUnit(
   const order: ProductionOrder = {
     id: `ord-${session.state.nextOrderId}`,
     unitTypeId,
+    ownerCountryId: countryId,
     progressHours: 0,
     totalHours: type.buildTimeHours / BUILD_TIME_SCALE,
   };
@@ -86,15 +87,19 @@ export interface UnitCompletion {
 export function stepProduction(session: SimContext, dtHours: number): UnitCompletion[] {
   const completed: UnitCompletion[] = [];
   for (const [pidStr, queue] of Object.entries(session.state.productionQueues)) {
-    if (queue.length === 0) continue;
     const provinceId = Number(pidStr);
+    // Drop any leading orders whose paying country no longer owns the province
+    // (captured since it was queued). Cost is forfeit — v1 rule.
+    while (queue.length > 0 && session.state.provinceOwners[provinceId] !== queue[0].ownerCountryId) {
+      queue.shift();
+    }
+    if (queue.length === 0) continue;
     const active = queue[0];
     active.progressHours += dtHours;
     if (active.progressHours < active.totalHours) continue;
 
     queue.shift();
-    const owner = session.state.provinceOwners[provinceId] ?? session.playerCountryId;
-    const armyId = spawnUnit(session, provinceId, active.unitTypeId, owner);
+    const armyId = spawnUnit(session, provinceId, active.unitTypeId, active.ownerCountryId);
     completed.push({ provinceId, unitTypeId: active.unitTypeId, armyId });
   }
   // Drop empty queues so the record stays sparse.
