@@ -762,15 +762,21 @@ function refreshSelectedArmy(session: GameSession): void {
 }
 
 function drainSessionEvents(session: GameSession): void {
+  const player = session.playerCountryId;
   for (const done of session.pendingCompletions.splice(0)) {
+    // Only the player's own production is player news.
+    if (session.state.provinceOwners[done.provinceId] !== player) continue;
     const name = gameUnitLabel(done.unitTypeId);
-    const province = session.world.provinces.find((p) => p.id === done.provinceId);
-    pushNotification('completed', `${name} ready`, `Built in ${province ? `province ${province.id}` : 'a city'}.`);
+    pushNotification('completed', `${name} ready`, 'Reinforcements have joined the line.');
   }
   for (const cap of session.pendingCaptures.splice(0)) {
+    // Only surface captures the player is involved in.
+    if (cap.toCountryId !== player && cap.fromCountryId !== player) continue;
     const to = session.state.countries[cap.toCountryId]?.name ?? '?';
     const from = session.state.countries[cap.fromCountryId]?.name ?? '?';
-    pushNotification('combat', 'Province captured', `${to} took province ${cap.provinceId} from ${from}.`);
+    pushNotification('combat',
+      cap.toCountryId === player ? 'Province captured' : 'Province lost',
+      `${to} took a province from ${from}.`);
   }
 }
 
