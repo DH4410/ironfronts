@@ -66,6 +66,20 @@ export class GameSession {
     return new GameSession(initGameState(selection, scenario, world), world);
   }
 
+  /** Restore a validated plain-data snapshot while rebuilding world-derived graph caches. */
+  static restore(state: GameState, world: WorldData): GameSession {
+    const restored = cloneGameState(state);
+    const scenario = scenarioById(restored.scenarioId);
+    const scaffold = initGameState({
+      scenarioId: restored.scenarioId,
+      theater: 'global',
+      startDate: restored.clock.startDate,
+      playerCountryId: 0,
+      sandbox: restored.mode === 'sandbox',
+    }, scenario, world);
+    return new GameSession({ ...scaffold, state: restored }, world);
+  }
+
   get gameTimeHours(): number {
     return this.state.clock.gameTimeHours;
   }

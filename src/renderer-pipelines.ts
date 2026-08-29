@@ -1,5 +1,5 @@
 import {
-  armyMarkerShader, cityLightShader, countryLabelShader, infrastructureShader, lineShader, mapMarkerShader,
+  armyMarkerShader, armyModelShader, cityLightShader, countryLabelShader, infrastructureShader, lineShader, mapMarkerShader,
   polarCapShader, propShader, rainShader, terrainShader, waterShader, waterwayShader,
 } from './shaders';
 
@@ -22,6 +22,8 @@ export interface RendererPipelines {
   lines: GPURenderPipeline;
   mapMarkers: GPURenderPipeline;
   armyMarkers: GPURenderPipeline;
+  armyModels: GPURenderPipeline;
+  armyKindCounts: GPURenderPipeline;
   countryLabels: GPURenderPipeline;
 }
 
@@ -188,6 +190,23 @@ export function createRendererPipelines(
     primitive: { topology: 'triangle-list', cullMode: 'none' },
     depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
   });
+  const armyModelModule = device.createShaderModule({ label: 'procedural army model shader', code: armyModelShader });
+  const armyModels = device.createRenderPipeline({
+    label: 'close-range army models pipeline',
+    layout: device.createPipelineLayout({ bindGroupLayouts: [layouts.common, layouts.lines] }),
+    vertex: { module: armyModelModule, entryPoint: 'armyModelVertex' },
+    fragment: { module: armyModelModule, entryPoint: 'armyModelFragment', targets: [{ format, blend: alphaBlend }] },
+    primitive: { topology: 'triangle-list', cullMode: 'none' },
+    depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less-equal' },
+  });
+  const armyKindCounts = device.createRenderPipeline({
+    label: 'close-range army kind count pipeline',
+    layout: device.createPipelineLayout({ bindGroupLayouts: [layouts.common, layouts.lines] }),
+    vertex: { module: armyModelModule, entryPoint: 'armyKindCountVertex' },
+    fragment: { module: armyModelModule, entryPoint: 'armyKindCountFragment', targets: [{ format, blend: alphaBlend }] },
+    primitive: { topology: 'triangle-list', cullMode: 'none' },
+    depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
+  });
   const countryLabels = device.createRenderPipeline({
     label: 'country label pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [layouts.common, layouts.countryLabels] }),
@@ -198,6 +217,7 @@ export function createRendererPipelines(
   });
   return {
     terrain, polarCaps, water, waterways, infrastructure, props, cityLights, rain, lines, mapMarkers, armyMarkers,
+    armyModels, armyKindCounts,
     countryLabels,
   };
 }

@@ -2,5 +2,6 @@ node_modules/
 dist/
 public/world/
 artifacts/
+data/
 *.log
 .DS_Store

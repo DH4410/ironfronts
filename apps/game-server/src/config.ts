@@ -20,6 +20,10 @@ export const config = {
   worldPublicUrl: (process.env.WORLD_PUBLIC_URL
     ?? `${process.env.CLIENT_ORIGIN ?? 'http://127.0.0.1:5173'}/world`).replace(/\/$/, ''),
   worldDirectory: path.resolve(process.cwd(), process.env.WORLD_DIRECTORY ?? 'public/world'),
+  gameDataPath: path.resolve(
+    process.cwd(),
+    process.env.GAME_DATA_PATH ?? path.join(process.env.DATA_DIRECTORY ?? 'data', 'game.json'),
+  ),
   ticketSecret: secret('TICKET_SECRET', 'ironfronts-local-ticket-secret-change-me'),
   internalSecret: secret('INTERNAL_SERVICE_SECRET', 'ironfronts-local-service-secret-change-me'),
 } as const;

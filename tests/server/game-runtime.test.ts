@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { GameRuntime } from '../../apps/game-server/src/runtime';
+import { GamePersistence } from '../../apps/game-server/src/persistence';
 import { diffProjection, projectFor } from '../../apps/game-server/src/projection';
 import type { WorldData, WorldProvince } from '../../src/game/world-data';
 
@@ -63,5 +67,31 @@ describe('single authoritative game runtime', () => {
     const runtime = new GameRuntime(tinyWorld());
     runtime.tick(1);
     expect(runtime.session.gameTimeHours).toBe(1);
+  });
+
+  it('round-trips authoritative state and permanent seats through game.json', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'ironfronts-game-'));
+    const persistence = new GamePersistence(path.join(directory, 'game.json'));
+    try {
+      const runtime = new GameRuntime(tinyWorld());
+      expect(runtime.join('account-a', 1)).toMatchObject({ ok: true });
+      runtime.tick(2);
+      await persistence.save({
+        formatVersion: 1,
+        gameId: 'world-at-war-1',
+        gameVersion: 'world-at-war@1',
+        worldHash: 'test-world',
+        savedAtEpochMs: 2_000,
+        gameStartedAtEpochMs: 1_000,
+        runtime: runtime.snapshot(),
+      });
+      const saved = await persistence.load();
+      const restored = new GameRuntime(tinyWorld(), saved!.runtime);
+      expect(restored.seat('account-a')).toBe(1);
+      expect(restored.session.gameTimeHours).toBeCloseTo(2, 5);
+      expect(restored.session.state.countries[1].controller).toBe('player');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

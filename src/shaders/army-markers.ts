@@ -34,6 +34,7 @@ struct ArmyOut {
   @location(4) @interpolate(flat) health: f32,
   @location(5) @interpolate(flat) selected: f32,
   @location(6) alpha: f32,
+  @location(7) @interpolate(flat) kind: f32,
 };
 
 fn unpackRgb(packed: f32) -> vec3f {
@@ -66,10 +67,12 @@ fn armyMarkerVertex(
   let corner = corners[vertexIndex];
 
   let zoom = uniforms.interaction.y;
-  let rangeFade = 1.0 - smoothstep(4200.0, 6200.0, zoom);
+  let contact = marker.a.w > 1.5;
+  let closeFade = select(smoothstep(1400.0, 1800.0, zoom), 1.0, contact);
+  let rangeFade = closeFade * (1.0 - smoothstep(4400.0, 5000.0, zoom));
   let zoomScale = mix(0.8, 1.25, smoothstep(4600.0, 900.0, zoom));
   // Plaque is a touch wider than tall.
-  let half = vec2f(21.0, 16.0) * zoomScale;
+  let half = vec2f(26.0, 15.0) * zoomScale;
 
   var output: ArmyOut;
   output.uv = corner;
@@ -78,6 +81,7 @@ fn armyMarkerVertex(
   output.count = marker.b.x;
   output.health = clamp(marker.b.y, 0.0, 1.0);
   output.selected = marker.b.z;
+  output.kind = marker.b.w;
   output.alpha = rangeFade * (1.0 - horizontalWorldFog(worldPos.x));
   if (clip.w <= 0.0001) {
     output.position = vec4f(0.0, 0.0, -10.0, 1.0);
@@ -125,6 +129,41 @@ fn roundedBox(p: vec2f, b: vec2f, r: f32) -> f32 {
   return length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0) - r;
 }
 
+fn markerSegmentDistance(p: vec2f, a: vec2f, b: vec2f) -> f32 {
+  let pa = p - a;
+  let ba = b - a;
+  let h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+  return length(pa - ba * h);
+}
+
+fn dominantIcon(kind: i32, p: vec2f) -> f32 {
+  let q = (p - vec2f(-0.46, 0.06)) / vec2f(0.38, 0.62);
+  if (kind == 0) {
+    let head = 1.0 - smoothstep(0.20, 0.26, length(q - vec2f(0.0, 0.52)));
+    let body = 1.0 - smoothstep(0.09, 0.15, markerSegmentDistance(q, vec2f(0.0, 0.30), vec2f(0.0, -0.35)));
+    let limbs = 1.0 - smoothstep(0.08, 0.14, min(
+      markerSegmentDistance(q, vec2f(0.0, 0.10), vec2f(-0.42, -0.05)),
+      markerSegmentDistance(q, vec2f(0.0, -0.30), vec2f(0.35, -0.82)),
+    ));
+    return max(head, max(body, limbs));
+  }
+  if (kind == 1) {
+    let hull = step(abs(q.x), 0.82) * step(abs(q.y + 0.18), 0.34);
+    let turret = step(abs(q.x), 0.42) * step(abs(q.y - 0.30), 0.26);
+    let barrel = step(abs(q.x), 0.10) * step(q.y, 0.95) * step(0.48, q.y);
+    return max(hull, max(turret, barrel));
+  }
+  if (kind == 2) {
+    let body = step(abs(q.x), 0.78) * step(abs(q.y + 0.10), 0.38);
+    let cabin = step(abs(q.x), 0.50) * step(abs(q.y - 0.38), 0.22);
+    let wheels = 1.0 - smoothstep(0.18, 0.25, min(length(q - vec2f(-0.50, -0.58)), length(q - vec2f(0.50, -0.58))));
+    return max(body, max(cabin, wheels));
+  }
+  let cannon = 1.0 - smoothstep(0.09, 0.15, markerSegmentDistance(q, vec2f(-0.52, -0.55), vec2f(0.55, 0.62)));
+  let wheel = 1.0 - smoothstep(0.27, 0.34, length(q - vec2f(-0.30, -0.48)));
+  return max(cannon, wheel);
+}
+
 @fragment
 fn armyMarkerFragment(input: ArmyOut) -> @location(0) vec4f {
   if (input.alpha < 0.01) { discard; }
@@ -155,14 +194,16 @@ fn armyMarkerFragment(input: ArmyOut) -> @location(0) vec4f {
   } else {
     let n = i32(clamp(input.count + 0.5, 1.0, 99.0));
     if (n < 10) {
-      glyphC = glyphCoverage(n, uv - vec2f(0.0, 0.05), 0.40, 0.60, 0.0);
+      glyphC = glyphCoverage(n, uv - vec2f(0.0, 0.05), 0.34, 0.60, 0.34);
     } else {
       let tens = n / 10;
       let ones = n % 10;
-      glyphC += glyphCoverage(tens, uv - vec2f(0.0, 0.05), 0.34, 0.56, -0.36);
-      glyphC += glyphCoverage(ones, uv - vec2f(0.0, 0.05), 0.34, 0.56, 0.36);
+      glyphC += glyphCoverage(tens, uv - vec2f(0.0, 0.05), 0.28, 0.56, 0.10);
+      glyphC += glyphCoverage(ones, uv - vec2f(0.0, 0.05), 0.28, 0.56, 0.56);
     }
   }
+  let iconC = select(dominantIcon(i32(input.kind + 0.5), uv), 0.0, contact);
+  rgb = mix(rgb, vec3f(0.94, 0.92, 0.82), clamp(iconC, 0.0, 1.0) * inside);
   rgb = mix(rgb, vec3f(0.99, 0.98, 0.93), clamp(glyphC, 0.0, 1.0) * inside);
 
   // Condition bar along the bottom inner edge.

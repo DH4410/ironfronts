@@ -1,12 +1,15 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { mkdir } from 'node:fs/promises';
+import path from 'node:path';
 import { credentialsSchema, GAME_ID, joinGameSchema, PROTOCOL_VERSION, type GameLobby, type SessionResponse } from '@ironfronts/protocol';
 import { signGameTicket } from '@ironfronts/protocol/ticket';
 import { config } from './config';
 import { AuthStore, type Account } from './auth-store';
 import { RateLimiter } from './rate-limit';
 
-const store = new AuthStore();
+await mkdir(path.dirname(config.authDatabasePath), { recursive: true });
+const store = new AuthStore(config.authDatabasePath);
 const limiter = new RateLimiter();
 const SESSION_COOKIE = 'ironfronts_session';
 
@@ -159,7 +162,7 @@ server.listen(config.port, '127.0.0.1', () => log('info', 'listening', { port: c
 function shutdown(signal: string): void {
   log('info', 'shutdown', { signal });
   clearInterval(cleanupTimer);
-  server.close(() => process.exit(0));
+  server.close(() => { store.close(); process.exit(0); });
   setTimeout(() => process.exit(1), 5_000).unref();
 }
 process.on('SIGINT', () => shutdown('SIGINT'));

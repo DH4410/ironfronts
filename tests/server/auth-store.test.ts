@@ -1,7 +1,10 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { AuthStore } from '../../apps/auth-server/src/auth-store';
 
-describe('memory authentication store', () => {
+describe('SQLite authentication store', () => {
   it('hashes passwords, treats usernames case-insensitively, and authenticates', async () => {
     const store = new AuthStore();
     const account = await store.register('FieldMarshal', 'correct horse battery');
@@ -31,5 +34,23 @@ describe('memory authentication store', () => {
     ]);
     expect(outcomes.filter((outcome) => outcome.status === 'fulfilled')).toHaveLength(1);
     expect(outcomes.filter((outcome) => outcome.status === 'rejected')).toHaveLength(1);
+  });
+
+  it('restores accounts and sessions from a SQLite file after restart', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'ironfronts-auth-'));
+    const databasePath = path.join(directory, 'auth.sqlite');
+    try {
+      const first = new AuthStore(databasePath);
+      const account = await first.register('PersistentUser', 'persistent-password');
+      const session = first.createSession(account.id, 60_000);
+      first.close();
+
+      const restored = new AuthStore(databasePath);
+      expect((await restored.authenticate('persistentuser', 'persistent-password'))?.id).toBe(account.id);
+      expect(restored.sessionAccount(session.token)?.id).toBe(account.id);
+      restored.close();
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });

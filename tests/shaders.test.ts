@@ -2,11 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { WgslReflect } from 'wgsl_reflect/wgsl_reflect.module.js';
 import { create, globals } from 'webgpu';
 import {
-  cityLightShader, countryLabelShader, infrastructureShader, lineShader, mapMarkerShader, polarCapShader, propShader,
+  armyMarkerShader, armyModelShader, cityLightShader, countryLabelShader, infrastructureShader, lineShader, mapMarkerShader, polarCapShader, propShader,
   rainShader, terrainShader, waterShader, waterwayShader,
 } from '../src/shaders';
 
 describe('WGSL programs', () => {
+  it('crossfades army models into dominant-type counters and hides the far LOD', () => {
+    expect(armyModelShader).toContain('smoothstep(1500.0, 1900.0, uniforms.interaction.y)');
+    expect(armyModelShader).toContain('fn armyKindCountVertex');
+    expect(armyModelShader).toContain('mix(model.c.xy, model.a.xy, motion)');
+    expect(armyMarkerShader).toContain('fn dominantIcon');
+    expect(armyMarkerShader).toContain('smoothstep(4400.0, 5000.0, zoom)');
+  });
+
   it('limits beach material to the actual shoreline mask', () => {
     expect(terrainShader).toContain('let bankField = bankFieldAt(input.mapUv)');
     expect(terrainShader).toContain('let shoreline = bankField.g');
@@ -170,6 +178,8 @@ describe('WGSL programs', () => {
     ['city lights', cityLightShader, ['cityLightVertex'], ['cityLightFragment']],
     ['rain', rainShader, ['rainVertex'], ['rainFragment']],
     ['lines', lineShader, ['lineVertex'], ['lineFragment']],
+    ['army markers', armyMarkerShader, ['armyMarkerVertex'], ['armyMarkerFragment']],
+    ['army models', armyModelShader, ['armyModelVertex', 'armyKindCountVertex'], ['armyModelFragment', 'armyKindCountFragment']],
     ['country labels', countryLabelShader, ['countryLabelVertex'], ['countryLabelFragment']],
   ])('parses the %s shader and exposes its render entry points', (_name, source, vertexNames, fragmentNames) => {
     const reflection = new WgslReflect(source);
@@ -191,7 +201,7 @@ describe('WGSL programs', () => {
     const device = await adapter.requestDevice();
     const modules = new Map<string, GPUShaderModule>();
     for (const [label, source] of [
-      ['terrain', terrainShader], ['polar caps', polarCapShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['city lights', cityLightShader], ['rain', rainShader], ['lines', lineShader], ['map markers', mapMarkerShader], ['country labels', countryLabelShader],
+      ['terrain', terrainShader], ['polar caps', polarCapShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['city lights', cityLightShader], ['rain', rainShader], ['lines', lineShader], ['map markers', mapMarkerShader], ['army markers', armyMarkerShader], ['army models', armyModelShader], ['country labels', countryLabelShader],
     ] as const) {
       const module = device.createShaderModule({ label, code: source });
       modules.set(label, module);

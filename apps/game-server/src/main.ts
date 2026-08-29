@@ -12,6 +12,7 @@ import { diffProjection } from './projection';
 import { TicketNonceStore } from './ticket-nonces';
 import { AuthoritativeGameClock } from './game-clock';
 import { CLOCK_SYNC_INTERVAL_MS, SIMULATION_INTERVAL_MS, SIMULATION_TICK_HOURS } from './timing';
+import { GamePersistence, type PersistedGame } from './persistence';
 
 const jsonHeaders = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
 
@@ -45,12 +46,37 @@ interface ClientConnection {
 }
 
 const loaded = await loadWorld(config.worldDirectory);
-const runtime = new GameRuntime(loaded.world);
-const gameClock = new AuthoritativeGameClock();
+const gamePersistence = new GamePersistence(config.gameDataPath);
+const persisted = await gamePersistence.load();
+if (persisted && (persisted.gameId !== GAME_ID || persisted.gameVersion !== GAME_VERSION || persisted.worldHash !== loaded.hash)) {
+  throw new Error('Persisted game does not match the configured game or world package.');
+}
+const runtime = new GameRuntime(loaded.world, persisted?.runtime);
+const gameClock = new AuthoritativeGameClock(persisted?.gameStartedAtEpochMs);
 const connections = new Set<ClientConnection>();
 const usedNonces = new TicketNonceStore();
 const recentCommands = new Map<string, Map<string, ServerMessage>>();
 let revision = 0;
+
+function persistedGame(): PersistedGame {
+  return {
+    formatVersion: 1,
+    gameId: GAME_ID,
+    gameVersion: GAME_VERSION,
+    worldHash: loaded.hash,
+    savedAtEpochMs: Date.now(),
+    gameStartedAtEpochMs: gameClock.gameStartedAtEpochMs,
+    runtime: runtime.snapshot(),
+  };
+}
+
+async function saveGame(): Promise<void> { await gamePersistence.save(persistedGame()); }
+function saveGameInBackground(): void {
+  void saveGame().catch((error) => log('error', 'game_save_failed', {
+    message: error instanceof Error ? error.message : String(error),
+  }));
+}
+if (!persisted) await saveGame();
 
 const server = createServer(async (request, response) => {
   try {
@@ -78,6 +104,7 @@ const server = createServer(async (request, response) => {
         return;
       }
       const result = runtime.join(input.accountId, Number(input.countryId));
+      if (result.ok) await saveGame();
       sendJson(response, result.ok ? 200 : 409, result);
       if (result.ok) log('info', 'country_claimed', { countryId: result.countryId });
       return;
@@ -153,6 +180,7 @@ sockets.on('connection', (socket) => {
       const existing = accountCommands.get(message.commandId);
       if (existing) { send(socket, existing); return; }
       const result = runtime.command(connection.countryId, message.command);
+      if (result.ok) saveGameInBackground();
       const ack: ServerMessage = {
         type: 'commandAck', commandId: message.commandId, ok: result.ok,
         ...(result.reason ? { reason: result.reason } : {}),
@@ -171,6 +199,7 @@ sockets.on('connection', (socket) => {
 });
 
 const simulationTimer = setInterval(() => runtime.tick(SIMULATION_TICK_HOURS), SIMULATION_INTERVAL_MS);
+const persistenceTimer = setInterval(saveGameInBackground, 5_000);
 // Civil time is interpolated by clients. This sparse sample corrects drift;
 // it is intentionally independent of the 10 Hz authoritative simulation.
 const clockSyncTimer = setInterval(() => {
@@ -218,13 +247,22 @@ const publishTimer = setInterval(() => {
 
 server.listen(config.port, '127.0.0.1', () => log('info', 'listening', { port: config.port, gameId: GAME_ID }));
 
+let shuttingDown = false;
 function shutdown(signal: string): void {
+  if (shuttingDown) return;
+  shuttingDown = true;
   log('info', 'shutdown', { signal });
   clearInterval(simulationTimer);
+  clearInterval(persistenceTimer);
   clearInterval(clockSyncTimer);
   clearInterval(publishTimer);
   for (const connection of connections) connection.socket.close(1001, 'Server shutting down');
-  server.close(() => process.exit(0));
+  void saveGame().then(() => gamePersistence.flush()).then(() => {
+    server.close(() => process.exit(0));
+  }).catch((error) => {
+    log('error', 'final_game_save_failed', { message: error instanceof Error ? error.message : String(error) });
+    server.close(() => process.exit(1));
+  });
   setTimeout(() => process.exit(1), 5_000).unref();
 }
 process.on('SIGINT', () => shutdown('SIGINT'));

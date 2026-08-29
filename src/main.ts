@@ -24,6 +24,7 @@ import { GameConnection } from './client/game-connection';
 import { RemoteGameSession } from './client/remote-session';
 import { configureWorldAssetBase } from './world-assets';
 import type { SessionResponse } from '@ironfronts/protocol';
+import { buildArmyFormation, dominantVisualKind } from './army-map-presentation';
 
 type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
 
@@ -645,6 +646,7 @@ async function bootstrapGameSession(
 }
 
 const armyMarkerScratch = new Float32Array(8 * 1_024);
+const armyModelScratch = new Float32Array(12 * 4_096);
 const resourceMarkerScratch = new Float32Array(4 * 4_096);
 const RESOURCE_KIND_INDEX: Record<'stone' | 'metal' | 'oil', number> = { stone: 0, metal: 1, oil: 2 };
 
@@ -684,16 +686,21 @@ function packRgb(hex: string): number {
  * contact/vision; hidden stacks omitted entirely.
  */
 const armyPickScratch: Array<{ id: string; x: number; z: number }> = [];
+const previousArmyModelPositions = new Map<string, { x: number; z: number }>();
 
 function syncArmyMarkers(
   session: RemoteGameSession, renderer: WorldRenderer,
 ): void {
   let cursor = 0;
   let count = 0;
+  let modelCursor = 0;
+  let modelCount = 0;
+  const activeModelKeys = new Set<string>();
   armyPickScratch.length = 0;
   for (const army of Object.values(session.state.armies)) {
     if (count >= 1_024) break;
     const identified = army.contact === 'visible';
+    const formation = identified ? buildArmyFormation(army.composition?.groups ?? []) : [];
     armyMarkerScratch[cursor] = army.x;
     armyMarkerScratch[cursor + 1] = army.z;
     armyMarkerScratch[cursor + 2] = packRgb(army.ownerColor);
@@ -702,12 +709,51 @@ function syncArmyMarkers(
     armyMarkerScratch[cursor + 4] = identified ? army.composition?.unitCount ?? 0 : 0;
     armyMarkerScratch[cursor + 5] = identified ? army.composition?.health ?? 0 : 0;
     armyMarkerScratch[cursor + 6] = army.id === selectedArmyId ? 1 : 0;
-    armyMarkerScratch[cursor + 7] = 0;
+    armyMarkerScratch[cursor + 7] = identified ? dominantVisualKind(formation) : 4;
     cursor += 8;
     count += 1;
     armyPickScratch.push({ id: army.id, x: army.x, z: army.z });
+
+    if (identified && formation.length) {
+      const target = army.moveOrder;
+      const heading = target ? Math.atan2(target.x - army.x, -(target.z - army.z)) : 0;
+      const perpendicularX = Math.cos(heading);
+      const perpendicularZ = Math.sin(heading);
+      for (let index = 0; index < formation.length && modelCount < 4_096; index += 1) {
+        const group = formation[index];
+        const offset = (index - (formation.length - 1) / 2) * 24;
+        let x = army.x + perpendicularX * offset;
+        if (renderer.manifest?.world.width) x = ((x % renderer.manifest.world.width) + renderer.manifest.world.width) % renderer.manifest.world.width;
+        const z = army.z + perpendicularZ * offset;
+        const modelKey = `${army.id}:${group.kind}`;
+        activeModelKeys.add(modelKey);
+        const previous = previousArmyModelPositions.get(modelKey) ?? { x, z };
+        let previousX = previous.x;
+        const worldWidth = renderer.manifest.world.width;
+        if (previousX - x > worldWidth / 2) previousX -= worldWidth;
+        else if (x - previousX > worldWidth / 2) previousX += worldWidth;
+        armyModelScratch[modelCursor] = x;
+        armyModelScratch[modelCursor + 1] = z;
+        armyModelScratch[modelCursor + 2] = packRgb(army.ownerColor);
+        armyModelScratch[modelCursor + 3] = group.kind;
+        armyModelScratch[modelCursor + 4] = group.count;
+        armyModelScratch[modelCursor + 5] = group.health;
+        armyModelScratch[modelCursor + 6] = army.id === selectedArmyId ? 1 : 0;
+        armyModelScratch[modelCursor + 7] = heading;
+        armyModelScratch[modelCursor + 8] = previousX;
+        armyModelScratch[modelCursor + 9] = previous.z;
+        armyModelScratch[modelCursor + 10] = 0;
+        armyModelScratch[modelCursor + 11] = 0;
+        previousArmyModelPositions.set(modelKey, { x, z });
+        modelCursor += 12;
+        modelCount += 1;
+      }
+    }
   }
-  renderer.setArmyMarkers(armyMarkerScratch, count, armyPickScratch);
+  for (const key of previousArmyModelPositions.keys()) {
+    if (!activeModelKeys.has(key)) previousArmyModelPositions.delete(key);
+  }
+  renderer.setArmyMarkers(armyMarkerScratch, count, armyPickScratch, armyModelScratch, modelCount);
 }
 
 // ---- army selection + orders --------------------------

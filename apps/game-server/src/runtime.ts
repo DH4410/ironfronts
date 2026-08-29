@@ -1,4 +1,4 @@
-import { GameSession, UNIT_TYPES, BUILDINGS, type GameCommand, type WorldData } from '@ironfronts/game-core';
+import { GameSession, UNIT_TYPES, BUILDINGS, type GameCommand, type GameState, type WorldData } from '@ironfronts/game-core';
 import {
   GAME_ID, GAME_VERSION, PROTOCOL_VERSION,
   type CommandPayload, type GameLobby, type PlayerProjection, type PresentationCatalogs,
@@ -14,11 +14,22 @@ export class GameRuntime {
     buildings: Object.entries(BUILDINGS).map(([id, building]) => ({ id, ...building })),
   };
 
-  constructor(readonly world: WorldData) {
-    this.session = GameSession.create({
-      scenarioId: 'OP-1939-01', theater: 'global', startDate: '1 Sep 1939',
-      playerCountryId: 0, sandbox: false,
-    }, world);
+  constructor(readonly world: WorldData, snapshot?: GameRuntimeSnapshot) {
+    this.session = snapshot
+      ? GameSession.restore(snapshot.state, world)
+      : GameSession.create({
+        scenarioId: 'OP-1939-01', theater: 'global', startDate: '1 Sep 1939',
+        playerCountryId: 0, sandbox: false,
+      }, world);
+    if (snapshot) {
+      for (const [accountId, countryId] of snapshot.seats) {
+        if (!accountId || !this.session.state.countries[countryId] || this.accountsByCountry.has(countryId)) {
+          throw new Error('Persisted country assignments are invalid.');
+        }
+        this.seatsByAccount.set(accountId, countryId);
+        this.accountsByCountry.set(countryId, accountId);
+      }
+    }
   }
 
   tick(hours: number): void { this.session.tick(hours); }
@@ -66,6 +77,9 @@ export class GameRuntime {
   }
 
   seat(accountId: string): number | null { return this.seatsByAccount.get(accountId) ?? null; }
+  snapshot(): GameRuntimeSnapshot {
+    return { version: 1, state: this.session.snapshot(), seats: [...this.seatsByAccount.entries()] };
+  }
   projection(countryId: number): PlayerProjection { return projectFor(this.session.state, this.world, countryId); }
 
   command(countryId: number, payload: CommandPayload) {
@@ -76,4 +90,10 @@ export class GameRuntime {
     const command = { ...payload, countryId } as GameCommand;
     return this.session.applyCommand(command);
   }
+}
+
+export interface GameRuntimeSnapshot {
+  version: 1;
+  state: GameState;
+  seats: Array<[accountId: string, countryId: number]>;
 }

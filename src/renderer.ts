@@ -92,6 +92,8 @@ export class WorldRenderer {
   private linePipeline!: GPURenderPipeline;
   private mapMarkerPipeline!: GPURenderPipeline;
   private armyMarkerPipeline!: GPURenderPipeline;
+  private armyModelPipeline!: GPURenderPipeline;
+  private armyKindCountPipeline!: GPURenderPipeline;
   private countryLabelPipeline!: GPURenderPipeline;
   private countryLabelBuffer?: GPUBuffer;
   private countryLabelParamsBuffer?: GPUBuffer;
@@ -146,7 +148,10 @@ export class WorldRenderer {
   /** Dynamic army-stack markers. Fixed capacity; only the used prefix is
    *  drawn. Rewritten from authoritative GameState when the army set changes. */
   private armyMarkers?: InstanceLayer;
+  private armyModels?: InstanceLayer;
   private static readonly ARMY_MARKER_CAPACITY = 1_024;
+  private static readonly ARMY_MODEL_CAPACITY = 4_096;
+  private static readonly ARMY_MODEL_VERTEX_COUNT = 6 * 36;
   /** The ONLY resource-deposit marker layer: fed the player-visible authoritative
    *  set (natural + scenario-guaranteed, fog-filtered) via `setGameResourceMarkers`.
    *  The static `mapMarkers` layer carries junctions/towns only. */
@@ -780,6 +785,8 @@ export class WorldRenderer {
     this.linePipeline = pipelines.lines;
     this.mapMarkerPipeline = pipelines.mapMarkers;
     this.armyMarkerPipeline = pipelines.armyMarkers;
+    this.armyModelPipeline = pipelines.armyModels;
+    this.armyKindCountPipeline = pipelines.armyKindCounts;
     this.countryLabelPipeline = pipelines.countryLabels;
   }
 
@@ -894,6 +901,10 @@ export class WorldRenderer {
     this.armyMarkers = this.createInstanceLayer(
       'army stack markers', zero.buffer as ArrayBuffer, 0, 0, this.lineLayout,
     );
+    const zeroModels = new Float32Array(WorldRenderer.ARMY_MODEL_CAPACITY * 12);
+    this.armyModels = this.createInstanceLayer(
+      'army formation models', zeroModels.buffer as ArrayBuffer, 0, 0, this.lineLayout,
+    );
     const zeroR = new Float32Array(WorldRenderer.RESOURCE_MARKER_CAPACITY * 4);
     this.gameResourceMarkers = this.createInstanceLayer(
       'game resource markers', zeroR.buffer as ArrayBuffer, 0, 0, this.lineLayout,
@@ -925,6 +936,7 @@ export class WorldRenderer {
   setArmyMarkers(
     records: Float32Array, count: number,
     pickList: ReadonlyArray<{ id: string; x: number; z: number }> = [],
+    modelRecords: Float32Array = new Float32Array(), modelCount = 0,
   ): void {
     if (!this.armyMarkers) return;
     const capped = Math.min(count, WorldRenderer.ARMY_MARKER_CAPACITY);
@@ -938,6 +950,20 @@ export class WorldRenderer {
       this.armyMarkers.params, 0, new Uint32Array([Math.max(1, capped), 0, 1, 0]),
     );
     this.armyMarkers.count = capped;
+    if (this.armyModels) {
+      const cappedModels = Math.min(modelCount, WorldRenderer.ARMY_MODEL_CAPACITY);
+      if (cappedModels > 0) {
+        for (let index = 0; index < cappedModels; index += 1) modelRecords[index * 12 + 10] = this.elapsed;
+        this.device.queue.writeBuffer(
+          this.armyModels.buffer, 0,
+          modelRecords.buffer as ArrayBuffer, modelRecords.byteOffset, cappedModels * 12 * 4,
+        );
+      }
+      this.device.queue.writeBuffer(
+        this.armyModels.params, 0, new Uint32Array([Math.max(1, cappedModels), 0, 1, 0]),
+      );
+      this.armyModels.count = cappedModels;
+    }
     this.armyPickList = pickList;
   }
 
@@ -956,6 +982,7 @@ export class WorldRenderer {
   /** Army stack marker under a screen coordinate (nearest within a
    *  zoom-scaled world radius), or null. */
   pickArmyAt(clientX: number, clientY: number): string | null {
+    if (this.camera.distance >= 5_000) return null;
     const ground = this.groundPointAt(clientX, clientY);
     if (!ground) return null;
     const radius = Math.max(28, this.camera.distance * 0.045);
@@ -1338,7 +1365,18 @@ export class WorldRenderer {
     // Army-stack markers: always on (they are gameplay, not an overlay), and
     // visible further out than the resource overlay. The shader fades the last
     // stretch before strategic altitude.
-    if (this.armyMarkers && this.armyMarkers.count > 0 && this.camera.distance < 6_400) {
+    if (this.armyModels && this.armyModels.count > 0 && this.camera.distance < 1_900) {
+      const instances = this.armyModels.count * WORLD_COPY_INDICES.length;
+      pass.setPipeline(this.armyModelPipeline);
+      pass.setBindGroup(1, this.armyModels.bindGroup);
+      pass.draw(WorldRenderer.ARMY_MODEL_VERTEX_COUNT, instances, 0, WORLD_COPY_INDICES[0] * this.armyModels.count);
+      this.recordTriangleDraw('roadFurniture', WorldRenderer.ARMY_MODEL_VERTEX_COUNT / 3 * instances, instances);
+      pass.setPipeline(this.armyKindCountPipeline);
+      pass.setBindGroup(1, this.armyModels.bindGroup);
+      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.armyModels.count);
+      this.recordTriangleDraw('debugLines', instances * 2, instances);
+    }
+    if (this.armyMarkers && this.armyMarkers.count > 0 && this.camera.distance < 5_000) {
       pass.setPipeline(this.armyMarkerPipeline);
       pass.setBindGroup(1, this.armyMarkers.bindGroup);
       const instances = this.armyMarkers.count * WORLD_COPY_INDICES.length;
