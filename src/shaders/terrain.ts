@@ -143,9 +143,15 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     baseColor = mix(baseColor, bakedSurface.rgb, smoothstep(3000.0, 4500.0, uniforms.interaction.y));
   }
   if (terrain == 3u) {
+    // Forests should read as a darker, denser green mass from strategic
+    // altitude, but the previous canopy colour was near-black and blended in
+    // at 0.78. Stacked on baked prop AO and surface shading it collapsed
+    // regional-zoom forest into flat black blobs. Lift the target to a deep
+    // forest green and ease the blend so the canopy still darkens the terrain
+    // without crushing it.
     let forestDistance = distance(uniforms.camera.xyz, input.worldPosition);
-    let canopySignal = vec3f(0.115, 0.31, 0.14) * (0.86 + variation * 0.24);
-    baseColor = mix(baseColor, canopySignal, smoothstep(1750.0, 3150.0, forestDistance) * 0.78);
+    let canopySignal = vec3f(0.17, 0.34, 0.18) * (0.86 + variation * 0.24);
+    baseColor = mix(baseColor, canopySignal, smoothstep(1750.0, 3150.0, forestDistance) * 0.5);
   }
 
   if (uniforms.interaction.z > 0.5 && uniforms.map.w < 0.5) {
