@@ -46,7 +46,7 @@
 }
 
 /* ---------- main area (menu screen + subpages share this) ---------- */
-.ifm__main-area { position: relative; grid-row: 1; min-height: 0; }
+.ifm__main-area { position: relative; grid-row: 1; min-height: 0; overflow: hidden; }
 .ifm__screen { position: absolute; inset: 0; z-index: 2; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3.2vh; padding: 3vh 3vw; }
 .ifm__screen[hidden] { display: none; }
 

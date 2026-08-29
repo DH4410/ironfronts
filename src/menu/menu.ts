@@ -19,7 +19,8 @@ export function mountMenu(handlers: MenuHandlers): void {
 
   let busy = false;
   let openScreen: string | null = null;
-  let transitionFile: HTMLElement | null = null;
+  let transitionPage: HTMLElement | null = null;
+  let riseDistance = 0;
 
   /**
    * One update() drives every sub-motion from the same t (0=on the menu,
@@ -27,11 +28,13 @@ export function mountMenu(handlers: MenuHandlers): void {
    * is already at cover-fit scale, and zooming further just softens it).
    * The logo/cards are measured to move by the exact same pixel amount the
    * backdrop's visible window shifts, so they read as scrolling with the
-   * desk rather than drifting at their own independent speed.
+   * desk rather than drifting at their own independent speed. The dossier
+   * page rides the same pan curve, sliding up fully opaque from below the
+   * fold so it reads as having been on the desk the whole time rather than
+   * fading into place.
    */
   function update(t: number): void {
     const panT = smooth(phase(t, 0, 0.92));
-    const inT = smooth(phase(t, 0.62, 1));
 
     const box = map.getBoundingClientRect();
     const renderedHeight = box.width * MAP_ASPECT;
@@ -44,16 +47,18 @@ export function mountMenu(handlers: MenuHandlers): void {
 
     main.style.transform = `translateY(${(-offsetPx).toFixed(2)}px)`;
 
-    if (transitionFile) {
-      transitionFile.style.opacity = String(inT);
-      transitionFile.style.transform = `translateY(${((1 - inT) * 28).toFixed(2)}px)`;
+    if (transitionPage) {
+      transitionPage.style.transform = `translateY(${((1 - panT) * riseDistance).toFixed(2)}px)`;
     }
   }
 
-  async function playTransition(fileEl: HTMLElement, direction: 1 | -1): Promise<void> {
-    transitionFile = fileEl;
+  async function playTransition(page: HTMLElement, direction: 1 | -1): Promise<void> {
+    transitionPage = page;
+    page.style.transform = 'none';
+    riseDistance = page.getBoundingClientRect().height;
+    update(direction === 1 ? 0 : 1);
     await runChoreo(OPEN_DURATION, direction, update);
-    transitionFile = null;
+    transitionPage = null;
   }
 
   async function openDossier(card: HTMLButtonElement): Promise<void> {
@@ -68,9 +73,8 @@ export function mountMenu(handlers: MenuHandlers): void {
     openScreen = name;
 
     page.hidden = false;
-    fileEl.style.opacity = '0';
     page.style.pointerEvents = 'none';
-    await playTransition(fileEl, 1);
+    await playTransition(page, 1);
     page.style.pointerEvents = '';
     main.style.pointerEvents = 'none';
     busy = false;
@@ -86,7 +90,7 @@ export function mountMenu(handlers: MenuHandlers): void {
     busy = true;
     main.style.pointerEvents = '';
     page.style.pointerEvents = 'none';
-    await playTransition(fileEl, -1);
+    await playTransition(page, -1);
     page.hidden = true;
     page.style.pointerEvents = '';
     openScreen = null;
