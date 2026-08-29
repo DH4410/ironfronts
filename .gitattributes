@@ -1,0 +1,2 @@
+# Generated data files must stay LF so byte-identical drift checks pass on Windows.
+src/game/data/*.generated.ts text eol=lf

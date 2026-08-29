@@ -1,6 +1,6 @@
 import {
-  cityLightShader, countryLabelShader, infrastructureShader, lineShader, polarCapShader, propShader, rainShader,
-  terrainShader, waterShader, waterwayShader,
+  armyMarkerShader, cityLightShader, countryLabelShader, infrastructureShader, lineShader, mapMarkerShader,
+  polarCapShader, propShader, rainShader, terrainShader, waterShader, waterwayShader,
 } from './shaders';
 
 export interface RendererLayouts {
@@ -20,6 +20,8 @@ export interface RendererPipelines {
   cityLights: GPURenderPipeline;
   rain: GPURenderPipeline;
   lines: GPURenderPipeline;
+  mapMarkers: GPURenderPipeline;
+  armyMarkers: GPURenderPipeline;
   countryLabels: GPURenderPipeline;
 }
 
@@ -85,6 +87,7 @@ export function createRendererPipelines(
   const cityLightModule = device.createShaderModule({ label: 'strategic city light shader', code: cityLightShader });
   const rainModule = device.createShaderModule({ label: 'procedural rain shader', code: rainShader });
   const lineModule = device.createShaderModule({ label: 'line shader', code: lineShader });
+  const mapMarkerModule = device.createShaderModule({ label: 'strategic map marker shader', code: mapMarkerShader });
   const countryLabelModule = device.createShaderModule({ label: 'country label shader', code: countryLabelShader });
   const commonLayout = device.createPipelineLayout({ bindGroupLayouts: [layouts.common] });
 
@@ -168,6 +171,23 @@ export function createRendererPipelines(
     primitive: { topology: 'triangle-list', cullMode: 'none' },
     depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
   });
+  const mapMarkers = device.createRenderPipeline({
+    label: 'strategic map markers pipeline',
+    layout: device.createPipelineLayout({ bindGroupLayouts: [layouts.common, layouts.lines] }),
+    vertex: { module: mapMarkerModule, entryPoint: 'mapMarkerVertex' },
+    fragment: { module: mapMarkerModule, entryPoint: 'mapMarkerFragment', targets: [{ format, blend: alphaBlend }] },
+    primitive: { topology: 'triangle-list', cullMode: 'none' },
+    depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
+  });
+  const armyMarkerModule = device.createShaderModule({ label: 'army marker shader', code: armyMarkerShader });
+  const armyMarkers = device.createRenderPipeline({
+    label: 'army stack markers pipeline',
+    layout: device.createPipelineLayout({ bindGroupLayouts: [layouts.common, layouts.lines] }),
+    vertex: { module: armyMarkerModule, entryPoint: 'armyMarkerVertex' },
+    fragment: { module: armyMarkerModule, entryPoint: 'armyMarkerFragment', targets: [{ format, blend: alphaBlend }] },
+    primitive: { topology: 'triangle-list', cullMode: 'none' },
+    depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
+  });
   const countryLabels = device.createRenderPipeline({
     label: 'country label pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [layouts.common, layouts.countryLabels] }),
@@ -176,7 +196,10 @@ export function createRendererPipelines(
     primitive: { topology: 'triangle-list', cullMode: 'none' },
     depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less-equal' },
   });
-  return { terrain, polarCaps, water, waterways, infrastructure, props, cityLights, rain, lines, countryLabels };
+  return {
+    terrain, polarCaps, water, waterways, infrastructure, props, cityLights, rain, lines, mapMarkers, armyMarkers,
+    countryLabels,
+  };
 }
 
 const alphaBlend: GPUBlendState = {

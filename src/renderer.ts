@@ -19,6 +19,9 @@ import {
 } from './performance-monitor';
 import { createHoverInfo, pickTerrainPoint, resolvePrimaryClick } from './picking';
 import { PoliticalCache } from './political-cache';
+import {
+  aggregateProvinceResources, generateResourceNodes, type ProvinceResources, type ResourceNode,
+} from './resource-nodes';
 import { createRendererLayouts, createRendererPipelines } from './renderer-pipelines';
 import { beginWorldFrame, submitWorldFrame } from './renderer-frame';
 import type { InstanceLayer, PerformanceLayerVisibility } from './renderer-types';
@@ -40,6 +43,9 @@ import { loadWorldAssetBuffers } from './world-assets';
 import { getVisibleInstanceView, updateVisibleInstanceView } from './visible-instance-cache';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
+// Strategic markers are a regional / close-zoom aid; above this orbit distance
+// the overview map stays clean and the marker draw is skipped entirely.
+const MAP_MARKER_MAX_DISTANCE = 5_000;
 const MIN_RAIN_PARTICLES = 400;
 const MAX_RAIN_PARTICLES = 1_400;
 
@@ -54,8 +60,10 @@ export class WorldRenderer {
   onHover?: (info: HoverInfo | null, x: number, y: number) => void;
   onStats?: (stats: FrameStats) => void;
   onDiplomacyChange?: (state: DiplomacyState) => void;
-  onProvinceCaptured?: (provinceId: number, previousCountry: CountryRecord, player: CountryRecord) => void;
   onProvinceSelected?: (info: HoverInfo | null) => void;
+  /** Gameplay-layer map tap handler. Return true to consume the click
+   *  (army selection / move order) and suppress province selection. */
+  onMapClick?: (clientX: number, clientY: number) => boolean;
   onTimeOfDayChange?: (state: TimeOfDayState) => void;
 
   private readonly canvas: HTMLCanvasElement;
@@ -82,6 +90,8 @@ export class WorldRenderer {
   private cityLightPipeline!: GPURenderPipeline;
   private rainPipeline!: GPURenderPipeline;
   private linePipeline!: GPURenderPipeline;
+  private mapMarkerPipeline!: GPURenderPipeline;
+  private armyMarkerPipeline!: GPURenderPipeline;
   private countryLabelPipeline!: GPURenderPipeline;
   private countryLabelBuffer?: GPUBuffer;
   private countryLabelParamsBuffer?: GPUBuffer;
@@ -126,6 +136,26 @@ export class WorldRenderer {
   private frustumPlanesRevision = -1;
   private heightData!: Float32Array;
   private provinceData!: Uint16Array;
+  private resourceNodeList: readonly ResourceNode[] = [];
+  private provinceResources = new Map<number, ProvinceResources>();
+  /** Static settlement markers: road junctions + unnamed towns only (no
+   *  deposits — those live in `gameResourceMarkers`). Drawn at map zoom
+   *  regardless of the resource-overlay toggle. */
+  private mapMarkers?: InstanceLayer;
+  private showResourceOverlay = false;
+  /** Dynamic army-stack markers. Fixed capacity; only the used prefix is
+   *  drawn. Rewritten from authoritative GameState when the army set changes. */
+  private armyMarkers?: InstanceLayer;
+  private static readonly ARMY_MARKER_CAPACITY = 1_024;
+  /** The ONLY resource-deposit marker layer: fed the player-visible authoritative
+   *  set (natural + scenario-guaranteed, fog-filtered) via `setGameResourceMarkers`.
+   *  The static `mapMarkers` layer carries junctions/towns only. */
+  private gameResourceMarkers?: InstanceLayer;
+  private static readonly RESOURCE_MARKER_CAPACITY = 4_096;
+  /** Flat (ax, az, bx, bz) edges of the movement/road graph — junction input. */
+  private connectionGraph?: Float32Array;
+  /** World-space centres of the more populous provinces (junction spacing). */
+  private settlementCenters: Array<readonly [number, number]> = [];
   private waterwayMask!: Uint8Array;
   private provinceOwners!: Uint32Array;
   private provinceById = new Map<number, ProvinceRecord>();
@@ -212,6 +242,52 @@ export class WorldRenderer {
     return resolveRenderPixelRatio(this.quality);
   }
 
+  /** Deterministic visual resource-deposit layer (no economy wiring). */
+  get resourceNodes(): readonly ResourceNode[] {
+    return this.resourceNodeList;
+  }
+
+  /**
+   * Read-only world facts the authoritative game layer needs. The renderer is a
+   * data source here, not the game authority — `main.ts` adapts these into a
+   * `WorldData` for `GameSession`. `connectionGraph` is undefined only if its
+   * fetch failed (junction markers off).
+   */
+  get worldWidth(): number { return this.manifest.world.width; }
+  get worldHeight(): number { return this.manifest.world.height; }
+  get provinceIdRaster(): Uint16Array { return this.provinceData; }
+  get provinceIdField(): { width: number; height: number } {
+    return {
+      width: this.manifest.fields.provinceIds.width,
+      height: this.manifest.fields.provinceIds.height,
+    };
+  }
+  get surfaceFieldSize(): { width: number; height: number } {
+    return {
+      width: this.manifest.fields.surface.width,
+      height: this.manifest.fields.surface.height,
+    };
+  }
+  get worldConnectionGraph(): Float32Array | undefined { return this.connectionGraph; }
+
+  /**
+   * Show / hide the GPU resource-deposit overlay. Cheap boolean flip — the
+   * markers are already resident on the GPU; this only gates that one instanced
+   * draw. Junction / town (settlement) markers are independent and stay on.
+   */
+  setResourceOverlay(enabled: boolean): void {
+    this.showResourceOverlay = enabled;
+  }
+
+  /**
+   * Precomputed deposit quantities for a province (abstract strategic units,
+   * not production/day). Returns null when the province holds no known
+   * deposits. O(1) map lookup — no node scan.
+   */
+  getProvinceResources(provinceId: number): ProvinceResources | null {
+    return this.provinceResources.get(provinceId) ?? null;
+  }
+
   /**
    * Switch graphics preset at runtime. Triggers one safe resize /
    * swap-chain + depth reconfigure and invalidates the visible-instance
@@ -291,6 +367,37 @@ export class WorldRenderer {
     } = await loadWorldAssetBuffers(this.manifest);
     this.heightData = new Float32Array(heightBuffer);
     this.provinceData = new Uint16Array(provinceBuffer);
+    this.resourceNodeList = generateResourceNodes({
+      surface: new Uint8Array(surfaceBuffer),
+      surfaceField: this.manifest.fields.surface,
+      height: this.heightData,
+      heightField: this.manifest.fields.height,
+      world: this.manifest.world,
+    });
+    this.provinceResources = aggregateProvinceResources(
+      this.resourceNodeList,
+      (x, z) => {
+        const encoded = this.sampleProvince(x, z);
+        return encoded ? encoded - 1 : 0;
+      },
+    );
+    try {
+      const graph = await fetchBinary(`/world/${this.manifest.buffers.connections.url}`);
+      this.connectionGraph = new Float32Array(graph);
+      const details = await fetchJson<{ provinces: Array<{ center: [number, number]; population: number }> }>(
+        `/world/${this.manifest.sidecars.provinceDetails.url}`,
+      );
+      // The 250 most populous provinces stand in for "real cities" — junction
+      // markers keep clear of these so they never crowd a labelled settlement.
+      this.settlementCenters = details.provinces
+        .slice()
+        .sort((a, b) => b.population - a.population)
+        .slice(0, 250)
+        .map((province) => province.center);
+    } catch {
+      this.connectionGraph = undefined; // road-junction markers simply stay off
+      this.settlementCenters = [];
+    }
     this.waterwayMask = buildWaterwayMask(new Uint8Array(navigationBuffer), this.provinceData.length);
     this.provinceOwners = new Uint32Array(provinceOwnerData);
     this.countryColors = buildCountryColorBuffer(this.manifest.politics.countries);
@@ -406,6 +513,8 @@ export class WorldRenderer {
     this.barriers = this.createInstanceLayer('road barriers', barrierBuffer, this.manifest.buffers.barriers.count, 3, this.instanceLayout, true);
     this.signs = this.createInstanceLayer('road signs', signBuffer, this.manifest.buffers.signs.count, 4, this.instanceLayout, true);
     this.borders = this.createInstanceLayer('borders', borderBuffer, this.manifest.buffers.borders.count, 0, this.lineLayout);
+    this.createStrategicMarkerLayer();
+    this.createArmyMarkerLayer();
     this.updateBorderVisibility();
     if (this.countryLabelCanvas) {
       await loadCountryLabelFont();
@@ -468,7 +577,6 @@ export class WorldRenderer {
     this.onHover = undefined;
     this.onStats = undefined;
     this.onDiplomacyChange = undefined;
-    this.onProvinceCaptured = undefined;
     this.onProvinceSelected = undefined;
     this.onTimeOfDayChange = undefined;
     if (!this.deviceReady) return;
@@ -670,6 +778,8 @@ export class WorldRenderer {
     this.cityLightPipeline = pipelines.cityLights;
     this.rainPipeline = pipelines.rain;
     this.linePipeline = pipelines.lines;
+    this.mapMarkerPipeline = pipelines.mapMarkers;
+    this.armyMarkerPipeline = pipelines.armyMarkers;
     this.countryLabelPipeline = pipelines.countryLabels;
   }
 
@@ -750,6 +860,158 @@ export class WorldRenderer {
     return { buffer, params, bindGroup, count, views };
   }
 
+  /**
+   * Pack the static settlement layer — road junctions and unnamed towns only —
+   * into one instance storage buffer, uploaded once. Resource deposits are NOT
+   * here: they are authoritative game state and are drawn from the separate
+   * `gameResourceMarkers` layer fed by `setGameResourceMarkers`. Keeping them
+   * apart stops a deposit rendering twice and lets the resource overlay toggle
+   * gate resources without hiding the junction/town markers.
+   *
+   * Marker record = f32x4 (worldX, worldZ, kind, richness).
+   *   kind: 3 road junction, 4 small town
+   */
+  private createStrategicMarkerLayer(): void {
+    const junctions = this.generateRoadJunctions();
+    const data = new Float32Array(Math.max(1, junctions.length) * 4);
+    let cursor = 0;
+    for (const junction of junctions) {
+      data[cursor] = junction.x;
+      data[cursor + 1] = junction.z;
+      data[cursor + 2] = junction.town ? 4 : 3;
+      data[cursor + 3] = 0;
+      cursor += 4;
+    }
+    this.mapMarkers = this.createInstanceLayer(
+      'settlement markers', data.buffer as ArrayBuffer, junctions.length, 0, this.lineLayout,
+    );
+  }
+
+  /** Allocate the fixed-capacity army-marker instance buffer (2×vec4f per
+   *  stack). `setArmyMarkers` fills only the used prefix each update. */
+  private createArmyMarkerLayer(): void {
+    const zero = new Float32Array(WorldRenderer.ARMY_MARKER_CAPACITY * 8);
+    this.armyMarkers = this.createInstanceLayer(
+      'army stack markers', zero.buffer as ArrayBuffer, 0, 0, this.lineLayout,
+    );
+    const zeroR = new Float32Array(WorldRenderer.RESOURCE_MARKER_CAPACITY * 4);
+    this.gameResourceMarkers = this.createInstanceLayer(
+      'game resource markers', zeroR.buffer as ArrayBuffer, 0, 0, this.lineLayout,
+    );
+  }
+
+  /** Replace the authoritative resource-deposit markers. `records` is 4 floats
+   *  per node: (worldX, worldZ, kind[0 stone/1 metal/2 oil], richness 0..1). */
+  setGameResourceMarkers(records: Float32Array, count: number): void {
+    if (!this.gameResourceMarkers) return;
+    const capped = Math.min(count, WorldRenderer.RESOURCE_MARKER_CAPACITY);
+    if (capped > 0) {
+      this.device.queue.writeBuffer(
+        this.gameResourceMarkers.buffer, 0,
+        records.buffer as ArrayBuffer, records.byteOffset, capped * 4 * 4,
+      );
+    }
+    this.device.queue.writeBuffer(
+      this.gameResourceMarkers.params, 0, new Uint32Array([Math.max(1, capped), 0, 1, 0]),
+    );
+    this.gameResourceMarkers.count = capped;
+  }
+
+  /**
+   * Replace the drawn army markers. `records` is 8 floats per stack — see
+   * `armyMarkerShader`. `count` stacks are drawn; the rest of the capacity is
+   * ignored. Cheap: one buffer write, no pipeline or bind-group churn.
+   */
+  setArmyMarkers(
+    records: Float32Array, count: number,
+    pickList: ReadonlyArray<{ id: string; x: number; z: number }> = [],
+  ): void {
+    if (!this.armyMarkers) return;
+    const capped = Math.min(count, WorldRenderer.ARMY_MARKER_CAPACITY);
+    if (capped > 0) {
+      this.device.queue.writeBuffer(
+        this.armyMarkers.buffer, 0,
+        records.buffer as ArrayBuffer, records.byteOffset, capped * 8 * 4,
+      );
+    }
+    this.device.queue.writeBuffer(
+      this.armyMarkers.params, 0, new Uint32Array([Math.max(1, capped), 0, 1, 0]),
+    );
+    this.armyMarkers.count = capped;
+    this.armyPickList = pickList;
+  }
+
+  private armyPickList: ReadonlyArray<{ id: string; x: number; z: number }> = [];
+
+  /** World-space ground point under a screen coordinate, or null over sky. */
+  groundPointAt(clientX: number, clientY: number): [number, number] | null {
+    const point = pickTerrainPoint(
+      this.camera, clientX, clientY,
+      this.manifest.terrain.maxHeight, this.manifest.world.height,
+      (x, z) => this.sampleHeight(x, z), this.pickPoint,
+    );
+    return point ? [point[0], point[2]] : null;
+  }
+
+  /** Army stack marker under a screen coordinate (nearest within a
+   *  zoom-scaled world radius), or null. */
+  pickArmyAt(clientX: number, clientY: number): string | null {
+    const ground = this.groundPointAt(clientX, clientY);
+    if (!ground) return null;
+    const radius = Math.max(28, this.camera.distance * 0.045);
+    const w = this.manifest.world.width;
+    let best: string | null = null;
+    let bestSq = radius * radius;
+    for (const entry of this.armyPickList) {
+      let dx = entry.x - ground[0];
+      if (dx > w / 2) dx -= w; else if (dx < -w / 2) dx += w;
+      const dz = entry.z - ground[1];
+      const dSq = dx * dx + dz * dz;
+      if (dSq < bestSq) { bestSq = dSq; best = entry.id; }
+    }
+    return best;
+  }
+
+  /**
+   * Classify vertices of the movement/road graph by degree. Degree >= 3 is a
+   * crossroads; a deterministic subset of degree >= 4 vertices is promoted to
+   * an unnamed town. Filtered to land, a minimum spacing between markers, and a
+   * minimum distance from the nearest labelled settlement so junction dots
+   * never crowd real cities. Returns [] when the graph is not loaded.
+   */
+  private generateRoadJunctions(): Array<{ x: number; z: number; town: boolean }> {
+    const graph = this.connectionGraph;
+    if (!graph || graph.length < 4) return [];
+    const CELL = 26;                 // world units — merges shared vertices
+    const MIN_SPACING = 150;         // between kept junction markers
+    const MIN_CITY_DISTANCE = 170;   // from one of the 250 largest settlements
+    const degree = new Map<number, { x: number; z: number; n: number }>();
+    const key = (x: number, z: number): number =>
+      Math.round(x / CELL) * 100_000 + Math.round(z / CELL);
+    for (let i = 0; i + 3 < graph.length; i += 4) {
+      for (const [x, z] of [[graph[i], graph[i + 1]], [graph[i + 2], graph[i + 3]]] as const) {
+        const k = key(x, z);
+        const entry = degree.get(k);
+        if (entry) entry.n += 1;
+        else degree.set(k, { x, z, n: 1 });
+      }
+    }
+    const cities = this.settlementCenters;
+    const kept: Array<{ x: number; z: number; town: boolean }> = [];
+    const candidates = [...degree.values()]
+      .filter((v) => v.n >= 3)
+      .sort((a, b) => b.n - a.n);
+    for (const v of candidates) {
+      if (kept.length >= 500) break;
+      if (this.sampleHeight(v.x, v.z) <= 0.05) continue; // land only
+      if (cities.some((c) => Math.hypot(c[0] - v.x, c[1] - v.z) < MIN_CITY_DISTANCE)) continue;
+      if (kept.some((m) => Math.hypot(m.x - v.x, m.z - v.z) < MIN_SPACING)) continue;
+      const town = v.n >= 4 && (Math.round(v.x * 7 + v.z * 13) & 7) === 0;
+      kept.push({ x: v.x, z: v.z, town });
+    }
+    return kept;
+  }
+
   private attachRuntimeBindings(): void {
     if (this.runtimeBindingsAttached) return;
     this.runtimeBindingsAttached = true;
@@ -792,6 +1054,9 @@ export class WorldRenderer {
       if (!start || start.pointerId !== event.pointerId || event.button !== 0) return;
       const tapSlop = event.pointerType === 'touch' ? 12 : 5;
       if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > tapSlop) return;
+      // Gameplay layer gets first refusal on a map tap (army pick / move
+      // order). If it handled the click, do not also select a province.
+      if (this.onMapClick?.(event.clientX, event.clientY)) return;
       if (event.pointerType === 'touch') {
         this.pointer.x = event.clientX;
         this.pointer.y = event.clientY;
@@ -821,7 +1086,7 @@ export class WorldRenderer {
     // Backing-store scale is the graphics-quality preset (0.75 / 1.0 / 1.25 /
     // 1.5), applied absolutely and capped at 1.5 so a 2x/3x HiDPI panel never
     // forces an oversized buffer. devicePixelRatio is deliberately not a
-    // multiplier here.
+    // multiplier here. This supersedes PR #36's flat min(dpr, 1.5) cap.
     const pixelRatio = resolveRenderPixelRatio(this.quality);
     const width = Math.max(1, Math.floor(this.canvas.clientWidth * pixelRatio));
     const height = Math.max(1, Math.floor(this.canvas.clientHeight * pixelRatio));
@@ -930,12 +1195,13 @@ export class WorldRenderer {
       sky: [...skyColor, 0],
       // weather.y = quality index (0 low .. 3 ultra), weather.z = 0..1 detail
       // factor. Shaders can scale purely-decorative expensive work by these
-      // without a struct change.
+      // without a struct change. weather.w = encoded (1-based) selected
+      // province id, 0 when nothing is selected (border shader outline).
       weather: [
         this.environment.rainIntensity,
         QUALITY_LEVELS.indexOf(this.quality),
         this.qualityPreset.detailFactor,
-        0,
+        this.selectedId,
       ],
     });
     this.device.queue.writeBuffer(this.uniformBuffer, 0, values);
@@ -1046,6 +1312,37 @@ export class WorldRenderer {
       pass.setBindGroup(1, this.waterwayNetwork.bindGroup);
       const instances = this.waterwayNetwork.count * WORLD_COPY_INDICES.length;
       pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.waterwayNetwork.count);
+      this.recordTriangleDraw('debugLines', instances * 2, instances);
+    }
+
+    // Strategic map markers. Two independent instanced draws, both projected on
+    // the GPU — locked to the terrain while panning, no CPU/DOM cost, only below
+    // strategic altitude (the shader fades the last stretch so nothing pops).
+    //   - settlement markers (junctions/towns): always shown at map zoom;
+    //   - resource deposits: gated by the resource-overlay toggle.
+    if (this.camera.distance < MAP_MARKER_MAX_DISTANCE) {
+      pass.setPipeline(this.mapMarkerPipeline);
+      if (this.mapMarkers && this.mapMarkers.count > 0) {
+        pass.setBindGroup(1, this.mapMarkers.bindGroup);
+        const instances = this.mapMarkers.count * WORLD_COPY_INDICES.length;
+        pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.mapMarkers.count);
+        this.recordTriangleDraw('debugLines', instances * 2, instances);
+      }
+      if (this.showResourceOverlay && this.gameResourceMarkers && this.gameResourceMarkers.count > 0) {
+        pass.setBindGroup(1, this.gameResourceMarkers.bindGroup);
+        const instances = this.gameResourceMarkers.count * WORLD_COPY_INDICES.length;
+        pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.gameResourceMarkers.count);
+        this.recordTriangleDraw('debugLines', instances * 2, instances);
+      }
+    }
+    // Army-stack markers: always on (they are gameplay, not an overlay), and
+    // visible further out than the resource overlay. The shader fades the last
+    // stretch before strategic altitude.
+    if (this.armyMarkers && this.armyMarkers.count > 0 && this.camera.distance < 6_400) {
+      pass.setPipeline(this.armyMarkerPipeline);
+      pass.setBindGroup(1, this.armyMarkers.bindGroup);
+      const instances = this.armyMarkers.count * WORLD_COPY_INDICES.length;
+      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.armyMarkers.count);
       this.recordTriangleDraw('debugLines', instances * 2, instances);
     }
     submitWorldFrame(
@@ -1344,24 +1641,6 @@ export class WorldRenderer {
     if (!this.selectedId) return;
     this.selectedId = 0;
     this.onProvinceSelected?.(null);
-  }
-
-  /**
-   * Explicit developer/gameplay pathway for transferring ownership of the
-   * province under a screen point to the player. A normal map click never
-   * reaches this; it must be invoked deliberately (e.g. a diagnostics tool).
-   */
-  forceCaptureProvinceAt(clientX: number, clientY: number): boolean {
-    const encodedId = this.provinceAtScreenPoint(clientX, clientY);
-    if (!encodedId) return false;
-    const previousCountryId = this.provinceOwners[encodedId];
-    if (this.diplomaticRelations.get(previousCountryId) !== 'war') return false;
-    const previousCountry = this.countryById.get(previousCountryId);
-    const player = this.countryById.get(this.playerCountryId);
-    if (!previousCountry || !player) return false;
-    this.setProvinceOwner(encodedId - 1, this.playerCountryId);
-    this.onProvinceCaptured?.(encodedId - 1, previousCountry, player);
-    return true;
   }
 
   private finishPicking(encodedId: number, started: number): { raycastMs: number; hoverUiMs: number } {
