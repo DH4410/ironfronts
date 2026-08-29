@@ -1,0 +1,67 @@
+import { describe, expect, it } from 'vitest';
+import { GameRuntime } from '../../apps/game-server/src/runtime';
+import { diffProjection, projectFor } from '../../apps/game-server/src/projection';
+import type { WorldData, WorldProvince } from '../../src/game/world-data';
+
+function tinyWorld(): WorldData {
+  const provinces: WorldProvince[] = Array.from({ length: 12 }, (_, id) => ({
+    id, center: [80 + id * 70, 100] as const, terrainId: 4, population: 10_000 - id,
+    coastal: false, urban: true,
+  }));
+  const owners = Object.fromEntries(provinces.map((province) => [province.id, province.id < 5 ? 1 : province.id < 10 ? 2 : 3]));
+  const edges: number[] = [];
+  for (let id = 0; id < provinces.length - 1; id += 1) {
+    edges.push(provinces[id].center[0], 100, provinces[id + 1].center[0], 100, 1, 0, 0, 0);
+  }
+  return {
+    width: 1_200, height: 500, provinces,
+    countries: [
+      { id: 1, name: 'Alpha', color: '#aa0000', capitalProvinceId: 0 },
+      { id: 2, name: 'Beta', color: '#0000aa', capitalProvinceId: 5 },
+      { id: 3, name: 'Minor', color: '#888888', capitalProvinceId: 10 },
+    ],
+    provinceOwner: (id) => owners[id] ?? 0,
+    provinceAt: (x) => Math.max(0, Math.min(11, Math.round((x - 80) / 70))),
+    terrainClassAt: () => 4,
+    connections: Float32Array.from(edges),
+    resourceNodes: [],
+  };
+}
+
+describe('single authoritative game runtime', () => {
+  it('selects five-city countries, initializes them equally, and assigns seats atomically', () => {
+    const runtime = new GameRuntime(tinyWorld());
+    expect(runtime.lobby().countries.map((country) => country.id)).toEqual([1, 2]);
+    expect(runtime.session.state.countries[1].stockpile).toEqual(runtime.session.state.countries[2].stockpile);
+    expect(Object.values(runtime.session.state.armies).filter((army) => army.ownerCountryId === 1)).toHaveLength(4);
+    expect(Object.values(runtime.session.state.armies).filter((army) => army.ownerCountryId === 2)).toHaveLength(4);
+    expect(runtime.join('account-a', 1)).toEqual({ ok: true, countryId: 1 });
+    expect(runtime.join('account-b', 1)).toMatchObject({ ok: false });
+    expect(runtime.join('account-a', 2)).toMatchObject({ ok: false });
+    expect(runtime.join('account-b', 3)).toMatchObject({ ok: false });
+    expect(runtime.seat('account-a')).toBe(1);
+  });
+
+  it('projects private state per viewer and emits change-only removals/redactions', () => {
+    const runtime = new GameRuntime(tinyWorld());
+    const before = projectFor(runtime.session.state, runtime.world, 1);
+    expect(before.ownCountry?.id).toBe(1);
+    expect(Object.keys(before.provinceBuildings).every((id) => before.provinceOwners[Number(id)] === 1)).toBe(true);
+    const foreign = Object.values(runtime.session.state.armies).find((army) => army.ownerCountryId === 2)!;
+    foreign.x = 1_100;
+    foreign.z = 450;
+    const after = projectFor(runtime.session.state, runtime.world, 1);
+    const delta = diffProjection(before, after);
+    if (before.armies[foreign.id]) {
+      expect(delta?.removals.armies).toContain(foreign.id);
+      expect(delta?.redactions).toContain(`armies.${foreign.id}`);
+    }
+    expect(after.ownCountry).not.toHaveProperty('password');
+  });
+
+  it('keeps advancing with no connected clients', () => {
+    const runtime = new GameRuntime(tinyWorld());
+    runtime.tick(1);
+    expect(runtime.session.gameTimeHours).toBe(1);
+  });
+});

@@ -4,18 +4,18 @@ import { phase, runChoreo, smooth } from './choreo';
 import {
   isQualityLevel, loadQuality, QUALITY_PRESETS, saveQuality, type QualityLevel,
 } from '../graphics/quality';
-import type { ScenarioSelection } from '../game/scenario';
-import {
-  buildScenarioSelection, resolvePlayableCountries, scenarioById,
-} from '../game/scenario-catalog';
-import { CATALOG_COUNTRY_BY_NAME, type CatalogCountry } from '../game/data/countries.generated';
+import type { GameLobby } from '@ironfronts/protocol';
+import { assignedCountry as resolveAssignedCountry, selectableCountries } from './lobby-state';
 
 export interface MenuHandlers {
   /**
    * Called once the player commits to entering the world, with the typed
    * scenario + country selection. Nothing downstream re-reads the DOM.
    */
-  onLaunch: (selection: ScenarioSelection) => void;
+  lobby: GameLobby;
+  username: string;
+  onLaunch: (countryId: number) => void | Promise<void>;
+  onLogout: () => void;
   audio?: AudioManager;
   /**
    * Fired when the player changes the graphics-quality preset in Settings.
@@ -37,6 +37,18 @@ export function mountMenu(handlers: MenuHandlers): void {
   const map = requiredChild<HTMLElement>(root, '.ifm__map');
   const masterVolume = document.getElementById('ifm-master-volume') as HTMLInputElement | null;
   const musicVolume = document.getElementById('ifm-music-volume') as HTMLInputElement | null;
+  const newCampaign = requiredId<HTMLButtonElement>('ifm-new-campaign');
+  const continueButton = requiredId<HTMLButtonElement>('ifm-continue');
+  const assignedCountry = resolveAssignedCountry(handlers.lobby);
+  requiredId<HTMLElement>('ifm-account-name').textContent = handlers.username;
+  requiredId<HTMLButtonElement>('ifm-logout').addEventListener('click', handlers.onLogout);
+  newCampaign.disabled = assignedCountry !== null;
+  newCampaign.classList.toggle('is-disabled', assignedCountry !== null);
+  continueButton.disabled = assignedCountry === null;
+  continueButton.classList.toggle('is-disabled', assignedCountry === null);
+  requiredId<HTMLElement>('ifm-continue-detail').textContent = assignedCountry
+    ? `Continue as ${assignedCountry.name}.` : 'No field assignment.';
+  if (assignedCountry) continueButton.addEventListener('click', () => void deploy(assignedCountry.id));
 
   let busy = false;
   let openScreen: string | null = null;
@@ -215,16 +227,8 @@ export function mountMenu(handlers: MenuHandlers): void {
   const countryHint = document.getElementById('ifm-country-hint');
   const startButton = document.getElementById('ifm-start-operation') as HTMLButtonElement | null;
   const DEFAULT_SCENARIO = 'OP-1939-01';
-  let selectedScenarioId = DEFAULT_SCENARIO;
   let selectedCountryId: number | null = null;
-
-  const flagUrls = import.meta.glob('../ui/assets/flags/*.svg', {
-    eager: true, query: '?url', import: 'default',
-  }) as Record<string, string>;
-  const flagStyle = (country: CatalogCountry): string => {
-    const url = country.flag ? flagUrls[`../ui/assets/flags/${country.flag}.svg`] : undefined;
-    return url ? `background-image:url(${url})` : `background:${country.color}`;
-  };
+  void DEFAULT_SCENARIO;
 
   function updateStartEnabled(): void {
     if (startButton) startButton.disabled = selectedCountryId === null;
@@ -235,10 +239,9 @@ export function mountMenu(handlers: MenuHandlers): void {
     }
   }
 
-  function renderCountryGrid(scenarioId: string, preferCountryId: number | null): void {
+  function renderCountryGrid(preferCountryId: number | null): void {
     if (!countryGrid) return;
-    const scenario = scenarioById(scenarioId);
-    const playable = resolvePlayableCountries(scenario);
+    const playable = selectableCountries(handlers.lobby);
     countryGrid.replaceChildren();
     const keep = preferCountryId !== null && playable.some((c) => c.id === preferCountryId);
     selectedCountryId = keep ? preferCountryId : null;
@@ -252,7 +255,7 @@ export function mountMenu(handlers: MenuHandlers): void {
       button.classList.toggle('is-selected', country.id === selectedCountryId);
       const flag = document.createElement('span');
       flag.className = 'ifm__country-flag';
-      flag.setAttribute('style', flagStyle(country));
+      flag.setAttribute('style', `background:${country.color}`);
       const body = document.createElement('span');
       body.className = 'ifm__country-body';
       const name = document.createElement('span');
@@ -260,7 +263,7 @@ export function mountMenu(handlers: MenuHandlers): void {
       name.textContent = country.name;
       const meta = document.createElement('span');
       meta.className = 'ifm__country-meta';
-      meta.textContent = `${country.cityCount} cities · ${country.provinceCount} provinces`;
+      meta.textContent = `${country.startingCities} starting cities`;
       body.append(name, meta);
       button.append(flag, body);
       button.addEventListener('click', () => {
@@ -286,14 +289,12 @@ export function mountMenu(handlers: MenuHandlers): void {
       playCue('select');
       if (row.dataset.objective) updateBriefing(row);
       if (row.dataset.op) {
-        selectedScenarioId = row.dataset.op;
-        renderCountryGrid(selectedScenarioId, selectedCountryId);
+        renderCountryGrid(selectedCountryId);
       }
     });
   });
 
-  // Pre-select World at War + Spain so the acceptance path is one click away.
-  renderCountryGrid(DEFAULT_SCENARIO, CATALOG_COUNTRY_BY_NAME.get('spain')?.id ?? null);
+  renderCountryGrid(null);
 
   // Graphics quality selector. Reads/persists the choice locally and only
   // notifies handlers - it never initializes the world renderer from the lobby.
@@ -321,20 +322,34 @@ export function mountMenu(handlers: MenuHandlers): void {
     }
   }
 
-  function launch(selection: ScenarioSelection): void {
+  async function launch(countryId: number): Promise<void> {
     playCue('confirm');
     root.style.transition = 'opacity .5s ease';
     root.style.opacity = '0';
-    window.setTimeout(() => {
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 500));
+    try {
       root.hidden = true;
       if (brand) brand.hidden = false;
-      handlers.onLaunch(selection);
-    }, 500);
+      await handlers.onLaunch(countryId);
+    } catch (error) {
+      root.hidden = false;
+      root.style.opacity = '1';
+      if (brand) brand.hidden = true;
+      throw error;
+    }
+  }
+
+  async function deploy(countryId: number): Promise<void> {
+    try {
+      await launch(countryId);
+    } catch (error) {
+      if (countryHint) countryHint.textContent = error instanceof Error ? error.message : 'Unable to deploy.';
+    }
   }
 
   startButton?.addEventListener('click', () => {
     if (selectedCountryId === null) return;
-    launch(buildScenarioSelection(selectedScenarioId, selectedCountryId));
+    void deploy(selectedCountryId);
   });
   document.getElementById('ifm-apply-settings')?.addEventListener('click', () => playCue('confirm'));
 }

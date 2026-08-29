@@ -14,11 +14,11 @@ function army(id: string, owner: number, x: number, z: number, typeId = 'infantr
 function state(fog: boolean, armies: ArmyStack[]): GameState {
   return {
     version: GAME_STATE_VERSION, seed: 1, scenarioId: 'OP-1939-01', mode: 'campaign',
-    playerCountryId: 1, fogOfWar: fog, economyEnabled: true,
+    fogOfWar: fog, economyEnabled: true,
     clock: { gameTimeHours: 0, startDate: 'x' },
     countries: {
-      1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1, isPlayer: true },
-      2: { id: 2, name: 'B', color: '#000', controller: 'neutral', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1, isPlayer: false },
+      1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
+      2: { id: 2, name: 'B', color: '#000', controller: 'neutral', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
     },
     provinceOwners: {}, provinceBuildings: {}, productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: Object.fromEntries(armies.map((a) => [a.id, a])),
@@ -36,35 +36,35 @@ const world: WorldData = {
 describe('fog of war visibility', () => {
   it('reveals everything when fog is disabled', () => {
     const s = state(false, [army('p', 1, 0, 0), army('e', 2, 9_000, 4_000)]);
-    const v = computeArmyVisibility(s, world);
+    const v = computeArmyVisibility(s, world, 1);
     expect(v.get('p')).toBe('visible');
     expect(v.get('e')).toBe('visible');
   });
 
   it('own armies are always visible under fog', () => {
     const s = state(true, [army('p', 1, 0, 0)]);
-    expect(computeArmyVisibility(s, world).get('p')).toBe('visible');
+    expect(computeArmyVisibility(s, world, 1).get('p')).toBe('visible');
   });
 
   it('foreign army: inner->visible, outer->contact, beyond->hidden', () => {
     const near = state(true, [army('p', 1, 0, 0), army('e', 2, 70, 0)]);   // 70 < inner 90
-    expect(computeArmyVisibility(near, world).get('e')).toBe('visible');
+    expect(computeArmyVisibility(near, world, 1).get('e')).toBe('visible');
 
     const mid = state(true, [army('p', 1, 0, 0), army('e', 2, 140, 0)]);   // 90 < 140 < 180
-    expect(computeArmyVisibility(mid, world).get('e')).toBe('contact');
+    expect(computeArmyVisibility(mid, world, 1).get('e')).toBe('contact');
 
     const far = state(true, [army('p', 1, 0, 0), army('e', 2, 400, 0)]);   // > outer
-    expect(computeArmyVisibility(far, world).get('e')).toBe('hidden');
+    expect(computeArmyVisibility(far, world, 1).get('e')).toBe('hidden');
   });
 
   it('wraps X for the vision check', () => {
     const s = state(true, [army('p', 1, 20, 0), army('e', 2, 9_980, 0)]); // 40 apart across seam
-    expect(computeArmyVisibility(s, world).get('e')).toBe('visible');
+    expect(computeArmyVisibility(s, world, 1).get('e')).toBe('visible');
   });
 
   it('foreignDetailVisible: own always, others only without fog', () => {
-    expect(foreignDetailVisible(state(true, []), 1)).toBe(true);
-    expect(foreignDetailVisible(state(true, []), 2)).toBe(false);
-    expect(foreignDetailVisible(state(false, []), 2)).toBe(true);
+    expect(foreignDetailVisible(state(true, []), 1, 1)).toBe(true);
+    expect(foreignDetailVisible(state(true, []), 1, 2)).toBe(false);
+    expect(foreignDetailVisible(state(false, []), 1, 2)).toBe(true);
   });
 });

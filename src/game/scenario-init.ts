@@ -23,27 +23,26 @@ import { wrappedDistance } from './geometry';
 import { mulberry32, hashString } from './rng';
 import { bootstrapResources, type ResourceBootstrapResult } from './resource-bootstrap';
 
-/** Starting stockpile for a campaign player country (step 6). */
-const PLAYER_START_STOCKPILE = {
+/** Every selectable (five-city) country starts on this identical footing. */
+export const SELECTABLE_START_STOCKPILE = {
   funds: 2_000, manpower: 1_500, food: 800, stone: 300, metal: 400, oil: 250,
 };
-const AI_START_STOCKPILE = {
+export const MINOR_START_STOCKPILE = {
   funds: 1_200, manpower: 1_000, food: 600, stone: 200, metal: 250, oil: 150,
 };
 const SANDBOX_STOCKPILE = {
   funds: 99_999, manpower: 99_999, food: 99_999, stone: 99_999, metal: 99_999, oil: 99_999,
 };
 
-/** Curated starting order of battle for the player's capital region. */
-const PLAYER_CAPITAL_ARMY: Array<{ typeId: string; count: number }> = [
+const SELECTABLE_CAPITAL_ARMY: Array<{ typeId: string; count: number }> = [
   { typeId: 'infantry', count: 4 },
   { typeId: 'engineer', count: 2 },
 ];
-const PLAYER_CITY_ARMY: Array<{ typeId: string; count: number }> = [
+const SELECTABLE_CITY_ARMY: Array<{ typeId: string; count: number }> = [
   { typeId: 'infantry', count: 2 },
   { typeId: 'armored-car', count: 1 },
 ];
-const AI_CITY_ARMY: Array<{ typeId: string; count: number }> = [
+const MINOR_CITY_ARMY: Array<{ typeId: string; count: number }> = [
   { typeId: 'infantry', count: 3 },
 ];
 
@@ -53,15 +52,12 @@ export interface InitResult {
   readonly graph: LandGraph;
   /** Diagnostics for the report / tests. */
   readonly diagnostics: {
-    readonly playerComponent: number;
-    readonly playerProvinces: number;
-    readonly playerUrbanProvinces: number;
+    readonly eligibleCountryIds: readonly number[];
     readonly reachableResourceNodes: number;
     readonly unreachableResourceNodes: number;
     readonly guaranteedDeposits: ResourceBootstrapResult['guarantees'];
-    readonly playerArmies: number;
     readonly totalArmies: number;
-    readonly startCamera: { readonly x: number; readonly z: number; readonly distance: number };
+    readonly startCameras: Readonly<Record<number, { readonly x: number; readonly z: number; readonly distance: number }>>;
   };
 }
 
@@ -76,13 +72,12 @@ function provincesByOwner(world: WorldData): Map<number, WorldProvince[]> {
 }
 
 function makeCountryState(
-  world: WorldData, countryId: number, controller: ControllerType, sandbox: boolean,
+  world: WorldData, countryId: number, controller: ControllerType, sandbox: boolean, selectable: boolean,
 ): CountryState {
-  const isPlayer = controller === 'player';
   const record = world.countries.find((country) => country.id === countryId);
   const stockpile = sandbox
     ? { ...SANDBOX_STOCKPILE }
-    : { ...(isPlayer ? PLAYER_START_STOCKPILE : AI_START_STOCKPILE) };
+    : { ...(selectable ? SELECTABLE_START_STOCKPILE : MINOR_START_STOCKPILE) };
   return {
     id: countryId,
     name: record?.name ?? `Country ${countryId}`,
@@ -90,8 +85,7 @@ function makeCountryState(
     controller,
     stockpile,
     income: emptyStockpile(),
-    industryCapacity: isPlayer ? 10 : 6,
-    isPlayer,
+    industryCapacity: selectable ? 10 : 6,
   };
 }
 
@@ -153,7 +147,7 @@ export function initGameState(
   world: WorldData,
 ): InitResult {
   const sandbox = scenario.mode === 'sandbox';
-  const seed = hashString(`${scenario.id}|${selection.playerCountryId}`);
+  const seed = hashString(scenario.id);
   const random = mulberry32(seed);
 
   const graph = buildLandGraph(world.connections, world.width, world.height);
@@ -163,17 +157,23 @@ export function initGameState(
   // is 'player', every other country is 'neutral'. A later phase promotes one
   // nearby hostile country to 'ai'.
   const byOwner = provincesByOwner(world);
+  const eligibleCountryIds = [...byOwner]
+    .filter(([, provinces]) => provinces.filter((province) => province.urban).length >= scenario.minimumStartingCities)
+    .map(([countryId]) => countryId)
+    .sort((a, b) => a - b);
+  const eligible = new Set(eligibleCountryIds);
+  const initializationCountryId = eligibleCountryIds[0] ?? byOwner.keys().next().value ?? 0;
   const countries: Record<number, CountryState> = {};
   for (const countryId of byOwner.keys()) {
-    const controller: ControllerType =
-      countryId === selection.playerCountryId ? 'player' : 'neutral';
-    countries[countryId] = makeCountryState(world, countryId, controller, sandbox);
+    countries[countryId] = makeCountryState(
+      world, countryId, 'neutral', sandbox, eligible.has(countryId),
+    );
   }
-  if (!countries[selection.playerCountryId]) {
+  if (Object.keys(countries).length === 0) {
     // Player country has no territory in this world — caller should have
     // validated, but fail loud rather than produce a broken game.
     throw new Error(
-      `Player country ${selection.playerCountryId} has no provinces in this world.`,
+      'World at War has no countries with territory.',
     );
   }
 
@@ -184,9 +184,9 @@ export function initGameState(
   }
 
   // ---- player component (the reachable mainland for this player) -------
-  const playerProvinces = byOwner.get(selection.playerCountryId) ?? [];
+  const playerProvinces = byOwner.get(initializationCountryId) ?? [];
   const capital = world.countries.find(
-    (country) => country.id === selection.playerCountryId,
+    (country) => country.id === initializationCountryId,
   )?.capitalProvinceId ?? playerProvinces[0]?.id ?? -1;
   const capitalProvince = world.provinces.find((province) => province.id === capital)
     ?? playerProvinces[0];
@@ -210,10 +210,18 @@ export function initGameState(
     provinceBuildings[provinceId] = buildings;
   }
   for (const [ownerId, provinces] of byOwner) {
-    if (ownerId === selection.playerCountryId) continue;
+    if (ownerId === initializationCountryId) continue;
     const cities = provinces.filter((province) => province.urban)
       .sort((a, b) => b.population - a.population);
-    if (cities[0]) provinceBuildings[cities[0].id] = { barracks: 1, tankPlant: 0, ordnance: 0 };
+    if (eligible.has(ownerId)) {
+      const capitalId = world.countries.find((country) => country.id === ownerId)?.capitalProvinceId
+        ?? cities[0]?.id ?? -1;
+      for (const [provinceId, buildings] of assignStartingBuildings(cities, capitalId)) {
+        provinceBuildings[provinceId] = buildings;
+      }
+    } else if (cities[0]) {
+      provinceBuildings[cities[0].id] = { barracks: 1, tankPlant: 0, ordnance: 0 };
+    }
   }
 
   // ---- resource nodes: point-in-province assignment + strategic baseline
@@ -222,7 +230,7 @@ export function initGameState(
   // its own guarantee when `GameSession` flips it on (enableNearbyAi); a
   // multiplayer server would call `guaranteeStrategicBaseline` per participant.
   // Every other neutral nation keeps whatever scarce natural geography it has.
-  const participantIds = sandbox ? [] : [selection.playerCountryId];
+  const participantIds = sandbox ? [] : eligibleCountryIds;
   const bootstrap = bootstrapResources(
     world.resourceNodes, world, graph, provinceOwners, participantIds, seed,
   );
@@ -231,7 +239,6 @@ export function initGameState(
   // ---- starting armies ----------------------------------------
   const armies: Record<string, ArmyStack> = {};
   let nextArmyId = 1;
-  let playerArmies = 0;
   const addArmy = (
     ownerId: number, name: string, province: WorldProvince, component: number,
     composition: Array<{ typeId: string; count: number }>,
@@ -242,11 +249,10 @@ export function initGameState(
     if (!army) return;
     armies[army.id] = army;
     nextArmyId += 1;
-    if (ownerId === selection.playerCountryId) playerArmies += 1;
   };
 
   if (capitalProvince) {
-    addArmy(selection.playerCountryId, '1st Army', capitalProvince, playerComponent, PLAYER_CAPITAL_ARMY);
+    addArmy(initializationCountryId, '1st Army', capitalProvince, playerComponent, SELECTABLE_CAPITAL_ARMY);
   }
   const playerCityTargets = [...playerCities]
     .filter((province) => province.id !== capital)
@@ -254,23 +260,25 @@ export function initGameState(
     .slice(0, 3);
   playerCityTargets.forEach((province, index) => {
     addArmy(
-      selection.playerCountryId, `${index + 2}${ordinalSuffix(index + 2)} Army`,
-      province, playerComponent, PLAYER_CITY_ARMY,
+      initializationCountryId, `${index + 2}${ordinalSuffix(index + 2)} Army`,
+      province, playerComponent, SELECTABLE_CITY_ARMY,
     );
   });
 
   if (!sandbox) {
     for (const [ownerId, provinces] of byOwner) {
-      if (ownerId === selection.playerCountryId) continue;
+      if (ownerId === initializationCountryId) continue;
       const cities = provinces.filter((province) => province.urban)
-        .sort((a, b) => b.population - a.population)
-        .slice(0, 2);
+        .sort((a, b) => b.population - a.population);
       const ownerComponent = cities[0]
         ? graph.component[nearestNode(graph, cities[0].center[0], cities[0].center[1], 400)] ?? -1
         : -1;
-      cities.forEach((province, index) => {
-        addArmy(ownerId, `${province.id} Garrison`, province, ownerComponent,
-          index === 0 ? AI_CITY_ARMY : [{ typeId: 'infantry', count: 2 }]);
+      const limit = eligible.has(ownerId) ? 4 : 2;
+      cities.slice(0, limit).forEach((province, index) => {
+        addArmy(ownerId, index === 0 && eligible.has(ownerId) ? '1st Army' : `${province.id} Garrison`, province, ownerComponent,
+          eligible.has(ownerId)
+            ? (index === 0 ? SELECTABLE_CAPITAL_ARMY : SELECTABLE_CITY_ARMY)
+            : (index === 0 ? MINOR_CITY_ARMY : [{ typeId: 'infantry', count: 2 }]));
       });
     }
   }
@@ -283,7 +291,6 @@ export function initGameState(
     seed,
     scenarioId: scenario.id,
     mode: scenario.mode,
-    playerCountryId: selection.playerCountryId,
     fogOfWar: scenario.fogOfWar && !sandbox,
     economyEnabled: scenario.economyEnabled && !sandbox,
     clock: { gameTimeHours: 0, startDate: selection.startDate },
@@ -304,20 +311,37 @@ export function initGameState(
   const startCamera = computeStartCamera(
     world, playerProvinces, playerComponent, graph, capitalProvince,
   );
+  const startCameras: Record<number, { x: number; z: number; distance: number }> = {
+    [initializationCountryId]: startCamera,
+  };
+  for (const countryId of eligibleCountryIds) {
+    if (countryId === initializationCountryId) continue;
+    const provinces = byOwner.get(countryId) ?? [];
+    const componentVotes = new Map<number, number>();
+    for (const province of provinces) {
+      const node = nearestNode(graph, province.center[0], province.center[1], 400);
+      if (node >= 0) componentVotes.set(graph.component[node], (componentVotes.get(graph.component[node]) ?? 0) + 1);
+    }
+    let component = -1;
+    let votes = -1;
+    for (const [candidate, count] of componentVotes) {
+      if (count > votes) { component = candidate; votes = count; }
+    }
+    const capitalId = world.countries.find((country) => country.id === countryId)?.capitalProvinceId;
+    const countryCapital = world.provinces.find((province) => province.id === capitalId);
+    startCameras[countryId] = computeStartCamera(world, provinces, component, graph, countryCapital);
+  }
 
   return {
     state,
     graph,
     diagnostics: {
-      playerComponent,
-      playerProvinces: playerProvinces.length,
-      playerUrbanProvinces: playerCities.length,
+      eligibleCountryIds,
       reachableResourceNodes: bootstrap.diagnostics.reachable,
       unreachableResourceNodes: bootstrap.diagnostics.unreachable,
       guaranteedDeposits: bootstrap.guarantees,
-      playerArmies,
       totalArmies: Object.keys(armies).length,
-      startCamera,
+      startCameras,
     },
   };
 }

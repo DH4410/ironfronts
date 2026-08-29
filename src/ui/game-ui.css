@@ -248,7 +248,7 @@
 /* ================= notifications ================= */
 .ifg-notify {
   position: absolute;
-  top: 96px;
+  top: 58px;
   right: 12px;
   width: 244px;
   display: flex;
@@ -499,6 +499,7 @@
 }
 @media (max-width: 1366px) {
   .ifg-topbar { height: 42px; gap: 12px; }
+  .ifg-notify { top: 50px; }
   .ifg-dock { top: 50px; }
   .ifg-topbar__country-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ifg-res__value { font-size: 12px; }

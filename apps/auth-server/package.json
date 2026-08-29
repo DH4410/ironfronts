@@ -1,0 +1,13 @@
+{
+  "name": "@ironfronts/auth-server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "dependencies": {
+    "@ironfronts/protocol": "0.1.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "check": "tsc -p tsconfig.json --noEmit"
+  }
+}

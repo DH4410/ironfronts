@@ -32,7 +32,7 @@
           </header>
 
           <nav class="ifm__grid" id="ifm-grid">
-            <button class="ifm__card" data-open="campaign" aria-label="New Campaign">
+            <button class="ifm__card" id="ifm-new-campaign" data-open="campaign" aria-label="New Campaign">
               <i class="ifm__corner ifm__corner--tl"></i><i class="ifm__corner ifm__corner--tr"></i>
               <i class="ifm__corner ifm__corner--bl"></i><i class="ifm__corner ifm__corner--br"></i>
               <span class="ifm__icon" style="--icon:url(/menu/icons/laurels.svg)"></span>
@@ -41,12 +41,12 @@
               <span class="ifm__card-foot"><i>01</i><span>Command</span></span>
             </button>
 
-            <button class="ifm__card is-disabled" disabled aria-label="Continue (no saved campaigns)" title="No saved campaigns yet">
+            <button class="ifm__card is-disabled" id="ifm-continue" disabled aria-label="Continue assigned campaign" title="No country assignment yet">
               <i class="ifm__corner ifm__corner--tl"></i><i class="ifm__corner ifm__corner--tr"></i>
               <i class="ifm__corner ifm__corner--bl"></i><i class="ifm__corner ifm__corner--br"></i>
               <span class="ifm__icon" style="--icon:url(/menu/icons/history.svg)"></span>
               <strong>Continue</strong>
-              <small>No saved campaigns.</small>
+              <small id="ifm-continue-detail">No field assignment.</small>
               <span class="ifm__card-foot"><i>02</i><span>Archive</span></span>
             </button>
 
@@ -140,7 +140,9 @@
       </div>
 
       <footer class="ifm__footer">
+        <button type="button" id="ifm-logout" class="ifm__back">Log out</button>
         <div class="ifm__footer-spacer"></div>
+        <span id="ifm-account-name"></span>
         <span class="ifm__footer-version">Prototype<br><small>v0.1.0</small></span>
         <span class="ifm__shield">I</span>
       </footer>
@@ -287,6 +289,6 @@
       <p>Open this build in a current version of Chrome or Edge with hardware acceleration enabled.</p>
     </section>
 
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/apps/client/src/main.ts"></script>
   </body>
 </html>

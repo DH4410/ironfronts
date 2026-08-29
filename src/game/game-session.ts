@@ -66,10 +66,6 @@ export class GameSession {
     return new GameSession(initGameState(selection, scenario, world), world);
   }
 
-  get playerCountryId(): number {
-    return this.state.playerCountryId;
-  }
-
   get gameTimeHours(): number {
     return this.state.clock.gameTimeHours;
   }
@@ -116,19 +112,19 @@ export class GameSession {
   }
 
   /** Only the player's own entities accept commands. */
-  ownsArmy(armyId: string): boolean {
-    return this.state.armies[armyId]?.ownerCountryId === this.state.playerCountryId;
+  ownsArmy(countryId: number, armyId: string): boolean {
+    return this.state.armies[armyId]?.ownerCountryId === countryId;
   }
 
-  ownsProvince(provinceId: number): boolean {
-    return this.state.provinceOwners[provinceId] === this.state.playerCountryId;
+  ownsProvince(countryId: number, provinceId: number): boolean {
+    return this.state.provinceOwners[provinceId] === countryId;
   }
 
   /**
    * Player-facing summary of a province, fog-aware. Deposit detail is
    * withheld for provinces the player does not own while fog of war is active.
    */
-  describeProvince(provinceId: number): {
+  describeProvince(viewerCountryId: number, provinceId: number): {
     ownerId: number;
     ownerName: string;
     ownerColor: string;
@@ -139,7 +135,7 @@ export class GameSession {
   } {
     const ownerId = this.state.provinceOwners[provinceId] ?? 0;
     const owner = this.state.countries[ownerId];
-    const isOwn = ownerId === this.state.playerCountryId;
+    const isOwn = ownerId === viewerCountryId;
     const fullDetail = isOwn || !this.state.fogOfWar;
 
     // Deposits shown here must match what the map overlay shows: own/sandbox
@@ -148,7 +144,7 @@ export class GameSession {
     // contradicts a deposit chip the player is looking at.
     const visibleIds = fullDetail
       ? null
-      : new Set(visibleResourceNodes(this.state, this.world).map((n) => n.id));
+      : new Set(visibleResourceNodes(this.state, this.world, viewerCountryId).map((n) => n.id));
 
     let resources: { stone: number; metal: number; oil: number } | null = null;
     let controlled = false;
@@ -197,46 +193,46 @@ export class GameSession {
     return runCommand(this, command);
   }
 
-  orderMove(armyId: string, x: number, z: number, intent: 'move' | 'attack' = 'move') {
+  orderMove(countryId: number, armyId: string, x: number, z: number, intent: 'move' | 'attack' = 'move') {
     return this.applyCommand({
       type: intent === 'attack' ? 'attackArmy' : 'moveArmy',
-      countryId: this.state.playerCountryId, armyId, x, z,
+      countryId, armyId, x, z,
     });
   }
 
-  orderStop(armyId: string): boolean {
+  orderStop(countryId: number, armyId: string): boolean {
     return this.applyCommand({
-      type: 'stopArmy', countryId: this.state.playerCountryId, armyId,
+      type: 'stopArmy', countryId, armyId,
     }).ok;
   }
 
-  orderExtract(armyId: string) {
+  orderExtract(countryId: number, armyId: string) {
     return this.applyCommand({
-      type: 'extract', countryId: this.state.playerCountryId, armyId,
+      type: 'extract', countryId, armyId,
     });
   }
 
-  produce(provinceId: number, unitTypeId: string) {
+  produce(countryId: number, provinceId: number, unitTypeId: string) {
     return this.applyCommand({
-      type: 'produce', countryId: this.state.playerCountryId, provinceId, unitTypeId,
+      type: 'produce', countryId, provinceId, unitTypeId,
     });
   }
 
-  build(provinceId: number, buildingId: import('./units/unit-types').BuildingId) {
+  build(countryId: number, provinceId: number, buildingId: import('./units/unit-types').BuildingId) {
     return this.applyCommand({
-      type: 'build', countryId: this.state.playerCountryId, provinceId, buildingId,
+      type: 'build', countryId, provinceId, buildingId,
     });
   }
 
-  setRally(provinceId: number, x: number, z: number) {
+  setRally(countryId: number, provinceId: number, x: number, z: number) {
     return this.applyCommand({
-      type: 'setRally', countryId: this.state.playerCountryId, provinceId, target: { x, z },
+      type: 'setRally', countryId, provinceId, target: { x, z },
     });
   }
 
-  clearRally(provinceId: number) {
+  clearRally(countryId: number, provinceId: number) {
     return this.applyCommand({
-      type: 'setRally', countryId: this.state.playerCountryId, provinceId, target: null,
+      type: 'setRally', countryId, provinceId, target: null,
     });
   }
 
@@ -244,12 +240,12 @@ export class GameSession {
     return this.state.rallyPoints[provinceId] ?? null;
   }
 
-  producible(provinceId: number): string[] {
-    return producibleUnits(this, provinceId, this.state.playerCountryId);
+  producible(countryId: number, provinceId: number): string[] {
+    return producibleUnits(this, provinceId, countryId);
   }
 
-  buildable(provinceId: number) {
-    return buildOptions(this, provinceId, this.state.playerCountryId);
+  buildable(countryId: number, provinceId: number) {
+    return buildOptions(this, provinceId, countryId);
   }
 
   /** Resource node whose access point the army is standing on (for the EXTRACT
@@ -265,10 +261,10 @@ export class GameSession {
 
   /** Flip the foreign country geographically nearest the player's capital to
    *  'ai' control, so the slice has one active opponent. Returns its id. */
-  enableNearbyAi(): number | null {
-    const player = this.state.countries[this.state.playerCountryId];
+  enableNearbyAi(originCountryId: number): number | null {
+    const player = this.state.countries[originCountryId];
     if (!player) return null;
-    const capitalId = this.world.countries.find((c) => c.id === this.state.playerCountryId)
+    const capitalId = this.world.countries.find((c) => c.id === originCountryId)
       ?.capitalProvinceId ?? -1;
     const capital = this.world.provinces.find((p) => p.id === capitalId)
       ?? this.world.provinces.find((p) => this.state.provinceOwners[p.id] === player.id);
@@ -297,6 +293,13 @@ export class GameSession {
       );
     }
     return best;
+  }
+
+  claimCountry(countryId: number): boolean {
+    const country = this.state.countries[countryId];
+    if (!country) return false;
+    country.controller = 'player';
+    return true;
   }
 
   serialize(): string {

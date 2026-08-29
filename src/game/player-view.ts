@@ -2,7 +2,7 @@
  * Player-facing projection of the authoritative state (fog of war / multiplayer
  * anti-cheat).
  *
- *   FullGameState ──projectFor(playerCountryId)──▶ information the player may know
+ *   FullGameState ──projectFor(viewerCountryId)──▶ information the viewer may know
  *
  * Today this is consumed locally by `main.ts` so the HUD never reads a secret
  * field straight off `GameState`. The same projection is what a future server
@@ -86,16 +86,17 @@ function composition(army: ArmyStack): PlayerArmyView['composition'] {
 export function projectArmyView(
   state: GameState,
   world: WorldData,
+  viewerCountryId: number,
   armyId: string,
   visibility?: Map<string, ContactLevel>,
 ): PlayerArmyView | null {
   const army = state.armies[armyId];
   if (!army) return null;
 
-  const own = army.ownerCountryId === state.playerCountryId;
+  const own = army.ownerCountryId === viewerCountryId;
   const level = own
     ? 'visible'
-    : (visibility ?? computeArmyVisibility(state, world)).get(armyId) ?? 'hidden';
+    : (visibility ?? computeArmyVisibility(state, world, viewerCountryId)).get(armyId) ?? 'hidden';
   if (level === 'hidden') return null;
 
   const owner = state.countries[army.ownerCountryId];
@@ -123,14 +124,13 @@ export function projectArmyView(
  * foreign deposits are not globally revealed by the overlay.
  */
 export function visibleResourceNodes(
-  state: GameState, world: WorldData,
+  state: GameState, world: WorldData, viewerCountryId: number,
 ): ResourceNodeState[] {
   const nodes = Object.values(state.resourceNodes);
   if (!state.fogOfWar) return nodes;
-  const player = state.playerCountryId;
-  const sources = friendlyVisionSources(state, world);
+  const sources = friendlyVisionSources(state, world, viewerCountryId);
   return nodes.filter((node) => {
-    if (node.controllerCountryId === player) return true;
+    if (node.controllerCountryId === viewerCountryId) return true;
     return pointContactLevel(sources, node.x, node.z, world.width) !== 'hidden';
   });
 }

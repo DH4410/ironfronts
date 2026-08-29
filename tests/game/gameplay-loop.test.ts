@@ -21,14 +21,14 @@ describe('gameplay vertical slice', () => {
     const target = world.provinces.find(
       (p) => s.state.provinceOwners[p.id] === SPAIN && p.id !== army.graphNodeId,
     )!;
-    const res = s.orderMove(army.id, target.center[0], target.center[1], 'move');
+    const res = s.orderMove(SPAIN, army.id, target.center[0], target.center[1], 'move');
     expect(res.ok).toBe(true);
     expect(army.order).not.toBeNull();
 
     const startX = army.x;
     s.tick(4);
     expect(army.x !== startX || army.z !== 0).toBe(true); // it moved
-    s.orderStop(army.id);
+    s.orderStop(SPAIN, army.id);
     expect(army.order).toBeNull();
     expect(army.status).toBe('idle');
     // graph node advanced or stayed valid
@@ -54,7 +54,7 @@ describe('gameplay vertical slice', () => {
 
     const before = s.state.countries[SPAIN].stockpile[node!.kind];
     const remainingBefore = node!.remaining;
-    const start = s.orderExtract('test-eng');
+    const start = s.orderExtract(SPAIN, 'test-eng');
     expect(start.ok).toBe(true);
     s.tick(6);
     expect(s.state.countries[SPAIN].stockpile[node!.kind]).toBeGreaterThan(before);
@@ -67,14 +67,14 @@ describe('gameplay vertical slice', () => {
     const plantProvince = Object.entries(s.state.provinceBuildings)
       .find(([, b]) => b.tankPlant > 0 && s.state.provinceOwners[Number([].concat()[0] ?? 0)] !== undefined);
     const pid = Number(Object.keys(s.state.provinceBuildings).find(
-      (k) => s.state.provinceBuildings[Number(k)].tankPlant > 0 && s.ownsProvince(Number(k)),
+      (k) => s.state.provinceBuildings[Number(k)].tankPlant > 0 && s.ownsProvince(SPAIN, Number(k)),
     ));
     expect(Number.isFinite(pid)).toBe(true);
     void plantProvince;
 
     const armiesBefore = Object.keys(s.state.armies).length;
     const fundsBefore = s.state.countries[SPAIN].stockpile.funds;
-    const order = s.produce(pid, 'light-tank');
+    const order = s.produce(SPAIN, pid, 'light-tank');
     expect(order.ok).toBe(true);
     expect(s.state.countries[SPAIN].stockpile.funds).toBeLessThan(fundsBefore);
 
@@ -86,7 +86,7 @@ describe('gameplay vertical slice', () => {
     expect(Object.keys(s.state.armies).length).toBeGreaterThanOrEqual(armiesBefore);
   });
 
-  it('guarantees a strategic baseline only for participants, not every nation', () => {
+  it('guarantees a strategic baseline for selectable countries', () => {
     const s = spainSession();
     const guaranteedOwners = new Set(
       Object.values(s.state.resourceNodes)
@@ -95,7 +95,7 @@ describe('gameplay vertical slice', () => {
     );
     // World at War has ~200 playable nations; only Spain should have been topped
     // up at init (or nobody, if Spain's natural geography already covered it).
-    expect([...guaranteedOwners].every((id) => id === SPAIN)).toBe(true);
+    expect([...guaranteedOwners].every((id) => s.diagnostics.eligibleCountryIds.includes(id))).toBe(true);
     for (const kind of ['stone', 'metal'] as const) {
       expect(Object.values(s.state.resourceNodes).some(
         (n) => n.kind === kind && n.controllerCountryId === SPAIN && n.accessNodeId >= 0,
@@ -103,7 +103,7 @@ describe('gameplay vertical slice', () => {
     }
 
     // Flipping on the AI opponent gives IT a baseline too — and no one else.
-    const aiId = s.enableNearbyAi()!;
+    const aiId = s.enableNearbyAi(SPAIN)!;
     for (const kind of ['stone', 'metal'] as const) {
       expect(Object.values(s.state.resourceNodes).some(
         (n) => n.kind === kind && n.controllerCountryId === aiId && n.accessNodeId >= 0,
@@ -114,12 +114,12 @@ describe('gameplay vertical slice', () => {
         .filter((n) => n.provenance === 'scenarioGuarantee')
         .map((n) => n.controllerCountryId),
     );
-    expect([...ownersNow].every((id) => id === SPAIN || id === aiId)).toBe(true);
+    expect([...ownersNow].every((id) => s.diagnostics.eligibleCountryIds.includes(id) || id === aiId)).toBe(true);
   });
 
   it('hostile stacks at the same node fight and one is destroyed; capture flips ownership', () => {
     const s = spainSession();
-    const enemyId = s.enableNearbyAi();
+    const enemyId = s.enableNearbyAi(SPAIN);
     expect(enemyId).not.toBeNull();
 
     // Put a strong Spanish stack and a weak enemy stack on the same enemy

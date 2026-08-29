@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#1c2427" />
+    <title>Ironfronts — Sign in</title>
+  </head>
+  <body class="login-page">
+    <main class="login-card">
+      <p class="login-eyebrow">Strategic Command</p>
+      <h1>IRONFRONTS</h1>
+      <p class="login-intro">Sign in to receive your field assignment.</p>
+      <div class="login-tabs" role="tablist" aria-label="Account action">
+        <button type="button" data-mode="login" aria-selected="true">Sign in</button>
+        <button type="button" data-mode="register" aria-selected="false">Create account</button>
+      </div>
+      <form id="login-form">
+        <label>Username<input id="username" name="username" autocomplete="username" minlength="3" maxlength="32" required /></label>
+        <label>Password<input id="password" name="password" type="password" autocomplete="current-password" minlength="8" maxlength="256" required /></label>
+        <button class="login-submit" type="submit">Sign in</button>
+        <p id="login-status" role="alert" aria-live="polite"></p>
+      </form>
+    </main>
+    <script type="module" src="/apps/client/src/login.ts"></script>
+  </body>
+</html>

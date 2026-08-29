@@ -39,8 +39,6 @@ export interface CountryState {
   income: Stockpile;
   /** Abstract build-throughput stat, not a stockpile. */
   industryCapacity: number;
-  /** Convenience mirror of `controller === 'player'`. */
-  readonly isPlayer: boolean;
 }
 
 export interface ProvinceBuildings {
@@ -116,7 +114,6 @@ export interface GameState {
   readonly seed: number;
   readonly scenarioId: string;
   readonly mode: 'campaign' | 'sandbox';
-  readonly playerCountryId: number;
   readonly fogOfWar: boolean;
   readonly economyEnabled: boolean;
 

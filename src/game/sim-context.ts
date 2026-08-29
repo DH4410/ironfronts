@@ -16,5 +16,4 @@ export interface SimContext {
   readonly state: GameState;
   readonly graph: LandGraph;
   readonly world: WorldData;
-  readonly playerCountryId: number;
 }

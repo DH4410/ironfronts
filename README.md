@@ -1,6 +1,6 @@
-# Ironfronts renderer
+# Ironfronts
 
-A native WebGPU world renderer built from the static map package in `material/`. This visual milestone includes bounded regional topography, biome materials, oceans and source lakes, the 24 supplied river systems, ocean-water Kiel and Suez canals, terrain-draped roads, road-shaped cities, dynamic country ownership, province and country borders, forests, and diagnostics. Rivers are reconstructed from the authored movement graph and source water topology; bridges, tunnels, units, gameplay, persistence, and servers are intentionally absent.
+An authoritative multiplayer strategy game with a native WebGPU client. The repository is an npm-workspace monorepo: `apps/client` is the stable browser entry, `apps/auth-server` owns accounts and sessions, `apps/game-server` owns the single always-running World at War simulation, and `packages/protocol` / `packages/game-core` define the shared boundaries.
 
 ## Run locally
 
@@ -8,10 +8,12 @@ Requirements: Node.js 22+ and a current desktop Chrome or Edge release with WebG
 
 ```sh
 npm install
+npm run game:dev
+npm run auth:dev
 npm run dev
 ```
 
-`npm run dev` first bakes manifest v12 into `public/world/`, then starts Vite. Use `npm run build` for a production build and `npm test` for generated-data plus Dawn-backed shader validation.
+Copy `.env.example` to `.env` or export the same variables before starting the processes. Local defaults use client `5173`, auth `3001`, and game `3002`. State is intentionally memory-only: restarting the suite clears accounts, sessions, country assignments, and the game. `npm run dev` bakes the versioned world and starts Vite; the client build deliberately excludes world data because the game handshake supplies its asset URL. Use `npm run build` for a production build and `npm run check` for workspace type checks plus the complete automated suite.
 
 With the dev server running, `npm run visual-check` launches Chrome through Playwright and writes world, mountain, city, lake-road, and diagnostic captures plus `artifacts/visual-report.json`. On Windows it defaults to a short-lived headed browser because Chrome headless does not reliably expose the hardware WebGPU adapter. Set `IRONFRONTS_BROWSER` to select another Chromium executable or `IRONFRONTS_HEADLESS=true` when a CI GPU adapter is available.
 

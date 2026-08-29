@@ -19,10 +19,8 @@ describe('Spain "World at War" initialisation', () => {
       selection, scenarioById('OP-1939-01'), world,
     );
 
-    // player country flagged, others present, none is the player
-    expect(state.playerCountryId).toBe(SPAIN_ID);
-    expect(state.countries[SPAIN_ID].isPlayer).toBe(true);
-    expect(Object.values(state.countries).filter((c) => c.isPlayer)).toHaveLength(1);
+    expect(diagnostics.eligibleCountryIds).toContain(SPAIN_ID);
+    expect(Object.values(state.countries).every((country) => country.controller === 'neutral')).toBe(true);
     expect(Object.keys(state.countries).length).toBeGreaterThan(150);
 
     // real starting stockpile (step 6)
@@ -32,8 +30,7 @@ describe('Spain "World at War" initialisation', () => {
     // dense province ownership; Spain owns its provinces
     const spainProvinces = Object.entries(state.provinceOwners)
       .filter(([, owner]) => owner === SPAIN_ID);
-    expect(spainProvinces.length).toBe(diagnostics.playerProvinces);
-    expect(diagnostics.playerProvinces).toBeGreaterThanOrEqual(20);
+    expect(spainProvinces.length).toBeGreaterThanOrEqual(20);
 
     // starting buildings only in owned urban provinces, capital has a plant
     const capital = world.countries.find((c) => c.id === SPAIN_ID)!.capitalProvinceId;
@@ -45,9 +42,9 @@ describe('Spain "World at War" initialisation', () => {
     }
 
     // starting armies exist, tied to the reachable mainland
-    expect(diagnostics.playerArmies).toBeGreaterThanOrEqual(1);
     const playerArmies = Object.values(state.armies)
       .filter((army) => army.ownerCountryId === SPAIN_ID);
+    expect(playerArmies.length).toBeGreaterThanOrEqual(1);
     for (const army of playerArmies) {
       expect(stackUnitCount(army)).toBeGreaterThan(0);
       expect(army.graphNodeId).toBeGreaterThanOrEqual(0);

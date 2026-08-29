@@ -1,14 +1,20 @@
 {
-  "name": "ironfronts-renderer",
+  "name": "ironfronts",
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
-    "predev": "npm run build:world",
-    "dev": "vite",
+    "dev": "vite --host 127.0.0.1 --port 5173",
+    "auth:dev": "tsx watch apps/auth-server/src/main.ts",
+    "pregame:dev": "npm run build:world",
+    "game:dev": "tsx watch apps/game-server/src/main.ts",
     "build:world": "node scripts/build-world.mjs",
-    "build": "npm run build:world && tsc --noEmit && vite build",
-    "check": "tsc --noEmit && npm run lint:scripts && npm run test:architecture && vitest run",
+    "build": "npm run build:world && npm run build --workspaces --if-present && tsc --noEmit && vite build",
+    "check": "npm run check --workspaces --if-present && tsc --noEmit && npm run lint:scripts && npm run test:architecture && vitest run",
     "lint:scripts": "eslint \"scripts/**/*.mjs\"",
     "preview": "vite preview",
     "pretest": "npm run build:world",
@@ -23,16 +29,21 @@
     "@fontsource/bitter": "^5.3.0",
     "@fontsource/cinzel-decorative": "^5.3.0",
     "@fontsource/special-elite": "^5.3.0",
-    "gl-matrix": "^3.4.3"
+    "gl-matrix": "^3.4.3",
+    "ws": "^8.18.3",
+    "zod": "^4.1.5"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.1",
     "@webgpu/types": "^0.1.64",
     "eslint": "^10.9.1",
     "playwright-core": "^1.62.1",
     "pngjs": "^7.0.0",
+    "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "vite": "^7.1.3",
+    "vite-plugin-static-copy": "^3.1.2",
     "vitest": "^3.2.4",
     "webgpu": "^0.4.0",
     "wgsl_reflect": "^1.5.0"

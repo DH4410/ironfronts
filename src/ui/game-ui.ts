@@ -15,8 +15,9 @@ import { QUALITY_LEVELS, QUALITY_PRESETS, type QualityLevel } from '../graphics/
 import { createArmyCounter, describeArmy } from './army';
 import { createFlag } from './flags';
 import { createIcon, type IconName } from './icons';
+import { buildNotification } from './notifications';
 import type {
-  GameNotification, MapMode, NavId, NotificationKind, ProvinceResourceTotals, StrategicUiState, UiStore,
+  MapMode, NavId, ProvinceResourceTotals, StrategicUiState, UiStore,
 } from './ui-state';
 
 export interface GameUiActions {
@@ -39,7 +40,6 @@ export interface GameUiActions {
   /** Arm map-click placement of a production city's rally point, or clear it. */
   rallyPoint(provinceId: number, action: 'arm' | 'clear'): void;
 }
-
 export interface GameUiHandle {
   destroy(): void;
 }
@@ -58,14 +58,6 @@ const DOCK_SECTIONS: ReadonlyArray<{ id: NavId; label: string; icon: IconName }>
   { id: 'economy', label: 'Economy', icon: 'economy' },
   { id: 'events', label: 'Objectives', icon: 'objectives' },
 ];
-
-const NOTE_ICON: Record<NotificationKind, IconName> = {
-  warning: 'note-warning',
-  combat: 'note-combat',
-  completed: 'note-completed',
-  diplomacy: 'note-diplomacy',
-  information: 'note-information',
-};
 
 const RESOURCE_CHIPS: ReadonlyArray<{ key: keyof ProvinceResourceTotals; label: string; icon: IconName }> = [
   { key: 'stone', label: 'Stone', icon: 'node-stone' },
@@ -299,7 +291,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   const armyCard = el('section', 'ifg-card ifg-card--army');
   armyCard.hidden = true;
 
-  // ---------------- pause / system overlay ----------------
+  // ---------------- local system/settings overlay ----------------
   const overlay = el('div', 'ifg-overlay');
   overlay.hidden = true;
   overlay.setAttribute('role', 'dialog');
@@ -307,9 +299,9 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   overlay.setAttribute('aria-label', 'System menu');
   const overlayCard = el('div', 'ifg-overlay__card');
   overlayCard.innerHTML =
-    '<header class="ifg-overlay__head"><small>Command</small><h2>Operations Paused</h2></header>';
+    '<header class="ifg-overlay__head"><small>Local Controls</small><h2>System &amp; Settings</h2></header>';
 
-  const resumeButton = el('button', 'ifg-overlay__primary', 'Resume');
+  const resumeButton = el('button', 'ifg-overlay__primary', 'Return to Map');
   resumeButton.type = 'button';
   resumeButton.addEventListener('click', () => actions.togglePause(false));
 
@@ -617,11 +609,11 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     // Notifications.
     const nextNotifyKey = state.notifications.map((n) => n.id).join(',');
     if (nextNotifyKey !== notifyKey) {
-      notifyStack.replaceChildren(...state.notifications.map((n) => buildNotification(n, actions)));
+      notifyStack.replaceChildren(...state.notifications.map((n) => buildNotification(n, actions.dismissNotification)));
       notifyKey = nextNotifyKey;
     }
 
-    // Pause overlay.
+    // This overlay only blocks local input; the authoritative simulation continues.
     overlay.hidden = !state.paused;
     for (const [level, button] of qualityButtons) {
       const active = level === state.quality;
@@ -643,20 +635,4 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       root.remove();
     },
   };
-}
-
-function buildNotification(n: GameNotification, actions: GameUiActions): HTMLElement {
-  const item = el('article', 'ifg-notify__item');
-  item.dataset.kind = n.kind;
-  const icon = createIcon(NOTE_ICON[n.kind], 'ifg-notify__icon');
-  const body = el('div', 'ifg-notify__body');
-  body.append(el('strong', undefined, n.title));
-  if (n.body) body.append(el('span', undefined, n.body));
-  const dismiss = el('button', 'ifg-notify__dismiss');
-  dismiss.type = 'button';
-  dismiss.setAttribute('aria-label', 'Dismiss');
-  dismiss.append(createIcon('close'));
-  dismiss.addEventListener('click', () => actions.dismissNotification(n.id));
-  item.append(icon, body, dismiss);
-  return item;
 }

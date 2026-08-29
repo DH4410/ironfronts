@@ -1,6 +1,16 @@
 import { fetchBinary } from './gpu-utils';
 import type { WorldManifest } from './types';
 
+let assetBaseUrl = '/world';
+
+export function configureWorldAssetBase(url: string): void {
+  assetBaseUrl = url.replace(/\/$/, '');
+}
+
+export function worldAssetUrl(path: string): string {
+  return `${assetBaseUrl}/${path.replace(/^\//, '')}`;
+}
+
 export interface WorldAssetBuffers {
   heightBuffer: ArrayBuffer;
   surfaceBuffer: ArrayBuffer;
@@ -53,7 +63,7 @@ export async function loadWorldAssetBuffers(manifest: WorldManifest): Promise<Wo
   } satisfies Record<keyof WorldAssetBuffers, string>;
 
   const entries = await Promise.all(Object.entries(paths).map(async ([key, path]) => (
-    [key, await fetchBinary(`/world/${path}`)] as const
+    [key, await fetchBinary(worldAssetUrl(path))] as const
   )));
   return Object.fromEntries(entries) as unknown as WorldAssetBuffers;
 }

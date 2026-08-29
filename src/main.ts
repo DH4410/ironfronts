@@ -18,22 +18,21 @@ import type { WorldRenderer, MapMode, TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
 import type { CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo } from './types';
 import { LOADING_QUOTES } from './loadingQuotes';
-import type { ScenarioSelection } from './game/scenario';
-import { GameSession } from './game/game-session';
-import { buildWorldData } from './game/world-data-loader';
-import { computeArmyVisibility, type ContactLevel } from './game/visibility';
-import { projectArmyView, visibleResourceNodes } from './game/player-view';
-import { BUILDINGS, costLabel as buildingCostLabel } from './game/construction';
-import type { BuildingId } from './game/units/unit-types';
-import {
-  canExtract as armyCanExtract, stackHealthFraction, stackUnitCount,
-} from './game/units/army';
-import { unitType } from './game/units/unit-catalog';
+import { getGame, getSession, joinGame, logout } from './client/auth-api';
+import { GameConnection } from './client/game-connection';
+import { RemoteGameSession } from './client/remote-session';
+import { configureWorldAssetBase } from './world-assets';
+import type { SessionResponse } from '@ironfronts/protocol';
 
-const gameUnitLabel = (typeId: string): string => unitType(typeId).name;
-const unitCostLabel = (typeId: string): string => Object.entries(unitType(typeId).cost)
+type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
+
+const gameUnit = (typeId: string): Record<string, unknown> => activeSession?.unit(typeId) ?? { id: typeId, name: typeId, cost: {} };
+const gameUnitLabel = (typeId: string): string => String(gameUnit(typeId).name ?? typeId);
+const unitCostLabel = (typeId: string): string => Object.entries((gameUnit(typeId).cost ?? {}) as Record<string, number>)
   .map(([k, v]) => `${v} ${k}`).join(' · ');
-const buildingLabel = (id: BuildingId): string => BUILDINGS[id].label;
+const buildingLabel = (id: BuildingId): string => String(activeSession?.building(id)?.label ?? id);
+const buildingCostLabel = (id: BuildingId): string => Object.entries((activeSession?.building(id)?.cost ?? {}) as Record<string, number>)
+  .map(([k, v]) => `${v} ${k}`).join(' · ');
 const orderPercent = (o: { progressHours: number; totalHours: number }): number =>
   o.totalHours > 0 ? Math.min(99, Math.floor((o.progressHours / o.totalHours) * 100)) : 0;
 
@@ -170,8 +169,8 @@ window.addEventListener('pagehide', (event) => {
 
 let rendererStarted = false;
 let activeRenderer: WorldRenderer | undefined;
-let activeSession: GameSession | undefined;
-let activeWorld: import('./game/world-data').WorldData | undefined;
+let activeSession: RemoteGameSession | undefined;
+let activeConnection: GameConnection | undefined;
 let selectedArmyId: string | null = null;
 let awaitingMoveTarget = false;
 // Selected province: id + the renderer-supplied labels, kept so the card can be
@@ -181,12 +180,24 @@ let selectedProvinceName = '';
 let selectedProvinceTerrain = '';
 /** True while the next map click places the selected province's rally point. */
 let awaitingRallyTarget = false;
+const authenticated = await getSession().catch((): SessionResponse => ({ authenticated: false }));
+if (!authenticated.authenticated || !authenticated.account) {
+  window.location.replace('/login.html');
+  await new Promise(() => { /* stop dossier bootstrap during navigation */ });
+}
+const lobby = await getGame();
+
 mountMenu({
   audio,
-  onLaunch: (selection: ScenarioSelection) => {
+  lobby,
+  username: authenticated.account!.username,
+  onLogout: () => { void logout().finally(() => window.location.replace('/login.html')); },
+  onLaunch: async (countryId: number) => {
     if (rendererStarted) return;
     rendererStarted = true;
-    void music.setState('opening');
+    try {
+      if (lobby.assignedCountryId === null) await joinGame(countryId);
+      await music.setState('opening');
 
     // The lobby is deliberately lightweight. The world canvas, loading scene,
     // renderer module graph, WebGPU device and world assets are all deferred
@@ -206,7 +217,11 @@ mountMenu({
       // radios) but is superseded by the in-game map-mode toolbar.
       mapModes.hidden = true;
       uiStore.patch({ phase: 'loading' });
-      void start(selection);
+      await start();
+    }
+    } catch (error) {
+      rendererStarted = false;
+      throw error;
     }
   },
   // In the lobby this only persists; once the renderer exists it applies live.
@@ -232,8 +247,18 @@ function startLoadingQuotes(): () => void {
   return () => window.clearInterval(timer);
 }
 
-async function start(selection: ScenarioSelection): Promise<void> {
+async function start(): Promise<void> {
   const stopQuotes = startLoadingQuotes();
+  const connection = await GameConnection.open();
+  activeConnection = connection;
+  configureWorldAssetBase(connection.world.assetBaseUrl);
+  const session = new RemoteGameSession(connection, (reason) => {
+    pushNotification('warning', 'Command failed', reason);
+    window.setTimeout(() => {
+      uiStore.patch({ notifications: uiStore.get().notifications.filter((entry) => entry.title !== 'Command failed') });
+    }, 4_000);
+  });
+  activeSession = session;
 
   // Keep the complete renderer/world module graph out of the lobby bundle.
   // This import is the first point at which world rendering code is loaded.
@@ -494,7 +519,7 @@ async function start(selection: ScenarioSelection): Promise<void> {
     // gameplay state. Build WorldData from the loaded package and start the
     // fixed-step simulation.
     try {
-      await bootstrapGameSession(renderer, selection);
+      await bootstrapGameSession(renderer, session);
     } catch (sessionError) {
       console.error('GameSession bootstrap failed; renderer stays up.', sessionError);
     }
@@ -533,74 +558,36 @@ function updateTimeControls(state: TimeOfDayState): void {
   if (document.activeElement !== debugTimeMultiplier) debugTimeMultiplier.value = state.multiplier.toFixed(1);
 }
 
-// --- Game session bootstrap + fixed-step simulation (Phase A) -----------
-/** Accelerated prototype rate: this much game time passes per real second. */
-const GAME_HOURS_PER_REAL_SECOND = 0.5;
-const SIM_HZ = 10;
-
 async function bootstrapGameSession(
-  renderer: WorldRenderer, selection: ScenarioSelection,
+  renderer: WorldRenderer, session: RemoteGameSession,
 ): Promise<void> {
-  const [detailsJson, ownersBuf, surfaceBuf, connectionsBuf] = await Promise.all([
-    fetch('/world/province-details.json').then((r) => r.json()),
-    fetch('/world/province-owners.u32').then((r) => r.arrayBuffer()),
-    fetch('/world/surface.rgba8').then((r) => r.arrayBuffer()),
-    fetch('/world/connections.f32').then((r) => r.arrayBuffer()),
-  ]);
-
-  const world = buildWorldData({
-    worldWidth: renderer.worldWidth,
-    worldHeight: renderer.worldHeight,
-    provinceDetails: detailsJson.provinces,
-    countries: renderer.getCountries().map((c) => ({
-      id: c.id, name: c.name, color: c.color, capitalProvinceId: c.capitalProvinceId,
-    })),
-    provinceOwners: new Uint32Array(ownersBuf),
-    provinceIdRaster: renderer.provinceIdRaster,
-    provinceIdField: renderer.provinceIdField,
-    surface: new Uint8Array(surfaceBuf),
-    surfaceField: renderer.surfaceFieldSize,
-    connections: new Float32Array(connectionsBuf),
-    resourceNodes: renderer.resourceNodes.map((n) => ({
-      id: n.id, kind: n.kind, x: n.x, z: n.z, amount: n.amount,
-    })),
-  });
-
-  const session = GameSession.create(selection, world);
-  activeSession = session;
-  activeWorld = world;
   selectedArmyId = null;
   awaitingMoveTarget = false;
   if (import.meta.env.DEV || debugEnabled) {
     // Authoritative-state inspection handle for QA / perf scripts. Exposing the
     // full GameState defeats fog of war, so it is DEV / ?debug only — never the
     // normal player build.
-    (window as Window & { __ironfrontsSession?: GameSession }).__ironfrontsSession = session;
+    (window as Window & { __ironfrontsSession?: RemoteGameSession }).__ironfrontsSession = session;
   }
 
   // One nearby country becomes an active opponent; the rest stay passive.
-  if (!selection.sandbox) {
-    const aiId = session.enableNearbyAi();
-    if (aiId !== null) {
-      console.info(`[game] AI opponent: ${session.state.countries[aiId]?.name} (${aiId})`);
-    }
-  }
+  // All unclaimed countries remain neutral; the server changes controller state on claim.
 
   // Player identity -> renderer flag/tint + HUD.
-  const player = session.state.countries[session.playerCountryId];
+  const player = session.ownCountry;
   renderer.setPlayerCountryByName(player.name);
-  const { x, z, distance } = session.diagnostics.startCamera;
+  const { x, z, distance } = session.state.startCamera;
   renderer.focus(x, z, distance);
 
   // Map-tap -> army selection / move order. Consumes the click so
   // it does not also select a province.
-  renderer.onMapClick = (clientX, clientY) => handleMapClick(renderer, session, world, clientX, clientY);
+  renderer.onMapClick = (clientX, clientY) => handleMapClick(renderer, session, clientX, clientY);
 
   // Resource deposits are gameplay-relevant from turn 0 — show the overlay by
   // default so the player can see where stone / metal / oil are, and feed
   // the renderer the authoritative set (natural + scenario-guaranteed).
   renderer.setResourceOverlay(true);
-  syncResourceMarkers(session, world, renderer);
+  syncResourceMarkers(session, renderer);
 
   uiStore.patch({
     playerCountry: { name: player.name, color: player.color },
@@ -609,25 +596,16 @@ async function bootstrapGameSession(
   });
 
   // Initial marker upload (before the first sim tick) so armies show at once.
-  syncArmyMarkers(session, world, renderer);
+  syncArmyMarkers(session, renderer);
 
   // Fixed-step simulation, decoupled from the render frame.
-  let lastSim = performance.now();
-  const simTimer = window.setInterval(() => {
-    const now = performance.now();
-    const dtRealSeconds = Math.min(0.5, (now - lastSim) / 1_000);
-    lastSim = now;
-    if (uiStore.get().paused) return;
-    session.tick(dtRealSeconds * GAME_HOURS_PER_REAL_SECOND);
-  }, 1_000 / SIM_HZ);
   const hudTimer = window.setInterval(() => {
     // Fog visibility is O(foreignArmies × visionSources); compute it once per
     // HUD tick and share it between the marker upload and the selection card.
-    const visibility = computeArmyVisibility(session.state, world);
     uiStore.patch({ resources: playerResourceLines(session) });
-    syncArmyMarkers(session, world, renderer, visibility);
-    syncResourceMarkers(session, world, renderer);
-    refreshSelectedArmy(session, visibility);
+    syncArmyMarkers(session, renderer);
+    syncResourceMarkers(session, renderer);
+    refreshSelectedArmy(session);
     refreshSelectedProvince(session); // keep production / construction % live
     drainSessionEvents(session);
   }, 400);
@@ -641,17 +619,15 @@ async function bootstrapGameSession(
   window.addEventListener('keydown', onKey);
   window.addEventListener('pagehide', (event) => {
     if (!event.persisted) {
-      window.clearInterval(simTimer);
       window.clearInterval(hudTimer);
       window.removeEventListener('keydown', onKey);
       if (activeSession === session) activeSession = undefined;
+      activeConnection?.close();
     }
   });
 
   console.info(
-    `[game] ${activeSession?.state.countries[session.playerCountryId].name} — `
-    + `${session.diagnostics.playerProvinces} provinces, `
-    + `${session.diagnostics.playerArmies} armies, camera @ ${Math.round(x)},${Math.round(z)}`,
+    `[game] ${player.name} connected — camera @ ${Math.round(x)},${Math.round(z)}`,
   );
 }
 
@@ -664,11 +640,12 @@ const RESOURCE_KIND_INDEX: Record<'stone' | 'metal' | 'oil', number> = { stone: 
  *  marker layer. Depleted nodes shrink; exhausted ones drop out. Foreign
  *  deposits are not globally revealed by the overlay. */
 function syncResourceMarkers(
-  session: GameSession, world: import('./game/world-data').WorldData, renderer: WorldRenderer,
+  session: RemoteGameSession, renderer: WorldRenderer,
 ): void {
   let cursor = 0;
   let count = 0;
-  for (const node of visibleResourceNodes(session.state, world)) {
+  for (const value of Object.values(session.state.resourceNodes)) {
+    const node = value as { x: number; z: number; kind: 'stone' | 'metal' | 'oil'; remaining: number; initialAmount: number };
     if (count >= 4_096 || node.remaining <= 0) continue;
     const depletion = node.initialAmount > 0 ? node.remaining / node.initialAmount : 1;
     const richness = Math.max(0.28, Math.min(1, (node.initialAmount / 260) * depletion));
@@ -696,25 +673,21 @@ function packRgb(hex: string): number {
 const armyPickScratch: Array<{ id: string; x: number; z: number }> = [];
 
 function syncArmyMarkers(
-  session: GameSession, world: import('./game/world-data').WorldData, renderer: WorldRenderer,
-  visibility: Map<string, ContactLevel> = computeArmyVisibility(session.state, world),
+  session: RemoteGameSession, renderer: WorldRenderer,
 ): void {
   let cursor = 0;
   let count = 0;
   armyPickScratch.length = 0;
   for (const army of Object.values(session.state.armies)) {
     if (count >= 1_024) break;
-    const level = visibility.get(army.id) ?? 'hidden';
-    if (level === 'hidden') continue;
-    const identified = level === 'visible';
-    const owner = session.state.countries[army.ownerCountryId];
+    const identified = army.contact === 'visible';
     armyMarkerScratch[cursor] = army.x;
     armyMarkerScratch[cursor + 1] = army.z;
-    armyMarkerScratch[cursor + 2] = packRgb(owner?.color ?? '#888888');
+    armyMarkerScratch[cursor + 2] = packRgb(army.ownerColor);
     armyMarkerScratch[cursor + 3] = identified ? 1 : 2;
     // Contact markers render as '?'; don't ship the real strength/health.
-    armyMarkerScratch[cursor + 4] = identified ? stackUnitCount(army) : 0;
-    armyMarkerScratch[cursor + 5] = identified ? stackHealthFraction(army) : 0;
+    armyMarkerScratch[cursor + 4] = identified ? army.composition?.unitCount ?? 0 : 0;
+    armyMarkerScratch[cursor + 5] = identified ? army.composition?.health ?? 0 : 0;
     armyMarkerScratch[cursor + 6] = army.id === selectedArmyId ? 1 : 0;
     armyMarkerScratch[cursor + 7] = 0;
     cursor += 8;
@@ -727,8 +700,7 @@ function syncArmyMarkers(
 // ---- army selection + orders --------------------------
 
 function handleMapClick(
-  renderer: WorldRenderer, session: GameSession,
-  world: import('./game/world-data').WorldData, clientX: number, clientY: number,
+  renderer: WorldRenderer, session: RemoteGameSession, clientX: number, clientY: number,
 ): boolean {
   // 1. Armed Move order -> issue to the clicked ground point.
   if (awaitingMoveTarget && selectedArmyId && session.ownsArmy(selectedArmyId)) {
@@ -737,7 +709,7 @@ function handleMapClick(
       const result = session.orderMove(selectedArmyId, ground[0], ground[1], 'move');
       if (!result.ok) pushNotification('warning', 'Move order', result.reason ?? 'No route.');
       awaitingMoveTarget = false;
-      syncArmyMarkers(session, world, renderer);
+      syncArmyMarkers(session, renderer);
       refreshSelectedArmy(session);
       return true;
     }
@@ -764,21 +736,21 @@ function handleMapClick(
   return false;
 }
 
-function selectArmy(session: GameSession, armyId: string): void {
+function selectArmy(session: RemoteGameSession, armyId: string): void {
   selectedArmyId = armyId;
   awaitingMoveTarget = false;
   awaitingRallyTarget = false;
   renderer_clearProvince();
   refreshSelectedArmy(session);
-  if (activeRenderer && activeWorld) syncArmyMarkers(session, activeWorld, activeRenderer);
+  if (activeRenderer) syncArmyMarkers(session, activeRenderer);
 }
 
 function deselectArmy(): void {
   selectedArmyId = null;
   awaitingMoveTarget = false;
   uiStore.patch({ selectedArmy: null });
-  if (activeSession && activeRenderer && activeWorld) {
-    syncArmyMarkers(activeSession, activeWorld, activeRenderer);
+  if (activeSession && activeRenderer) {
+    syncArmyMarkers(activeSession, activeRenderer);
   }
 }
 
@@ -806,21 +778,18 @@ function handleArmyCommand(command: 'move' | 'stop' | 'extract' | 'deselect'): v
 }
 
 function refreshSelectedArmy(
-  session: GameSession, visibility?: Map<string, ContactLevel>,
+  session: RemoteGameSession,
 ): void {
   if (!selectedArmyId) { if (uiStore.get().selectedArmy) uiStore.patch({ selectedArmy: null }); return; }
   // Everything the card shows comes from the fog-aware projection — the raw
   // ArmyStack (exact groups / hp / speed) never reaches the HUD for a foreign
   // stack the player has not fully identified.
-  const view = activeWorld
-    ? projectArmyView(session.state, activeWorld, selectedArmyId, visibility)
-    : null;
+  const view = session.army(selectedArmyId);
   if (!view) { deselectArmy(); return; } // gone, or degraded to hidden
   const comp = view.composition;
   const combat = view.status === 'moving' ? 'moving'
     : view.status === 'engaged' ? 'engaged'
     : view.status === 'retreating' ? 'retreating' : 'idle';
-  const ownArmy = view.own ? session.state.armies[view.id] : undefined;
   uiStore.patch({
     selectedArmy: {
       id: view.id,
@@ -839,8 +808,7 @@ function refreshSelectedArmy(
       })),
       speed: comp?.speed,
       own: view.own,
-      canExtract: Boolean(ownArmy) && !ownArmy!.order
-        && session.extractableNodeAt(view.id) !== null && armyCanExtract(ownArmy!),
+      canExtract: view.own && !view.moveOrder && session.extractableNodeAt(view.id) !== null,
       awaitingMoveTarget: view.own && awaitingMoveTarget,
     },
   });
@@ -849,7 +817,7 @@ function refreshSelectedArmy(
 /** Build the province card from fog-aware GameState + the renderer-supplied
  *  name/terrain for `provinceId` (which must be the selected province). */
 function projectSelectedProvince(
-  session: GameSession, provinceId: number,
+  session: RemoteGameSession, provinceId: number,
 ): import('./ui/ui-state').SelectedProvince {
   const summary = session.describeProvince(provinceId);
   return {
@@ -860,7 +828,7 @@ function projectSelectedProvince(
     terrain: selectedProvinceTerrain,
     resources: summary.resources,
     isOwn: summary.isOwn,
-    coastal: activeWorld?.provinces.find((p) => p.id === provinceId)?.coastal ?? false,
+    coastal: false,
     deposits: summary.resources
       ? { controlled: summary.controlled, extracting: summary.extracting }
       : null,
@@ -872,7 +840,7 @@ function projectSelectedProvince(
     // Only the head order is being worked; tag it with its % so the player can
     // see how close the next unit / building is.
     queue: summary.isOwn
-      ? (session.state.productionQueues[provinceId] ?? []).map((o, i) =>
+      ? (session.state.productionQueues[provinceId] as Array<{ unitTypeId: string; progressHours: number; totalHours: number }> ?? []).map((o, i) =>
           i === 0 ? `${gameUnitLabel(o.unitTypeId)} · ${orderPercent(o)}%` : gameUnitLabel(o.unitTypeId))
       : [],
     buildable: summary.isOwn
@@ -881,7 +849,7 @@ function projectSelectedProvince(
         }))
       : [],
     construction: summary.isOwn
-      ? (session.state.constructionQueues[provinceId] ?? []).map((o, i) =>
+      ? (session.state.constructionQueues[provinceId] as Array<{ buildingId: BuildingId; progressHours: number; totalHours: number }> ?? []).map((o, i) =>
           i === 0 ? `${buildingLabel(o.buildingId)} · ${orderPercent(o)}%` : buildingLabel(o.buildingId))
       : [],
     rally: summary.isOwn ? session.rallyPoint(provinceId) : null,
@@ -891,13 +859,13 @@ function projectSelectedProvince(
 
 /** Re-project the province card in place — used after a capture flips the
  *  selected province's owner, so it doesn't need a reselect to update. */
-function refreshSelectedProvince(session: GameSession): void {
+function refreshSelectedProvince(session: RemoteGameSession): void {
   if (selectedProvinceId === null) return;
   if (uiStore.get().selectedProvince?.id !== selectedProvinceId) return;
   uiStore.patch({ selectedProvince: projectSelectedProvince(session, selectedProvinceId) });
 }
 
-function drainSessionEvents(session: GameSession): void {
+function drainSessionEvents(session: RemoteGameSession): void {
   const player = session.playerCountryId;
   for (const done of session.pendingCompletions.splice(0)) {
     // Only the player's own production is player news.
@@ -963,8 +931,8 @@ function pushNotification(kind: GameNotification['kind'], title: string, body?: 
  * Capacity is a throughput stat, not a stockpile — it belongs in the economy
  * panel, not this row.
  */
-function playerResourceLines(session: GameSession): ResourceLine[] {
-  const country = session.state.countries[session.playerCountryId];
+function playerResourceLines(session: RemoteGameSession): ResourceLine[] {
+  const country = session.ownCountry;
   const s = country.stockpile;
   const inc = country.income;
   const line = (

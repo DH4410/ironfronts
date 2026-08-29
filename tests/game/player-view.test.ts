@@ -30,11 +30,11 @@ function node(id: number, controller: number, x: number, z: number): ResourceNod
 function state(fog: boolean, armies: ArmyStack[], nodes: ResourceNodeState[] = []): GameState {
   return {
     version: GAME_STATE_VERSION, seed: 1, scenarioId: 'OP-1939-01', mode: 'campaign',
-    playerCountryId: 1, fogOfWar: fog, economyEnabled: true,
+    fogOfWar: fog, economyEnabled: true,
     clock: { gameTimeHours: 0, startDate: 'x' },
     countries: {
-      1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1, isPlayer: true },
-      2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1, isPlayer: false },
+      1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
+      2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
     },
     provinceOwners: {}, provinceBuildings: {}, productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: Object.fromEntries(armies.map((a) => [a.id, a])),
@@ -53,7 +53,7 @@ const world: WorldData = {
 describe('projectArmyView', () => {
   it('gives full composition for an own stack', () => {
     const s = state(true, [army('p', 1, 0, 0)], []);
-    const v = projectArmyView(s, world, 'p')!;
+    const v = projectArmyView(s, world, 1, 'p')!;
     expect(v.own).toBe(true);
     expect(v.composition).not.toBeNull();
     expect(v.composition!.unitCount).toBe(4);
@@ -62,7 +62,7 @@ describe('projectArmyView', () => {
 
   it('withholds composition and name for a contact-range foreign stack', () => {
     const s = state(true, [army('p', 1, 0, 0), army('e', 2, 140, 0)]); // 90 < 140 < 180
-    const v = projectArmyView(s, world, 'e')!;
+    const v = projectArmyView(s, world, 1, 'e')!;
     expect(v.contact).toBe('contact');
     expect(v.composition).toBeNull();
     expect(v.status).toBe('unknown');
@@ -75,14 +75,14 @@ describe('projectArmyView', () => {
 
   it('reveals composition once a foreign stack is inside inner vision', () => {
     const s = state(true, [army('p', 1, 0, 0), army('e', 2, 70, 0)]); // < 90
-    const v = projectArmyView(s, world, 'e')!;
+    const v = projectArmyView(s, world, 1, 'e')!;
     expect(v.contact).toBe('visible');
     expect(v.composition!.unitCount).toBe(4);
   });
 
   it('does not project a hidden foreign stack at all', () => {
     const s = state(true, [army('p', 1, 0, 0), army('e', 2, 400, 0)]);
-    expect(projectArmyView(s, world, 'e')).toBeNull();
+    expect(projectArmyView(s, world, 1, 'e')).toBeNull();
   });
 });
 
@@ -93,12 +93,12 @@ describe('visibleResourceNodes', () => {
       node(2, 2, 60, 0),          // foreign but under the player's army -> visible
       node(3, 2, 5_000, 2_000),   // foreign, no vision -> hidden
     ]);
-    const ids = visibleResourceNodes(s, world).map((n) => n.id).sort();
+    const ids = visibleResourceNodes(s, world, 1).map((n) => n.id).sort();
     expect(ids).toEqual([1, 2]);
   });
 
   it('shows every node when fog is off', () => {
     const s = state(false, [], [node(1, 2, 0, 0), node(2, 2, 9_000, 4_000)]);
-    expect(visibleResourceNodes(s, world)).toHaveLength(2);
+    expect(visibleResourceNodes(s, world, 1)).toHaveLength(2);
   });
 });

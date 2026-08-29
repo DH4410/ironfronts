@@ -39,7 +39,7 @@ import {
   extractFrustumPlanes, sphereIntersectsFrustum, sphereIntersectsHorizontalWorldWindow, WORLD_COPY_INDICES,
 } from './visibility';
 import { sampleWrappedField } from './world-sampling';
-import { loadWorldAssetBuffers } from './world-assets';
+import { loadWorldAssetBuffers, worldAssetUrl } from './world-assets';
 import { getVisibleInstanceView, updateVisibleInstanceView } from './visible-instance-cache';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
@@ -310,7 +310,7 @@ export class WorldRenderer {
     if (this.initialized) return;
     if (!navigator.gpu) throw new Error('WebGPU is unavailable');
     report('Loading world manifest', 0.04);
-    this.manifest = await fetchJson<WorldManifest>('/world/world.json');
+    this.manifest = await fetchJson<WorldManifest>(worldAssetUrl('world.json'));
     this.provinceById = new Map(this.manifest.provinces.map((province) => [province.id, province]));
     this.countryById = new Map(this.manifest.politics.countries.map((country) => [country.id, country]));
     if (this.manifest.politics.countries.some((country) => country.id > 255)) {
@@ -382,10 +382,10 @@ export class WorldRenderer {
       },
     );
     try {
-      const graph = await fetchBinary(`/world/${this.manifest.buffers.connections.url}`);
+      const graph = await fetchBinary(worldAssetUrl(this.manifest.buffers.connections.url));
       this.connectionGraph = new Float32Array(graph);
       const details = await fetchJson<{ provinces: Array<{ center: [number, number]; population: number }> }>(
-        `/world/${this.manifest.sidecars.provinceDetails.url}`,
+        worldAssetUrl(this.manifest.sidecars.provinceDetails.url),
       );
       // The 250 most populous provinces stand in for "real cities" — junction
       // markers keep clear of these so they never crowd a labelled settlement.
@@ -741,14 +741,14 @@ export class WorldRenderer {
   async setConnectionsVisible(enabled: boolean): Promise<void> {
     this.showConnections = enabled;
     if (!enabled || this.connections) return;
-    const data = await fetchBinary(`/world/${this.manifest.buffers.connections.url}`);
+    const data = await fetchBinary(worldAssetUrl(this.manifest.buffers.connections.url));
     this.connections = this.createInstanceLayer('movement connections', data, this.manifest.buffers.connections.count, 1, this.lineLayout);
   }
 
   async setWaterwayNetworkVisible(enabled: boolean): Promise<void> {
     this.showWaterwayNetwork = enabled;
     if (!enabled || this.waterwayNetwork) return;
-    const data = await fetchBinary(`/world/${this.manifest.buffers.waterwayNetworkLines.url}`);
+    const data = await fetchBinary(worldAssetUrl(this.manifest.buffers.waterwayNetworkLines.url));
     this.waterwayNetwork = this.createInstanceLayer(
       'authoritative waterway network', data, this.manifest.buffers.waterwayNetworkLines.count, 2, this.lineLayout,
     );

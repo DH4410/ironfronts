@@ -26,11 +26,11 @@ function world(urban = true): WorldData {
 function state(): GameState {
   return {
     version: GAME_STATE_VERSION, seed: 1, scenarioId: 'OP-1939-01', mode: 'campaign',
-    playerCountryId: 1, fogOfWar: false, economyEnabled: false,
+    fogOfWar: false, economyEnabled: false,
     clock: { gameTimeHours: 0, startDate: 'x' },
     countries: {
-      1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: { ...emptyStockpile(), funds: 5000, stone: 5000, metal: 5000 }, income: emptyStockpile(), industryCapacity: 1, isPlayer: true },
-      2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1, isPlayer: false },
+      1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: { ...emptyStockpile(), funds: 5000, stone: 5000, metal: 5000 }, income: emptyStockpile(), industryCapacity: 1 },
+      2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
     },
     provinceOwners: { 10: 1 },
     provinceBuildings: {},
@@ -41,7 +41,7 @@ function state(): GameState {
 }
 
 function ctx(s: GameState, urban = true): SimContext {
-  return { state: s, graph: {} as never, world: world(urban), playerCountryId: 1 };
+  return { state: s, graph: {} as never, world: world(urban) };
 }
 
 describe('queueBuilding', () => {

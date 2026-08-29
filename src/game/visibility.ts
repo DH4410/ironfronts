@@ -35,18 +35,19 @@ export interface VisionSource {
   innerSq: number;
 }
 
-export function friendlyVisionSources(state: GameState, world: WorldData): VisionSource[] {
-  const player = state.playerCountryId;
+export function friendlyVisionSources(
+  state: GameState, world: WorldData, viewerCountryId: number,
+): VisionSource[] {
   const sources: VisionSource[] = [];
   for (const army of Object.values(state.armies)) {
-    if (army.ownerCountryId !== player) continue;
+    if (army.ownerCountryId !== viewerCountryId) continue;
     const lead = strongestGroup(army);
     const outer = lead ? unitType(lead.typeId).visionOuter : 150;
     const inner = lead ? unitType(lead.typeId).visionInner : 80;
     sources.push({ x: army.x, z: army.z, outerSq: outer * outer, innerSq: inner * inner });
   }
   for (const province of world.provinces) {
-    if (state.provinceOwners[province.id] !== player) continue;
+    if (state.provinceOwners[province.id] !== viewerCountryId) continue;
     sources.push({
       x: province.center[0],
       z: province.center[1],
@@ -71,19 +72,18 @@ export function pointContactLevel(
 }
 
 export function computeArmyVisibility(
-  state: GameState, world: WorldData,
+  state: GameState, world: WorldData, viewerCountryId: number,
 ): Map<string, ContactLevel> {
   const result = new Map<string, ContactLevel>();
-  const player = state.playerCountryId;
 
   if (!state.fogOfWar) {
     for (const id of Object.keys(state.armies)) result.set(id, 'visible');
     return result;
   }
 
-  const sources = friendlyVisionSources(state, world);
+  const sources = friendlyVisionSources(state, world, viewerCountryId);
   for (const army of Object.values(state.armies)) {
-    if (army.ownerCountryId === player) {
+    if (army.ownerCountryId === viewerCountryId) {
       result.set(army.id, 'visible');
       continue;
     }
@@ -94,6 +94,8 @@ export function computeArmyVisibility(
 
 /** True when the player may see any detail of `countryId`'s internal state
  *  (economy, production, buildings). Own country, or fog disabled. */
-export function foreignDetailVisible(state: GameState, countryId: number): boolean {
-  return countryId === state.playerCountryId || !state.fogOfWar;
+export function foreignDetailVisible(
+  state: GameState, viewerCountryId: number, countryId: number,
+): boolean {
+  return countryId === viewerCountryId || !state.fogOfWar;
 }

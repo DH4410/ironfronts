@@ -10,7 +10,6 @@ function minimalState(): GameState {
     seed: 1,
     scenarioId: 'OP-1939-01',
     mode: 'campaign',
-    playerCountryId: 24,
     fogOfWar: true,
     economyEnabled: true,
     clock: { gameTimeHours: 12.5, startDate: '1 Sep 1939' },
@@ -18,7 +17,7 @@ function minimalState(): GameState {
       24: {
         id: 24, name: 'Spain', color: '#8EB0BB', controller: 'player',
         stockpile: { ...emptyStockpile(), funds: 100 },
-        income: emptyStockpile(), industryCapacity: 10, isPlayer: true,
+        income: emptyStockpile(), industryCapacity: 10,
       },
     },
     provinceOwners: { 294: 24, 295: 41 },

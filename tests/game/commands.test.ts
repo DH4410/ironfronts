@@ -36,11 +36,11 @@ function world(): WorldData {
 function ctx(): SimContext {
   const state: GameState = {
     version: GAME_STATE_VERSION, seed: 1, scenarioId: 'OP-1939-01', mode: 'campaign',
-    playerCountryId: 1, fogOfWar: false, economyEnabled: false,
+    fogOfWar: false, economyEnabled: false,
     clock: { gameTimeHours: 0, startDate: 'x' },
     countries: {
-      1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: { ...emptyStockpile(), funds: 999, manpower: 999, food: 999, metal: 999 }, income: emptyStockpile(), industryCapacity: 1, isPlayer: true },
-      2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: { ...emptyStockpile(), funds: 999, manpower: 999, food: 999, metal: 999 }, income: emptyStockpile(), industryCapacity: 1, isPlayer: false },
+      1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: { ...emptyStockpile(), funds: 999, manpower: 999, food: 999, metal: 999 }, income: emptyStockpile(), industryCapacity: 1 },
+      2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: { ...emptyStockpile(), funds: 999, manpower: 999, food: 999, metal: 999 }, income: emptyStockpile(), industryCapacity: 1 },
     },
     provinceOwners: { 10: 1 },
     provinceBuildings: { 10: { barracks: 1, tankPlant: 0, ordnance: 0 } },
@@ -54,7 +54,7 @@ function ctx(): SimContext {
     },
     resourceNodes: {}, relations: {}, nextArmyId: 2, nextOrderId: 1, nextEventId: 1,
   };
-  return { state, graph: graph(), world: world(), playerCountryId: 1 };
+  return { state, graph: graph(), world: world() };
 }
 
 describe('applyCommand ownership gate', () => {

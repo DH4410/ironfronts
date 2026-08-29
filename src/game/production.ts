@@ -32,9 +32,9 @@ function hasBuilding(session: SimContext, provinceId: number, building: Building
     : b.ordnance) > 0;
 }
 
-/** Units `countryId` (default: the player) can produce in this province now. */
+/** Units `countryId` can produce in this province now. */
 export function producibleUnits(
-  session: SimContext, provinceId: number, countryId = session.playerCountryId,
+  session: SimContext, provinceId: number, countryId: number,
 ): string[] {
   if (session.state.provinceOwners[provinceId] !== countryId) return [];
   const out: string[] = [];
@@ -46,7 +46,7 @@ export function producibleUnits(
 
 export function queueUnit(
   session: SimContext, provinceId: number, unitTypeId: string,
-  countryId = session.playerCountryId,
+  countryId: number,
 ): ProduceResult {
   if (session.state.provinceOwners[provinceId] !== countryId) {
     return { ok: false, reason: 'Not your province.' };

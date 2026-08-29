@@ -1,0 +1,12 @@
+export { GameSession } from '../../../src/game/game-session';
+export { initGameState } from '../../../src/game/scenario-init';
+export { scenarioById } from '../../../src/game/scenario-catalog';
+export { buildWorldData } from '../../../src/game/world-data-loader';
+export { projectArmyView, visibleResourceNodes } from '../../../src/game/player-view';
+export { computeArmyVisibility } from '../../../src/game/visibility';
+export { UNIT_TYPES, unitType } from '../../../src/game/units/unit-catalog';
+export { BUILDINGS } from '../../../src/game/construction';
+export type { GameState, CountryState, ResourceNodeState } from '../../../src/game/game-state';
+export type { GameCommand, CommandResult } from '../../../src/game/commands';
+export type { WorldData } from '../../../src/game/world-data';
+export type { PlayerArmyView } from '../../../src/game/player-view';
