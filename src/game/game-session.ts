@@ -19,11 +19,12 @@ import { scenarioById } from './scenario-catalog';
 import { initGameState, type InitResult } from './scenario-init';
 import type { WorldData } from './world-data';
 import { applyIncome, recomputeIncome } from './economy';
-import { issueMoveOrder, issueStop, stepMovement } from './units/movement';
-import { issueExtract, stepExtraction } from './extraction';
-import { producibleUnits, queueUnit, stepProduction, type UnitCompletion } from './production';
+import { stepMovement } from './units/movement';
+import { stepExtraction } from './extraction';
+import { producibleUnits, stepProduction, type UnitCompletion } from './production';
 import { stepCombat, stepCapture, type CaptureEvent } from './combat';
 import { stepAi } from './ai/simple-ai';
+import { applyCommand as runCommand, type CommandResult, type GameCommand } from './commands';
 import { guaranteeStrategicBaseline } from './resource-bootstrap';
 import { visibleResourceNodes } from './player-view';
 import { wrappedDistance } from './geometry';
@@ -182,26 +183,39 @@ export class GameSession {
     setRelation(this.state, a, b, 'war');
   }
 
-  // ---- player commands (§34: player entities only) ------------------
+  // ---- command boundary (§34, § server-ready) ---------------------
+  // Every mutation goes through `applyCommand`, which validates the acting
+  // country against authoritative ownership. The AI issues the same commands;
+  // a future server receives them. The `order*` / `produce` helpers below just
+  // stamp the player's countryId onto a command for the HUD's convenience.
+
+  applyCommand(command: GameCommand): CommandResult {
+    return runCommand(this, command);
+  }
 
   orderMove(armyId: string, x: number, z: number, intent: 'move' | 'attack' = 'move') {
-    if (!this.ownsArmy(armyId)) return { ok: false, reason: 'Not your army.' };
-    return issueMoveOrder(this, armyId, x, z, intent);
+    return this.applyCommand({
+      type: intent === 'attack' ? 'attackArmy' : 'moveArmy',
+      countryId: this.state.playerCountryId, armyId, x, z,
+    });
   }
 
   orderStop(armyId: string): boolean {
-    if (!this.ownsArmy(armyId)) return false;
-    return issueStop(this, armyId);
+    return this.applyCommand({
+      type: 'stopArmy', countryId: this.state.playerCountryId, armyId,
+    }).ok;
   }
 
   orderExtract(armyId: string) {
-    if (!this.ownsArmy(armyId)) return { ok: false, reason: 'Not your army.' };
-    return issueExtract(this, armyId);
+    return this.applyCommand({
+      type: 'extract', countryId: this.state.playerCountryId, armyId,
+    });
   }
 
   produce(provinceId: number, unitTypeId: string) {
-    if (!this.ownsProvince(provinceId)) return { ok: false, reason: 'Not your province.' };
-    return queueUnit(this, provinceId, unitTypeId, this.state.playerCountryId);
+    return this.applyCommand({
+      type: 'produce', countryId: this.state.playerCountryId, provinceId, unitTypeId,
+    });
   }
 
   producible(provinceId: number): string[] {

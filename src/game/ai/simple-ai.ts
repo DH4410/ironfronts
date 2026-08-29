@@ -1,17 +1,16 @@
 /**
  * Simple defensive AI v1 (§56, "IMPORTANT AI RULE").
  *
- * AI-controlled countries issue the SAME GameSession commands the player does —
- * `issueMoveOrder`, `queueUnit`, `issueExtract` — never direct state edits.
+ * AI-controlled countries go through the SAME `applyCommand` boundary the player
+ * does (with their own countryId) — never direct state edits.
  * v1 goals: keep producing cheap infantry, work owned resource nodes, garrison
  * cities, and only push out to retake a lost home province or hit an obviously
  * weaker adjacent enemy stack. Nothing clever.
  */
 
 import type { SimContext } from '../sim-context';
-import { issueMoveOrder } from '../units/movement';
-import { issueExtract } from '../extraction';
-import { queueUnit, producibleUnits } from '../production';
+import { applyCommand } from '../commands';
+import { producibleUnits } from '../production';
 import { canExtract, stackUnitCount } from '../units/army';
 import { relationOf } from '../game-state';
 import { wrappedDistance } from '../geometry';
@@ -33,7 +32,9 @@ export function stepAi(session: SimContext, _dtHours: number): void {
       const queued = state.productionQueues[provinceId]?.length ?? 0;
       if (queued >= 2) continue;
       if (country.stockpile.manpower > 120 && country.stockpile.funds > 80) {
-        queueUnit(session, provinceId, 'infantry', country.id);
+        applyCommand(session, {
+          type: 'produce', countryId: country.id, provinceId, unitTypeId: 'infantry',
+        });
       }
       break; // one order per pass keeps it slow
     }
@@ -48,9 +49,11 @@ export function stepAi(session: SimContext, _dtHours: number): void {
       );
       if (!node) continue;
       if (army.graphNodeId === node.accessNodeId) {
-        issueExtract(session, army.id);
+        applyCommand(session, { type: 'extract', countryId: country.id, armyId: army.id });
       } else {
-        issueMoveOrder(session, army.id, node.x, node.z, 'move');
+        applyCommand(session, {
+          type: 'moveArmy', countryId: country.id, armyId: army.id, x: node.x, z: node.z,
+        });
       }
       break;
     }
@@ -72,6 +75,11 @@ export function stepAi(session: SimContext, _dtHours: number): void {
       .map((e) => ({ e, d: wrappedDistance(strongest.x, strongest.z, e.x, e.z, session.world.width) }))
       .filter((x) => x.d < 900)
       .sort((a, b) => a.d - b.d)[0];
-    if (target) issueMoveOrder(session, strongest.id, target.e.x, target.e.z, 'attack');
+    if (target) {
+      applyCommand(session, {
+        type: 'attackArmy', countryId: country.id, armyId: strongest.id,
+        x: target.e.x, z: target.e.z,
+      });
+    }
   }
 }
