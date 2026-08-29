@@ -132,6 +132,8 @@ export interface GameState {
   productionQueues: Record<number, ProductionOrder[]>;
   /** Sparse: province id -> ordered building-construction queue. */
   constructionQueues: Record<number, ConstructionOrder[]>;
+  /** Sparse: province id -> world-space point newly produced units march to. */
+  rallyPoints: Record<number, { x: number; z: number }>;
 
   armies: Record<string, ArmyStack>;
   resourceNodes: Record<number, ResourceNodeState>;

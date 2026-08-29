@@ -55,7 +55,7 @@ function baseState(): GameState {
     },
     provinceOwners: { 10: 1 },
     provinceBuildings: { 10: { barracks: 1, tankPlant: 0, ordnance: 0 } },
-    productionQueues: {}, constructionQueues: {},
+    productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: {},
     resourceNodes: {},
     relations: {},

@@ -11,6 +11,7 @@ import { buildLandGraph, type LandGraph } from '../../src/game/movement/graph';
 import type { SimContext } from '../../src/game/sim-context';
 import type { WorldData } from '../../src/game/world-data';
 import { applyCommand } from '../../src/game/commands';
+import { stepProduction } from '../../src/game/production';
 import type { ArmyStack } from '../../src/game/units/army';
 
 function graph(): LandGraph {
@@ -43,7 +44,7 @@ function ctx(): SimContext {
     },
     provinceOwners: { 10: 1 },
     provinceBuildings: { 10: { barracks: 1, tankPlant: 0, ordnance: 0 } },
-    productionQueues: {}, constructionQueues: {},
+    productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: {
       a1: {
         id: 'a1', ownerCountryId: 1, name: '1st', x: 100, z: 100, graphNodeId: 0,
@@ -94,5 +95,34 @@ describe('applyCommand ownership gate', () => {
     expect(c.state.armies.a1.order).not.toBeNull();
     expect(applyCommand(c, { type: 'stopArmy', countryId: 1, armyId: 'a1' }).ok).toBe(true);
     expect(c.state.armies.a1.order).toBeNull();
+  });
+
+  it('setRally is gated by province ownership and clears with a null target', () => {
+    const c = ctx();
+    expect(applyCommand(c, {
+      type: 'setRally', countryId: 2, provinceId: 10, target: { x: 300, z: 100 },
+    }).ok).toBe(false);
+    expect(c.state.rallyPoints[10]).toBeUndefined();
+
+    expect(applyCommand(c, {
+      type: 'setRally', countryId: 1, provinceId: 10, target: { x: 300, z: 100 },
+    }).ok).toBe(true);
+    expect(c.state.rallyPoints[10]).toEqual({ x: 300, z: 100 });
+
+    applyCommand(c, { type: 'setRally', countryId: 1, provinceId: 10, target: null });
+    expect(c.state.rallyPoints[10]).toBeUndefined();
+  });
+
+  it('a produced unit marches to the rally point', () => {
+    const c = ctx();
+    applyCommand(c, {
+      type: 'setRally', countryId: 1, provinceId: 10, target: { x: 300, z: 100 },
+    });
+    applyCommand(c, { type: 'produce', countryId: 1, provinceId: 10, unitTypeId: 'infantry' });
+    const done = stepProduction(c, 999);
+    expect(done).toHaveLength(1);
+    const army = c.state.armies[done[0].armyId];
+    expect(army.order).not.toBeNull();
+    expect(army.status).toBe('moving');
   });
 });

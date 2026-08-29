@@ -36,6 +36,8 @@ export interface GameUiActions {
   produceUnit(provinceId: number, unitTypeId: string): void;
   /** Start a building in the selected (own, urban) province. */
   buildStructure(provinceId: number, buildingId: string): void;
+  /** Arm map-click placement of a production city's rally point, or clear it. */
+  rallyPoint(provinceId: number, action: 'arm' | 'clear'): void;
 }
 
 export interface GameUiHandle {
@@ -261,6 +263,15 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   const pvQueue = el('small', 'ifg-card__resstatus');
   pvQueue.hidden = true;
   pvProduce.append(pvQueue);
+  const pvRally = el('div', 'ifg-card__actions');
+  pvRally.hidden = true;
+  const pvRallyBtn = el('button', 'ifg-card__act');
+  pvRallyBtn.type = 'button';
+  const pvRallyClear = el('button', 'ifg-card__act');
+  pvRallyClear.type = 'button';
+  pvRallyClear.textContent = 'Clear rally';
+  pvRally.append(pvRallyBtn, pvRallyClear);
+  pvProduce.append(pvRally);
 
   // BUILD — construct a production building in an owned urban province.
   const pvBuild = el('div', 'ifg-card__resources');
@@ -458,6 +469,8 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         (province.queue ?? []).join(','),
         (province.buildable ?? []).map((b) => b.id).join(','),
         (province.construction ?? []).join(','),
+        province.rally ? `${Math.round(province.rally.x)},${Math.round(province.rally.z)}` : '-',
+        province.awaitingRallyTarget ? 'arm' : '',
       ].join('|');
       if (nextPvResourceKey !== pvResourceKey) {
         pvResourceKey = nextPvResourceKey;
@@ -490,6 +503,18 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
           const q = province.queue ?? [];
           pvQueue.hidden = q.length === 0;
           pvQueue.textContent = q.length ? `Queue: ${q.join(', ')}` : '';
+
+          // Rally point: where finished units march. Placed by a map click.
+          pvRally.hidden = false;
+          pvRallyBtn.textContent = province.awaitingRallyTarget
+            ? 'Click map…'
+            : province.rally ? 'Move rally' : 'Set rally point';
+          pvRallyBtn.classList.toggle('is-active', province.awaitingRallyTarget === true);
+          pvRallyBtn.onclick = () => actions.rallyPoint(province.id, 'arm');
+          pvRallyClear.hidden = !province.rally;
+          pvRallyClear.onclick = () => actions.rallyPoint(province.id, 'clear');
+        } else {
+          pvRally.hidden = true;
         }
 
         // BUILD panel — offered buildings and anything under construction.

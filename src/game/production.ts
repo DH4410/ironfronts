@@ -13,6 +13,7 @@ import type { BuildingId } from './units/unit-types';
 import { UNIT_TYPE_BY_ID, unitType } from './units/unit-catalog';
 import { makeGroup, mergeStacks, type ArmyStack } from './units/army';
 import { nearestNode } from './movement/graph';
+import { issueMoveOrder } from './units/movement';
 
 /** Accelerated prototype clock: real build times divided by this (§31). */
 const BUILD_TIME_SCALE = 4;
@@ -101,6 +102,13 @@ export function stepProduction(session: SimContext, dtHours: number): UnitComple
     queue.shift();
     const armyId = spawnUnit(session, provinceId, active.unitTypeId, active.ownerCountryId);
     completed.push({ provinceId, unitTypeId: active.unitTypeId, armyId });
+
+    // Rally point: march the fresh unit (or the idle stack it joined) toward it.
+    const rally = session.state.rallyPoints[provinceId];
+    const army = session.state.armies[armyId];
+    if (rally && army && !army.order && army.status === 'idle') {
+      issueMoveOrder(session, armyId, rally.x, rally.z, 'move');
+    }
   }
   // Drop empty queues so the record stays sparse.
   for (const [pid, queue] of Object.entries(session.state.productionQueues)) {

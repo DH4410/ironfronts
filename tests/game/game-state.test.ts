@@ -23,7 +23,7 @@ function minimalState(): GameState {
     },
     provinceOwners: { 294: 24, 295: 41 },
     provinceBuildings: { 294: { barracks: 1, tankPlant: 1, ordnance: 0 } },
-    productionQueues: {}, constructionQueues: {},
+    productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: {
       'army-1': {
         id: 'army-1', ownerCountryId: 24, name: '1st Army', x: 100, z: 200,

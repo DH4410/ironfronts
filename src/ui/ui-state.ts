@@ -98,6 +98,10 @@ export interface SelectedProvince {
   }[];
   /** Buildings currently under construction here (labels), own provinces only. */
   readonly construction?: readonly string[];
+  /** World-space rally point newly produced units march to, or null. */
+  readonly rally?: { readonly x: number; readonly z: number } | null;
+  /** UI is waiting for a map click to place this province's rally point. */
+  readonly awaitingRallyTarget?: boolean;
 }
 
 export type NavId =

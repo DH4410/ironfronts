@@ -227,6 +227,22 @@ export class GameSession {
     });
   }
 
+  setRally(provinceId: number, x: number, z: number) {
+    return this.applyCommand({
+      type: 'setRally', countryId: this.state.playerCountryId, provinceId, target: { x, z },
+    });
+  }
+
+  clearRally(provinceId: number) {
+    return this.applyCommand({
+      type: 'setRally', countryId: this.state.playerCountryId, provinceId, target: null,
+    });
+  }
+
+  rallyPoint(provinceId: number): { x: number; z: number } | null {
+    return this.state.rallyPoints[provinceId] ?? null;
+  }
+
   producible(provinceId: number): string[] {
     return producibleUnits(this, provinceId, this.state.playerCountryId);
   }

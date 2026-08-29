@@ -292,6 +292,7 @@ export function initGameState(
     provinceBuildings,
     productionQueues,
     constructionQueues: {},
+    rallyPoints: {},
     armies,
     resourceNodes,
     relations: {},

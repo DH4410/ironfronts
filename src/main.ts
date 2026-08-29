@@ -48,6 +48,20 @@ function handleProduce(provinceId: number, unitTypeId: string): void {
   if (selectedProvinceId === provinceId) refreshSelectedProvince(session);
 }
 
+/** Arm / clear the selected production city's rally point. */
+function handleRally(provinceId: number, action: 'arm' | 'clear'): void {
+  const session = activeSession;
+  if (!session || selectedProvinceId !== provinceId) return;
+  if (action === 'clear') {
+    session.clearRally(provinceId);
+    awaitingRallyTarget = false;
+    pushNotification('information', 'Rally point cleared');
+  } else {
+    awaitingRallyTarget = !awaitingRallyTarget;
+  }
+  refreshSelectedProvince(session);
+}
+
 /** Player starts a building from the selected-province BUILD panel. */
 function handleBuild(provinceId: number, buildingId: string): void {
   const session = activeSession;
@@ -163,6 +177,8 @@ let awaitingMoveTarget = false;
 let selectedProvinceId: number | null = null;
 let selectedProvinceName = '';
 let selectedProvinceTerrain = '';
+/** True while the next map click places the selected province's rally point. */
+let awaitingRallyTarget = false;
 mountMenu({
   audio,
   onLaunch: (selection: ScenarioSelection) => {
@@ -269,6 +285,7 @@ async function start(selection: ScenarioSelection): Promise<void> {
     armyCommand: (command) => handleArmyCommand(command),
     produceUnit: (provinceId, unitTypeId) => handleProduce(provinceId, unitTypeId),
     buildStructure: (provinceId, buildingId) => handleBuild(provinceId, buildingId),
+    rallyPoint: (provinceId, action) => handleRally(provinceId, action),
   };
   const gameUi = mountGameUi(uiStore, gameUiActions);
   window.addEventListener('pagehide', (event) => {
@@ -299,12 +316,14 @@ async function start(selection: ScenarioSelection): Promise<void> {
   renderer.onProvinceSelected = (info) => {
     if (!info) {
       selectedProvinceId = null;
+      awaitingRallyTarget = false;
       uiStore.patch({ selectedProvince: null });
       return;
     }
     // Prefer authoritative, fog-aware GameState detail once the session exists.
     const session = activeSession;
     if (session) {
+      if (info.id !== selectedProvinceId) awaitingRallyTarget = false;
       selectedProvinceId = info.id;
       selectedProvinceName = info.name;
       selectedProvinceTerrain = info.terrain;
@@ -720,6 +739,17 @@ function handleMapClick(
       return true;
     }
   }
+  // 1b. Armed rally placement -> set the selected province's rally point.
+  if (awaitingRallyTarget && selectedProvinceId !== null && session.ownsProvince(selectedProvinceId)) {
+    const ground = renderer.groundPointAt(clientX, clientY);
+    if (ground) {
+      session.setRally(selectedProvinceId, ground[0], ground[1]);
+      awaitingRallyTarget = false;
+      pushNotification('information', 'Rally point set', 'New units from here will march to it.');
+      refreshSelectedProvince(session);
+      return true;
+    }
+  }
   // 2. Otherwise, army pick.
   const hit = renderer.pickArmyAt(clientX, clientY);
   if (hit) {
@@ -734,6 +764,7 @@ function handleMapClick(
 function selectArmy(session: GameSession, armyId: string): void {
   selectedArmyId = armyId;
   awaitingMoveTarget = false;
+  awaitingRallyTarget = false;
   renderer_clearProvince();
   refreshSelectedArmy(session);
   if (activeRenderer && activeWorld) syncArmyMarkers(session, activeWorld, activeRenderer);
@@ -846,6 +877,8 @@ function projectSelectedProvince(
     construction: summary.isOwn
       ? (session.state.constructionQueues[provinceId] ?? []).map((o) => buildingLabel(o.buildingId))
       : [],
+    rally: summary.isOwn ? session.rallyPoint(provinceId) : null,
+    awaitingRallyTarget: summary.isOwn && awaitingRallyTarget && selectedProvinceId === provinceId,
   };
 }
 

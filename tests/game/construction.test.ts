@@ -34,7 +34,7 @@ function state(): GameState {
     },
     provinceOwners: { 10: 1 },
     provinceBuildings: {},
-    productionQueues: {}, constructionQueues: {},
+    productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: {}, resourceNodes: {}, relations: {},
     nextArmyId: 1, nextOrderId: 1, nextEventId: 1,
   };

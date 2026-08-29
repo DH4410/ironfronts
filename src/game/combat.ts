@@ -173,9 +173,11 @@ export function stepCapture(session: SimContext): CaptureEvent[] {
 
     session.state.provinceOwners[province.id] = army.ownerCountryId;
     setRelation(session.state, army.ownerCountryId, owner, 'war');
-    // Units and buildings the previous owner was working on here are forfeit.
+    // Units and buildings the previous owner was working on here are forfeit,
+    // and their rally point no longer applies.
     delete session.state.productionQueues[province.id];
     delete session.state.constructionQueues[province.id];
+    delete session.state.rallyPoints[province.id];
     // Resource nodes in the province change controller.
     for (const node of Object.values(session.state.resourceNodes)) {
       if (node.provinceId !== province.id) continue;

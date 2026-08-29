@@ -57,16 +57,23 @@ export interface BuildCommand {
   readonly provinceId: number;
   readonly buildingId: BuildingId;
 }
+export interface RallyCommand {
+  readonly type: 'setRally';
+  readonly countryId: number;
+  readonly provinceId: number;
+  /** null clears the rally point. */
+  readonly target: { readonly x: number; readonly z: number } | null;
+}
 
-/** Every mutation the player or AI can request today. `rally` joins this union
- *  when that system lands. */
+/** Every mutation the player or AI can request today. */
 export type GameCommand =
   | MoveArmyCommand
   | AttackCommand
   | StopArmyCommand
   | ExtractCommand
   | ProduceCommand
-  | BuildCommand;
+  | BuildCommand
+  | RallyCommand;
 
 export type GameCommandType = GameCommand['type'];
 
@@ -118,6 +125,17 @@ export function applyCommand(ctx: SimContext, command: GameCommand): CommandResu
         return { ok: false, reason: 'Not your province.' };
       }
       return queueBuilding(ctx, command.provinceId, command.buildingId, command.countryId);
+    }
+    case 'setRally': {
+      if (ctx.state.provinceOwners[command.provinceId] !== command.countryId) {
+        return { ok: false, reason: 'Not your province.' };
+      }
+      if (command.target) {
+        ctx.state.rallyPoints[command.provinceId] = { x: command.target.x, z: command.target.z };
+      } else {
+        delete ctx.state.rallyPoints[command.provinceId];
+      }
+      return { ok: true };
     }
     default: {
       const exhaustive: never = command;
