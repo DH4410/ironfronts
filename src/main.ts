@@ -149,6 +149,11 @@ let activeSession: GameSession | undefined;
 let activeWorld: import('./game/world-data').WorldData | undefined;
 let selectedArmyId: string | null = null;
 let awaitingMoveTarget = false;
+// Selected province: id + the renderer-supplied labels, kept so the card can be
+// re-projected from GameState (e.g. after a capture) without a reselect.
+let selectedProvinceId: number | null = null;
+let selectedProvinceName = '';
+let selectedProvinceTerrain = '';
 mountMenu({
   audio,
   onLaunch: (selection: ScenarioSelection) => {
@@ -286,39 +291,17 @@ async function start(selection: ScenarioSelection): Promise<void> {
   };
   renderer.onProvinceSelected = (info) => {
     if (!info) {
+      selectedProvinceId = null;
       uiStore.patch({ selectedProvince: null });
       return;
     }
     // Prefer authoritative, fog-aware GameState detail once the session exists.
     const session = activeSession;
     if (session) {
-      const summary = session.describeProvince(info.id);
-      const coastal = activeWorld?.provinces.find((p) => p.id === info.id)?.coastal ?? false;
-      const producible = summary.isOwn
-        ? session.producible(info.id).map((id) => ({
-            id, name: gameUnitLabel(id), costLabel: unitCostLabel(id),
-          }))
-        : [];
-      const queue = summary.isOwn
-        ? (session.state.productionQueues[info.id] ?? []).map((o) => gameUnitLabel(o.unitTypeId))
-        : [];
-      uiStore.patch({
-        selectedProvince: {
-          id: info.id,
-          name: info.name,
-          owner: summary.ownerName,
-          ownerColor: summary.ownerColor,
-          terrain: info.terrain,
-          resources: summary.resources,
-          isOwn: summary.isOwn,
-          coastal,
-          deposits: summary.resources
-            ? { controlled: summary.controlled, extracting: summary.extracting }
-            : null,
-          producible,
-          queue,
-        },
-      });
+      selectedProvinceId = info.id;
+      selectedProvinceName = info.name;
+      selectedProvinceTerrain = info.terrain;
+      uiStore.patch({ selectedProvince: projectSelectedProvince(session, info.id) });
       selectedArmyId = null;
       awaitingMoveTarget = false;
       return;
@@ -817,6 +800,43 @@ function refreshSelectedArmy(
   });
 }
 
+/** Build the province card from fog-aware GameState + the renderer-supplied
+ *  name/terrain for `provinceId` (which must be the selected province). */
+function projectSelectedProvince(
+  session: GameSession, provinceId: number,
+): import('./ui/ui-state').SelectedProvince {
+  const summary = session.describeProvince(provinceId);
+  return {
+    id: provinceId,
+    name: selectedProvinceName,
+    owner: summary.ownerName,
+    ownerColor: summary.ownerColor,
+    terrain: selectedProvinceTerrain,
+    resources: summary.resources,
+    isOwn: summary.isOwn,
+    coastal: activeWorld?.provinces.find((p) => p.id === provinceId)?.coastal ?? false,
+    deposits: summary.resources
+      ? { controlled: summary.controlled, extracting: summary.extracting }
+      : null,
+    producible: summary.isOwn
+      ? session.producible(provinceId).map((id) => ({
+          id, name: gameUnitLabel(id), costLabel: unitCostLabel(id),
+        }))
+      : [],
+    queue: summary.isOwn
+      ? (session.state.productionQueues[provinceId] ?? []).map((o) => gameUnitLabel(o.unitTypeId))
+      : [],
+  };
+}
+
+/** Re-project the province card in place — used after a capture flips the
+ *  selected province's owner, so it doesn't need a reselect to update. */
+function refreshSelectedProvince(session: GameSession): void {
+  if (selectedProvinceId === null) return;
+  if (uiStore.get().selectedProvince?.id !== selectedProvinceId) return;
+  uiStore.patch({ selectedProvince: projectSelectedProvince(session, selectedProvinceId) });
+}
+
 function drainSessionEvents(session: GameSession): void {
   const player = session.playerCountryId;
   for (const done of session.pendingCompletions.splice(0)) {
@@ -826,6 +846,16 @@ function drainSessionEvents(session: GameSession): void {
     pushNotification('completed', `${name} ready`, 'Reinforcements have joined the line.');
   }
   for (const cap of session.pendingCaptures.splice(0)) {
+    // One-way projection: push the authoritative owner change onto the renderer
+    // (political colour, borders, labels, hover ownership) for EVERY capture,
+    // not just the player's, so the political map can't diverge from GameState
+    // (§39). The renderer stays a presentation cache.
+    try {
+      activeRenderer?.setProvinceOwner(cap.provinceId, cap.toCountryId);
+    } catch (err) {
+      console.warn('[game] capture → renderer ownership projection failed', cap, err);
+    }
+    if (selectedProvinceId === cap.provinceId) refreshSelectedProvince(session);
     // Only surface captures the player is involved in.
     if (cap.toCountryId !== player && cap.fromCountryId !== player) continue;
     const to = session.state.countries[cap.toCountryId]?.name ?? '?';

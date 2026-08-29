@@ -139,15 +139,18 @@ export class WorldRenderer {
   private provinceData!: Uint16Array;
   private resourceNodeList: readonly ResourceNode[] = [];
   private provinceResources = new Map<number, ProvinceResources>();
+  /** Static settlement markers: road junctions + unnamed towns only (no
+   *  deposits — those live in `gameResourceMarkers`). Drawn at map zoom
+   *  regardless of the resource-overlay toggle. */
   private mapMarkers?: InstanceLayer;
   private showResourceOverlay = false;
   /** Dynamic army-stack markers (§9). Fixed capacity; only the used prefix is
    *  drawn. Rewritten from authoritative GameState when the army set changes. */
   private armyMarkers?: InstanceLayer;
   private static readonly ARMY_MARKER_CAPACITY = 1_024;
-  /** Dynamic resource-deposit markers fed from authoritative GameState (natural
-   *  + scenario-guaranteed). Supplements the static `mapMarkers` layer, which
-   *  only knows the renderer-generated natural nodes + junctions. */
+  /** The ONLY resource-deposit marker layer: fed the player-visible authoritative
+   *  set (natural + scenario-guaranteed, fog-filtered) via `setGameResourceMarkers`.
+   *  The static `mapMarkers` layer carries junctions/towns only. */
   private gameResourceMarkers?: InstanceLayer;
   private static readonly RESOURCE_MARKER_CAPACITY = 4_096;
   /** Flat (ax, az, bx, bz) edges of the movement/road graph — junction input. */
@@ -269,9 +272,9 @@ export class WorldRenderer {
   get worldConnectionGraph(): Float32Array | undefined { return this.connectionGraph; }
 
   /**
-   * Show / hide the GPU strategic-marker overlay (resource deposits + road
-   * junctions). Cheap boolean flip — the markers are already resident on the
-   * GPU; this only gates the one instanced draw.
+   * Show / hide the GPU resource-deposit overlay. Cheap boolean flip — the
+   * markers are already resident on the GPU; this only gates that one instanced
+   * draw. Junction / town (settlement) markers are independent and stay on.
    */
   setResourceOverlay(enabled: boolean): void {
     this.showResourceOverlay = enabled;
@@ -860,27 +863,20 @@ export class WorldRenderer {
   }
 
   /**
-   * Pack every strategic map marker (resource deposits + road junctions) into
-   * one instance storage buffer, uploaded once. The marker vertex shader does
-   * all camera projection on the GPU per frame — there is no per-frame CPU or
-   * DOM work for the overlay.
+   * Pack the static settlement layer — road junctions and unnamed towns only —
+   * into one instance storage buffer, uploaded once. Resource deposits are NOT
+   * here: they are authoritative game state and are drawn from the separate
+   * `gameResourceMarkers` layer fed by `setGameResourceMarkers`. Keeping them
+   * apart stops a deposit rendering twice and lets the resource overlay toggle
+   * gate resources without hiding the junction/town markers.
    *
    * Marker record = f32x4 (worldX, worldZ, kind, richness).
-   *   kind: 0 stone, 1 metal, 2 oil, 3 road junction, 4 small town
+   *   kind: 3 road junction, 4 small town
    */
   private createStrategicMarkerLayer(): void {
-    const KIND: Record<ResourceNode['kind'], number> = { stone: 0, metal: 1, oil: 2 };
     const junctions = this.generateRoadJunctions();
-    const total = this.resourceNodeList.length + junctions.length;
-    const data = new Float32Array(Math.max(1, total) * 4);
+    const data = new Float32Array(Math.max(1, junctions.length) * 4);
     let cursor = 0;
-    for (const node of this.resourceNodeList) {
-      data[cursor] = node.x;
-      data[cursor + 1] = node.z;
-      data[cursor + 2] = KIND[node.kind];
-      data[cursor + 3] = node.richness;
-      cursor += 4;
-    }
     for (const junction of junctions) {
       data[cursor] = junction.x;
       data[cursor + 1] = junction.z;
@@ -889,7 +885,7 @@ export class WorldRenderer {
       cursor += 4;
     }
     this.mapMarkers = this.createInstanceLayer(
-      'strategic map markers', data.buffer as ArrayBuffer, total, 0, this.lineLayout,
+      'settlement markers', data.buffer as ArrayBuffer, junctions.length, 0, this.lineLayout,
     );
   }
 
@@ -1321,11 +1317,12 @@ export class WorldRenderer {
       this.recordTriangleDraw('debugLines', instances * 2, instances);
     }
 
-    // Strategic map markers (resource deposits + road junctions). One instanced
-    // draw, projected on the GPU — locked to the terrain while panning, no CPU
-    // or DOM cost. Only issued below strategic altitude; the shader fades the
-    // last stretch so nothing pops.
-    if (this.showResourceOverlay && this.camera.distance < MAP_MARKER_MAX_DISTANCE) {
+    // Strategic map markers. Two independent instanced draws, both projected on
+    // the GPU — locked to the terrain while panning, no CPU/DOM cost, only below
+    // strategic altitude (the shader fades the last stretch so nothing pops).
+    //   - settlement markers (junctions/towns): always shown at map zoom;
+    //   - resource deposits: gated by the resource-overlay toggle.
+    if (this.camera.distance < MAP_MARKER_MAX_DISTANCE) {
       pass.setPipeline(this.mapMarkerPipeline);
       if (this.mapMarkers && this.mapMarkers.count > 0) {
         pass.setBindGroup(1, this.mapMarkers.bindGroup);
@@ -1333,7 +1330,7 @@ export class WorldRenderer {
         pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.mapMarkers.count);
         this.recordTriangleDraw('debugLines', instances * 2, instances);
       }
-      if (this.gameResourceMarkers && this.gameResourceMarkers.count > 0) {
+      if (this.showResourceOverlay && this.gameResourceMarkers && this.gameResourceMarkers.count > 0) {
         pass.setBindGroup(1, this.gameResourceMarkers.bindGroup);
         const instances = this.gameResourceMarkers.count * WORLD_COPY_INDICES.length;
         pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.gameResourceMarkers.count);
