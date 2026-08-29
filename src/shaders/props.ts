@@ -129,6 +129,10 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
   var materialUv = vec2f(0.0);
   var treeMaterialLayer = -1.0;
   var emissiveKind = 0.0;
+  // Regional city LOD (buildings only). Set inside the kind == 1u branch and
+  // folded into the final visibility term so it also drives the fragment
+  // discard. 1.0 means "full close-up city"; lower values thin the cluster.
+  var buildingLod = 1.0;
 
   if (instanceParams.kind == 0u) {
     let variant = min(u32(record.a.w + 0.5), 4u);
@@ -156,8 +160,20 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
       local.y = 1.0 + (local.y - 1.0) * 0.42;
     }
     local *= vec3f(record.a.z, record.a.w, record.b.x);
-    angle = record.b.y;
-    transformedNormal = rotateY(input.normal, angle);
+    // As the camera pulls back to regional/overview zoom, dense city clusters
+    // read as oversized miniature towns. Keep the silhouette and the landmark
+    // archetype (4) intact, but tighten every other building's footprint,
+    // lower its height toward a map-scale block, and fade out a staggered
+    // fraction of them so the cluster stops competing with labels and roads.
+    let regionalLod = smoothstep(1400.0, 2800.0, uniforms.interaction.y);
+    if (archetype != 4u) {
+      local.x *= mix(1.0, 0.82, regionalLod);
+      local.z *= mix(1.0, 0.82, regionalLod);
+      local.y *= mix(1.0, 0.5, regionalLod);
+      let lodHash = noiseHash(vec2f(f32(visibleInstance % count), 7.31));
+      let lodStart = 0.25 + lodHash * 0.55;
+      buildingLod = 1.0 - smoothstep(lodStart, lodStart + 0.25, regionalLod) * 0.6;
+    }
     let wallPalette = array<vec3f, 4>(
       vec3f(0.47, 0.44, 0.38), vec3f(0.67, 0.57, 0.43),
       vec3f(0.64, 0.59, 0.49), vec3f(0.43, 0.45, 0.43)
@@ -189,7 +205,7 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
   local = rotateY(local, angle);
   let worldPosition = vec3f(record.a.x + copyOffset + local.x, ground + local.y, record.a.y + local.z);
   let maximumDistance = select(select(1900.0, 2600.0, instanceParams.kind == 1u), 3200.0, instanceParams.kind == 0u);
-  let visibility = 1.0 - smoothstep(maximumDistance * 0.75, maximumDistance, distance(uniforms.camera.xyz, worldPosition));
+  let visibility = (1.0 - smoothstep(maximumDistance * 0.75, maximumDistance, distance(uniforms.camera.xyz, worldPosition))) * buildingLod;
   var output: PropVertexOutput;
   output.position = uniforms.viewProjection * vec4f(worldPosition, 1.0);
   output.worldPosition = worldPosition;
@@ -237,7 +253,12 @@ fn propFragment(input: PropVertexOutput) -> @location(0) vec4f {
   }
   var wetSheen = vec3f(0.0);
   if (input.treeMaterialLayer < -0.5) { wetSheen = wetSurfaceSheen(normal, input.worldPosition); }
-  let color = mix(mix(albedo * surfaceLight(normal) + emission + wetSheen, distanceFogColor(), fog * 0.39), worldFogColor(), worldFog);
+  // Floor the lighting term for buildings (treeMaterialLayer < -0.5) so faces
+  // turned away from the sun keep fill light. Dark roof palettes on a shaded
+  // side were rendering whole cities as flat black. Trees keep full shading.
+  let litShade = surfaceLight(normal);
+  let shade = select(litShade, max(litShade, vec3f(0.46)), input.treeMaterialLayer < -0.5);
+  let color = mix(mix(albedo * shade + emission + wetSheen, distanceFogColor(), fog * 0.39), worldFogColor(), worldFog);
   return vec4f(color, input.visibility * input.opacity * (1.0 - worldFog));
 }
 `;
