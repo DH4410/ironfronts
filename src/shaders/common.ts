@@ -173,6 +173,12 @@ fn oceanWaveHeight(world: vec2f, openWater: f32) -> f32 {
 fn oceanSurfaceColor(worldPosition: vec3f, depth: f32, shoreline: f32, visualRiver: f32) -> vec3f {
   let time = uniforms.sunTime.w;
   let world = worldPosition.xz;
+  // uniforms.interaction.y is the camera orbit distance. As the camera pulls
+  // back to regional/overview zoom the shallow shelf band and shoreline foam
+  // stop being detail and start reading as a thick cyan halo that is wider
+  // than small islands. Collapse both toward a clean deep-ocean edge with
+  // altitude; near the ground everything below is unchanged (overview == 0).
+  let overview = smoothstep(2400.0, 6800.0, uniforms.interaction.y);
   let warp = vec2f(valueNoise(world / 175.0 + vec2f(time * 0.025, -time * 0.017)),
     valueNoise(world / 243.0 + vec2f(-time * 0.013, time * 0.021))) - 0.5;
   let waveA = sin(dot(world + warp * 36.0, normalize(vec2f(0.86, 0.51))) * 0.019 + time * 0.53);
@@ -184,13 +190,21 @@ fn oceanSurfaceColor(worldPosition: vec3f, depth: f32, shoreline: f32, visualRiv
   let viewDirection = normalize(uniforms.camera.xyz - worldPosition);
   let fresnel = pow(1.0 - max(dot(normal, viewDirection), 0.0), 4.5);
   let sun = pow(max(dot(reflect(-normalize(uniforms.sunTime.xyz), normal), viewDirection), 0.0), 112.0);
-  let shelf = smoothstep(0.0, 0.44, depth);
-  let shallow = vec3f(0.12, 0.48, 0.52);
+  let shelf = smoothstep(0.0, mix(0.44, 0.12, overview), depth);
+  let shallow = vec3f(0.09, 0.38, 0.44);
   let deep = vec3f(0.025, 0.16, 0.255);
   var color = mix(shallow, deep, shelf);
-  color = mix(color, vec3f(0.40, 0.60, 0.63), fresnel * 0.64);
+  // Even at ground level the shallow band + shoreline foam hug the coast too
+  // widely and read as a glowing cyan rim - worst around island clusters. Pull
+  // near-shore water toward the deep colour, calm the grazing-angle sheen, and
+  // take strength out of the foam at every zoom; the overview term then
+  // finishes collapsing them as the camera pulls back.
+  color = mix(color, deep, 0.32);
+  color = mix(color, deep, overview * 0.45);
+  color = mix(color, vec3f(0.30, 0.46, 0.50), fresnel * 0.42);
   let foamBreak = valueNoise(world / 11.0 + warp * 2.4 + vec2f(time * 0.15, -time * 0.09));
-  let foam = shoreline * (1.0 - visualRiver * 0.80) * smoothstep(0.54, 0.82, foamBreak + waveA * 0.12);
+  let foam = shoreline * (1.0 - visualRiver * 0.80)
+    * smoothstep(0.54, 0.82, foamBreak + waveA * 0.12) * mix(0.55, 0.12, overview);
   color = mix(color, vec3f(0.73, 0.82, 0.77), foam * 0.52);
   color += vec3f(1.0, 0.86, 0.61) * sun * (0.34 + ripple * 0.05) * uniforms.lighting.x;
   color *= mix(vec3f(0.27, 0.36, 0.56), vec3f(1.0), uniforms.lighting.x);
