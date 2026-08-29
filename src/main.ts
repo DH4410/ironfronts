@@ -845,9 +845,10 @@ function pushNotification(kind: GameNotification['kind'], title: string, body?: 
 }
 
 /**
- * Map the player country's authoritative stockpile onto the HUD's resource
- * slots (§25). The HUD currently has no STONE slot — tracked as a follow-up;
- * stone is still authoritative in GameState.
+ * Map the player country's authoritative stockpile onto the HUD's physical
+ * stockpile row (§25): Funds · Manpower · Food · Stone · Metal · Oil. Industry
+ * Capacity is a throughput stat, not a stockpile — it belongs in the economy
+ * panel, not this row.
  */
 function playerResourceLines(session: GameSession): ResourceLine[] {
   const country = session.state.countries[session.playerCountryId];
@@ -863,9 +864,10 @@ function playerResourceLines(session: GameSession): ResourceLine[] {
     line('money', 'Funds', s.funds, inc.funds),
     line('manpower', 'Manpower', s.manpower, inc.manpower),
     line('food', 'Food', s.food, inc.food),
+    // stone/metal/oil have no passive rate — physical extraction only (§26).
+    line('stone', 'Stone', s.stone),
     line('metal', 'Metal', s.metal),
     line('oil', 'Oil', s.oil),
-    line('industry', 'Industry', country.industryCapacity),
   ];
 }
 

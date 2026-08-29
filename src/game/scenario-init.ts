@@ -21,7 +21,6 @@ import { makeGroup } from './units/army';
 import { buildLandGraph, nearestNode, type LandGraph } from './movement/graph';
 import { wrappedDistance } from './geometry';
 import { mulberry32, hashString } from './rng';
-import { resolvePlayableCountries } from './scenario-catalog';
 import { bootstrapResources, type ResourceBootstrapResult } from './resource-bootstrap';
 
 /** Starting stockpile for a campaign player country (§37 step 6). */
@@ -218,13 +217,14 @@ export function initGameState(
   }
 
   // ---- resource nodes: point-in-province assignment + strategic baseline
-  // Campaign guarantees each playable country >=1 reachable stone + metal it
-  // controls; sandbox skips the guarantee (no economy requirement, §4).
-  const playableIds = sandbox
-    ? []
-    : resolvePlayableCountries(scenario).map((country) => country.id);
+  // The baseline stone+metal guarantee runs ONLY for the participants that need
+  // an economy — at init that is just the selected player. An AI opponent gets
+  // its own guarantee when `GameSession` flips it on (enableNearbyAi); a
+  // multiplayer server would call `guaranteeStrategicBaseline` per participant.
+  // Every other neutral nation keeps whatever scarce natural geography it has.
+  const participantIds = sandbox ? [] : [selection.playerCountryId];
   const bootstrap = bootstrapResources(
-    world.resourceNodes, world, graph, provinceOwners, playableIds, seed,
+    world.resourceNodes, world, graph, provinceOwners, participantIds, seed,
   );
   const resourceNodes = bootstrap.nodes;
 

@@ -101,7 +101,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   resourceStrip.setAttribute('aria-label', 'National resources');
   const resourceIcon: Partial<Record<string, IconName>> = {
     money: 'funds', manpower: 'manpower', food: 'food',
-    metal: 'metal', oil: 'oil', industry: 'industry',
+    stone: 'node-stone', metal: 'metal', oil: 'oil',
   };
 
   const clockBlock = el('div', 'ifg-topbar__clock');

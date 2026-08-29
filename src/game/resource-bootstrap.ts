@@ -91,11 +91,9 @@ export function bootstrapResources(
   let naturalInWater = 0;
   let reachable = 0;
   let unreachable = 0;
-  let maxId = 0;
 
   // ---- Part A: assign every natural deposit by point-in-province -------
   for (const node of worldNodes) {
-    maxId = Math.max(maxId, node.id);
     const provinceId = resolveProvince(world, node.x, node.z);
     if (provinceId < 0) naturalInWater += 1;
     const accessNodeId = nearestNode(graph, node.x, node.z, ACCESS_SNAP_MAX);
@@ -116,49 +114,28 @@ export function bootstrapResources(
     };
   }
 
-  // ---- Part B: guarantee stone + metal for each playable country ------
+  // ---- Part B: guarantee stone + metal for each participant ----------
+  // The caller passes ONLY the countries that need an economy this game — the
+  // selected player plus any active AI / multiplayer participants — never every
+  // theoretically playable nation. Natural geography stays scarce for the rest.
   const graphNodesByCountry = indexGraphNodesByCountry(world, graph, provinceOwners);
   const guarantees: Array<{
     countryId: number; kind: GuaranteedKind; nodeId: number; provinceId: number;
   }> = [];
   const unsatisfied: Array<{ countryId: number; kind: GuaranteedKind }> = [];
-  let nextId = maxId + 1;
 
   for (const countryId of [...playableCountryIds].sort((a, b) => a - b)) {
-    for (const kind of ['stone', 'metal'] as const) {
-      const already = Object.values(nodes).some(
-        (n) => n.kind === kind && n.controllerCountryId === countryId && n.accessNodeId >= 0,
-      );
-      if (already) continue;
-
-      const placed = placeGuaranteedDeposit(
-        kind, graphNodesByCountry.get(countryId) ?? [], nodes, world,
-        mulberry32((seed ^ (countryId * 2654435761) ^ (kind === 'stone' ? 0x51 : 0xa7)) >>> 0),
-      );
-      if (!placed) {
-        unsatisfied.push({ countryId, kind });
-        continue;
-      }
-
-      const id = nextId;
-      nextId += 1;
-      nodes[id] = {
-        id,
-        kind,
-        x: placed.x,
-        z: placed.z,
-        remaining: GUARANTEE_AMOUNT[kind],
-        initialAmount: GUARANTEE_AMOUNT[kind],
-        controllerCountryId: countryId,
-        provinceId: placed.provinceId,
-        accessNodeId: placed.accessNodeId,
-        extractorArmyId: null,
-        status: 'idle',
-        provenance: 'scenarioGuarantee',
-      };
+    const result = guaranteeStrategicBaseline(
+      nodes, { world, graph, provinceOwners }, countryId, seed, graphNodesByCountry,
+    );
+    for (const added of result.added) {
       reachable += 1;
-      guarantees.push({ countryId, kind, nodeId: id, provinceId: placed.provinceId });
+      guarantees.push({
+        countryId, kind: added.kind as GuaranteedKind,
+        nodeId: added.id, provinceId: added.provinceId,
+      });
     }
+    for (const kind of result.unsatisfied) unsatisfied.push({ countryId, kind });
   }
 
   return {
@@ -170,6 +147,68 @@ export function bootstrapResources(
       guaranteed: guarantees.length,
     },
   };
+}
+
+export interface ResourceWorldCtx {
+  readonly world: WorldData;
+  readonly graph: LandGraph;
+  readonly provinceOwners: Record<number, number>;
+}
+
+/**
+ * Guarantee ONE country a reachable stone + metal deposit it controls, added to
+ * `nodes` in place. A no-op for a kind the country already controls reachably.
+ * Same deterministic placement as the campaign bootstrap, so calling it later
+ * for a country that joins mid-setup (an AI opponent flipped on after
+ * `GameSession.create`, or a multiplayer participant) yields the same result as
+ * if it had been in the initial participant list.
+ */
+export function guaranteeStrategicBaseline(
+  nodes: Record<number, ResourceNodeState>,
+  ctx: ResourceWorldCtx,
+  countryId: number,
+  seed: number,
+  graphIndex?: Map<number, GraphNodeInfo[]>,
+): { added: ResourceNodeState[]; unsatisfied: GuaranteedKind[] } {
+  const { world, graph, provinceOwners } = ctx;
+  const candidates = (graphIndex ?? indexGraphNodesByCountry(world, graph, provinceOwners))
+    .get(countryId) ?? [];
+  let nextId = 1;
+  for (const key of Object.keys(nodes)) nextId = Math.max(nextId, Number(key) + 1);
+
+  const added: ResourceNodeState[] = [];
+  const unsatisfied: GuaranteedKind[] = [];
+  for (const kind of ['stone', 'metal'] as const) {
+    const already = Object.values(nodes).some(
+      (n) => n.kind === kind && n.controllerCountryId === countryId && n.accessNodeId >= 0,
+    );
+    if (already) continue;
+
+    const placed = placeGuaranteedDeposit(
+      kind, candidates, nodes, world,
+      mulberry32((seed ^ (countryId * 2654435761) ^ (kind === 'stone' ? 0x51 : 0xa7)) >>> 0),
+    );
+    if (!placed) { unsatisfied.push(kind); continue; }
+
+    const node: ResourceNodeState = {
+      id: nextId,
+      kind,
+      x: placed.x,
+      z: placed.z,
+      remaining: GUARANTEE_AMOUNT[kind],
+      initialAmount: GUARANTEE_AMOUNT[kind],
+      controllerCountryId: countryId,
+      provinceId: placed.provinceId,
+      accessNodeId: placed.accessNodeId,
+      extractorArmyId: null,
+      status: 'idle',
+      provenance: 'scenarioGuarantee',
+    };
+    nodes[nextId] = node;
+    added.push(node);
+    nextId += 1;
+  }
+  return { added, unsatisfied };
 }
 
 function indexGraphNodesByCountry(

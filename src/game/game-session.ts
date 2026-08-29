@@ -24,6 +24,7 @@ import { issueExtract, stepExtraction } from './extraction';
 import { producibleUnits, queueUnit, stepProduction, type UnitCompletion } from './production';
 import { stepCombat, stepCapture, type CaptureEvent } from './combat';
 import { stepAi } from './ai/simple-ai';
+import { guaranteeStrategicBaseline } from './resource-bootstrap';
 import { wrappedDistance } from './geometry';
 
 /** Longest game-time step a single `tick` will integrate; larger dt is clamped
@@ -230,7 +231,17 @@ export class GameSession {
       );
       if (d < bestDist) { bestDist = d; best = country.id; }
     }
-    if (best !== null) this.state.countries[best].controller = 'ai';
+    if (best !== null) {
+      this.state.countries[best].controller = 'ai';
+      // The AI opponent now needs an economy too — give it the same strategic
+      // baseline the player got at init (idempotent if its natural geography
+      // already covers stone + metal).
+      guaranteeStrategicBaseline(
+        this.state.resourceNodes,
+        { world: this.world, graph: this.graph, provinceOwners: this.state.provinceOwners },
+        best, this.state.seed,
+      );
+    }
     return best;
   }
 

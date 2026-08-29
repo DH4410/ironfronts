@@ -87,6 +87,37 @@ describe('gameplay vertical slice (§61)', () => {
     expect(Object.keys(s.state.armies).length).toBeGreaterThanOrEqual(armiesBefore);
   });
 
+  it('guarantees a strategic baseline only for participants, not every nation', () => {
+    const s = spainSession();
+    const guaranteedOwners = new Set(
+      Object.values(s.state.resourceNodes)
+        .filter((n) => n.provenance === 'scenarioGuarantee')
+        .map((n) => n.controllerCountryId),
+    );
+    // World at War has ~200 playable nations; only Spain should have been topped
+    // up at init (or nobody, if Spain's natural geography already covered it).
+    expect([...guaranteedOwners].every((id) => id === SPAIN)).toBe(true);
+    for (const kind of ['stone', 'metal'] as const) {
+      expect(Object.values(s.state.resourceNodes).some(
+        (n) => n.kind === kind && n.controllerCountryId === SPAIN && n.accessNodeId >= 0,
+      )).toBe(true);
+    }
+
+    // Flipping on the AI opponent gives IT a baseline too — and no one else.
+    const aiId = s.enableNearbyAi()!;
+    for (const kind of ['stone', 'metal'] as const) {
+      expect(Object.values(s.state.resourceNodes).some(
+        (n) => n.kind === kind && n.controllerCountryId === aiId && n.accessNodeId >= 0,
+      )).toBe(true);
+    }
+    const ownersNow = new Set(
+      Object.values(s.state.resourceNodes)
+        .filter((n) => n.provenance === 'scenarioGuarantee')
+        .map((n) => n.controllerCountryId),
+    );
+    expect([...ownersNow].every((id) => id === SPAIN || id === aiId)).toBe(true);
+  });
+
   it('hostile stacks at the same node fight and one is destroyed; capture flips ownership', () => {
     const s = spainSession();
     const enemyId = s.enableNearbyAi();

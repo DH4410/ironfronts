@@ -21,7 +21,7 @@ export interface PlayerCountry {
   readonly color: string;
 }
 
-export type ResourceId = 'money' | 'manpower' | 'food' | 'metal' | 'oil' | 'industry';
+export type ResourceId = 'money' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil';
 
 export interface ResourceLine {
   readonly id: ResourceId;
@@ -174,9 +174,9 @@ export const DEFAULT_RESOURCES: readonly ResourceLine[] = [
   { id: 'money', label: 'Funds', value: null },
   { id: 'manpower', label: 'Manpower', value: null },
   { id: 'food', label: 'Food', value: null },
+  { id: 'stone', label: 'Stone', value: null },
   { id: 'metal', label: 'Metal', value: null },
   { id: 'oil', label: 'Oil', value: null },
-  { id: 'industry', label: 'Industry', value: null },
 ];
 
 export function createInitialState(overrides: Partial<StrategicUiState> = {}): StrategicUiState {
