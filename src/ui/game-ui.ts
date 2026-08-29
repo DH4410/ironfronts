@@ -34,6 +34,8 @@ export interface GameUiActions {
   armyCommand(command: 'move' | 'stop' | 'extract' | 'deselect'): void;
   /** Queue a unit in the selected (own) province (§31). */
   produceUnit(provinceId: number, unitTypeId: string): void;
+  /** Start a building in the selected (own, urban) province. */
+  buildStructure(provinceId: number, buildingId: string): void;
 }
 
 export interface GameUiHandle {
@@ -260,9 +262,19 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   pvQueue.hidden = true;
   pvProduce.append(pvQueue);
 
+  // BUILD — construct a production building in an owned urban province.
+  const pvBuild = el('div', 'ifg-card__resources');
+  pvBuild.hidden = true;
+  pvBuild.append(el('small', 'ifg-card__restitle', 'Build'));
+  const pvBuildList = el('div', 'ifg-card__prodlist');
+  pvBuild.append(pvBuildList);
+  const pvConstruction = el('small', 'ifg-card__resstatus');
+  pvConstruction.hidden = true;
+  pvBuild.append(pvConstruction);
+
   const pvActions = el('div', 'ifg-card__actions');
   for (const label of PROVINCE_ACTIONS) {
-    if (label === 'Produce') continue; // real PRODUCE panel above
+    if (label === 'Produce' || label === 'Build') continue; // real panels above
     const b = el('button', 'ifg-card__act');
     b.type = 'button';
     b.textContent = label;
@@ -270,7 +282,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     b.title = `${label} — not available yet`;
     pvActions.append(b);
   }
-  provinceCard.append(pvHead, pvGrid, pvResources, pvProduce, pvActions);
+  provinceCard.append(pvHead, pvGrid, pvResources, pvProduce, pvBuild, pvActions);
 
   // ---------------- army card (dev fixture only) ----------------
   const armyCard = el('section', 'ifg-card ifg-card--army');
@@ -444,6 +456,8 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         province.isOwn,
         (province.producible ?? []).map((u) => u.id).join(','),
         (province.queue ?? []).join(','),
+        (province.buildable ?? []).map((b) => b.id).join(','),
+        (province.construction ?? []).join(','),
       ].join('|');
       if (nextPvResourceKey !== pvResourceKey) {
         pvResourceKey = nextPvResourceKey;
@@ -476,6 +490,24 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
           const q = province.queue ?? [];
           pvQueue.hidden = q.length === 0;
           pvQueue.textContent = q.length ? `Queue: ${q.join(', ')}` : '';
+        }
+
+        // BUILD panel — offered buildings and anything under construction.
+        const buildable = province.buildable ?? [];
+        const construction = province.construction ?? [];
+        pvBuild.hidden = !province.isOwn || (buildable.length === 0 && construction.length === 0);
+        if (!pvBuild.hidden) {
+          pvBuildList.replaceChildren(...buildable.map((b) => {
+            const btn = el('button', 'ifg-card__act');
+            btn.type = 'button';
+            btn.textContent = b.name;
+            btn.title = b.costLabel;
+            btn.addEventListener('click', () => actions.buildStructure(province.id, b.id));
+            return btn;
+          }));
+          pvConstruction.hidden = construction.length === 0;
+          pvConstruction.textContent = construction.length
+            ? `Under construction: ${construction.join(', ')}` : '';
         }
 
         if (dep && hasDeposits) {

@@ -49,6 +49,16 @@ export interface ProvinceBuildings {
   ordnance: number;
 }
 
+/** One queued building. Same capture rule as a `ProductionOrder`: it belongs to
+ *  the country that paid, and is voided if that country loses the province. */
+export interface ConstructionOrder {
+  readonly id: string;
+  readonly buildingId: keyof ProvinceBuildings;
+  readonly ownerCountryId: number;
+  progressHours: number;
+  readonly totalHours: number;
+}
+
 export interface ProductionOrder {
   readonly id: string;
   readonly unitTypeId: string;
@@ -120,6 +130,8 @@ export interface GameState {
   provinceBuildings: Record<number, ProvinceBuildings>;
   /** Sparse: province id -> ordered production queue (§32). */
   productionQueues: Record<number, ProductionOrder[]>;
+  /** Sparse: province id -> ordered building-construction queue. */
+  constructionQueues: Record<number, ConstructionOrder[]>;
 
   armies: Record<string, ArmyStack>;
   resourceNodes: Record<number, ResourceNodeState>;

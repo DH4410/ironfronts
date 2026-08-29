@@ -43,7 +43,7 @@ function ctx(): SimContext {
     },
     provinceOwners: { 10: 1 },
     provinceBuildings: { 10: { barracks: 1, tankPlant: 0, ordnance: 0 } },
-    productionQueues: {},
+    productionQueues: {}, constructionQueues: {},
     armies: {
       a1: {
         id: 'a1', ownerCountryId: 1, name: '1st', x: 100, z: 100, graphNodeId: 0,

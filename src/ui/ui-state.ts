@@ -90,6 +90,14 @@ export interface SelectedProvince {
   }[];
   /** Current production queue (unit names), own provinces only. */
   readonly queue?: readonly string[];
+  /** Buildings this province can start right now (own + urban + affordable). */
+  readonly buildable?: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly costLabel: string;
+  }[];
+  /** Buildings currently under construction here (labels), own provinces only. */
+  readonly construction?: readonly string[];
 }
 
 export type NavId =

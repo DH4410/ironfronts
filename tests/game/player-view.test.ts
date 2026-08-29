@@ -36,7 +36,7 @@ function state(fog: boolean, armies: ArmyStack[], nodes: ResourceNodeState[] = [
       1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1, isPlayer: true },
       2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1, isPlayer: false },
     },
-    provinceOwners: {}, provinceBuildings: {}, productionQueues: {},
+    provinceOwners: {}, provinceBuildings: {}, productionQueues: {}, constructionQueues: {},
     armies: Object.fromEntries(armies.map((a) => [a.id, a])),
     resourceNodes: Object.fromEntries(nodes.map((n) => [n.id, n])),
     relations: {}, nextArmyId: 99, nextOrderId: 1, nextEventId: 1,

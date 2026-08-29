@@ -18,6 +18,8 @@ import type { SimContext } from './sim-context';
 import { issueMoveOrder, issueStop } from './units/movement';
 import { issueExtract } from './extraction';
 import { queueUnit } from './production';
+import { queueBuilding } from './construction';
+import type { BuildingId } from './units/unit-types';
 
 export interface MoveArmyCommand {
   readonly type: 'moveArmy';
@@ -49,15 +51,22 @@ export interface ProduceCommand {
   readonly provinceId: number;
   readonly unitTypeId: string;
 }
+export interface BuildCommand {
+  readonly type: 'build';
+  readonly countryId: number;
+  readonly provinceId: number;
+  readonly buildingId: BuildingId;
+}
 
-/** Every mutation the player or AI can request today. `build` / `rally` join
- *  this union when those systems land. */
+/** Every mutation the player or AI can request today. `rally` joins this union
+ *  when that system lands. */
 export type GameCommand =
   | MoveArmyCommand
   | AttackCommand
   | StopArmyCommand
   | ExtractCommand
-  | ProduceCommand;
+  | ProduceCommand
+  | BuildCommand;
 
 export type GameCommandType = GameCommand['type'];
 
@@ -103,6 +112,12 @@ export function applyCommand(ctx: SimContext, command: GameCommand): CommandResu
         return { ok: false, reason: 'Not your province.' };
       }
       return queueUnit(ctx, command.provinceId, command.unitTypeId, command.countryId);
+    }
+    case 'build': {
+      if (ctx.state.provinceOwners[command.provinceId] !== command.countryId) {
+        return { ok: false, reason: 'Not your province.' };
+      }
+      return queueBuilding(ctx, command.provinceId, command.buildingId, command.countryId);
     }
     default: {
       const exhaustive: never = command;

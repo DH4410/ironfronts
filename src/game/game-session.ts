@@ -22,6 +22,7 @@ import { applyIncome, recomputeIncome } from './economy';
 import { stepMovement } from './units/movement';
 import { stepExtraction } from './extraction';
 import { producibleUnits, stepProduction, type UnitCompletion } from './production';
+import { buildableBuildings, stepConstruction, type BuildingCompletion } from './construction';
 import { stepCombat, stepCapture, type CaptureEvent } from './combat';
 import { stepAi } from './ai/simple-ai';
 import { applyCommand as runCommand, type CommandResult, type GameCommand } from './commands';
@@ -48,6 +49,7 @@ export class GameSession {
 
   /** Drained by `main.ts` each frame for HUD notifications. */
   readonly pendingCompletions: UnitCompletion[] = [];
+  readonly pendingBuildings: BuildingCompletion[] = [];
   readonly pendingCaptures: CaptureEvent[] = [];
 
   private constructor(init: InitResult, world: WorldData) {
@@ -99,6 +101,7 @@ export class GameSession {
     // --- gameplay systems, fixed order ------------------------------
     stepMovement(this, dtHours);            // §14
     stepExtraction(this, dtHours);          // §23
+    for (const b of stepConstruction(this, dtHours)) this.pendingBuildings.push(b);
     for (const done of stepProduction(this, dtHours)) this.pendingCompletions.push(done); // §28
     stepCombat(this, dtHours);              // §38
     for (const cap of stepCapture(this)) this.pendingCaptures.push(cap); // §39
@@ -218,8 +221,18 @@ export class GameSession {
     });
   }
 
+  build(provinceId: number, buildingId: import('./units/unit-types').BuildingId) {
+    return this.applyCommand({
+      type: 'build', countryId: this.state.playerCountryId, provinceId, buildingId,
+    });
+  }
+
   producible(provinceId: number): string[] {
     return producibleUnits(this, provinceId, this.state.playerCountryId);
+  }
+
+  buildable(provinceId: number) {
+    return buildableBuildings(this, provinceId, this.state.playerCountryId);
   }
 
   /** Resource node whose access point the army is standing on (for the EXTRACT

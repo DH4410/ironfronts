@@ -23,6 +23,8 @@ import { GameSession } from './game/game-session';
 import { buildWorldData } from './game/world-data-loader';
 import { computeArmyVisibility, type ContactLevel } from './game/visibility';
 import { projectArmyView, visibleResourceNodes } from './game/player-view';
+import { BUILDINGS, costLabel as buildingCostLabel } from './game/construction';
+import type { BuildingId } from './game/units/unit-types';
 import {
   canExtract as armyCanExtract, stackHealthFraction, stackUnitCount,
 } from './game/units/army';
@@ -31,6 +33,7 @@ import { unitType } from './game/units/unit-catalog';
 const gameUnitLabel = (typeId: string): string => unitType(typeId).name;
 const unitCostLabel = (typeId: string): string => Object.entries(unitType(typeId).cost)
   .map(([k, v]) => `${v} ${k}`).join(' · ');
+const buildingLabel = (id: BuildingId): string => BUILDINGS[id].label;
 
 /** Player queues a unit from the selected-province PRODUCE panel. */
 function handleProduce(provinceId: number, unitTypeId: string): void {
@@ -42,15 +45,21 @@ function handleProduce(provinceId: number, unitTypeId: string): void {
     return;
   }
   pushNotification('information', `${gameUnitLabel(unitTypeId)} queued`, 'Now in the build queue.');
-  const sp = uiStore.get().selectedProvince;
-  if (sp && sp.id === provinceId) {
-    uiStore.patch({
-      selectedProvince: {
-        ...sp,
-        queue: (session.state.productionQueues[provinceId] ?? []).map((o) => gameUnitLabel(o.unitTypeId)),
-      },
-    });
+  if (selectedProvinceId === provinceId) refreshSelectedProvince(session);
+}
+
+/** Player starts a building from the selected-province BUILD panel. */
+function handleBuild(provinceId: number, buildingId: string): void {
+  const session = activeSession;
+  if (!session) return;
+  const result = session.build(provinceId, buildingId as BuildingId);
+  if (!result.ok) {
+    pushNotification('warning', 'Construction', result.reason ?? 'Cannot build that here.');
+    return;
   }
+  pushNotification('information', `${buildingLabel(buildingId as BuildingId)} started`,
+    'Construction is under way.');
+  if (selectedProvinceId === provinceId) refreshSelectedProvince(session);
 }
 
 const canvas = required<HTMLCanvasElement>('world');
@@ -259,6 +268,7 @@ async function start(selection: ScenarioSelection): Promise<void> {
     },
     armyCommand: (command) => handleArmyCommand(command),
     produceUnit: (provinceId, unitTypeId) => handleProduce(provinceId, unitTypeId),
+    buildStructure: (provinceId, buildingId) => handleBuild(provinceId, buildingId),
   };
   const gameUi = mountGameUi(uiStore, gameUiActions);
   window.addEventListener('pagehide', (event) => {
@@ -828,6 +838,14 @@ function projectSelectedProvince(
     queue: summary.isOwn
       ? (session.state.productionQueues[provinceId] ?? []).map((o) => gameUnitLabel(o.unitTypeId))
       : [],
+    buildable: summary.isOwn
+      ? session.buildable(provinceId).map((id) => ({
+          id, name: buildingLabel(id), costLabel: buildingCostLabel(id),
+        }))
+      : [],
+    construction: summary.isOwn
+      ? (session.state.constructionQueues[provinceId] ?? []).map((o) => buildingLabel(o.buildingId))
+      : [],
   };
 }
 
@@ -846,6 +864,12 @@ function drainSessionEvents(session: GameSession): void {
     if (session.state.provinceOwners[done.provinceId] !== player) continue;
     const name = gameUnitLabel(done.unitTypeId);
     pushNotification('completed', `${name} ready`, 'Reinforcements have joined the line.');
+  }
+  for (const done of session.pendingBuildings.splice(0)) {
+    if (session.state.provinceOwners[done.provinceId] !== player) continue;
+    pushNotification('completed', `${buildingLabel(done.buildingId)} complete`,
+      'The site is operational.');
+    if (selectedProvinceId === done.provinceId) refreshSelectedProvince(session);
   }
   for (const cap of session.pendingCaptures.splice(0)) {
     // One-way projection: push the authoritative owner change onto the renderer
