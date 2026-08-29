@@ -58,23 +58,39 @@ export function costLabel(building: BuildingId): string {
   return Object.entries(BUILDINGS[building].cost).map(([k, v]) => `${v} ${k}`).join(' · ');
 }
 
-/** Buildings `countryId` can start in this province right now (owned, urban,
- *  not already built or queued, affordable). */
-export function buildableBuildings(
+export interface BuildOption {
+  readonly id: BuildingId;
+  /** Country can pay the cost right now. Unaffordable options are still
+   *  offered (shown disabled) so the player learns the price before they can
+   *  meet it. */
+  readonly affordable: boolean;
+}
+
+/** Every building this province could still take — owned, urban, not already
+ *  built, not already queued — each flagged with current affordability. Empty
+ *  when the province can never build here (not owned by `countryId`, or rural). */
+export function buildOptions(
   ctx: SimContext, provinceId: number, countryId: number,
-): BuildingId[] {
+): BuildOption[] {
   if (ctx.state.provinceOwners[provinceId] !== countryId) return [];
   if (!isUrban(ctx, provinceId)) return [];
   const country = ctx.state.countries[countryId];
   if (!country) return [];
-  const out: BuildingId[] = [];
+  const out: BuildOption[] = [];
   for (const id of Object.keys(BUILDINGS) as BuildingId[]) {
     if (levelOf(ctx, provinceId, id) >= 1) continue;
     if (queuedAlready(ctx, provinceId, id)) continue;
-    if (!affordable(country.stockpile, BUILDINGS[id].cost)) continue;
-    out.push(id);
+    out.push({ id, affordable: affordable(country.stockpile, BUILDINGS[id].cost) });
   }
   return out;
+}
+
+/** Buildings `countryId` can start in this province right now (as `buildOptions`,
+ *  filtered to the affordable ones). */
+export function buildableBuildings(
+  ctx: SimContext, provinceId: number, countryId: number,
+): BuildingId[] {
+  return buildOptions(ctx, provinceId, countryId).filter((o) => o.affordable).map((o) => o.id);
 }
 
 function affordable(stockpile: Stockpile, cost: Partial<Stockpile>): boolean {

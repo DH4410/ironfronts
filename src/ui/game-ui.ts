@@ -467,7 +467,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         province.isOwn,
         (province.producible ?? []).map((u) => u.id).join(','),
         (province.queue ?? []).join(','),
-        (province.buildable ?? []).map((b) => b.id).join(','),
+        (province.buildable ?? []).map((b) => `${b.id}${b.affordable ? '+' : '-'}`).join(','),
         (province.construction ?? []).join(','),
         province.rally ? `${Math.round(province.rally.x)},${Math.round(province.rally.z)}` : '-',
         province.awaitingRallyTarget ? 'arm' : '',
@@ -525,9 +525,14 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
           pvBuildList.replaceChildren(...buildable.map((b) => {
             const btn = el('button', 'ifg-card__act');
             btn.type = 'button';
-            btn.textContent = b.name;
             btn.title = b.costLabel;
-            btn.addEventListener('click', () => actions.buildStructure(province.id, b.id));
+            // Unaffordable buildings stay on the list, disabled, with the cost
+            // spelled out so the player knows what to save for.
+            btn.textContent = b.affordable ? b.name : `${b.name} (${b.costLabel})`;
+            btn.disabled = !b.affordable;
+            if (b.affordable) {
+              btn.addEventListener('click', () => actions.buildStructure(province.id, b.id));
+            }
             return btn;
           }));
           pvConstruction.hidden = construction.length === 0;

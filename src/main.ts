@@ -870,8 +870,8 @@ function projectSelectedProvince(
       ? (session.state.productionQueues[provinceId] ?? []).map((o) => gameUnitLabel(o.unitTypeId))
       : [],
     buildable: summary.isOwn
-      ? session.buildable(provinceId).map((id) => ({
-          id, name: buildingLabel(id), costLabel: buildingCostLabel(id),
+      ? session.buildable(provinceId).map(({ id, affordable }) => ({
+          id, name: buildingLabel(id), costLabel: buildingCostLabel(id), affordable,
         }))
       : [],
     construction: summary.isOwn
@@ -903,6 +903,23 @@ function drainSessionEvents(session: GameSession): void {
     pushNotification('completed', `${buildingLabel(done.buildingId)} complete`,
       'The site is operational.');
     if (selectedProvinceId === done.provinceId) refreshSelectedProvince(session);
+  }
+  for (const ev of session.pendingCombat.splice(0)) {
+    // Only fights the player is in are player news. 'engaged' is gated to the
+    // moment contact is made, so it fires once per battle, not every tick.
+    if (ev.attacker !== player && ev.defender !== player) continue;
+    const mine = ev.defender === player;
+    if (ev.kind === 'engaged') {
+      pushNotification('combat', mine ? 'Under attack' : 'Contact',
+        mine ? 'Enemy forces have engaged your line.' : 'Your forces have made contact.');
+    } else if (ev.kind === 'retreat') {
+      pushNotification('combat', mine ? 'Forces withdrawing' : 'Enemy in retreat',
+        mine ? 'A battered stack is pulling back to friendly ground.'
+          : 'An enemy stack has broken off and is falling back.');
+    } else {
+      pushNotification('combat', mine ? 'Stack destroyed' : 'Enemy stack destroyed',
+        mine ? 'One of your armies has been wiped out.' : 'You have annihilated an enemy army.');
+    }
   }
   for (const cap of session.pendingCaptures.splice(0)) {
     // One-way projection: push the authoritative owner change onto the renderer

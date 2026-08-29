@@ -22,8 +22,8 @@ import { applyIncome, recomputeIncome } from './economy';
 import { stepMovement } from './units/movement';
 import { stepExtraction } from './extraction';
 import { producibleUnits, stepProduction, type UnitCompletion } from './production';
-import { buildableBuildings, stepConstruction, type BuildingCompletion } from './construction';
-import { stepCombat, stepCapture, type CaptureEvent } from './combat';
+import { buildOptions, stepConstruction, type BuildingCompletion } from './construction';
+import { stepCombat, stepCapture, type CaptureEvent, type CombatEvent } from './combat';
 import { stepAi } from './ai/simple-ai';
 import { applyCommand as runCommand, type CommandResult, type GameCommand } from './commands';
 import { guaranteeStrategicBaseline } from './resource-bootstrap';
@@ -51,6 +51,7 @@ export class GameSession {
   readonly pendingCompletions: UnitCompletion[] = [];
   readonly pendingBuildings: BuildingCompletion[] = [];
   readonly pendingCaptures: CaptureEvent[] = [];
+  readonly pendingCombat: CombatEvent[] = [];
 
   private constructor(init: InitResult, world: WorldData) {
     this.state = init.state;
@@ -103,7 +104,7 @@ export class GameSession {
     stepExtraction(this, dtHours);
     for (const b of stepConstruction(this, dtHours)) this.pendingBuildings.push(b);
     for (const done of stepProduction(this, dtHours)) this.pendingCompletions.push(done);
-    stepCombat(this, dtHours);
+    for (const ev of stepCombat(this, dtHours)) this.pendingCombat.push(ev);
     for (const cap of stepCapture(this)) this.pendingCaptures.push(cap);
 
     // --- simple defensive AI (slow cadence) -----------------------
@@ -248,7 +249,7 @@ export class GameSession {
   }
 
   buildable(provinceId: number) {
-    return buildableBuildings(this, provinceId, this.state.playerCountryId);
+    return buildOptions(this, provinceId, this.state.playerCountryId);
   }
 
   /** Resource node whose access point the army is standing on (for the EXTRACT

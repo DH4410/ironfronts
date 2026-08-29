@@ -9,7 +9,7 @@ import { GAME_STATE_VERSION, emptyStockpile, type GameState } from '../../src/ga
 import type { SimContext } from '../../src/game/sim-context';
 import type { WorldData } from '../../src/game/world-data';
 import {
-  BUILDINGS, buildableBuildings, queueBuilding, stepConstruction,
+  BUILDINGS, buildOptions, buildableBuildings, queueBuilding, stepConstruction,
 } from '../../src/game/construction';
 import { producibleUnits } from '../../src/game/production';
 
@@ -122,5 +122,27 @@ describe('buildableBuildings', () => {
   it('is empty for a province the country does not own', () => {
     const s = state();
     expect(buildableBuildings(ctx(s), 10, 2)).toEqual([]);
+  });
+});
+
+describe('buildOptions', () => {
+  it('still offers a building the country cannot afford, flagged unaffordable', () => {
+    const s = state();
+    s.countries[1].stockpile = { ...emptyStockpile(), funds: 0, stone: 0, metal: 0 };
+    const opts = buildOptions(ctx(s), 10, 1);
+    expect(opts.map((o) => o.id).sort()).toEqual(['barracks', 'ordnance', 'tankPlant']);
+    expect(opts.every((o) => !o.affordable)).toBe(true);
+    expect(buildableBuildings(ctx(s), 10, 1)).toEqual([]); // none actually startable
+  });
+
+  it('drops a building once it is built or queued', () => {
+    const s = state();
+    const c = ctx(s);
+    queueBuilding(c, 10, 'barracks', 1);
+    expect(buildOptions(c, 10, 1).map((o) => o.id).sort()).toEqual(['ordnance', 'tankPlant']);
+  });
+
+  it('is empty for a rural province', () => {
+    expect(buildOptions(ctx(state(), false), 10, 1)).toEqual([]);
   });
 });

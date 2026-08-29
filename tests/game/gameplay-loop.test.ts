@@ -144,8 +144,10 @@ describe('gameplay vertical slice', () => {
     };
 
     s.tick(8);
-    // Enemy stack destroyed; province captured by Spain.
-    const enemyGone = !s.state.armies['en-weak'] || stackUnitCount(s.state.armies['en-weak']) === 0;
+    // The weak stack loses the field — wiped out, or beaten badly enough that it
+    // breaks off and withdraws. Either way it is no longer defending here.
+    const enemy = s.state.armies['en-weak'];
+    const enemyGone = !enemy || stackUnitCount(enemy) === 0 || enemy.status === 'retreating';
     expect(enemyGone).toBe(true);
     // give capture a tick with no defender
     s.tick(2);

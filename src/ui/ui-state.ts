@@ -90,11 +90,13 @@ export interface SelectedProvince {
   }[];
   /** Current production queue (unit names), own provinces only. */
   readonly queue?: readonly string[];
-  /** Buildings this province can start right now (own + urban + affordable). */
+  /** Buildings this own urban province could still take. Unaffordable ones are
+   *  included (rendered disabled) so the cost is visible before it can be met. */
   readonly buildable?: readonly {
     readonly id: string;
     readonly name: string;
     readonly costLabel: string;
+    readonly affordable: boolean;
   }[];
   /** Buildings currently under construction here (labels), own provinces only. */
   readonly construction?: readonly string[];

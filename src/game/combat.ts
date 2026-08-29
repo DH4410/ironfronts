@@ -13,6 +13,7 @@ import { relationOf, setRelation } from './game-state';
 import type { ArmyStack } from './units/army';
 import { stackHealthFraction, stackUnitCount } from './units/army';
 import { issueMoveOrder } from './units/movement';
+import { nearestNode } from './movement/graph';
 import { unitType } from './units/unit-catalog';
 import type { UnitCategory } from './units/unit-types';
 import { wrappedDistance } from './geometry';
@@ -91,17 +92,27 @@ function applyDamage(stack: ArmyStack, amount: number): void {
   });
 }
 
-/** Send `army` back to its nearest owned province centre and mark it retreating.
- *  Returns false (and does nothing) if it has nowhere to run. */
+/** Send `army` back toward its nearest *other* owned province centre and mark it
+ *  retreating. Returns false (and does nothing) if it has nowhere to run — no
+ *  owned province reachable on this landmass except the node it is already on
+ *  (a last stand on your only foothold, or an invader deep in enemy ground). */
 function withdraw(session: SimContext, army: ArmyStack): boolean {
+  const graph = session.graph;
+  const component = graph.component[army.graphNodeId] ?? -1;
   let best: readonly [number, number] | null = null;
   let bestD = Infinity;
   for (const province of session.world.provinces) {
     if (session.state.provinceOwners[province.id] !== army.ownerCountryId) continue;
-    const d = wrappedDistance(
-      army.x, army.z, province.center[0], province.center[1], session.world.width,
+    const node = nearestNode(
+      graph, province.center[0], province.center[1], Infinity, component,
     );
-    if (d > 0 && d < bestD) { bestD = d; best = province.center; }
+    // Must land the stack on a *different* node, or the move order is a no-op
+    // ("Already there.") and the stack fights on where it stands.
+    if (node < 0 || node === army.graphNodeId) continue;
+    const d = wrappedDistance(
+      army.x, army.z, graph.nodeX[node], graph.nodeZ[node], session.world.width,
+    );
+    if (d < bestD) { bestD = d; best = [graph.nodeX[node], graph.nodeZ[node]]; }
   }
   if (!best) return false;
   if (!issueMoveOrder(session, army.id, best[0], best[1], 'move').ok) return false;
