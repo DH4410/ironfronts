@@ -1,5 +1,5 @@
 /**
- * Data-driven unit-type definitions (§7, §8).
+ * Data-driven unit-type definitions.
  *
  * The first roster is deliberately small (6 types) but real. Every number here
  * is tuning data, not a hard rule — values are chosen against the world scale
@@ -7,16 +7,16 @@
  * balanced further in later phases.
  *
  * No behaviour lives here: movement, combat, extraction and production all read
- * these fields. Research gating (§58) is represented by `requiredBuilding` only
+ * these fields. Research gating is represented by `requiredBuilding` only
  * for now; a `techTag` field can be added later without touching consumers.
  */
 
 export type UnitCategory = 'infantry' | 'engineer' | 'recon' | 'armor' | 'artillery';
 
-/** Coarse armour bucket used by the combat table (§38). */
+/** Coarse armour bucket used by the combat table. */
 export type ArmorClass = 'unarmored' | 'light' | 'heavy';
 
-/** Production buildings (§28). */
+/** Production buildings. */
 export type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
 
 export interface ResourceCost {
@@ -42,18 +42,18 @@ export interface UnitType {
   readonly attack: number;
   /** Flat damage reduction / staying power contribution. */
   readonly defense: number;
-  /** Outer vision radius (contact) in world units (§6). */
+  /** Outer vision radius (contact) in world units. */
   readonly visionOuter: number;
-  /** Inner vision radius (composition reveal) in world units (§6). */
+  /** Inner vision radius (composition reveal) in world units. */
   readonly visionInner: number;
-  /** Resource-node extraction contribution per unit per game-hour (§23). 0 = cannot extract. */
+  /** Resource-node extraction contribution per unit per game-hour. 0 = cannot extract. */
   readonly extractionRate: number;
-  /** Engagement radius for ranged support units; melee units use 0 (§8 artillery). */
+  /** Engagement radius for ranged support units; melee units use 0 (artillery). */
   readonly engagementRange: number;
   readonly cost: ResourceCost;
-  /** Build time in game-hours at a level-1 building (§31 uses accelerated values). */
+  /** Build time in game-hours at a level-1 building (uses accelerated values). */
   readonly buildTimeHours: number;
   readonly requiredBuilding: BuildingId;
-  /** Relative signature weight for "strongest unit on the stack" selection (§10). */
+  /** Relative signature weight for "strongest unit on the stack" selection. */
   readonly stackPriority: number;
 }

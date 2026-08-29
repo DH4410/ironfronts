@@ -490,7 +490,7 @@ async function start(selection: ScenarioSelection): Promise<void> {
     // ---- Authoritative game session (Phase A wiring) -----------------
     // The renderer is now a data source + presentation cache; GameSession owns
     // gameplay state. Build WorldData from the loaded package and start the
-    // fixed-step simulation (§46).
+    // fixed-step simulation.
     try {
       await bootstrapGameSession(renderer, selection);
     } catch (sessionError) {
@@ -576,7 +576,7 @@ async function bootstrapGameSession(
     (window as Window & { __ironfrontsSession?: GameSession }).__ironfrontsSession = session;
   }
 
-  // One nearby country becomes an active opponent (§56); the rest stay passive.
+  // One nearby country becomes an active opponent; the rest stay passive.
   if (!selection.sandbox) {
     const aiId = session.enableNearbyAi();
     if (aiId !== null) {
@@ -590,12 +590,12 @@ async function bootstrapGameSession(
   const { x, z, distance } = session.diagnostics.startCamera;
   renderer.focus(x, z, distance);
 
-  // Map-tap -> army selection / move order (§17, §42). Consumes the click so
+  // Map-tap -> army selection / move order. Consumes the click so
   // it does not also select a province.
   renderer.onMapClick = (clientX, clientY) => handleMapClick(renderer, session, world, clientX, clientY);
 
   // Resource deposits are gameplay-relevant from turn 0 — show the overlay by
-  // default so the player can see where stone / metal / oil are (§4), and feed
+  // default so the player can see where stone / metal / oil are, and feed
   // the renderer the authoritative set (natural + scenario-guaranteed).
   renderer.setResourceOverlay(true);
   syncResourceMarkers(session, world, renderer);
@@ -609,7 +609,7 @@ async function bootstrapGameSession(
   // Initial marker upload (before the first sim tick) so armies show at once.
   syncArmyMarkers(session, world, renderer);
 
-  // Fixed-step simulation, decoupled from the render frame (§46).
+  // Fixed-step simulation, decoupled from the render frame.
   let lastSim = performance.now();
   const simTimer = window.setInterval(() => {
     const now = performance.now();
@@ -659,7 +659,7 @@ const RESOURCE_KIND_INDEX: Record<'stone' | 'metal' | 'oil', number> = { stone: 
 /** Push the deposit set the PLAYER may see (own-controlled + anything inside
  *  friendly vision; all of it in sandbox) to the renderer's dynamic deposit-
  *  marker layer. Depleted nodes shrink; exhausted ones drop out. Foreign
- *  deposits are not globally revealed by the overlay (§ fog). */
+ *  deposits are not globally revealed by the overlay. */
 function syncResourceMarkers(
   session: GameSession, world: import('./game/world-data').WorldData, renderer: WorldRenderer,
 ): void {
@@ -687,7 +687,7 @@ function packRgb(hex: string): number {
 
 /**
  * Rebuild the renderer's army-stack marker buffer from authoritative GameState,
- * fog-gated (§5, §9): own stacks always shown; foreign stacks only when in
+ * fog-gated: own stacks always shown; foreign stacks only when in
  * contact/vision; hidden stacks omitted entirely.
  */
 const armyPickScratch: Array<{ id: string; x: number; z: number }> = [];
@@ -721,7 +721,7 @@ function syncArmyMarkers(
   renderer.setArmyMarkers(armyMarkerScratch, count, armyPickScratch);
 }
 
-// ---- army selection + orders (§17, §42, §44) --------------------------
+// ---- army selection + orders --------------------------
 
 function handleMapClick(
   renderer: WorldRenderer, session: GameSession,
@@ -808,7 +808,7 @@ function refreshSelectedArmy(
   if (!selectedArmyId) { if (uiStore.get().selectedArmy) uiStore.patch({ selectedArmy: null }); return; }
   // Everything the card shows comes from the fog-aware projection — the raw
   // ArmyStack (exact groups / hp / speed) never reaches the HUD for a foreign
-  // stack the player has not fully identified (§ fog leak: contact composition).
+  // stack the player has not fully identified.
   const view = activeWorld
     ? projectArmyView(session.state, activeWorld, selectedArmyId, visibility)
     : null;
@@ -908,7 +908,7 @@ function drainSessionEvents(session: GameSession): void {
     // One-way projection: push the authoritative owner change onto the renderer
     // (political colour, borders, labels, hover ownership) for EVERY capture,
     // not just the player's, so the political map can't diverge from GameState
-    // (§39). The renderer stays a presentation cache.
+    //. The renderer stays a presentation cache.
     try {
       activeRenderer?.setProvinceOwner(cap.provinceId, cap.toCountryId);
     } catch (err) {
@@ -935,7 +935,7 @@ function pushNotification(kind: GameNotification['kind'], title: string, body?: 
 
 /**
  * Map the player country's authoritative stockpile onto the HUD's physical
- * stockpile row (§25): Funds · Manpower · Food · Stone · Metal · Oil. Industry
+ * stockpile row: Funds · Manpower · Food · Stone · Metal · Oil. Industry
  * Capacity is a throughput stat, not a stockpile — it belongs in the economy
  * panel, not this row.
  */
@@ -953,7 +953,7 @@ function playerResourceLines(session: GameSession): ResourceLine[] {
     line('money', 'Funds', s.funds, inc.funds),
     line('manpower', 'Manpower', s.manpower, inc.manpower),
     line('food', 'Food', s.food, inc.food),
-    // stone/metal/oil have no passive rate — physical extraction only (§26).
+    // stone/metal/oil have no passive rate — physical extraction only.
     line('stone', 'Stone', s.stone),
     line('metal', 'Metal', s.metal),
     line('oil', 'Oil', s.oil),

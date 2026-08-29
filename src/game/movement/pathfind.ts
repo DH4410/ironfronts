@@ -1,5 +1,5 @@
 /**
- * A* pathfinding on the land movement graph (§14).
+ * A* pathfinding on the land movement graph.
  *
  * Pure. Returns the node-id sequence from `start` to `goal` inclusive, or
  * `null` when they are not connected (different components — e.g. an island

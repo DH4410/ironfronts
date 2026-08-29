@@ -1,7 +1,7 @@
 /**
  * Resource-node spatial assignment + strategic baseline guarantee.
  *
- * Part A (§ resource blocker fix): every deposit's controlling country is the
+ * Part A: every deposit's controlling country is the
  * owner of the province it PHYSICALLY sits in — point-in-province from the id
  * raster (`world.provinceAt`), never nearest-centroid. Water/void cannot own a
  * node.
@@ -23,7 +23,7 @@ import type { WorldData, WorldResourceNode } from './world-data';
 import { wrappedDistance } from './geometry';
 import { mulberry32 } from './rng';
 
-/** A node farther than this from any land graph node is unreachable (§20). */
+/** A node farther than this from any land graph node is unreachable. */
 export const ACCESS_SNAP_MAX = 260;
 /** Guaranteed deposits keep clear of the province city at its centre. */
 const MIN_CITY_DISTANCE = 70;

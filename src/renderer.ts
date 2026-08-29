@@ -143,7 +143,7 @@ export class WorldRenderer {
    *  regardless of the resource-overlay toggle. */
   private mapMarkers?: InstanceLayer;
   private showResourceOverlay = false;
-  /** Dynamic army-stack markers (§9). Fixed capacity; only the used prefix is
+  /** Dynamic army-stack markers. Fixed capacity; only the used prefix is
    *  drawn. Rewritten from authoritative GameState when the army set changes. */
   private armyMarkers?: InstanceLayer;
   private static readonly ARMY_MARKER_CAPACITY = 1_024;
@@ -920,7 +920,7 @@ export class WorldRenderer {
   /**
    * Replace the drawn army markers. `records` is 8 floats per stack — see
    * `armyMarkerShader`. `count` stacks are drawn; the rest of the capacity is
-   * ignored. Cheap: one buffer write, no pipeline or bind-group churn (§48).
+   * ignored. Cheap: one buffer write, no pipeline or bind-group churn.
    */
   setArmyMarkers(
     records: Float32Array, count: number,

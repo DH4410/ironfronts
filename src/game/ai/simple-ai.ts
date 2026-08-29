@@ -1,5 +1,5 @@
 /**
- * Simple defensive AI v1 (§56, "IMPORTANT AI RULE").
+ * Simple defensive AI v1 ("IMPORTANT AI RULE").
  *
  * AI-controlled countries go through the SAME `applyCommand` boundary the player
  * does (with their own countryId) — never direct state edits.

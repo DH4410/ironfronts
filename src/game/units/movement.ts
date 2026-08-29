@@ -1,5 +1,5 @@
 /**
- * Army movement along the land road graph (§14, §16, §12).
+ * Army movement along the land road graph.
  *
  * Orders are issued by the player (or AI) through `GameSession`; `stepMovement`
  * advances every ordered stack each simulation tick. Speed is the slowest unit
@@ -15,7 +15,7 @@ import { nearestNode } from '../movement/graph';
 import { wrappedDistance } from '../geometry';
 import { TERRAIN_CLASS } from '../world-data';
 
-/** Terrain speed multipliers (§16). The graph itself is the road network, so a
+/** Terrain speed multipliers. The graph itself is the road network, so a
  *  flat road bonus is folded in. */
 const TERRAIN_SPEED: Record<number, number> = {
   [TERRAIN_CLASS.plain]: 1.0,

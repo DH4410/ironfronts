@@ -1,5 +1,5 @@
 /**
- * Land movement graph (§14, guardrail 2).
+ * Land movement graph (guardrail 2).
  *
  * Built at runtime from the already-loaded `connections.f32` buffer — no
  * build-pipeline change. Stride-8 records are `[x1, y1, x2, y2, medium, 0,0,0]`

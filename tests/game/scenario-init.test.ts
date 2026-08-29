@@ -12,7 +12,7 @@ const SPAIN_ID = CATALOG_COUNTRY_BY_NAME.get('spain')!.id;
 let world: LoadedWorld;
 beforeAll(async () => { world = await loadWorld(); }, 60_000);
 
-describe('Spain "World at War" initialisation (§37)', () => {
+describe('Spain "World at War" initialisation', () => {
   it('produces a coherent starting state', () => {
     const selection = buildScenarioSelection('OP-1939-01', SPAIN_ID);
     const { state, diagnostics } = initGameState(
@@ -25,7 +25,7 @@ describe('Spain "World at War" initialisation (§37)', () => {
     expect(Object.values(state.countries).filter((c) => c.isPlayer)).toHaveLength(1);
     expect(Object.keys(state.countries).length).toBeGreaterThan(150);
 
-    // real starting stockpile (§37 step 6)
+    // real starting stockpile (step 6)
     expect(state.countries[SPAIN_ID].stockpile.funds).toBeGreaterThan(0);
     expect(state.countries[SPAIN_ID].stockpile.metal).toBeGreaterThan(0);
 
@@ -35,7 +35,7 @@ describe('Spain "World at War" initialisation (§37)', () => {
     expect(spainProvinces.length).toBe(diagnostics.playerProvinces);
     expect(diagnostics.playerProvinces).toBeGreaterThanOrEqual(20);
 
-    // starting buildings only in owned urban provinces, capital has a plant (§30)
+    // starting buildings only in owned urban provinces, capital has a plant
     const capital = world.countries.find((c) => c.id === SPAIN_ID)!.capitalProvinceId;
     expect(state.provinceBuildings[capital]?.tankPlant).toBeGreaterThanOrEqual(1);
     for (const provinceId of Object.keys(state.provinceBuildings).map(Number)) {
@@ -44,7 +44,7 @@ describe('Spain "World at War" initialisation (§37)', () => {
       expect(total).toBeGreaterThan(0);
     }
 
-    // starting armies exist, tied to the reachable mainland (§36)
+    // starting armies exist, tied to the reachable mainland
     expect(diagnostics.playerArmies).toBeGreaterThanOrEqual(1);
     const playerArmies = Object.values(state.armies)
       .filter((army) => army.ownerCountryId === SPAIN_ID);
@@ -53,13 +53,13 @@ describe('Spain "World at War" initialisation (§37)', () => {
       expect(army.graphNodeId).toBeGreaterThanOrEqual(0);
     }
 
-    // capital-region army carries engineer-capable units (needed for §61 O–S)
+    // capital-region army carries engineer-capable units (needed for O–S)
     const engineerArmies = playerArmies.filter(
       (army) => army.units.some((g) => g.typeId === 'engineer' || g.typeId === 'infantry'),
     );
     expect(engineerArmies.length).toBeGreaterThanOrEqual(1);
 
-    // resource nodes snapped to land access (§20); the mechanism works
+    // resource nodes snapped to land access; the mechanism works
     const nodes = Object.values(state.resourceNodes);
     expect(nodes.length).toBeGreaterThan(0);
     expect(diagnostics.reachableResourceNodes).toBeGreaterThan(diagnostics.unreachableResourceNodes);
@@ -70,7 +70,7 @@ describe('Spain "World at War" initialisation (§37)', () => {
       }
     }
 
-    // §61 O–S: Spain MUST control a reachable stone AND metal deposit so the
+    // O–S: Spain MUST control a reachable stone AND metal deposit so the
     // vertical slice (move engineers -> deposit -> EXTRACT -> stockpile rises)
     // is buildable. Guaranteed by the resource bootstrap if the seed's natural
     // geography does not already provide them.
@@ -84,7 +84,7 @@ describe('Spain "World at War" initialisation (§37)', () => {
     expect(spainMetal.length).toBeGreaterThanOrEqual(1);
     expect(diagnostics.guaranteedDeposits.every((g) => g.provinceId >= 0)).toBe(true);
 
-    // all peace at start (§40)
+    // all peace at start
     expect(Object.keys(state.relations)).toHaveLength(0);
   });
 
@@ -95,24 +95,24 @@ describe('Spain "World at War" initialisation (§37)', () => {
     expect(serializeGameState(a.state)).toBe(serializeGameState(b.state));
   });
 
-  it('round-trips the initialised state through JSON (§47)', () => {
+  it('round-trips the initialised state through JSON', () => {
     const selection = buildScenarioSelection('OP-1939-01', SPAIN_ID);
     const { state } = initGameState(selection, scenarioById('OP-1939-01'), world);
     expect(deserializeGameState(serializeGameState(state))).toEqual(state);
   });
 
-  it('GameSession.create advances game time and accrues passive income (§26, §46)', () => {
+  it('GameSession.create advances game time and accrues passive income', () => {
     const selection = buildScenarioSelection('OP-1939-01', SPAIN_ID);
     const session = GameSession.create(selection, world);
     const before = session.state.countries[SPAIN_ID].stockpile.funds;
     session.tick(6);
     expect(session.gameTimeHours).toBeCloseTo(6, 5);
     expect(session.state.countries[SPAIN_ID].stockpile.funds).toBeGreaterThan(before);
-    // stone/metal/oil are physical-only — no passive gain (§26)
+    // stone/metal/oil are physical-only — no passive gain
     expect(session.state.countries[SPAIN_ID].income.metal).toBe(0);
   });
 
-  it('Sandbox mode disables fog and economy limits (§4)', () => {
+  it('Sandbox mode disables fog and economy limits', () => {
     const selection = buildScenarioSelection('SANDBOX', SPAIN_ID);
     const { state } = initGameState(selection, scenarioById('SANDBOX'), world);
     expect(state.fogOfWar).toBe(false);

@@ -30,9 +30,9 @@ export interface GameUiActions {
   returnToMenu(): void;
   openDebugInspector(): void;
   focusSelected?: () => void;
-  /** Selected-army orders (§17). 'deselect' clears the selection. */
+  /** Selected-army orders. 'deselect' clears the selection. */
   armyCommand(command: 'move' | 'stop' | 'extract' | 'deselect'): void;
-  /** Queue a unit in the selected (own) province (§31). */
+  /** Queue a unit in the selected (own) province. */
   produceUnit(provinceId: number, unitTypeId: string): void;
   /** Start a building in the selected (own, urban) province. */
   buildStructure(provinceId: number, buildingId: string): void;

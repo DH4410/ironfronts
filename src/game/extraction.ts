@@ -1,5 +1,5 @@
 /**
- * Physical resource extraction (§23, §24).
+ * Physical resource extraction.
  *
  * A friendly stack standing on a deposit's access node, with extraction-capable
  * units (engineers/infantry), can EXTRACT: the deposit drains into the

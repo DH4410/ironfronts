@@ -101,7 +101,7 @@ describe('module architecture', () => {
   });
 
   it('keeps the authoritative game layer independent from renderer, HUD and shaders', () => {
-    // src/game/** owns gameplay state (§1). It must not depend on the renderer,
+    // src/game/** owns gameplay state. It must not depend on the renderer,
     // the entrypoint, the HUD, or any GPU shader module — those are
     // presentation/cache layers that read a projection of game state.
     const gameRoot = path.join(sourceRoot, 'game');
@@ -122,7 +122,7 @@ describe('module architecture', () => {
   });
 
   it('keeps the game layer free of browser globals so it can run in Node', () => {
-    // The server-ready promise (§ multiplayer): GameSession + rules must import
+    // The server-ready promise: GameSession + rules must import
     // nothing browser-only AND touch no browser global. Guards against a stray
     // `window.`/`document.`/`localStorage.` creeping into a rules module.
     const gameRoot = path.join(sourceRoot, 'game');

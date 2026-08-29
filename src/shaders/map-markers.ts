@@ -55,7 +55,7 @@ fn mapMarkerVertex(
   // overview map stays clean.
   let zoom = uniforms.interaction.y;
   // Keep deposit markers legible through normal gameplay zoom; only fade them
-  // approaching strategic altitude so the overview map stays clean (§4).
+  // approaching strategic altitude so the overview map stays clean.
   let rangeFade = 1.0 - smoothstep(3800.0, 4900.0, zoom);
   let zoomScale = mix(0.85, 1.15, smoothstep(3600.0, 1000.0, zoom));
 

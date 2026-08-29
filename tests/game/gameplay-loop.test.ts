@@ -13,7 +13,7 @@ function spainSession(): GameSession {
   return GameSession.create(buildScenarioSelection('OP-1939-01', SPAIN), world);
 }
 
-describe('gameplay vertical slice (§61)', () => {
+describe('gameplay vertical slice', () => {
   it('an ordered army moves along the road graph and stops when told', () => {
     const s = spainSession();
     const army = Object.values(s.state.armies).find((a) => a.ownerCountryId === SPAIN)!;

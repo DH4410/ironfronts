@@ -1,5 +1,5 @@
 /**
- * Deterministic scenario initialisation (§30, §36, §37).
+ * Deterministic scenario initialisation.
  *
  * Pure: `(selection, scenario, world) -> GameState`. Same inputs always produce
  * the same starting game — starting buildings, armies and stockpiles are seeded
@@ -23,7 +23,7 @@ import { wrappedDistance } from './geometry';
 import { mulberry32, hashString } from './rng';
 import { bootstrapResources, type ResourceBootstrapResult } from './resource-bootstrap';
 
-/** Starting stockpile for a campaign player country (§37 step 6). */
+/** Starting stockpile for a campaign player country (step 6). */
 const PLAYER_START_STOCKPILE = {
   funds: 2_000, manpower: 1_500, food: 800, stone: 300, metal: 400, oil: 250,
 };
@@ -34,7 +34,7 @@ const SANDBOX_STOCKPILE = {
   funds: 99_999, manpower: 99_999, food: 99_999, stone: 99_999, metal: 99_999, oil: 99_999,
 };
 
-/** Curated starting order of battle for the player's capital region (§36). */
+/** Curated starting order of battle for the player's capital region. */
 const PLAYER_CAPITAL_ARMY: Array<{ typeId: string; count: number }> = [
   { typeId: 'infantry', count: 4 },
   { typeId: 'engineer', count: 2 },
@@ -51,7 +51,7 @@ export interface InitResult {
   readonly state: GameState;
   /** Kept out of GameState (rebuilt on load); systems read it from the session. */
   readonly graph: LandGraph;
-  /** Diagnostics for the §68 report / tests. */
+  /** Diagnostics for the report / tests. */
   readonly diagnostics: {
     readonly playerComponent: number;
     readonly playerProvinces: number;
@@ -95,8 +95,8 @@ function makeCountryState(
   };
 }
 
-/** Deterministically choose which urban provinces get which starting building
- *  (§30): capital always gets a barracks + tank plant; the next cities get one
+/** Deterministically choose which urban provinces get which starting building:
+ *  the capital always gets a barracks + tank plant; the next cities get one
  *  building each, cycling barracks -> ordnance -> barracks so the player has a
  *  real choice about what to expand. */
 function assignStartingBuildings(
@@ -159,7 +159,7 @@ export function initGameState(
   const graph = buildLandGraph(world.connections, world.width, world.height);
 
   // ---- countries ---------------------------------------------------------
-  // ControllerType is authoritative (§ AI). Checkpoint 1: the player's country
+  // ControllerType is authoritative. Checkpoint 1: the player's country
   // is 'player', every other country is 'neutral'. A later phase promotes one
   // nearby hostile country to 'ai'.
   const byOwner = provincesByOwner(world);
@@ -228,7 +228,7 @@ export function initGameState(
   );
   const resourceNodes = bootstrap.nodes;
 
-  // ---- starting armies (§36) ----------------------------------------
+  // ---- starting armies ----------------------------------------
   const armies: Record<string, ArmyStack> = {};
   let nextArmyId = 1;
   let playerArmies = 0;
@@ -323,7 +323,7 @@ export function initGameState(
 }
 
 /**
- * Frame the player's homeland (§2 camera). Uses the population-weighted centroid
+ * Frame the player's homeland (camera). Uses the population-weighted centroid
  * of the provinces on the reachable mainland (so far-flung island exclaves do
  * not drag the view off the country), and an orbit distance sized to the
  * territory's extent so the nation reads clearly and fills most of the view

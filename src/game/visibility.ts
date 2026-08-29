@@ -1,5 +1,5 @@
 /**
- * Fog of war — information visibility (§5, §6).
+ * Fog of war — information visibility.
  *
  * Three levels per foreign army:
  *   HIDDEN  — not detected; no marker.

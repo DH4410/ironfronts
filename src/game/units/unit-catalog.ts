@@ -1,7 +1,7 @@
 /**
- * The first playable roster (§7). Six data-driven types, no more.
+ * The first playable roster. Six data-driven types, no more.
  *
- * Tuning intent (§8):
+ * Tuning intent:
  *  - Infantry: cheap, slow, holds ground, modest extraction.
  *  - Engineers: weak in a fight, best extraction, economic backbone.
  *  - Armored Car: fast scout, big view range, light punch.
@@ -11,7 +11,7 @@
  *
  * Speeds are world-units / game-hour. Provinces sit ~150-400 units apart, so a
  * 90 u/h infantry stack crosses a short hop in a few game-hours; the sim runs
- * game-time faster than wall-clock (§46, §31) so this is minutes of play.
+ * game-time faster than wall-clock so this is minutes of play.
  */
 
 import type { UnitType } from './unit-types';

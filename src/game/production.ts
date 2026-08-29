@@ -1,5 +1,5 @@
 /**
- * Urban unit production (§28, §31–§33).
+ * Urban unit production.
  *
  * A player-owned urban province with the right building can queue units. Cost
  * is paid up front; the active order advances in game time; on completion the
@@ -15,7 +15,7 @@ import { makeGroup, mergeStacks, type ArmyStack } from './units/army';
 import { nearestNode } from './movement/graph';
 import { issueMoveOrder } from './units/movement';
 
-/** Accelerated prototype clock: real build times divided by this (§31). */
+/** Accelerated prototype clock: real build times divided by this. */
 const BUILD_TIME_SCALE = 4;
 
 export interface ProduceResult {
@@ -127,7 +127,7 @@ function spawnUnit(
   const nx = node >= 0 ? session.graph.nodeX[node] : cx;
   const nz = node >= 0 ? session.graph.nodeZ[node] : cz;
 
-  // Auto-stack onto a friendly idle army already at that node (§33).
+  // Auto-stack onto a friendly idle army already at that node.
   const existing = Object.values(session.state.armies).find(
     (a) => a.ownerCountryId === ownerCountryId
       && a.graphNodeId === node && !a.order && a.extractingNodeId === null,

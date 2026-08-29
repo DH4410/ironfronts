@@ -1,5 +1,5 @@
 /**
- * Basic ground combat + province capture (§38, §39, §40).
+ * Basic ground combat + province capture.
  *
  * When hostile stacks occupy the same movement node they are ENGAGED and trade
  * damage each tick until one is destroyed or withdraws. Damage is
@@ -25,7 +25,7 @@ const DAMAGE_VS: Record<UnitCategory, [number, number, number]> = {
   artillery: [1.15, 0.9, 1.25],
 };
 const ARMOR_INDEX = { unarmored: 0, light: 1, heavy: 2 } as const;
-/** Only the strongest this-many units per side deal full damage (§38). */
+/** Only the strongest this-many units per side deal full damage. */
 const FRONTAGE = 10;
 const COMBAT_SNAP = 26;
 
@@ -150,7 +150,7 @@ export interface CaptureEvent {
   readonly toCountryId: number;
 }
 
-/** Unopposed stack on a foreign province centre captures it (§39). */
+/** Unopposed stack on a foreign province centre captures it. */
 export function stepCapture(session: SimContext): CaptureEvent[] {
   const events: CaptureEvent[] = [];
   const world = session.world;
@@ -186,7 +186,7 @@ export function stepCapture(session: SimContext): CaptureEvent[] {
       if (extractor && extractor.ownerCountryId !== army.ownerCountryId) {
         // Mine seized from under an enemy extractor: clear BOTH sides. Once the
         // node leaves 'extracting', stepExtraction's own cleanup can't reach the
-        // army, so it would otherwise stay pinned in 'extracting' forever (§23).
+        // army, so it would otherwise stay pinned in 'extracting' forever.
         extractor.extractingNodeId = null;
         if (extractor.status === 'extracting') extractor.status = 'idle';
         node.extractorArmyId = null;

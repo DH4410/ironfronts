@@ -21,7 +21,7 @@ function countriesWithLandGraphNode(
   return [...set];
 }
 
-describe('point-in-province assignment (§ resource blocker fix, part A)', () => {
+describe('point-in-province assignment (resource blocker fix, part A)', () => {
   it('resolves a world point to the province actually under it', () => {
     // Every province centre must resolve to that province's own id.
     let matched = 0;

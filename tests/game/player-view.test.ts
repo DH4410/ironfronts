@@ -1,5 +1,5 @@
 /**
- * The player-facing projection must not leak secret state (§ fog):
+ * The player-facing projection must not leak secret state:
  *   - a foreign stack at CONTACT range projects position + owner but no
  *     composition, name, speed or status;
  *   - a HIDDEN foreign stack does not project at all;

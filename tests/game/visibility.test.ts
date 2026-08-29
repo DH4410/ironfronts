@@ -33,7 +33,7 @@ const world: WorldData = {
 };
 
 // Infantry: visionOuter 180, visionInner 90 (unit-catalog).
-describe('fog of war visibility (§5, §6)', () => {
+describe('fog of war visibility', () => {
   it('reveals everything when fog is disabled', () => {
     const s = state(false, [army('p', 1, 0, 0), army('e', 2, 9_000, 4_000)]);
     const v = computeArmyVisibility(s, world);

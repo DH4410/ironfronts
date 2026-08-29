@@ -1,6 +1,6 @@
 /**
- * Player-facing projection of the authoritative state (§5, §6, § multiplayer
- * fog / anti-cheat).
+ * Player-facing projection of the authoritative state (fog of war / multiplayer
+ * anti-cheat).
  *
  *   FullGameState ──projectFor(playerCountryId)──▶ information the player may know
  *

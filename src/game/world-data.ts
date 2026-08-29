@@ -13,7 +13,7 @@ export interface WorldProvince {
   readonly terrainId: number;
   readonly population: number;
   readonly coastal: boolean;
-  /** Surface class 4 at the centre — a city province (§28 production sites). */
+  /** Surface class 4 at the centre — a city province (production sites). */
   readonly urban: boolean;
 }
 
@@ -60,7 +60,7 @@ export interface WorldData {
    * Point-in-province lookup from the province-id raster at an actual world
    * position (X wraps). Returns the RAW province id under the point, or -1 for
    * open water / void. This is the canonical spatial owner answer — do NOT use
-   * nearest-centroid for authoritative assignment (§ resource blocker fix).
+   * nearest-centroid for authoritative assignment.
    */
   readonly provinceAt: (x: number, z: number) => number;
   /**

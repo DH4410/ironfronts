@@ -70,7 +70,7 @@ export interface SelectedProvince {
   /**
    * Aggregated deposit quantities, or `null` when none are known. Under fog of
    * war this is `null` for provinces the player does not own — foreign deposit
-   * detail must not leak (§ fog).
+   * detail must not leak.
    */
   readonly resources: ProvinceResourceTotals | null;
   /** True when the player commands this province — unlocks full detail. */
@@ -144,12 +144,12 @@ export interface ArmyStackView {
   /**
    * False for a foreign stack seen only at contact range — position and owner
    * are known, composition is not. The card shows an "unidentified" readout and
-   * `unitCount` / `health` / `groups` carry no real data (§ fog).
+   * `unitCount` / `health` / `groups` carry no real data.
    */
   readonly identified?: boolean;
   /** Optional pending move order, world-space target. */
   readonly moveOrder?: { readonly x: number; readonly z: number } | null;
-  /** Per-unit-type composition (§10, §44). */
+  /** Per-unit-type composition. */
   readonly groups?: readonly ArmyUnitGroupView[];
   /** World units per game-hour (slowest unit). */
   readonly speed?: number;

@@ -1,5 +1,5 @@
 /**
- * The scenario catalogue (§2). Mirrors the three operation rows already in
+ * The scenario catalogue. Mirrors the three operation rows already in
  * `index.html` plus the Map Sandbox card, and is the single typed source of
  * truth for what each operation means. `menu.ts` renders the operation and
  * country lists from this; it never invents rows.
@@ -115,12 +115,12 @@ export function resolvePlayableCountries(scenario: ScenarioDef): CatalogCountry[
   return resolved;
 }
 
-/** True when `countryId` is a legal player choice for the scenario (§34 safety). */
+/** True when `countryId` is a legal player choice for the scenario (safety). */
 export function isPlayableCountry(scenario: ScenarioDef, countryId: number): boolean {
   return resolvePlayableCountries(scenario).some((country) => country.id === countryId);
 }
 
-/** Build the typed menu -> game hand-off (§2). Throws on an illegal country. */
+/** Build the typed menu -> game hand-off. Throws on an illegal country. */
 export function buildScenarioSelection(
   scenarioId: string, playerCountryId: number,
 ): ScenarioSelection {

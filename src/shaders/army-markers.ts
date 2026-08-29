@@ -1,7 +1,7 @@
 import { commonWgsl } from './common';
 
 /**
- * World-space instanced army-stack markers (§9, §10, §45).
+ * World-space instanced army-stack markers.
  *
  * One `pass.draw(6, N)` — every stack marker is projected on the GPU from its
  * world position each frame, so markers track terrain while panning with no

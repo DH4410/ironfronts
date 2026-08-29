@@ -43,7 +43,7 @@ function minimalState(): GameState {
   };
 }
 
-describe('game-state serialization (§47)', () => {
+describe('game-state serialization', () => {
   it('round-trips through JSON unchanged', () => {
     const state = minimalState();
     const restored = deserializeGameState(serializeGameState(state));

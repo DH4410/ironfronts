@@ -1,13 +1,13 @@
 /**
- * Passive macro economy (§26).
+ * Passive macro economy.
  *
  * FUNDS and MANPOWER accrue from owned populated provinces; FOOD from owned
  * provinces generally (agriculture proxy). STONE / METAL / OIL are NOT passive —
- * they come only from physical extraction (§23) and are added by that system.
+ * they come only from physical extraction and are added by that system.
  *
  * `recomputeIncome` sets each country's per-game-hour `income`; `applyIncome`
  * adds `income * dtHours` to the stockpile. Split so the HUD can show a stable
- * rate (§27) without re-deriving it.
+ * rate without re-deriving it.
  */
 
 import type { GameState, Stockpile } from './game-state';
@@ -46,6 +46,6 @@ export function applyIncome(state: GameState, dtHours: number): void {
     country.stockpile.funds += country.income.funds * dtHours;
     country.stockpile.manpower += country.income.manpower * dtHours;
     country.stockpile.food += country.income.food * dtHours;
-    // stone/metal/oil intentionally excluded — physical extraction only (§26).
+    // stone/metal/oil intentionally excluded — physical extraction only.
   }
 }

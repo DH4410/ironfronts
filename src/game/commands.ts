@@ -1,5 +1,5 @@
 /**
- * The single validated mutation boundary for gameplay (§34, § server-ready).
+ * The single validated mutation boundary for gameplay.
  *
  *   PLAYER  ─┐
  *   SIMPLE AI ├─▶ applyCommand(ctx, { type, countryId, … }) ─▶ authoritative state

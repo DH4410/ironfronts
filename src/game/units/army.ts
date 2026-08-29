@@ -1,10 +1,9 @@
 /**
- * Authoritative army-stack data model (§11).
+ * Authoritative army-stack data model.
  *
  * Plain data (part of `GameState`). Units are tracked as GROUPS
- * (typeId + count + pooled hp), never as individual soldiers (§11). One stack
- * renders as one map marker (§12); the strongest group drives its portrait
- * (§10).
+ * (typeId + count + pooled hp), never as individual soldiers. One stack
+ * renders as one map marker; the strongest group drives its portrait.
  */
 
 import type { UnitType } from './unit-types';
@@ -22,7 +21,7 @@ export interface UnitGroup {
   count: number;
   /** Pooled hit points for the whole group (0 .. count * maxHp). */
   hp: number;
-  /** Reserved for later; 0 for now (§11 experience?). */
+  /** Reserved for later; 0 for now (experience?). */
   experience: number;
 }
 
@@ -32,7 +31,7 @@ export interface MoveOrder {
   /** World-space destination (the last node's position), for marker/HUD. */
   readonly destX: number;
   readonly destZ: number;
-  /** 'move' = cream route, 'attack' = red route (§18). */
+  /** 'move' = cream route, 'attack' = red route. */
   readonly intent: 'move' | 'attack';
   /** Progress along the edge to `path[0]`, world units. */
   edgeProgress: number;
@@ -50,7 +49,7 @@ export interface ArmyStack {
   units: UnitGroup[];
   status: ArmyStatus;
   order: MoveOrder | null;
-  /** Resource node id this stack is extracting, or null (§23). */
+  /** Resource node id this stack is extracting, or null. */
   extractingNodeId: number | null;
 }
 
@@ -83,7 +82,7 @@ export function stackHealthFraction(stack: ArmyStack): number {
 }
 
 /**
- * The representative unit for the map marker (§10): highest `stackPriority`,
+ * The representative unit for the map marker: highest `stackPriority`,
  * ties broken by larger group count then unit id for determinism.
  */
 export function strongestGroup(stack: ArmyStack): UnitGroup | null {
@@ -106,7 +105,7 @@ export function strongestGroup(stack: ArmyStack): UnitGroup | null {
   return best;
 }
 
-/** Stack speed is set by its slowest unit (§16). Empty stack -> 0. */
+/** Stack speed is set by its slowest unit. Empty stack -> 0. */
 export function stackBaseSpeed(stack: ArmyStack): number {
   let slowest = Infinity;
   for (const group of stack.units) {
@@ -116,7 +115,7 @@ export function stackBaseSpeed(stack: ArmyStack): number {
   return Number.isFinite(slowest) ? slowest : 0;
 }
 
-/** Total per-game-hour extraction capacity of the stack (§23, §24). */
+/** Total per-game-hour extraction capacity of the stack. */
 export function stackExtractionRate(stack: ArmyStack): number {
   let rate = 0;
   for (const group of stack.units) {
@@ -130,7 +129,7 @@ export function canExtract(stack: ArmyStack): boolean {
 }
 
 /**
- * Merge `source` groups into `target` in place (§12). Same typeId groups pool
+ * Merge `source` groups into `target` in place. Same typeId groups pool
  * their count and hp; new types are appended. `source.units` is emptied.
  */
 export function mergeStacks(target: ArmyStack, source: ArmyStack): void {

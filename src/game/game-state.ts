@@ -1,5 +1,5 @@
 /**
- * Authoritative game state (§1, §47).
+ * Authoritative game state.
  *
  * This is PLAIN DATA: no class instances, no DOM nodes, no GPU handles, no
  * functions. Everything here round-trips through JSON. `GameSession` owns a
@@ -25,7 +25,7 @@ export type Stockpile = Record<ResourceKey, number>;
 /**
  * Who drives a country. The player/AI/neutral split is authoritative here so
  * nothing hardcodes "player vs everyone else" — AI countries issue the SAME
- * GameSession commands the player does (§ AI rule).
+ * GameSession commands the player does.
  */
 export type ControllerType = 'player' | 'ai' | 'neutral';
 
@@ -35,9 +35,9 @@ export interface CountryState {
   readonly color: string;
   controller: ControllerType;
   stockpile: Stockpile;
-  /** Passive per-game-hour income, recomputed by the economy system (§26). */
+  /** Passive per-game-hour income, recomputed by the economy system. */
   income: Stockpile;
-  /** Abstract build-throughput stat, not a stockpile (§25). */
+  /** Abstract build-throughput stat, not a stockpile. */
   industryCapacity: number;
   /** Convenience mirror of `controller === 'player'`. */
   readonly isPlayer: boolean;
@@ -65,7 +65,7 @@ export interface ProductionOrder {
   /**
    * Country that paid for this order. The completed unit is delivered to this
    * country, not to whoever owns the province at completion time — so capturing
-   * a factory mid-build does not hand you the previous owner's unit (§ capture).
+   * a factory mid-build does not hand you the previous owner's unit.
    */
   readonly ownerCountryId: number;
   /** Game-hours of work already applied. */
@@ -76,7 +76,7 @@ export interface ProductionOrder {
 
 export type ResourceNodeStatus = 'idle' | 'secured' | 'extracting' | 'exhausted';
 
-/** How a deposit came to exist (§ resource blocker fix, part B). */
+/** How a deposit came to exist. */
 export type ResourceProvenance = 'generatedNatural' | 'scenarioGuarantee';
 
 export interface ResourceNodeState {
@@ -89,15 +89,15 @@ export interface ResourceNodeState {
   /**
    * Country that currently controls the node. Initial value is the owner of
    * the province the node physically sits in — point-in-province from the
-   * id raster, never nearest-centroid (§22, resource blocker fix part A).
+   * id raster, never nearest-centroid (resource blocker fix part A).
    * 0 = uncontrolled (node in water/void — should not happen after bootstrap).
    */
   controllerCountryId: number;
   /** Raw id of the province the node sits in, or -1 for water/void. */
   readonly provinceId: number;
-  /** Nearest reachable land movement-graph node (§20); -1 when unreachable. */
+  /** Nearest reachable land movement-graph node; -1 when unreachable. */
   readonly accessNodeId: number;
-  /** Army currently extracting here, or null (§23). */
+  /** Army currently extracting here, or null. */
   extractorArmyId: string | null;
   status: ResourceNodeStatus;
   readonly provenance: ResourceProvenance;
@@ -124,11 +124,11 @@ export interface GameState {
 
   /** Every country with territory, keyed by id. */
   countries: Record<number, CountryState>;
-  /** Dense: province id -> owning country id (§39 authority). */
+  /** Dense: province id -> owning country id (authority). */
   provinceOwners: Record<number, number>;
   /** Sparse: only provinces that have at least one building. */
   provinceBuildings: Record<number, ProvinceBuildings>;
-  /** Sparse: province id -> ordered production queue (§32). */
+  /** Sparse: province id -> ordered production queue. */
   productionQueues: Record<number, ProductionOrder[]>;
   /** Sparse: province id -> ordered building-construction queue. */
   constructionQueues: Record<number, ConstructionOrder[]>;
@@ -138,7 +138,7 @@ export interface GameState {
   armies: Record<string, ArmyStack>;
   resourceNodes: Record<number, ResourceNodeState>;
 
-  /** Directed-pair relation key "a:b" with a < b -> 'war' (absent = peace) (§40). */
+  /** Directed-pair relation key "a:b" with a < b -> 'war' (absent = peace). */
   relations: Record<string, Relation>;
 
   nextArmyId: number;
@@ -168,7 +168,7 @@ export function setRelation(state: GameState, a: number, b: number, relation: Re
 
 /**
  * Serialize to a plain JSON string. Because `GameState` is already plain data
- * this is a thin wrapper, but keeping it explicit documents the §47 contract
+ * this is a thin wrapper, but keeping it explicit documents the contract
  * and gives one place to add a schema/version migration later.
  */
 export function serializeGameState(state: GameState): string {

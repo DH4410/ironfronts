@@ -13,7 +13,7 @@ import { CATALOG_COUNTRY_BY_NAME, type CatalogCountry } from '../game/data/count
 export interface MenuHandlers {
   /**
    * Called once the player commits to entering the world, with the typed
-   * scenario + country selection (§2). Nothing downstream re-reads the DOM.
+   * scenario + country selection. Nothing downstream re-reads the DOM.
    */
   onLaunch: (selection: ScenarioSelection) => void;
   audio?: AudioManager;
