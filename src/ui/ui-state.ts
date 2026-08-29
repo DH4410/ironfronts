@@ -128,6 +128,7 @@ export interface GameNotification {
 export type CombatStatus = 'idle' | 'moving' | 'engaged' | 'retreating';
 
 export interface ArmyUnitGroupView {
+  readonly typeId: string;
   readonly label: string;
   readonly count: number;
   /** 0..1 */
@@ -158,6 +159,11 @@ export interface ArmyStackView {
   readonly groups?: readonly ArmyUnitGroupView[];
   /** World units per game-hour (slowest unit). */
   readonly speed?: number;
+  /** Aggregate combat values across every surviving troop in the stack. */
+  readonly attack?: number;
+  readonly defense?: number;
+  /** Player-facing current activity, e.g. moving, extracting, or holding. */
+  readonly activity: string;
   /** True when the player commands this stack (enables order buttons). */
   readonly own?: boolean;
   /** Which order buttons are currently valid. */

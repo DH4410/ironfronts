@@ -350,7 +350,6 @@
 }
 .ifg-card::before { top: 5px; left: 5px; border-right: 0; border-bottom: 0; }
 .ifg-card::after { bottom: 5px; right: 5px; border-left: 0; border-top: 0; }
-.ifg-card--army { bottom: 16px; }
 
 .ifg-card__head { display: flex; align-items: flex-start; gap: 9px; }
 .ifg-card__flag { flex: none; margin-top: 3px; }
@@ -402,7 +401,241 @@
 .ifg-card__act:disabled { opacity: 0.4; }
 .ifg-card__act--ghost { background: none; border-color: var(--ifg-rule); }
 
-.ifg-card--army .ifg-counter { margin: 10px 0; }
+
+/* ================= centered selected-army command overlay ================= */
+.ifg-army-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  width: min(1040px, calc(100vw - 80px));
+  color: var(--ifg-text);
+  background: #171911;
+  border: 1px solid var(--ifg-rule);
+  border-top: 2px solid var(--ifg-brass);
+  border-radius: 3px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.58), inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+  overflow: hidden;
+  opacity: 0;
+  transform: translate(-50%, 14px);
+  transition: transform 0.18s var(--ifg-ease), opacity 0.14s ease;
+}
+.ifg-army-panel:not([hidden]) { opacity: 1; transform: translate(-50%, 0); }
+.ifg-army-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--army-country, var(--ifg-brass));
+  opacity: 0.9;
+}
+.ifg-army-panel__header {
+  min-height: 34px;
+  display: grid;
+  grid-template-columns: 32px 1fr 32px;
+  align-items: center;
+  padding: 0 7px;
+  background: linear-gradient(180deg, rgba(201, 164, 99, 0.25), rgba(201, 164, 99, 0.08));
+  border-bottom: 1px solid var(--ifg-rule);
+}
+.ifg-army-panel__identity {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+}
+.ifg-army-panel__identity strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--ifg-serif);
+  font-size: 16px;
+  letter-spacing: 0.035em;
+}
+.ifg-army-panel__identity small {
+  color: var(--ifg-dim);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.ifg-army-panel__close {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ifg-dim);
+}
+.ifg-army-panel__close .ifg-icon { width: 13px; height: 13px; }
+.ifg-army-panel__close:hover { color: var(--ifg-text); }
+.ifg-army-panel__body {
+  min-height: 178px;
+  display: grid;
+  grid-template-columns: 180px minmax(360px, 1fr) 270px;
+}
+.ifg-army-panel__health,
+.ifg-army-panel__composition,
+.ifg-army-panel__report { padding: 15px 17px; min-width: 0; }
+.ifg-army-panel__health,
+.ifg-army-panel__composition { border-right: 1px solid var(--ifg-rule-soft); }
+.ifg-army-panel__health {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.ifg-army-panel__eyebrow {
+  display: block;
+  color: var(--ifg-dim);
+  font-size: 8.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.ifg-army-panel__health .ifg-army-panel__eyebrow { align-self: flex-start; margin-bottom: 9px; }
+.ifg-army-panel__health-value {
+  align-self: flex-start;
+  margin-bottom: 9px;
+  font-family: var(--ifg-serif);
+  font-size: 28px;
+  line-height: 1;
+  color: var(--ifg-brass-lit);
+}
+.ifg-army-panel__health-track {
+  display: block;
+  width: 100%;
+  height: 10px;
+  padding: 2px;
+  background: #090b08;
+  border: 1px solid var(--ifg-rule-soft);
+}
+.ifg-army-panel__health-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #677f49, #9eb66a);
+  box-shadow: 0 0 6px rgba(142, 174, 91, 0.25);
+}
+.ifg-army-panel__health-caption,
+.ifg-army-panel__unknown {
+  align-self: flex-start;
+  margin-top: 7px;
+  color: var(--ifg-dim);
+  font-size: 9.5px;
+}
+.ifg-army-panel__composition { display: flex; flex-direction: column; }
+.ifg-army-panel__composition > .ifg-army-panel__eyebrow { margin-bottom: 9px; }
+.ifg-army-panel__units {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  align-content: stretch;
+  gap: 7px;
+}
+.ifg-army-panel__intel {
+  display: grid;
+  place-items: center;
+  min-height: 112px;
+  color: var(--ifg-dim);
+  border: 1px dashed var(--ifg-rule);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ifg-army-unit {
+  position: relative;
+  min-height: 112px;
+  display: grid;
+  grid-template-rows: 1fr auto 4px;
+  overflow: hidden;
+  background: linear-gradient(155deg, rgba(56, 60, 51, 0.72), rgba(24, 27, 23, 0.92));
+  border: 1px solid var(--ifg-rule-soft);
+  border-bottom-color: var(--ifg-rule);
+}
+.ifg-army-unit::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 28%, rgba(201, 164, 99, 0.12), transparent 58%);
+  pointer-events: none;
+}
+.ifg-army-unit__visual { display: grid; place-items: center; min-height: 63px; color: #cbc5b2; }
+.ifg-army-unit__glyph {
+  width: 50px;
+  height: 50px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.65));
+}
+.ifg-army-unit__details {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 5px 7px;
+  background: rgba(9, 11, 8, 0.62);
+  border-top: 1px solid var(--ifg-rule-soft);
+}
+.ifg-army-unit__details strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.ifg-army-unit__details b { color: var(--ifg-brass-lit); font-size: 11px; }
+.ifg-army-unit__condition { display: block; height: 4px; background: #090b08; }
+.ifg-army-unit__condition i { display: block; height: 100%; background: #819c58; }
+.ifg-army-panel__report { display: grid; grid-template-rows: auto 1fr auto; gap: 10px; }
+.ifg-army-panel__stats > .ifg-army-panel__eyebrow,
+.ifg-army-panel__activity > .ifg-army-panel__eyebrow { margin-bottom: 6px; }
+.ifg-army-panel__stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--ifg-rule-soft); }
+.ifg-army-stat {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 7px;
+  background: #1b1e19;
+}
+.ifg-army-stat small { color: var(--ifg-dim); font-size: 8px; letter-spacing: 0.08em; text-transform: uppercase; }
+.ifg-army-stat b { font-size: 11px; font-variant-numeric: tabular-nums; }
+.ifg-army-panel__activity { border-top: 1px solid var(--ifg-rule-soft); padding-top: 8px; }
+.ifg-army-panel__activity-value {
+  display: block;
+  padding: 7px 8px;
+  color: var(--ifg-text);
+  background: rgba(201, 164, 99, 0.07);
+  border-left: 2px solid var(--ifg-brass);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.ifg-army-panel__activity-value[data-combat="moving"] { border-left-color: #6f8fae; }
+.ifg-army-panel__activity-value[data-combat="engaged"] { border-left-color: #c9603f; color: #e6a088; }
+.ifg-army-panel__activity-value[data-combat="retreating"] { border-left-color: #d9a441; }
+.ifg-army-panel__commands { display: flex; gap: 5px; }
+.ifg-army-panel__commands:empty { display: none; }
+.ifg-army-panel__command {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 5px;
+  color: var(--ifg-text);
+  background: var(--ifg-chip);
+  border: 1px solid var(--ifg-rule-soft);
+  border-radius: 2px;
+  font-size: 8.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ifg-army-panel__command:not(:disabled):hover,
+.ifg-army-panel__command.is-active { color: var(--ifg-brass-lit); border-color: var(--ifg-brass); }
+.ifg-army-panel__command.is-active { background: rgba(201, 164, 99, 0.18); }
+.ifg-army-panel__command:disabled { opacity: 0.32; }
 
 /* ---- province card: deposit abundance (not production/day) ---- */
 .ifg-card__resources {
@@ -547,11 +780,20 @@
   .ifg-topbar__country-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ifg-res__value { font-size: 12px; }
   .ifg-card { width: clamp(300px, 30vw, 380px); }
+  .ifg-army-panel { width: min(930px, calc(100vw - 48px)); }
+  .ifg-army-panel__body { grid-template-columns: 155px minmax(320px, 1fr) 235px; }
+  .ifg-army-panel__health,
+  .ifg-army-panel__composition,
+  .ifg-army-panel__report { padding: 12px 13px; }
 }
 @media (max-width: 860px) {
   .ifg-topbar { width: 100vw; min-width: 0; }
   .ifg-topbar__country-name { display: none; }
   .ifg-topbar__resources { gap: 7px; }
+  .ifg-army-panel { width: calc(100vw - 24px); bottom: 12px; }
+  .ifg-army-panel__body { grid-template-columns: 130px minmax(270px, 1fr) 200px; }
+  .ifg-army-panel__units { grid-template-columns: repeat(auto-fit, minmax(82px, 1fr)); }
+  .ifg-army-panel__identity small { display: none; }
 }
 @media (min-width: 2400px) {
   .ifg { font-size: 15px; }

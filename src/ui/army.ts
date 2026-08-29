@@ -7,7 +7,7 @@
  * dev / `?debug` fixture only, gated by the caller.
  */
 
-import { iconMarkup } from './icons';
+import { createIcon, iconMarkup } from './icons';
 import type { ArmyStackView, CombatStatus } from './ui-state';
 
 export type { ArmyStackView, CombatStatus } from './ui-state';
@@ -66,6 +66,147 @@ export function describeArmy(army: ArmyStackView): Array<[string, string]> {
   ];
 }
 
+type ArmyPanelCommand = 'move' | 'stop' | 'extract' | 'deselect';
+
+const UNIT_GLYPHS: Readonly<Record<string, string>> = {
+  infantry: '<circle cx="24" cy="10" r="5"/><path d="M17 42l2-17 5-7 5 7 2 17M12 25l12 5 13-12M29 26l9 16"/>',
+  engineer: '<path d="M14 16h20l-2-7H16zM12 19h24M24 19v22M16 41h16M14 28h20"/><path d="M31 23l8 8m0-8-8 8"/>',
+  'armored-car': '<path d="M7 31h34l-3-12H18l-7 6zM15 19l5-7h13l5 7M13 31v5h24v-5"/><circle cx="16" cy="37" r="4"/><circle cx="34" cy="37" r="4"/>',
+  'light-tank': '<path d="M7 31h35l-4-13H16l-6 6zM17 18l4-7h15v7M28 11V7h11"/><path d="M10 35h30M13 39h24"/><circle cx="17" cy="35" r="3"/><circle cx="33" cy="35" r="3"/>',
+  'medium-tank': '<path d="M5 31h39l-4-15H15l-7 8zM16 16l5-8h16v8M29 8V5h15"/><path d="M8 35h34M12 40h26"/><circle cx="15" cy="35" r="3"/><circle cx="25" cy="35" r="3"/><circle cx="35" cy="35" r="3"/>',
+  artillery: '<path d="M8 35h27M17 35l8-13 17-9M24 22l9 8M37 10l5 3-3 5"/><circle cx="17" cy="36" r="6"/><circle cx="34" cy="36" r="4"/>',
+};
+
+function node<K extends keyof HTMLElementTagNameMap>(
+  tag: K, className?: string, text?: string,
+): HTMLElementTagNameMap[K] {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+
+function createUnitGlyph(typeId: string, label: string): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'ifg-army-unit__glyph');
+  svg.setAttribute('viewBox', '0 0 48 48');
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', label);
+  svg.innerHTML = UNIT_GLYPHS[typeId] ?? '<path d="M8 34h32V14H8zM14 20h20M14 27h20"/>';
+  return svg;
+}
+
+function appendStat(host: HTMLElement, label: string, value: string): void {
+  const stat = node('span', 'ifg-army-stat');
+  stat.append(node('small', undefined, label), node('b', undefined, value));
+  host.append(stat);
+}
+
+/** Populate the large centered selected-army command overlay. */
+export function renderSelectedArmyPanel(
+  host: HTMLElement,
+  army: ArmyStackView,
+  onCommand: (command: ArmyPanelCommand) => void,
+): void {
+  host.style.setProperty('--army-country', army.countryColor);
+  host.dataset.combat = army.combat;
+  host.setAttribute('aria-label', `${army.name}, ${army.country}`);
+
+  const header = node('header', 'ifg-army-panel__header');
+  const identity = node('span', 'ifg-army-panel__identity');
+  identity.append(node('strong', undefined, army.name), node('small', undefined, army.country));
+  const close = node('button', 'ifg-army-panel__close');
+  close.type = 'button';
+  close.title = 'Deselect army';
+  close.setAttribute('aria-label', 'Deselect army');
+  close.append(createIcon('close'));
+  close.addEventListener('click', () => onCommand('deselect'));
+  header.append(node('span', 'ifg-army-panel__header-spacer'), identity, close);
+
+  const health = node('section', 'ifg-army-panel__health');
+  health.append(node('small', 'ifg-army-panel__eyebrow', 'Health'));
+  if (army.identified === false) {
+    health.append(node('b', 'ifg-army-panel__health-value', '--'), node('span', 'ifg-army-panel__unknown', 'Unknown strength'));
+  } else {
+    const healthPercent = Math.round(army.health * 100);
+    health.append(node('b', 'ifg-army-panel__health-value', `${healthPercent}%`));
+    const healthTrack = node('span', 'ifg-army-panel__health-track');
+    const healthFill = node('i', 'ifg-army-panel__health-fill');
+    healthFill.style.width = `${healthPercent}%`;
+    healthTrack.append(healthFill);
+    health.append(healthTrack, node('span', 'ifg-army-panel__health-caption', `${healthPercent} / 100 readiness`));
+  }
+
+  const composition = node('section', 'ifg-army-panel__composition');
+  composition.append(node('small', 'ifg-army-panel__eyebrow', 'Composition'));
+  const unitRow = node('div', 'ifg-army-panel__units');
+  if (army.identified === false || !army.groups?.length) {
+    unitRow.append(node('span', 'ifg-army-panel__intel', 'Composition unavailable'));
+  } else {
+    for (const group of army.groups) {
+      const unit = node('article', 'ifg-army-unit');
+      unit.dataset.unitType = group.typeId;
+      unit.title = `${group.label}: ${group.count} troops, ${Math.round(group.health * 100)}% health`;
+      const visual = node('span', 'ifg-army-unit__visual');
+      visual.append(createUnitGlyph(group.typeId, group.label));
+      const details = node('span', 'ifg-army-unit__details');
+      details.append(node('strong', undefined, group.label), node('b', undefined, `×${group.count}`));
+      const condition = node('span', 'ifg-army-unit__condition');
+      const conditionFill = node('i');
+      conditionFill.style.width = `${Math.round(group.health * 100)}%`;
+      condition.append(conditionFill);
+      unit.append(visual, details, condition);
+      unitRow.append(unit);
+    }
+  }
+  composition.append(unitRow);
+
+  const report = node('section', 'ifg-army-panel__report');
+  const stats = node('div', 'ifg-army-panel__stats');
+  stats.append(node('small', 'ifg-army-panel__eyebrow', 'Troop stats'));
+  const statGrid = node('div', 'ifg-army-panel__stat-grid');
+  if (army.identified === false) {
+    appendStat(statGrid, 'Troops', '--');
+    appendStat(statGrid, 'Attack', '--');
+    appendStat(statGrid, 'Defence', '--');
+    appendStat(statGrid, 'Speed', '--');
+  } else {
+    appendStat(statGrid, 'Troops', String(army.unitCount));
+    appendStat(statGrid, 'Attack', String(Math.round(army.attack ?? 0)));
+    appendStat(statGrid, 'Defence', String(Math.round(army.defense ?? 0)));
+    appendStat(statGrid, 'Speed', army.speed === undefined ? '--' : String(Math.round(army.speed)));
+  }
+  stats.append(statGrid);
+
+  const activity = node('div', 'ifg-army-panel__activity');
+  activity.append(node('small', 'ifg-army-panel__eyebrow', 'Activity'));
+  const activityValue = node('strong', 'ifg-army-panel__activity-value', army.activity);
+  activityValue.dataset.combat = army.combat;
+  activity.append(activityValue);
+
+  const commands = node('div', 'ifg-army-panel__commands');
+  const command = (label: string, key: Exclude<ArmyPanelCommand, 'deselect'>, enabled: boolean, active = false): HTMLButtonElement => {
+    const button = node('button', 'ifg-army-panel__command', label);
+    button.type = 'button';
+    button.disabled = !enabled;
+    button.classList.toggle('is-active', active);
+    if (enabled) button.addEventListener('click', () => onCommand(key));
+    return button;
+  };
+  if (army.own) {
+    commands.append(
+      command(army.awaitingMoveTarget ? 'Select destination' : 'Move', 'move', true, army.awaitingMoveTarget === true),
+      command('Stop', 'stop', army.combat !== 'idle' || army.awaitingMoveTarget === true),
+      command('Extract', 'extract', army.canExtract === true),
+    );
+  }
+  report.append(stats, activity, commands);
+
+  const body = node('div', 'ifg-army-panel__body');
+  body.append(health, composition, report);
+  host.replaceChildren(header, body);
+}
+
 /**
  * SVG marker for a movement / attack order arrow. Styling only — it encodes no
  * game rules and is not placed until a movement system supplies path points.
@@ -96,5 +237,16 @@ export const DEMO_ARMY: ArmyStackView = {
   health: 0.67,
   selected: true,
   combat: 'idle',
+  activity: 'Holding position',
   moveOrder: null,
+  speed: 90,
+  attack: 52,
+  defense: 44,
+  own: true,
+  canExtract: true,
+  groups: [
+    { typeId: 'infantry', label: 'Infantry', count: 8, health: 0.72 },
+    { typeId: 'armored-car', label: 'Armored Car', count: 2, health: 0.61 },
+    { typeId: 'artillery', label: 'Artillery', count: 2, health: 0.7 },
+  ],
 };

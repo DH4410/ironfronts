@@ -12,6 +12,7 @@ import {
   createInitialState, createUiStore, type GameNotification, type ResourceLine,
 } from './ui/ui-state';
 import { DEMO_ARMY } from './ui/army';
+import { aggregateTroopStat, armyActivityLabel } from './ui/army-presentation';
 import { iconMarkup } from './ui/icons';
 import type { ProvinceResources } from './resource-nodes';
 import type { WorldRenderer, MapMode, TimeOfDayState } from './renderer';
@@ -802,6 +803,10 @@ function refreshSelectedArmy(
   const combat = view.status === 'moving' ? 'moving'
     : view.status === 'engaged' ? 'engaged'
     : view.status === 'retreating' ? 'retreating' : 'idle';
+  const groups = comp?.groups.map((g) => ({
+    typeId: g.typeId, label: gameUnitLabel(g.typeId), count: g.count, health: g.health,
+  }));
+  const activity = armyActivityLabel(view.status, awaitingMoveTarget, view.own);
   uiStore.patch({
     selectedArmy: {
       id: view.id,
@@ -815,10 +820,11 @@ function refreshSelectedArmy(
       selected: true,
       combat,
       moveOrder: view.moveOrder,
-      groups: comp?.groups.map((g) => ({
-        label: gameUnitLabel(g.typeId), count: g.count, health: g.health,
-      })),
+      groups,
       speed: comp?.speed,
+      attack: aggregateTroopStat(groups, 'attack', gameUnit),
+      defense: aggregateTroopStat(groups, 'defense', gameUnit),
+      activity,
       own: view.own,
       canExtract: view.own && !view.moveOrder && session.extractableNodeAt(view.id) !== null,
       awaitingMoveTarget: view.own && awaitingMoveTarget,
