@@ -123,7 +123,10 @@ describe('WGSL programs', () => {
   });
 
   it('ranks national over province borders at overview zoom without touching hover or other modes', () => {
-    expect(lineShader).toContain('if (lineParams.mode == 0u && !hovered) {');
+    // The overview border-ranking block still skips hover; the reconciled
+    // shader also skips a selected province (its border must not recede at
+    // overview — in-game command UI v2), so match the stable prefix.
+    expect(lineShader).toContain('if (lineParams.mode == 0u && !hovered');
     expect(lineShader).toContain('let overviewFade = smoothstep(3200.0, 7600.0, uniforms.interaction.y)');
     expect(lineShader).toContain('color.a = mix(color.a, 0.92, overviewFade * 0.6)');
     expect(lineShader).toContain('color.a *= mix(1.0, 0.22, overviewFade)');
