@@ -4,6 +4,7 @@ import {
 } from '@ironfronts/protocol';
 import { connectGame } from './auth-api';
 import { applyDelta } from './replica-store';
+import { InterpolatedGameClock, type GameClockReading } from './game-clock';
 
 interface PendingCommand {
   timer: number;
@@ -15,6 +16,7 @@ export class GameConnection extends EventTarget {
   catalogs!: PresentationCatalogs;
   world!: WorldDescriptor;
   revision = 0;
+  private readonly gameClock = new InterpolatedGameClock();
   private socket: WebSocket | null = null;
   private closed = false;
   private commandSequence = 0;
@@ -46,6 +48,7 @@ export class GameConnection extends EventTarget {
           this.state = message.state;
           this.catalogs = message.catalogs;
           this.revision = message.revision;
+          this.gameClock.synchronize(message.clock);
           this.dispatchEvent(new Event('state'));
           if (!ready) { ready = true; clearTimeout(timeout); resolve(); }
         } else if (message.type === 'delta') {
@@ -64,6 +67,9 @@ export class GameConnection extends EventTarget {
             this.pending.delete(message.commandId);
             pending.settle(message.ok, message.reason);
           }
+        } else if (message.type === 'clockSync') {
+          this.gameClock.synchronize(message.clock);
+          this.dispatchEvent(new Event('clock-sync'));
         } else if (message.type === 'error') {
           this.dispatchEvent(new CustomEvent('connection-error', { detail: message.message }));
         }
@@ -97,6 +103,8 @@ export class GameConnection extends EventTarget {
     this.socket.send(JSON.stringify({ type: 'command', commandId, command }));
     return commandId;
   }
+
+  readClock(): GameClockReading { return this.gameClock.read(); }
 
   close(): void { this.closed = true; this.socket?.close(1000, 'Client closed'); }
 }

@@ -51,7 +51,6 @@ export interface ProjectedArmy {
 }
 
 export interface PlayerProjection {
-  gameTimeHours: number;
   viewerCountryId: number;
   startCamera: { x: number; z: number; distance: number };
   countries: Record<number, PublicCountry>;
@@ -64,6 +63,17 @@ export interface PlayerProjection {
   resourceNodes: Record<number, unknown>;
   ownCountry: null | Record<string, unknown>;
   relations: Record<string, 'peace' | 'war'>;
+}
+
+/**
+ * Sparse authoritative civil-clock sample. Clients advance `serverEpochMs`
+ * locally at one second per real second and use later samples only to correct
+ * drift. The offset is deliberately fixed rather than taken from the host OS.
+ */
+export interface GameClockSync {
+  gameStartedAtEpochMs: number;
+  serverEpochMs: number;
+  utcOffsetMinutes: number;
 }
 
 export interface PresentationCatalogs {
@@ -86,8 +96,9 @@ export type ProjectionDelta = {
 
 export type ServerMessage =
   | { type: 'hello'; gameId: string; gameVersion: string; protocolVersion: 1; capabilities: string[]; world: WorldDescriptor; countryId: number }
-  | { type: 'baseline'; revision: number; state: PlayerProjection; catalogs: PresentationCatalogs }
+  | { type: 'baseline'; revision: number; state: PlayerProjection; catalogs: PresentationCatalogs; clock: GameClockSync }
   | { type: 'delta'; fromRevision: number; revision: number; delta: ProjectionDelta; events: FilteredEvent[] }
+  | { type: 'clockSync'; clock: GameClockSync }
   | { type: 'commandAck'; commandId: string; ok: boolean; reason?: string }
   | { type: 'event'; event: FilteredEvent }
   | { type: 'error'; code: string; message: string; retryable?: boolean };
@@ -99,8 +110,23 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
     world: z.object({ version: z.string(), hash: z.string(), assetBaseUrl: z.url() }),
     countryId: z.number().int().positive(),
   }),
-  z.object({ type: z.literal('baseline'), revision: z.number().int().nonnegative(), state: z.custom<PlayerProjection>((value) => Boolean(value && typeof value === 'object')), catalogs: z.custom<PresentationCatalogs>((value) => Boolean(value && typeof value === 'object')) }),
+  z.object({
+    type: z.literal('baseline'), revision: z.number().int().nonnegative(),
+    state: z.custom<PlayerProjection>((value) => Boolean(value && typeof value === 'object')),
+    catalogs: z.custom<PresentationCatalogs>((value) => Boolean(value && typeof value === 'object')),
+    clock: z.object({
+      gameStartedAtEpochMs: z.number().finite(), serverEpochMs: z.number().finite(),
+      utcOffsetMinutes: z.number().int(),
+    }),
+  }),
   z.object({ type: z.literal('delta'), fromRevision: z.number().int().nonnegative(), revision: z.number().int().nonnegative(), delta: z.custom<ProjectionDelta>((value) => Boolean(value && typeof value === 'object')), events: z.array(z.custom<FilteredEvent>((value) => Boolean(value && typeof value === 'object'))) }),
+  z.object({
+    type: z.literal('clockSync'),
+    clock: z.object({
+      gameStartedAtEpochMs: z.number().finite(), serverEpochMs: z.number().finite(),
+      utcOffsetMinutes: z.number().int(),
+    }),
+  }),
   z.object({ type: z.literal('commandAck'), commandId: z.string(), ok: z.boolean(), reason: z.string().optional() }),
   z.object({ type: z.literal('event'), event: z.custom<FilteredEvent>((value) => Boolean(value && typeof value === 'object')) }),
   z.object({ type: z.literal('error'), code: z.string(), message: z.string(), retryable: z.boolean().optional() }),

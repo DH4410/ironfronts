@@ -10,6 +10,8 @@ import { loadWorld } from './world-loader';
 import { GameRuntime } from './runtime';
 import { diffProjection } from './projection';
 import { TicketNonceStore } from './ticket-nonces';
+import { AuthoritativeGameClock } from './game-clock';
+import { CLOCK_SYNC_INTERVAL_MS, SIMULATION_INTERVAL_MS, SIMULATION_TICK_HOURS } from './timing';
 
 const jsonHeaders = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' };
 
@@ -44,6 +46,7 @@ interface ClientConnection {
 
 const loaded = await loadWorld(config.worldDirectory);
 const runtime = new GameRuntime(loaded.world);
+const gameClock = new AuthoritativeGameClock();
 const connections = new Set<ClientConnection>();
 const usedNonces = new TicketNonceStore();
 const recentCommands = new Map<string, Map<string, ServerMessage>>();
@@ -125,7 +128,7 @@ sockets.on('connection', (socket) => {
         connections.add(connection);
         send(socket, {
           type: 'hello', gameId: GAME_ID, gameVersion: GAME_VERSION, protocolVersion: PROTOCOL_VERSION,
-          capabilities: ['filtered-baseline', 'change-only-deltas', 'resync', 'optimistic-commands'],
+          capabilities: ['filtered-baseline', 'change-only-deltas', 'resync', 'optimistic-commands', 'sparse-clock-sync'],
           world: {
             version: loaded.version,
             hash: loaded.hash,
@@ -133,7 +136,7 @@ sockets.on('connection', (socket) => {
           },
           countryId: claims.countryId,
         });
-        send(socket, { type: 'baseline', revision, state: projection, catalogs: runtime.catalogs });
+        send(socket, { type: 'baseline', revision, state: projection, catalogs: runtime.catalogs, clock: gameClock.snapshot() });
         log('info', 'client_connected', { countryId: claims.countryId });
         return;
       }
@@ -142,7 +145,7 @@ sockets.on('connection', (socket) => {
         const projection = runtime.projection(connection.countryId);
         connection.projection = projection;
         connection.revision = revision;
-        send(socket, { type: 'baseline', revision, state: projection, catalogs: runtime.catalogs });
+        send(socket, { type: 'baseline', revision, state: projection, catalogs: runtime.catalogs, clock: gameClock.snapshot() });
         return;
       }
       const accountCommands = recentCommands.get(connection.accountId) ?? new Map<string, ServerMessage>();
@@ -167,7 +170,13 @@ sockets.on('connection', (socket) => {
   });
 });
 
-const simulationTimer = setInterval(() => runtime.tick(0.5 / 10), 100);
+const simulationTimer = setInterval(() => runtime.tick(SIMULATION_TICK_HOURS), SIMULATION_INTERVAL_MS);
+// Civil time is interpolated by clients. This sparse sample corrects drift;
+// it is intentionally independent of the 10 Hz authoritative simulation.
+const clockSyncTimer = setInterval(() => {
+  const clock = gameClock.snapshot();
+  for (const connection of connections) send(connection.socket, { type: 'clockSync', clock });
+}, CLOCK_SYNC_INTERVAL_MS);
 const publishTimer = setInterval(() => {
   const unitEvents = runtime.session.pendingCompletions.splice(0).map((event) => ({
     countryId: runtime.session.state.armies[event.armyId]?.ownerCountryId ?? runtime.session.state.provinceOwners[event.provinceId],
@@ -212,6 +221,7 @@ server.listen(config.port, '127.0.0.1', () => log('info', 'listening', { port: c
 function shutdown(signal: string): void {
   log('info', 'shutdown', { signal });
   clearInterval(simulationTimer);
+  clearInterval(clockSyncTimer);
   clearInterval(publishTimer);
   for (const connection of connections) connection.socket.close(1001, 'Server shutting down');
   server.close(() => process.exit(0));

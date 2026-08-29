@@ -372,7 +372,6 @@ async function start(): Promise<void> {
   };
   renderer.onTimeOfDayChange = (state) => {
     updateTimeControls(state);
-    uiStore.patch({ clock: { label: `${capitalize(state.stage)} · ${state.clock}`, phase: state.stage } });
   };
 
   debugTime.addEventListener('change', () => {
@@ -525,10 +524,10 @@ async function start(): Promise<void> {
     }
 
     // Hand the HUD its opening state from real renderer/game values.
-    const clock = renderer.getTimeOfDay();
+    const clock = session.readClock();
     uiStore.patch({
       phase: 'in-game',
-      clock: { label: `${capitalize(clock.stage)} · ${clock.clock}`, phase: clock.stage },
+      clock,
       quality: renderer.graphicsQuality,
       effectiveRenderScale: renderer.effectiveRenderScale,
       weather: { raining: renderer.isRainEnabled(), label: renderer.isRainEnabled() ? 'Rain' : 'Clear' },
@@ -598,7 +597,19 @@ async function bootstrapGameSession(
   // Initial marker upload (before the first sim tick) so armies show at once.
   syncArmyMarkers(session, renderer);
 
-  // Fixed-step simulation, decoupled from the render frame.
+  // Civil time is sparse server state, interpolated locally at 1:1 speed. It
+  // drives lighting and the analogue HUD, but never changes gameplay dt: the
+  // server retains its existing 10 Hz / 0.05-hour simulation ticks.
+  renderer.setTimeMultiplier(0);
+  const updateCivilClock = (): void => {
+    const clock = session.readClock();
+    uiStore.patch({ clock });
+    renderer.setTimeOfDay(clock.hour + clock.minute / 60 + clock.second / 3_600);
+  };
+  updateCivilClock();
+  const civilClockTimer = window.setInterval(updateCivilClock, 250);
+
+  // Replica/HUD refresh, decoupled from the authoritative simulation.
   const hudTimer = window.setInterval(() => {
     // Fog visibility is O(foreignArmies × visionSources); compute it once per
     // HUD tick and share it between the marker upload and the selection card.
@@ -620,6 +631,7 @@ async function bootstrapGameSession(
   window.addEventListener('pagehide', (event) => {
     if (!event.persisted) {
       window.clearInterval(hudTimer);
+      window.clearInterval(civilClockTimer);
       window.removeEventListener('keydown', onKey);
       if (activeSession === session) activeSession = undefined;
       activeConnection?.close();
@@ -1124,10 +1136,6 @@ function required<T extends HTMLElement>(id: string): T {
 
 function isMapMode(value: string): value is MapMode {
   return value === 'political' || value === 'diplomacy' || value === 'clear' || value === 'balanced';
-}
-
-function capitalize(value: string): string {
-  return value ? value[0].toUpperCase() + value.slice(1) : value;
 }
 
 const DEMO_NOTIFICATIONS: readonly GameNotification[] = [

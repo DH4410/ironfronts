@@ -32,7 +32,6 @@ export function projectFor(state: GameState, world: WorldData, viewerCountryId: 
   const capitalId = world.countries.find((country) => country.id === viewerCountryId)?.capitalProvinceId;
   const capital = world.provinces.find((province) => province.id === capitalId) ?? owned[0];
   return {
-    gameTimeHours: state.clock.gameTimeHours,
     viewerCountryId,
     startCamera: capital
       ? { x: capital.center[0], z: capital.center[1], distance: Math.min(3_200, Math.max(900, Math.sqrt(owned.length) * 180)) }
@@ -64,7 +63,6 @@ function same(a: unknown, b: unknown): boolean {
 
 export function diffProjection(previous: PlayerProjection, next: PlayerProjection): ProjectionDelta | null {
   const delta: ProjectionDelta = { changed: {}, upserts: {}, removals: {}, redactions: [] };
-  if (previous.gameTimeHours !== next.gameTimeHours) delta.changed.gameTimeHours = next.gameTimeHours;
   if (!same(previous.ownCountry, next.ownCountry)) delta.changed.ownCountry = next.ownCountry;
   for (const key of COLLECTIONS) {
     const before = previous[key] as Record<string, unknown>;

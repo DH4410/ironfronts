@@ -38,10 +38,13 @@ export interface ResourceLine {
 }
 
 export interface StrategicClock {
-  /** e.g. "Morning · 08:00". */
-  readonly label: string;
-  /** Day-stage token, e.g. "morning". */
-  readonly phase: string;
+  /** Campaign day in the fixed GMT+2 civil calendar; the starting day is 1. */
+  readonly day: number;
+  readonly hour: number;
+  readonly minute: number;
+  /** Fractional so an analogue second hand need not jump once per second. */
+  readonly second: number;
+  readonly utcOffsetMinutes: number;
 }
 
 export interface WeatherState {

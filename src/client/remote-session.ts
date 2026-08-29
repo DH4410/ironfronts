@@ -2,6 +2,7 @@ import type {
   CommandPayload, PlayerProjection, PresentationCatalogs, ProjectedArmy,
 } from '@ironfronts/protocol';
 import { GameConnection } from './game-connection';
+import type { GameClockReading } from './game-clock';
 
 type OptimisticMutation = (state: PlayerProjection) => void;
 type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
@@ -36,7 +37,7 @@ export class RemoteGameSession extends EventTarget {
 
   get playerCountryId(): number { return this.state.viewerCountryId; }
   get ownCountry(): OwnCountry { return this.state.ownCountry as unknown as OwnCountry; }
-  get gameTimeHours(): number { return this.state.gameTimeHours; }
+  readClock(): GameClockReading { return this.connection.readClock(); }
 
   unit(typeId: string): Record<string, unknown> | undefined {
     return this.catalogs.units.find((unit) => unit.id === typeId);

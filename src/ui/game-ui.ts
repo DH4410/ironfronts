@@ -101,8 +101,22 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   };
 
   const clockBlock = el('div', 'ifg-topbar__clock');
-  const clockValue = el('b', undefined, '--');
-  clockBlock.append(clockValue);
+  const clockText = el('span', 'ifg-clock__text');
+  const clockDay = el('b', 'ifg-clock__day', 'Day --');
+  const clockZone = el('small', 'ifg-clock__zone', 'GMT+2');
+  clockText.append(clockDay, clockZone);
+  const clockFace = el('span', 'ifg-clock__face');
+  clockFace.setAttribute('role', 'img');
+  for (let index = 0; index < 12; index += 1) {
+    const marker = el('i', 'ifg-clock__marker');
+    marker.style.setProperty('--clock-marker', `${index * 30}deg`);
+    clockFace.append(marker);
+  }
+  const hourHand = el('i', 'ifg-clock__hand ifg-clock__hand--hour');
+  const minuteHand = el('i', 'ifg-clock__hand ifg-clock__hand--minute');
+  const secondHand = el('i', 'ifg-clock__hand ifg-clock__hand--second');
+  clockFace.append(hourHand, minuteHand, secondHand, el('i', 'ifg-clock__pin'));
+  clockBlock.append(clockText, clockFace);
 
   const weatherChip = el('span', 'ifg-topbar__weather');
   weatherChip.title = 'Weather';
@@ -413,7 +427,22 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     }
 
     // Clock + weather.
-    clockValue.textContent = state.clock?.label ?? '--';
+    const clock = state.clock;
+    clockDay.textContent = clock ? `Day ${clock.day}` : 'Day --';
+    if (clock) {
+      const hourAngle = ((clock.hour % 12) + clock.minute / 60 + clock.second / 3_600) * 30;
+      const minuteAngle = (clock.minute + clock.second / 60) * 6;
+      const secondAngle = clock.second * 6;
+      hourHand.style.transform = `translateX(-50%) rotate(${hourAngle}deg)`;
+      minuteHand.style.transform = `translateX(-50%) rotate(${minuteAngle}deg)`;
+      secondHand.style.transform = `translateX(-50%) rotate(${secondAngle}deg)`;
+      const wholeSecond = Math.floor(clock.second);
+      const accessibleTime = `${String(clock.hour).padStart(2, '0')}:${String(clock.minute).padStart(2, '0')}:${String(wholeSecond).padStart(2, '0')}`;
+      clockFace.setAttribute('aria-label', `Day ${clock.day}, ${accessibleTime}, GMT+2`);
+      clockZone.textContent = `GMT${clock.utcOffsetMinutes >= 0 ? '+' : '-'}${Math.abs(clock.utcOffsetMinutes / 60)}`;
+    } else {
+      clockFace.setAttribute('aria-label', 'Game clock unavailable');
+    }
     const nextWeatherKey = `${state.weather.raining}|${state.weather.label}`;
     if (nextWeatherKey !== weatherKey) {
       weatherKey = nextWeatherKey;
