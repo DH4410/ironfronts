@@ -29,6 +29,29 @@ import { unitType } from './game/units/unit-catalog';
 
 const gameUnitLabel = (typeId: string): string => unitType(typeId).name;
 const unitMaxHp = (typeId: string): number => unitType(typeId).maxHp;
+const unitCostLabel = (typeId: string): string => Object.entries(unitType(typeId).cost)
+  .map(([k, v]) => `${v} ${k}`).join(' · ');
+
+/** Player queues a unit from the selected-province PRODUCE panel. */
+function handleProduce(provinceId: number, unitTypeId: string): void {
+  const session = activeSession;
+  if (!session) return;
+  const result = session.produce(provinceId, unitTypeId);
+  if (!result.ok) {
+    pushNotification('warning', 'Production', result.reason ?? 'Cannot build that here.');
+    return;
+  }
+  pushNotification('information', `${gameUnitLabel(unitTypeId)} queued`, 'Now in the build queue.');
+  const sp = uiStore.get().selectedProvince;
+  if (sp && sp.id === provinceId) {
+    uiStore.patch({
+      selectedProvince: {
+        ...sp,
+        queue: (session.state.productionQueues[provinceId] ?? []).map((o) => gameUnitLabel(o.unitTypeId)),
+      },
+    });
+  }
+}
 
 const canvas = required<HTMLCanvasElement>('world');
 const countryLabels = required<HTMLCanvasElement>('country-labels');
@@ -225,6 +248,7 @@ async function start(selection: ScenarioSelection): Promise<void> {
       if (debugEnabled) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3', key: 'F3' }));
     },
     armyCommand: (command) => handleArmyCommand(command),
+    produceUnit: (provinceId, unitTypeId) => handleProduce(provinceId, unitTypeId),
   };
   const gameUi = mountGameUi(uiStore, gameUiActions);
   window.addEventListener('pagehide', (event) => {
@@ -265,6 +289,14 @@ async function start(selection: ScenarioSelection): Promise<void> {
     if (session) {
       const summary = session.describeProvince(info.id);
       const coastal = activeWorld?.provinces.find((p) => p.id === info.id)?.coastal ?? false;
+      const producible = summary.isOwn
+        ? session.producible(info.id).map((id) => ({
+            id, name: gameUnitLabel(id), costLabel: unitCostLabel(id),
+          }))
+        : [];
+      const queue = summary.isOwn
+        ? (session.state.productionQueues[info.id] ?? []).map((o) => gameUnitLabel(o.unitTypeId))
+        : [];
       uiStore.patch({
         selectedProvince: {
           id: info.id,
@@ -278,8 +310,12 @@ async function start(selection: ScenarioSelection): Promise<void> {
           deposits: summary.resources
             ? { controlled: summary.controlled, extracting: summary.extracting }
             : null,
+          producible,
+          queue,
         },
       });
+      selectedArmyId = null;
+      awaitingMoveTarget = false;
       return;
     }
     uiStore.patch({

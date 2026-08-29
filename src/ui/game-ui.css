@@ -509,3 +509,6 @@
   .ifg-topbar { height: 50px; }
   .ifg-dock { top: 62px; }
 }
+
+.ifg-card__prodlist { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.ifg-card__prodlist .ifg-card__act { flex: 0 0 auto; }

@@ -32,6 +32,8 @@ export interface GameUiActions {
   focusSelected?: () => void;
   /** Selected-army orders (§17). 'deselect' clears the selection. */
   armyCommand(command: 'move' | 'stop' | 'extract' | 'deselect'): void;
+  /** Queue a unit in the selected (own) province (§31). */
+  produceUnit(provinceId: number, unitTypeId: string): void;
 }
 
 export interface GameUiHandle {
@@ -248,8 +250,19 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   pvResStatus.hidden = true;
   pvResources.append(pvResStatus);
 
+  // PRODUCE — real unit queue for an owned province with the right building.
+  const pvProduce = el('div', 'ifg-card__resources');
+  pvProduce.hidden = true;
+  pvProduce.append(el('small', 'ifg-card__restitle', 'Produce'));
+  const pvProduceList = el('div', 'ifg-card__prodlist');
+  pvProduce.append(pvProduceList);
+  const pvQueue = el('small', 'ifg-card__resstatus');
+  pvQueue.hidden = true;
+  pvProduce.append(pvQueue);
+
   const pvActions = el('div', 'ifg-card__actions');
   for (const label of PROVINCE_ACTIONS) {
+    if (label === 'Produce') continue; // real PRODUCE panel above
     const b = el('button', 'ifg-card__act');
     b.type = 'button';
     b.textContent = label;
@@ -257,7 +270,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     b.title = `${label} — not available yet`;
     pvActions.append(b);
   }
-  provinceCard.append(pvHead, pvGrid, pvResources, pvActions);
+  provinceCard.append(pvHead, pvGrid, pvResources, pvProduce, pvActions);
 
   // ---------------- army card (dev fixture only) ----------------
   const armyCard = el('section', 'ifg-card ifg-card--army');
@@ -429,6 +442,8 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         province.coastal ? 'c' : '',
         dep ? `${dep.controlled ? 'C' : ''}${dep.extracting ? 'E' : ''}` : '',
         province.isOwn,
+        (province.producible ?? []).map((u) => u.id).join(','),
+        (province.queue ?? []).join(','),
       ].join('|');
       if (nextPvResourceKey !== pvResourceKey) {
         pvResourceKey = nextPvResourceKey;
@@ -445,6 +460,24 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
           for (const { key } of RESOURCE_CHIPS) pvResChipByKey.get(key)!.chip.hidden = true;
         }
         pvCoastalChip.hidden = province.coastal !== true;
+
+        // PRODUCE panel.
+        const prod = province.producible ?? [];
+        pvProduce.hidden = !(province.isOwn && prod.length > 0);
+        if (province.isOwn && prod.length > 0) {
+          pvProduceList.replaceChildren(...prod.map((u) => {
+            const b = el('button', 'ifg-card__act');
+            b.type = 'button';
+            b.textContent = u.name;
+            b.title = u.costLabel;
+            b.addEventListener('click', () => actions.produceUnit(province.id, u.id));
+            return b;
+          }));
+          const q = province.queue ?? [];
+          pvQueue.hidden = q.length === 0;
+          pvQueue.textContent = q.length ? `Queue: ${q.join(', ')}` : '';
+        }
+
         if (dep && hasDeposits) {
           pvResStatus.hidden = false;
           pvResStatus.textContent = dep.extracting
