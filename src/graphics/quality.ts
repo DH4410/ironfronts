@@ -56,9 +56,12 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
     treeInstanceBudget: 9_000,
     buildingInstanceBudget: 6_000,
     furniture: false,
-    terrainLodScale: 0.6,
+    // Keep enough terrain-mesh resolution that ridges and coastlines still read
+    // as relief — LOW should be cheaper, not flatter. The heavy savings come
+    // from render scale, prop budgets and the shader detail factor below.
+    terrainLodScale: 0.85,
     rainScale: 0.35,
-    detailFactor: 0,
+    detailFactor: 0.12,
   },
   medium: {
     label: 'Medium',

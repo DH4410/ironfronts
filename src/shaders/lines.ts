@@ -53,6 +53,11 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   let side = array<f32, 6>(-1.0, -1.0, 1.0, 1.0, -1.0, 1.0)[vertexIndex];
   let hoverId = uniforms.interaction.x;
   let hovered = hoverId > 0.5 && (abs(line.b.x - hoverId) < 0.5 || abs(line.b.y - hoverId) < 0.5);
+  // weather.w carries the encoded selected province id (0 = none). A selected
+  // province gets the strongest border treatment in the hierarchy: above
+  // hover, and it does not recede at overview zoom.
+  let selectedId = uniforms.weather.w;
+  let selected = selectedId > 0.5 && (abs(line.b.x - selectedId) < 0.5 || abs(line.b.y - selectedId) < 0.5);
   let nearFactor = 1.0 - smoothstep(700.0, 8200.0, uniforms.interaction.y);
   var widthPixels = 0.72 + nearFactor * 0.8;
   var color = vec4f(0.055, 0.085, 0.077, mix(0.30, 0.10, nearFactor));
@@ -79,6 +84,12 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
       innerColor = color;
       countryCasing = 0.0;
     }
+    if (selected && (provinceBordersVisible || countryBordersVisible)) {
+      widthPixels = max(widthPixels + nearFactor * 0.6, 3.6);
+      color = vec4f(0.04, 0.05, 0.05, 0.98);
+      innerColor = vec4f(0.99, 0.9, 0.62, 1.0);
+      countryCasing = 1.0;
+    }
   } else if (lineParams.mode == 1u) {
     widthPixels = 1.1;
     color = select(vec4f(0.19, 0.64, 0.78, 0.68), vec4f(0.80, 0.67, 0.25, 0.72), line.b.x > 0.5);
@@ -92,7 +103,7 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   // province borders are secondary and should recede so political structure
   // reads at a glance, then return progressively toward regional zoom.
   // Hovered lines and non-border modes keep their own styling.
-  if (lineParams.mode == 0u && !hovered) {
+  if (lineParams.mode == 0u && !hovered && !selected) {
     let overviewFade = smoothstep(3200.0, 7600.0, uniforms.interaction.y);
     if (countryCasing > 0.5) {
       widthPixels += overviewFade * 0.5;

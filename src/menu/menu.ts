@@ -1,4 +1,5 @@
 import './menu.css';
+import type { AudioManager, UiAudioCue } from '../audio/audio-manager';
 import { phase, runChoreo, smooth } from './choreo';
 import {
   isQualityLevel, loadQuality, QUALITY_PRESETS, saveQuality, type QualityLevel,
@@ -7,6 +8,7 @@ import {
 export interface MenuHandlers {
   /** Called once the player commits to entering the world (campaign, continue, or sandbox). */
   onLaunch: () => void;
+  audio?: AudioManager;
   /**
    * Fired when the player changes the graphics-quality preset in Settings.
    * In the lobby this only persists the choice; once a WorldRenderer exists
@@ -15,7 +17,7 @@ export interface MenuHandlers {
   onGraphicsQuality?: (level: QualityLevel) => void;
 }
 
-const OPEN_DURATION = 1250;
+const OPEN_DURATION = 760;
 
 /** Natural aspect (height/width) of public/menu/desk-scene.jpg, for computing its cover-fit pixel size. */
 const MAP_ASPECT = 2620 / 2402;
@@ -25,11 +27,40 @@ export function mountMenu(handlers: MenuHandlers): void {
   const brand = document.querySelector<HTMLElement>('.brand');
   const main = requiredId<HTMLElement>('ifm-main');
   const map = requiredChild<HTMLElement>(root, '.ifm__map');
+  const masterVolume = document.getElementById('ifm-master-volume') as HTMLInputElement | null;
+  const musicVolume = document.getElementById('ifm-music-volume') as HTMLInputElement | null;
 
   let busy = false;
   let openScreen: string | null = null;
   let transitionPage: HTMLElement | null = null;
   let riseDistance = 0;
+  let panOffsetPx = 0;
+
+  const playCue = (cue: UiAudioCue): void => {
+    if (!handlers.audio) return;
+    void handlers.audio.playUiCue(cue).catch((error) => {
+      console.warn(`Ignoring non-critical UI audio failure for "${cue}".`, error);
+    });
+  };
+
+  if (handlers.audio) {
+    if (masterVolume) {
+      masterVolume.value = String(Math.round(handlers.audio.getVolume('master') * 100));
+      masterVolume.addEventListener('input', () => {
+        handlers.audio?.setVolume('master', Number(masterVolume.value) / 100);
+      });
+    }
+    if (musicVolume) {
+      musicVolume.value = String(Math.round(handlers.audio.getVolume('music') * 100));
+      musicVolume.addEventListener('input', () => {
+        handlers.audio?.setVolume('music', Number(musicVolume.value) / 100);
+      });
+    }
+
+    root.querySelectorAll<HTMLButtonElement>('button').forEach((button) => {
+      button.addEventListener('pointerenter', () => playCue('hover'));
+    });
+  }
 
   /**
    * One update() drives every sub-motion from the same t (0=on the menu,
@@ -44,30 +75,55 @@ export function mountMenu(handlers: MenuHandlers): void {
    */
   function update(t: number): void {
     const panT = smooth(phase(t, 0, 0.92));
+    const offsetPx = panOffsetPx * panT;
 
-    const box = map.getBoundingClientRect();
-    const renderedHeight = box.width * MAP_ASPECT;
-    const excess = Math.max(0, renderedHeight - box.height);
-    const posY = panT * 62;
-    const offsetPx = excess * (posY / 100);
-
-    map.style.backgroundPosition = `center ${posY.toFixed(2)}%`;
-    map.style.filter = `brightness(${(.86 + panT * .09).toFixed(3)}) saturate(.92) contrast(1.02)`;
-
-    main.style.transform = `translateY(${(-offsetPx).toFixed(2)}px)`;
+    // Keep transitions compositor-only. Animating background-position and
+    // CSS filters on the full-screen desk image forced expensive repaints on
+    // every frame and could stall/crash the browser GPU process.
+    main.style.transform = `translate3d(0, ${(-offsetPx).toFixed(2)}px, 0)`;
 
     if (transitionPage) {
-      transitionPage.style.transform = `translateY(${((1 - panT) * riseDistance).toFixed(2)}px)`;
+      transitionPage.style.transform =
+        `translate3d(0, ${((1 - panT) * riseDistance).toFixed(2)}px, 0)`;
     }
   }
 
   async function playTransition(page: HTMLElement, direction: 1 | -1): Promise<void> {
     transitionPage = page;
     page.style.transform = 'none';
-    riseDistance = page.getBoundingClientRect().height;
-    update(direction === 1 ? 0 : 1);
-    await runChoreo(OPEN_DURATION, direction, update);
-    transitionPage = null;
+    main.style.willChange = 'transform';
+    page.style.willChange = 'transform';
+
+    // Measure once before animation. The previous implementation called
+    // getBoundingClientRect() every frame, forcing repeated layout work while
+    // moving large full-screen menu layers.
+    const pageBox = page.getBoundingClientRect();
+    const mapBox = map.getBoundingClientRect();
+    riseDistance = pageBox.height;
+    const renderedHeight = mapBox.width * MAP_ASPECT;
+    const excess = Math.max(0, renderedHeight - mapBox.height);
+    panOffsetPx = excess * 0.62;
+
+    const target = direction === 1 ? 1 : 0;
+
+    try {
+      update(direction === 1 ? 0 : 1);
+      await runChoreo(OPEN_DURATION, direction, update);
+    } catch (error) {
+      // A menu transition must never leave the interface permanently frozen.
+      // If animation work fails, snap to the requested final state and keep
+      // the control flow moving.
+      console.error('Menu dossier transition failed; snapping to end state.', error);
+      try {
+        update(target);
+      } catch (snapError) {
+        console.error('Unable to snap dossier transition to end state.', snapError);
+      }
+    } finally {
+      main.style.willChange = '';
+      page.style.willChange = '';
+      transitionPage = null;
+    }
   }
 
   async function openDossier(card: HTMLButtonElement): Promise<void> {
@@ -75,35 +131,41 @@ export function mountMenu(handlers: MenuHandlers): void {
     const name = card.dataset.open;
     if (!name) return;
     const page = document.getElementById(`ifm-${name}`);
-    const fileEl = page?.querySelector<HTMLElement>('.ifm__file');
-    if (!page || !fileEl) return;
+    if (!page?.querySelector<HTMLElement>('.ifm__file')) return;
 
     busy = true;
     openScreen = name;
+    playCue('dossier-open');
 
     page.hidden = false;
     page.style.pointerEvents = 'none';
-    await playTransition(page, 1);
-    page.style.pointerEvents = '';
-    main.style.pointerEvents = 'none';
-    busy = false;
+    try {
+      await playTransition(page, 1);
+    } finally {
+      page.style.pointerEvents = '';
+      main.style.pointerEvents = 'none';
+      busy = false;
+    }
   }
 
   async function closeDossier(): Promise<void> {
     if (busy || !openScreen) return;
     const name = openScreen;
     const page = document.getElementById(`ifm-${name}`);
-    const fileEl = page?.querySelector<HTMLElement>('.ifm__file');
-    if (!page || !fileEl) return;
+    if (!page?.querySelector<HTMLElement>('.ifm__file')) return;
 
     busy = true;
+    playCue('dossier-close');
     main.style.pointerEvents = '';
     page.style.pointerEvents = 'none';
-    await playTransition(page, -1);
-    page.hidden = true;
-    page.style.pointerEvents = '';
-    openScreen = null;
-    busy = false;
+    try {
+      await playTransition(page, -1);
+    } finally {
+      page.hidden = true;
+      page.style.pointerEvents = '';
+      openScreen = null;
+      busy = false;
+    }
   }
 
   root.querySelectorAll<HTMLButtonElement>('[data-open]').forEach((card) => {
@@ -142,6 +204,7 @@ export function mountMenu(handlers: MenuHandlers): void {
       const list = row.parentElement;
       list?.querySelectorAll('.ifm__row').forEach((sibling) => sibling.classList.remove('is-selected'));
       row.classList.add('is-selected');
+      playCue('select');
       if (row.dataset.objective) updateBriefing(row);
     });
   });
@@ -173,6 +236,7 @@ export function mountMenu(handlers: MenuHandlers): void {
   }
 
   function launch(): void {
+    playCue('confirm');
     root.style.transition = 'opacity .5s ease';
     root.style.opacity = '0';
     window.setTimeout(() => {
@@ -185,6 +249,7 @@ export function mountMenu(handlers: MenuHandlers): void {
   document.getElementById('ifm-start-operation')?.addEventListener('click', launch);
   document.getElementById('ifm-resume-operation')?.addEventListener('click', launch);
   document.getElementById('ifm-enter-sandbox')?.addEventListener('click', launch);
+  document.getElementById('ifm-apply-settings')?.addEventListener('click', () => playCue('confirm'));
 }
 
 function requiredId<T extends HTMLElement>(id: string): T {
