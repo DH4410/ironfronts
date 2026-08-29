@@ -102,6 +102,13 @@ export interface GameNotification {
 
 export type CombatStatus = 'idle' | 'moving' | 'engaged' | 'retreating';
 
+export interface ArmyUnitGroupView {
+  readonly label: string;
+  readonly count: number;
+  /** 0..1 */
+  readonly health: number;
+}
+
 export interface ArmyStackView {
   readonly id: string;
   readonly country: string;
@@ -116,6 +123,16 @@ export interface ArmyStackView {
   readonly combat: CombatStatus;
   /** Optional pending move order, world-space target. */
   readonly moveOrder?: { readonly x: number; readonly z: number } | null;
+  /** Per-unit-type composition (§10, §44). */
+  readonly groups?: readonly ArmyUnitGroupView[];
+  /** World units per game-hour (slowest unit). */
+  readonly speed?: number;
+  /** True when the player commands this stack (enables order buttons). */
+  readonly own?: boolean;
+  /** Which order buttons are currently valid. */
+  readonly canExtract?: boolean;
+  /** UI is waiting for a map click to set the move destination. */
+  readonly awaitingMoveTarget?: boolean;
 }
 
 export interface StrategicUiState {

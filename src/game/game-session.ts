@@ -19,12 +19,20 @@ import { scenarioById } from './scenario-catalog';
 import { initGameState, type InitResult } from './scenario-init';
 import type { WorldData } from './world-data';
 import { applyIncome, recomputeIncome } from './economy';
+import { issueMoveOrder, issueStop, stepMovement } from './units/movement';
+import { issueExtract, stepExtraction } from './extraction';
+import { producibleUnits, queueUnit, stepProduction, type UnitCompletion } from './production';
+import { stepCombat, stepCapture, type CaptureEvent } from './combat';
+import { stepAi } from './ai/simple-ai';
+import { wrappedDistance } from './geometry';
 
 /** Longest game-time step a single `tick` will integrate; larger dt is clamped
  *  so a stall can't teleport armies through provinces (§46). */
 const MAX_TICK_HOURS = 1.5;
 /** Income is recomputed on this game-hour cadence, not every tick (§48). */
 const INCOME_RECOMPUTE_INTERVAL = 1;
+/** AI re-plans on this game-hour cadence (§56 — cheap, not per tick). */
+const AI_INTERVAL = 2;
 
 export class GameSession {
   readonly state: GameState;
@@ -33,6 +41,11 @@ export class GameSession {
   readonly diagnostics: InitResult['diagnostics'];
 
   private incomeClock = 0;
+  private aiClock = 0;
+
+  /** Drained by `main.ts` each frame for HUD notifications. */
+  readonly pendingCompletions: UnitCompletion[] = [];
+  readonly pendingCaptures: CaptureEvent[] = [];
 
   private constructor(init: InitResult, world: WorldData) {
     this.state = init.state;
@@ -80,12 +93,19 @@ export class GameSession {
       applyIncome(this.state, dtHours);
     }
 
-    // --- later phases ------------------------------------------------
-    // Phase E: movement.step(this, dtHours)
-    // Phase F: extraction.step(this, dtHours)
-    // Phase G: production.step(this, dtHours)
-    // Phase H: combat.step(this, dtHours); capture.step(this)
-    // Phase B: visibility recompute (event-driven / throttled)
+    // --- gameplay systems, fixed order ------------------------------
+    stepMovement(this, dtHours);            // §14
+    stepExtraction(this, dtHours);          // §23
+    for (const done of stepProduction(this, dtHours)) this.pendingCompletions.push(done); // §28
+    stepCombat(this, dtHours);              // §38
+    for (const cap of stepCapture(this)) this.pendingCaptures.push(cap); // §39
+
+    // --- simple defensive AI (slow cadence) -----------------------
+    this.aiClock += dtHours;
+    if (this.aiClock >= AI_INTERVAL) {
+      stepAi(this, this.aiClock);
+      this.aiClock = 0;
+    }
   }
 
   /** §34: only the player's own entities accept commands. */
@@ -149,6 +169,69 @@ export class GameSession {
   /** §40: entering / capturing foreign land forces war if not already. */
   declareWar(a: number, b: number): void {
     setRelation(this.state, a, b, 'war');
+  }
+
+  // ---- player commands (§34: player entities only) ------------------
+
+  orderMove(armyId: string, x: number, z: number, intent: 'move' | 'attack' = 'move') {
+    if (!this.ownsArmy(armyId)) return { ok: false, reason: 'Not your army.' };
+    return issueMoveOrder(this, armyId, x, z, intent);
+  }
+
+  orderStop(armyId: string): boolean {
+    if (!this.ownsArmy(armyId)) return false;
+    return issueStop(this, armyId);
+  }
+
+  orderExtract(armyId: string) {
+    if (!this.ownsArmy(armyId)) return { ok: false, reason: 'Not your army.' };
+    return issueExtract(this, armyId);
+  }
+
+  produce(provinceId: number, unitTypeId: string) {
+    if (!this.ownsProvince(provinceId)) return { ok: false, reason: 'Not your province.' };
+    return queueUnit(this, provinceId, unitTypeId, this.state.playerCountryId);
+  }
+
+  producible(provinceId: number): string[] {
+    return producibleUnits(this, provinceId, this.state.playerCountryId);
+  }
+
+  /** Resource node whose access point the army is standing on (for the EXTRACT
+   *  affordance), or null. */
+  extractableNodeAt(armyId: string): number | null {
+    const army = this.state.armies[armyId];
+    if (!army) return null;
+    const node = Object.values(this.state.resourceNodes).find(
+      (n) => n.accessNodeId === army.graphNodeId && n.remaining > 0,
+    );
+    return node ? node.id : null;
+  }
+
+  /** Flip the foreign country geographically nearest the player's capital to
+   *  'ai' control, so the slice has one active opponent (§56). Returns its id. */
+  enableNearbyAi(): number | null {
+    const player = this.state.countries[this.state.playerCountryId];
+    if (!player) return null;
+    const capitalId = this.world.countries.find((c) => c.id === this.state.playerCountryId)
+      ?.capitalProvinceId ?? -1;
+    const capital = this.world.provinces.find((p) => p.id === capitalId)
+      ?? this.world.provinces.find((p) => this.state.provinceOwners[p.id] === player.id);
+    if (!capital) return null;
+
+    let best: number | null = null;
+    let bestDist = Infinity;
+    for (const country of Object.values(this.state.countries)) {
+      if (country.id === player.id || country.controller === 'player') continue;
+      const home = this.world.provinces.find((p) => this.state.provinceOwners[p.id] === country.id);
+      if (!home) continue;
+      const d = wrappedDistance(
+        capital.center[0], capital.center[1], home.center[0], home.center[1], this.world.width,
+      );
+      if (d < bestDist) { bestDist = d; best = country.id; }
+    }
+    if (best !== null) this.state.countries[best].controller = 'ai';
+    return best;
   }
 
   serialize(): string {

@@ -62,6 +62,9 @@ export class WorldRenderer {
   onDiplomacyChange?: (state: DiplomacyState) => void;
   onProvinceCaptured?: (provinceId: number, previousCountry: CountryRecord, player: CountryRecord) => void;
   onProvinceSelected?: (info: HoverInfo | null) => void;
+  /** Gameplay-layer map tap handler. Return true to consume the click
+   *  (army selection / move order) and suppress province selection. */
+  onMapClick?: (clientX: number, clientY: number) => boolean;
   onTimeOfDayChange?: (state: TimeOfDayState) => void;
 
   private readonly canvas: HTMLCanvasElement;
@@ -925,7 +928,10 @@ export class WorldRenderer {
    * `armyMarkerShader`. `count` stacks are drawn; the rest of the capacity is
    * ignored. Cheap: one buffer write, no pipeline or bind-group churn (§48).
    */
-  setArmyMarkers(records: Float32Array, count: number): void {
+  setArmyMarkers(
+    records: Float32Array, count: number,
+    pickList: ReadonlyArray<{ id: string; x: number; z: number }> = [],
+  ): void {
     if (!this.armyMarkers) return;
     const capped = Math.min(count, WorldRenderer.ARMY_MARKER_CAPACITY);
     if (capped > 0) {
@@ -938,6 +944,38 @@ export class WorldRenderer {
       this.armyMarkers.params, 0, new Uint32Array([Math.max(1, capped), 0, 1, 0]),
     );
     this.armyMarkers.count = capped;
+    this.armyPickList = pickList;
+  }
+
+  private armyPickList: ReadonlyArray<{ id: string; x: number; z: number }> = [];
+
+  /** World-space ground point under a screen coordinate, or null over sky. */
+  groundPointAt(clientX: number, clientY: number): [number, number] | null {
+    const point = pickTerrainPoint(
+      this.camera, clientX, clientY,
+      this.manifest.terrain.maxHeight, this.manifest.world.height,
+      (x, z) => this.sampleHeight(x, z), this.pickPoint,
+    );
+    return point ? [point[0], point[2]] : null;
+  }
+
+  /** Army stack marker under a screen coordinate (nearest within a
+   *  zoom-scaled world radius), or null. */
+  pickArmyAt(clientX: number, clientY: number): string | null {
+    const ground = this.groundPointAt(clientX, clientY);
+    if (!ground) return null;
+    const radius = Math.max(28, this.camera.distance * 0.045);
+    const w = this.manifest.world.width;
+    let best: string | null = null;
+    let bestSq = radius * radius;
+    for (const entry of this.armyPickList) {
+      let dx = entry.x - ground[0];
+      if (dx > w / 2) dx -= w; else if (dx < -w / 2) dx += w;
+      const dz = entry.z - ground[1];
+      const dSq = dx * dx + dz * dz;
+      if (dSq < bestSq) { bestSq = dSq; best = entry.id; }
+    }
+    return best;
   }
 
   /**
@@ -1022,6 +1060,9 @@ export class WorldRenderer {
       if (!start || start.pointerId !== event.pointerId || event.button !== 0) return;
       const tapSlop = event.pointerType === 'touch' ? 12 : 5;
       if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > tapSlop) return;
+      // Gameplay layer gets first refusal on a map tap (army pick / move
+      // order). If it handled the click, do not also select a province.
+      if (this.onMapClick?.(event.clientX, event.clientY)) return;
       if (event.pointerType === 'touch') {
         this.pointer.x = event.clientX;
         this.pointer.y = event.clientY;

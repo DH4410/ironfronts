@@ -22,7 +22,13 @@ import type { ScenarioSelection } from './game/scenario';
 import { GameSession } from './game/game-session';
 import { buildWorldData } from './game/world-data-loader';
 import { computeArmyVisibility } from './game/visibility';
-import { stackHealthFraction, stackUnitCount } from './game/units/army';
+import {
+  canExtract as armyCanExtract, stackBaseSpeed, stackHealthFraction, stackUnitCount,
+} from './game/units/army';
+import { unitType } from './game/units/unit-catalog';
+
+const gameUnitLabel = (typeId: string): string => unitType(typeId).name;
+const unitMaxHp = (typeId: string): number => unitType(typeId).maxHp;
 
 const canvas = required<HTMLCanvasElement>('world');
 const countryLabels = required<HTMLCanvasElement>('country-labels');
@@ -118,6 +124,8 @@ let rendererStarted = false;
 let activeRenderer: WorldRenderer | undefined;
 let activeSession: GameSession | undefined;
 let activeWorld: import('./game/world-data').WorldData | undefined;
+let selectedArmyId: string | null = null;
+let awaitingMoveTarget = false;
 mountMenu({
   audio,
   onLaunch: (selection: ScenarioSelection) => {
@@ -216,6 +224,7 @@ async function start(selection: ScenarioSelection): Promise<void> {
     openDebugInspector: () => {
       if (debugEnabled) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3', key: 'F3' }));
     },
+    armyCommand: (command) => handleArmyCommand(command),
   };
   const gameUi = mountGameUi(uiStore, gameUiActions);
   window.addEventListener('pagehide', (event) => {
@@ -508,13 +517,27 @@ async function bootstrapGameSession(
   const session = GameSession.create(selection, world);
   activeSession = session;
   activeWorld = world;
+  selectedArmyId = null;
+  awaitingMoveTarget = false;
   (window as Window & { __ironfrontsSession?: GameSession }).__ironfrontsSession = session;
+
+  // One nearby country becomes an active opponent (§56); the rest stay passive.
+  if (!selection.sandbox) {
+    const aiId = session.enableNearbyAi();
+    if (aiId !== null) {
+      console.info(`[game] AI opponent: ${session.state.countries[aiId]?.name} (${aiId})`);
+    }
+  }
 
   // Player identity -> renderer flag/tint + HUD.
   const player = session.state.countries[session.playerCountryId];
   renderer.setPlayerCountryByName(player.name);
   const { x, z, distance } = session.diagnostics.startCamera;
   renderer.focus(x, z, distance);
+
+  // Map-tap -> army selection / move order (§17, §42). Consumes the click so
+  // it does not also select a province.
+  renderer.onMapClick = (clientX, clientY) => handleMapClick(renderer, session, world, clientX, clientY);
 
   // Resource deposits are gameplay-relevant from turn 0 — show the overlay by
   // default so the player can see where stone / metal / oil are (§4), and feed
@@ -544,11 +567,22 @@ async function bootstrapGameSession(
     uiStore.patch({ resources: playerResourceLines(session) });
     syncArmyMarkers(session, world, renderer);
     syncResourceMarkers(session, renderer);
-  }, 500);
+    refreshSelectedArmy(session);
+    drainSessionEvents(session);
+  }, 400);
+  const onKey = (event: KeyboardEvent): void => {
+    if (event.repeat || !selectedArmyId) return;
+    if (event.key === 'm' || event.key === 'M') { awaitingMoveTarget = true; refreshSelectedArmy(session); }
+    else if (event.key === 's' || event.key === 'S') { session.orderStop(selectedArmyId); awaitingMoveTarget = false; refreshSelectedArmy(session); }
+    else if (event.key === 'e' || event.key === 'E') { handleArmyCommand('extract'); }
+    else if (event.key === 'Escape') { deselectArmy(); }
+  };
+  window.addEventListener('keydown', onKey);
   window.addEventListener('pagehide', (event) => {
     if (!event.persisted) {
       window.clearInterval(simTimer);
       window.clearInterval(hudTimer);
+      window.removeEventListener('keydown', onKey);
       if (activeSession === session) activeSession = undefined;
     }
   });
@@ -595,12 +629,15 @@ function packRgb(hex: string): number {
  * fog-gated (§5, §9): own stacks always shown; foreign stacks only when in
  * contact/vision; hidden stacks omitted entirely.
  */
+const armyPickScratch: Array<{ id: string; x: number; z: number }> = [];
+
 function syncArmyMarkers(
   session: GameSession, world: import('./game/world-data').WorldData, renderer: WorldRenderer,
 ): void {
   const visibility = computeArmyVisibility(session.state, world);
   let cursor = 0;
   let count = 0;
+  armyPickScratch.length = 0;
   for (const army of Object.values(session.state.armies)) {
     if (count >= 1_024) break;
     const level = visibility.get(army.id) ?? 'hidden';
@@ -612,12 +649,137 @@ function syncArmyMarkers(
     armyMarkerScratch[cursor + 3] = level === 'visible' ? 1 : 2;
     armyMarkerScratch[cursor + 4] = stackUnitCount(army);
     armyMarkerScratch[cursor + 5] = stackHealthFraction(army);
-    armyMarkerScratch[cursor + 6] = 0; // selection — Phase D
+    armyMarkerScratch[cursor + 6] = army.id === selectedArmyId ? 1 : 0;
     armyMarkerScratch[cursor + 7] = 0;
     cursor += 8;
     count += 1;
+    armyPickScratch.push({ id: army.id, x: army.x, z: army.z });
   }
-  renderer.setArmyMarkers(armyMarkerScratch, count);
+  renderer.setArmyMarkers(armyMarkerScratch, count, armyPickScratch);
+}
+
+// ---- army selection + orders (§17, §42, §44) --------------------------
+
+function handleMapClick(
+  renderer: WorldRenderer, session: GameSession,
+  world: import('./game/world-data').WorldData, clientX: number, clientY: number,
+): boolean {
+  // 1. Armed Move order -> issue to the clicked ground point.
+  if (awaitingMoveTarget && selectedArmyId && session.ownsArmy(selectedArmyId)) {
+    const ground = renderer.groundPointAt(clientX, clientY);
+    if (ground) {
+      const result = session.orderMove(selectedArmyId, ground[0], ground[1], 'move');
+      if (!result.ok) pushNotification('warning', 'Move order', result.reason ?? 'No route.');
+      awaitingMoveTarget = false;
+      syncArmyMarkers(session, world, renderer);
+      refreshSelectedArmy(session);
+      return true;
+    }
+  }
+  // 2. Otherwise, army pick.
+  const hit = renderer.pickArmyAt(clientX, clientY);
+  if (hit) {
+    selectArmy(session, hit);
+    return true;
+  }
+  // 3. Nothing — let province selection proceed, and drop any army selection.
+  if (selectedArmyId) deselectArmy();
+  return false;
+}
+
+function selectArmy(session: GameSession, armyId: string): void {
+  selectedArmyId = armyId;
+  awaitingMoveTarget = false;
+  renderer_clearProvince();
+  refreshSelectedArmy(session);
+  if (activeRenderer && activeWorld) syncArmyMarkers(session, activeWorld, activeRenderer);
+}
+
+function deselectArmy(): void {
+  selectedArmyId = null;
+  awaitingMoveTarget = false;
+  uiStore.patch({ selectedArmy: null });
+  if (activeSession && activeRenderer && activeWorld) {
+    syncArmyMarkers(activeSession, activeWorld, activeRenderer);
+  }
+}
+
+function renderer_clearProvince(): void {
+  activeRenderer?.clearProvinceSelection();
+}
+
+function handleArmyCommand(command: 'move' | 'stop' | 'extract' | 'deselect'): void {
+  const session = activeSession;
+  if (!session || !selectedArmyId) { if (command === 'deselect') deselectArmy(); return; }
+  if (command === 'deselect') { deselectArmy(); return; }
+  if (command === 'move') { awaitingMoveTarget = true; refreshSelectedArmy(session); return; }
+  if (command === 'stop') {
+    session.orderStop(selectedArmyId);
+    awaitingMoveTarget = false;
+    refreshSelectedArmy(session);
+    return;
+  }
+  if (command === 'extract') {
+    const result = session.orderExtract(selectedArmyId);
+    if (!result.ok) pushNotification('warning', 'Extract', result.reason ?? 'Cannot extract here.');
+    else pushNotification('information', 'Extraction started', 'Deposit is now feeding your stockpile.');
+    refreshSelectedArmy(session);
+  }
+}
+
+function refreshSelectedArmy(session: GameSession): void {
+  if (!selectedArmyId) { if (uiStore.get().selectedArmy) uiStore.patch({ selectedArmy: null }); return; }
+  const army = session.state.armies[selectedArmyId];
+  if (!army) { deselectArmy(); return; }
+  const owner = session.state.countries[army.ownerCountryId];
+  const own = army.ownerCountryId === session.playerCountryId;
+  const combat = army.status === 'moving' ? 'moving'
+    : army.status === 'engaged' ? 'engaged'
+    : army.status === 'retreating' ? 'retreating' : 'idle';
+  uiStore.patch({
+    selectedArmy: {
+      id: army.id,
+      country: owner?.name ?? 'Unknown',
+      countryColor: owner?.color ?? '#888888',
+      name: army.name,
+      unitCount: stackUnitCount(army),
+      strength: Math.min(1, stackUnitCount(army) / 12),
+      health: stackHealthFraction(army),
+      selected: true,
+      combat,
+      moveOrder: army.order ? { x: army.order.destX, z: army.order.destZ } : null,
+      groups: army.units.map((g) => ({
+        label: gameUnitLabel(g.typeId),
+        count: g.count,
+        health: g.count > 0 ? Math.min(1, g.hp / (g.count * unitMaxHp(g.typeId))) : 0,
+      })),
+      speed: Math.round(stackBaseSpeed(army)),
+      own,
+      canExtract: own && !army.order && session.extractableNodeAt(army.id) !== null && armyCanExtract(army),
+      awaitingMoveTarget: own && awaitingMoveTarget,
+    },
+  });
+}
+
+function drainSessionEvents(session: GameSession): void {
+  for (const done of session.pendingCompletions.splice(0)) {
+    const name = gameUnitLabel(done.unitTypeId);
+    const province = session.world.provinces.find((p) => p.id === done.provinceId);
+    pushNotification('completed', `${name} ready`, `Built in ${province ? `province ${province.id}` : 'a city'}.`);
+  }
+  for (const cap of session.pendingCaptures.splice(0)) {
+    const to = session.state.countries[cap.toCountryId]?.name ?? '?';
+    const from = session.state.countries[cap.fromCountryId]?.name ?? '?';
+    pushNotification('combat', 'Province captured', `${to} took province ${cap.provinceId} from ${from}.`);
+  }
+}
+
+function pushNotification(kind: GameNotification['kind'], title: string, body?: string): void {
+  const notifications = [...uiStore.get().notifications, {
+    id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    kind, title, body, at: Date.now(),
+  }].slice(-4);
+  uiStore.patch({ notifications });
 }
 
 /**

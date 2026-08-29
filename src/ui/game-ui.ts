@@ -30,6 +30,8 @@ export interface GameUiActions {
   returnToMenu(): void;
   openDebugInspector(): void;
   focusSelected?: () => void;
+  /** Selected-army orders (§17). 'deselect' clears the selection. */
+  armyCommand(command: 'move' | 'stop' | 'extract' | 'deselect'): void;
 }
 
 export interface GameUiHandle {
@@ -455,20 +457,65 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       }
     }
 
-    // Army card — dev fixture, and only when no province is selected.
+    // Army card — shown whenever a stack is selected (province takes priority).
     const showArmy = Boolean(army) && !province;
     armyCard.hidden = !showArmy;
-    const nextArmyKey = showArmy && army ? army.id + army.combat + army.selected : '';
+    const groupsKey = army?.groups?.map((g) => `${g.label}${g.count}${g.health.toFixed(2)}`).join('|') ?? '';
+    const nextArmyKey = showArmy && army
+      ? `${army.id}|${army.combat}|${army.selected}|${groupsKey}|${army.awaitingMoveTarget}|${army.canExtract}`
+      : '';
     if (nextArmyKey !== armyKey) {
       armyKey = nextArmyKey;
       if (showArmy && army) {
         const head = el('header', 'ifg-card__head');
         head.append(el('strong', 'ifg-card__title', army.name));
+        const close = el('button', 'ifg-card__close');
+        close.type = 'button';
+        close.append(createIcon('close'));
+        close.addEventListener('click', () => actions.armyCommand('deselect'));
+        head.append(close);
+
         const grid = el('div', 'ifg-card__grid');
         for (const [label, value] of describeArmy(army)) {
           grid.append(el('span', 'ifg-field', `<small>${label}</small><b>${value}</b>`));
         }
-        armyCard.replaceChildren(head, createArmyCounter(army), grid);
+
+        const children: HTMLElement[] = [head, createArmyCounter(army), grid];
+
+        if (army.groups && army.groups.length > 0) {
+          const comp = el('div', 'ifg-card__resources');
+          comp.append(el('small', 'ifg-card__restitle', 'Composition'));
+          const row = el('div', 'ifg-card__reschips');
+          for (const g of army.groups) {
+            const chip = el('span', 'ifg-rchip');
+            chip.title = `${g.label} — ${Math.round(g.health * 100)}% strength`;
+            chip.append(el('b', 'ifg-rchip__value', `${g.label} ×${g.count}`));
+            row.append(chip);
+          }
+          comp.append(row);
+          children.push(comp);
+        }
+
+        if (army.own) {
+          const cmd = el('div', 'ifg-card__actions');
+          const mk = (label: string, key: 'move' | 'stop' | 'extract', enabled: boolean, active = false) => {
+            const b = el('button', 'ifg-card__act');
+            b.type = 'button';
+            b.textContent = label;
+            b.disabled = !enabled;
+            b.classList.toggle('is-active', active);
+            if (enabled) b.addEventListener('click', () => actions.armyCommand(key));
+            return b;
+          };
+          cmd.append(
+            mk(army.awaitingMoveTarget ? 'Click map…' : 'Move', 'move', true, army.awaitingMoveTarget === true),
+            mk('Stop', 'stop', army.combat !== 'idle' || army.awaitingMoveTarget === true),
+            mk('Extract', 'extract', army.canExtract === true),
+          );
+          children.push(cmd);
+        }
+
+        armyCard.replaceChildren(...children);
       }
     }
 
