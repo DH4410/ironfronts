@@ -286,9 +286,6 @@ async function start(selection: ScenarioSelection): Promise<void> {
       void music.setState('peace');
     }
   };
-  renderer.onProvinceCaptured = (provinceId, previousCountry, player) => {
-    setDiplomacyStatus(`Province ${provinceId} taken from ${previousCountry.name} by ${player.name}.`);
-  };
   renderer.onProvinceSelected = (info) => {
     if (!info) {
       selectedProvinceId = null;
@@ -543,7 +540,12 @@ async function bootstrapGameSession(
   activeWorld = world;
   selectedArmyId = null;
   awaitingMoveTarget = false;
-  (window as Window & { __ironfrontsSession?: GameSession }).__ironfrontsSession = session;
+  if (import.meta.env.DEV || debugEnabled) {
+    // Authoritative-state inspection handle for QA / perf scripts. Exposing the
+    // full GameState defeats fog of war, so it is DEV / ?debug only — never the
+    // normal player build.
+    (window as Window & { __ironfrontsSession?: GameSession }).__ironfrontsSession = session;
+  }
 
   // One nearby country becomes an active opponent (§56); the rest stay passive.
   if (!selection.sandbox) {

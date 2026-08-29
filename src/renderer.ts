@@ -60,7 +60,6 @@ export class WorldRenderer {
   onHover?: (info: HoverInfo | null, x: number, y: number) => void;
   onStats?: (stats: FrameStats) => void;
   onDiplomacyChange?: (state: DiplomacyState) => void;
-  onProvinceCaptured?: (provinceId: number, previousCountry: CountryRecord, player: CountryRecord) => void;
   onProvinceSelected?: (info: HoverInfo | null) => void;
   /** Gameplay-layer map tap handler. Return true to consume the click
    *  (army selection / move order) and suppress province selection. */
@@ -578,7 +577,6 @@ export class WorldRenderer {
     this.onHover = undefined;
     this.onStats = undefined;
     this.onDiplomacyChange = undefined;
-    this.onProvinceCaptured = undefined;
     this.onProvinceSelected = undefined;
     this.onTimeOfDayChange = undefined;
     if (!this.deviceReady) return;
@@ -1643,24 +1641,6 @@ export class WorldRenderer {
     if (!this.selectedId) return;
     this.selectedId = 0;
     this.onProvinceSelected?.(null);
-  }
-
-  /**
-   * Explicit developer/gameplay pathway for transferring ownership of the
-   * province under a screen point to the player. A normal map click never
-   * reaches this; it must be invoked deliberately (e.g. a diagnostics tool).
-   */
-  forceCaptureProvinceAt(clientX: number, clientY: number): boolean {
-    const encodedId = this.provinceAtScreenPoint(clientX, clientY);
-    if (!encodedId) return false;
-    const previousCountryId = this.provinceOwners[encodedId];
-    if (this.diplomaticRelations.get(previousCountryId) !== 'war') return false;
-    const previousCountry = this.countryById.get(previousCountryId);
-    const player = this.countryById.get(this.playerCountryId);
-    if (!previousCountry || !player) return false;
-    this.setProvinceOwner(encodedId - 1, this.playerCountryId);
-    this.onProvinceCaptured?.(encodedId - 1, previousCountry, player);
-    return true;
   }
 
   private finishPicking(encodedId: number, started: number): { raycastMs: number; hoverUiMs: number } {

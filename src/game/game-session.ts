@@ -25,6 +25,7 @@ import { producibleUnits, queueUnit, stepProduction, type UnitCompletion } from 
 import { stepCombat, stepCapture, type CaptureEvent } from './combat';
 import { stepAi } from './ai/simple-ai';
 import { guaranteeStrategicBaseline } from './resource-bootstrap';
+import { visibleResourceNodes } from './player-view';
 import { wrappedDistance } from './geometry';
 
 /** Longest game-time step a single `tick` will integrate; larger dt is clamped
@@ -134,16 +135,25 @@ export class GameSession {
     const ownerId = this.state.provinceOwners[provinceId] ?? 0;
     const owner = this.state.countries[ownerId];
     const isOwn = ownerId === this.state.playerCountryId;
-    const detailVisible = isOwn || !this.state.fogOfWar;
+    const fullDetail = isOwn || !this.state.fogOfWar;
+
+    // Deposits shown here must match what the map overlay shows: own/sandbox
+    // reveal everything in the province; otherwise only deposits the player can
+    // actually see (inside friendly vision) count — so the tooltip never
+    // contradicts a deposit chip the player is looking at (§ fog).
+    const visibleIds = fullDetail
+      ? null
+      : new Set(visibleResourceNodes(this.state, this.world).map((n) => n.id));
 
     let resources: { stone: number; metal: number; oil: number } | null = null;
     let controlled = false;
     let extracting = false;
-    if (detailVisible) {
+    {
       const totals = { stone: 0, metal: 0, oil: 0 };
       let any = false;
       for (const node of Object.values(this.state.resourceNodes)) {
         if (node.provinceId !== provinceId) continue;
+        if (visibleIds && !visibleIds.has(node.id)) continue;
         any = true;
         totals[node.kind] += node.remaining;
         if (node.controllerCountryId === ownerId) controlled = true;

@@ -35,8 +35,8 @@ export type PrimaryClickAction =
 
 /**
  * Resolve a normal left-click / tap on the map. This is selection only: it never
- * changes province ownership. Ownership mutation goes through an explicit
- * gameplay/debug pathway (see WorldRenderer.forceCaptureProvinceAt).
+ * changes province ownership. Ownership changes are authoritative GameState
+ * transitions (capture via combat) projected onto the renderer, never a click.
  */
 export function resolvePrimaryClick(encodedProvinceId: number): PrimaryClickAction {
   return encodedProvinceId > 0
