@@ -23,11 +23,13 @@ export interface ScenarioDef {
   readonly startDate: string;
   readonly mode: GameMode;
   /**
-   * Playable countries. `'all'` = every country with territory (World at War,
-   * Sandbox). Otherwise a curated, scenario-specific faction list by name,
-   * resolved against the loaded world at session init.
+   * Playable-country source. `'all'` starts from every catalogued country;
+   * `minimumStartingCities` applies the scenario's eligibility threshold.
+   * Otherwise this is a curated faction list resolved against the same cache.
    */
   readonly playableCountries: readonly string[] | 'all';
+  /** A country must own at least this many urban provinces at game start. */
+  readonly minimumStartingCities: number;
   /** Countries surfaced first in the picker; the rest stay available for 'all'. */
   readonly featuredCountries: readonly string[];
   readonly fogOfWar: boolean;

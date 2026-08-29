@@ -3,48 +3,28 @@ import {
   SCENARIOS, buildScenarioSelection, isPlayableCountry, resolvePlayableCountries,
   scenarioById,
 } from '../../src/game/scenario-catalog';
-import { CATALOG_COUNTRY_BY_NAME } from '../../src/game/data/countries.generated';
+import {
+  CATALOG_COUNTRIES, CATALOG_COUNTRY_BY_NAME,
+} from '../../src/game/data/countries.generated';
 
 const spainId = CATALOG_COUNTRY_BY_NAME.get('spain')!.id;
-const franceId = CATALOG_COUNTRY_BY_NAME.get('france')!.id;
 
 describe('scenario catalogue', () => {
-  it('mirrors the three operations plus sandbox', () => {
-    expect(SCENARIOS.map((scenario) => scenario.id)).toEqual([
-      'OP-1939-01', 'OP-1941-22', 'OP-1944-01', 'SANDBOX',
-    ]);
+  it('offers only World at War', () => {
+    expect(SCENARIOS.map((scenario) => scenario.id)).toEqual(['OP-1939-01']);
+    expect(() => scenarioById('OP-1941-22')).toThrow(/Unknown scenario/);
+    expect(() => scenarioById('SANDBOX')).toThrow(/Unknown scenario/);
   });
 
-  it('World at War is broad; Spain is playable, featured-first', () => {
+  it('World at War allows exactly the countries with at least five starting cities', () => {
     const worldAtWar = scenarioById('OP-1939-01');
     const playable = resolvePlayableCountries(worldAtWar);
-    expect(playable.length).toBeGreaterThan(100);
+    const expected = CATALOG_COUNTRIES.filter((country) => country.cityCount >= 5);
+    expect(playable).toHaveLength(expected.length);
+    expect(playable.length).toBeGreaterThan(0);
+    expect(playable.every((country) => country.cityCount >= 5)).toBe(true);
     expect(isPlayableCountry(worldAtWar, spainId)).toBe(true);
     expect(playable.slice(0, 8).map((c) => c.name)).toContain('Germany');
-  });
-
-  it('Barbarossa restricts playable factions (no Spain)', () => {
-    const barbarossa = scenarioById('OP-1941-22');
-    const names = resolvePlayableCountries(barbarossa).map((c) => c.name);
-    expect(names).toContain('Germany');
-    expect(names).not.toContain('Spain');
-    expect(isPlayableCountry(barbarossa, spainId)).toBe(false);
-    expect(names.length).toBeLessThan(20);
-  });
-
-  it('Overlord restricts to western factions (France + Germany, no Spain)', () => {
-    const overlord = scenarioById('OP-1944-01');
-    const names = resolvePlayableCountries(overlord).map((c) => c.name);
-    expect(names).toEqual(expect.arrayContaining(['France', 'Germany']));
-    expect(names).not.toContain('Spain');
-    expect(isPlayableCountry(overlord, franceId)).toBe(true);
-  });
-
-  it('Sandbox allows everything and is fog/economy-free', () => {
-    const sandbox = scenarioById('SANDBOX');
-    expect(sandbox.fogOfWar).toBe(false);
-    expect(sandbox.economyEnabled).toBe(false);
-    expect(isPlayableCountry(sandbox, spainId)).toBe(true);
   });
 
   it('buildScenarioSelection produces typed data and rejects illegal countries', () => {
@@ -56,6 +36,8 @@ describe('scenario catalogue', () => {
       playerCountryId: spainId,
       sandbox: false,
     });
-    expect(() => buildScenarioSelection('OP-1941-22', spainId)).toThrow(/not playable/);
+    const ineligible = CATALOG_COUNTRIES.find((country) => country.cityCount < 5);
+    expect(ineligible).toBeDefined();
+    expect(() => buildScenarioSelection('OP-1939-01', ineligible!.id)).toThrow(/not playable/);
   });
 });

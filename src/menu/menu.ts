@@ -260,7 +260,7 @@ export function mountMenu(handlers: MenuHandlers): void {
       name.textContent = country.name;
       const meta = document.createElement('span');
       meta.className = 'ifm__country-meta';
-      meta.textContent = `${country.provinceCount} provinces`;
+      meta.textContent = `${country.cityCount} cities · ${country.provinceCount} provinces`;
       body.append(name, meta);
       button.append(flag, body);
       button.addEventListener('click', () => {
@@ -332,18 +332,9 @@ export function mountMenu(handlers: MenuHandlers): void {
     }, 500);
   }
 
-  const fallbackCountryId = (): number =>
-    selectedCountryId
-    ?? CATALOG_COUNTRY_BY_NAME.get('spain')?.id
-    ?? resolvePlayableCountries(scenarioById(selectedScenarioId))[0]?.id
-    ?? 1;
-
   startButton?.addEventListener('click', () => {
     if (selectedCountryId === null) return;
     launch(buildScenarioSelection(selectedScenarioId, selectedCountryId));
-  });
-  document.getElementById('ifm-enter-sandbox')?.addEventListener('click', () => {
-    launch(buildScenarioSelection('SANDBOX', fallbackCountryId()));
   });
   document.getElementById('ifm-apply-settings')?.addEventListener('click', () => playCue('confirm'));
 }

@@ -4,6 +4,8 @@ import type { CatalogCountry } from '../src/game/data/countries.generated';
 export function deriveCatalogCountries(
   worldJson: unknown,
   ownersU32: Uint32Array,
+  provinceDetailsJson: unknown,
+  surfaceRgba8: Uint8Array,
 ): CatalogCountry[];
 
 /** Render the full `countries.generated.ts` module text from rows. */

@@ -50,22 +50,13 @@
               <span class="ifm__card-foot"><i>02</i><span>Archive</span></span>
             </button>
 
-            <button class="ifm__card" data-open="sandbox" aria-label="Map Sandbox">
-              <i class="ifm__corner ifm__corner--tl"></i><i class="ifm__corner ifm__corner--tr"></i>
-              <i class="ifm__corner ifm__corner--bl"></i><i class="ifm__corner ifm__corner--br"></i>
-              <span class="ifm__icon" style="--icon:url(/menu/icons/globe.svg)"></span>
-              <strong>Map Sandbox</strong>
-              <small>Explore the world freely.</small>
-              <span class="ifm__card-foot"><i>03</i><span>Atlas</span></span>
-            </button>
-
             <button class="ifm__card" data-open="settings" aria-label="Settings">
               <i class="ifm__corner ifm__corner--tl"></i><i class="ifm__corner ifm__corner--tr"></i>
               <i class="ifm__corner ifm__corner--bl"></i><i class="ifm__corner ifm__corner--br"></i>
               <span class="ifm__icon" style="--icon:url(/menu/icons/cog.svg)"></span>
               <strong>Settings</strong>
               <small>Adjust game preferences.</small>
-              <span class="ifm__card-foot"><i>04</i><span>Config</span></span>
+              <span class="ifm__card-foot"><i>03</i><span>Config</span></span>
             </button>
           </nav>
         </main>
@@ -77,7 +68,7 @@
             <i class="ifm__file-corner ifm__file-corner--bl"></i><i class="ifm__file-corner ifm__file-corner--br"></i>
             <header class="ifm__file-header">
               <button class="ifm__back" data-back>&larr; Command</button>
-              <div><small>Operation Order</small><h2>Choose Campaign</h2><p>Select a strategic starting point before deployment.</p></div>
+              <div><small>Operation Order</small><h2>World at War</h2><p>Choose the nation you will command.</p></div>
               <div class="ifm__doc-code"><span>DMO File <b>IF-01</b></span><span>Clearance <b>New</b></span></div>
             </header>
             <div class="ifm__body ifm__body--map-left">
@@ -88,14 +79,6 @@
                 <button class="ifm__row is-selected" data-op="OP-1939-01" data-objective="Coordinate a global mobilization and hold every theater at once." data-theater="Global" data-date="1 Sep 1939" data-duration="68 Months" data-risk="medium" data-readiness="3">
                   <span><span class="ifm__row-code">OP-1939-01</span><b>World at War</b><small>Global campaign across every theater.</small></span>
                   <span class="ifm__row-meta"><i class="ifm__row-insignia" style="--icon:url(/menu/kit/insignia-globe.png)"></i><span class="ifm__row-readiness"><i class="is-filled"></i><i class="is-filled"></i><i class="is-filled"></i></span></span>
-                </button>
-                <button class="ifm__row" data-op="OP-1941-22" data-objective="Break Soviet resistance in the west before winter closes the front." data-theater="Eastern Front" data-date="22 Jun 1941" data-duration="6 Months" data-risk="high" data-readiness="2">
-                  <span><span class="ifm__row-code">OP-1941-22</span><b>Operation Barbarossa</b><small>Compressed eastern-front campaign.</small></span>
-                  <span class="ifm__row-meta"><i class="ifm__row-insignia" style="--icon:url(/menu/kit/insignia-cross.png)"></i><span class="ifm__row-readiness"><i class="is-filled"></i><i class="is-filled"></i><i></i></span></span>
-                </button>
-                <button class="ifm__row" data-op="OP-1944-01" data-objective="Break the Atlantic Wall and open a second front in the west." data-theater="Western Europe" data-date="6 Jun 1944" data-duration="11 Months" data-risk="medium" data-readiness="3">
-                  <span><span class="ifm__row-code">OP-1944-01</span><b>Operation Overlord</b><small>Break the Atlantic wall and reclaim Europe.</small></span>
-                  <span class="ifm__row-meta"><i class="ifm__row-insignia" style="--icon:url(/menu/kit/insignia-star.png)"></i><span class="ifm__row-readiness"><i class="is-filled"></i><i class="is-filled"></i><i class="is-filled"></i></span></span>
                 </button>
               </div>
               <div class="ifm__briefing">
@@ -120,31 +103,6 @@
           </article>
         </section>
 
-        <section class="ifm__subpage" id="ifm-sandbox" data-screen="sandbox" hidden>
-          <article class="ifm__file">
-            <i class="ifm__file-grunge"></i>
-            <i class="ifm__file-corner ifm__file-corner--tl"></i><i class="ifm__file-corner ifm__file-corner--tr"></i>
-            <i class="ifm__file-corner ifm__file-corner--bl"></i><i class="ifm__file-corner ifm__file-corner--br"></i>
-            <header class="ifm__file-header">
-              <button class="ifm__back" data-back>&larr; Command</button>
-              <div><small>Field Atlas // Free Inspection</small><h2>Map Sandbox</h2><p>Explore the world freely.</p></div>
-              <div class="ifm__doc-code"><span>DMO File <b>FA-03</b></span><span>Clearance <b>Free</b></span></div>
-            </header>
-            <div class="ifm__body ifm__body--wide">
-              <div class="ifm__map-frame">
-                <div class="ifm__map-photo"><span>Europe</span><i class="ifm__map-compass"></i></div>
-              </div>
-              <div class="ifm__list">
-                <label class="ifm__row" style="cursor:default"><span><b>Political ownership</b><small>Country tint and national borders.</small></span><input type="checkbox" checked></label>
-                <label class="ifm__row" style="cursor:default"><span><b>Road network</b><small>Terrain-draped movement paths.</small></span><input type="checkbox" checked></label>
-                <label class="ifm__row" style="cursor:default"><span><b>Waterways</b><small>Rivers, lakes and canals.</small></span><input type="checkbox" checked></label>
-                <button class="ifm__primary" id="ifm-enter-sandbox">Enter Map Sandbox <span>&rarr;</span></button>
-              </div>
-            </div>
-            <footer class="ifm__doc-footer"><span>Field Atlas FA-03</span><span>Cartographic Division</span></footer>
-          </article>
-        </section>
-
         <section class="ifm__subpage" id="ifm-settings" data-screen="settings" hidden>
           <article class="ifm__file">
             <i class="ifm__file-grunge"></i>
@@ -153,7 +111,7 @@
             <header class="ifm__file-header">
               <button class="ifm__back" data-back>&larr; Command</button>
               <div><small>Command Preferences</small><h2>Settings</h2><p>Adjust game preferences and display options.</p></div>
-              <div class="ifm__doc-code"><span>DMO File <b>IF-04</b></span><span>Clearance <b>Local</b></span></div>
+              <div class="ifm__doc-code"><span>DMO File <b>IF-03</b></span><span>Clearance <b>Local</b></span></div>
             </header>
             <div class="ifm__body">
               <div class="ifm__list">
@@ -176,7 +134,7 @@
                 <button class="ifm__primary" id="ifm-apply-settings">Apply Preferences <span>&rarr;</span></button>
               </div>
             </div>
-            <footer class="ifm__doc-footer"><span>Command Prefs IF-04</span><span>Local Configuration</span></footer>
+            <footer class="ifm__doc-footer"><span>Command Prefs IF-03</span><span>Local Configuration</span></footer>
           </article>
         </section>
       </div>

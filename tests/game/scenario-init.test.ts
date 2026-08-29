@@ -112,11 +112,4 @@ describe('Spain "World at War" initialisation', () => {
     expect(session.state.countries[SPAIN_ID].income.metal).toBe(0);
   });
 
-  it('Sandbox mode disables fog and economy limits', () => {
-    const selection = buildScenarioSelection('SANDBOX', SPAIN_ID);
-    const { state } = initGameState(selection, scenarioById('SANDBOX'), world);
-    expect(state.fogOfWar).toBe(false);
-    expect(state.economyEnabled).toBe(false);
-    expect(state.countries[SPAIN_ID].stockpile.funds).toBeGreaterThan(9_000);
-  });
 });
