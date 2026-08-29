@@ -233,6 +233,29 @@ export class WorldRenderer {
   }
 
   /**
+   * Read-only world facts the authoritative game layer needs. The renderer is a
+   * data source here, not the game authority — `main.ts` adapts these into a
+   * `WorldData` for `GameSession`. `connectionGraph` is undefined only if its
+   * fetch failed (junction markers off).
+   */
+  get worldWidth(): number { return this.manifest.world.width; }
+  get worldHeight(): number { return this.manifest.world.height; }
+  get provinceIdRaster(): Uint16Array { return this.provinceData; }
+  get provinceIdField(): { width: number; height: number } {
+    return {
+      width: this.manifest.fields.provinceIds.width,
+      height: this.manifest.fields.provinceIds.height,
+    };
+  }
+  get surfaceFieldSize(): { width: number; height: number } {
+    return {
+      width: this.manifest.fields.surface.width,
+      height: this.manifest.fields.surface.height,
+    };
+  }
+  get worldConnectionGraph(): Float32Array | undefined { return this.connectionGraph; }
+
+  /**
    * Show / hide the GPU strategic-marker overlay (resource deposits + road
    * junctions). Cheap boolean flip — the markers are already resident on the
    * GPU; this only gates the one instanced draw.

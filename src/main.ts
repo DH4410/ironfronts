@@ -8,7 +8,9 @@ import { TRACK_BY_ID, trackSources } from './audio/music-catalog';
 import { loadQuality, saveQuality } from './graphics/quality';
 import { mountMenu } from './menu/menu';
 import { mountGameUi, type GameUiActions } from './ui/game-ui';
-import { createInitialState, createUiStore, type GameNotification } from './ui/ui-state';
+import {
+  createInitialState, createUiStore, type GameNotification, type ResourceLine,
+} from './ui/ui-state';
 import { DEMO_ARMY } from './ui/army';
 import { iconMarkup } from './ui/icons';
 import type { ProvinceResources } from './resource-nodes';
@@ -16,6 +18,9 @@ import type { WorldRenderer, MapMode, TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
 import type { CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo } from './types';
 import { LOADING_QUOTES } from './loadingQuotes';
+import type { ScenarioSelection } from './game/scenario';
+import { GameSession } from './game/game-session';
+import { buildWorldData } from './game/world-data-loader';
 
 const canvas = required<HTMLCanvasElement>('world');
 const countryLabels = required<HTMLCanvasElement>('country-labels');
@@ -109,9 +114,10 @@ window.addEventListener('pagehide', (event) => {
 
 let rendererStarted = false;
 let activeRenderer: WorldRenderer | undefined;
+let activeSession: GameSession | undefined;
 mountMenu({
   audio,
-  onLaunch: () => {
+  onLaunch: (selection: ScenarioSelection) => {
     if (rendererStarted) return;
     rendererStarted = true;
     void music.setState('opening');
@@ -134,7 +140,7 @@ mountMenu({
       // radios) but is superseded by the in-game map-mode toolbar.
       mapModes.hidden = true;
       uiStore.patch({ phase: 'loading' });
-      void start();
+      void start(selection);
     }
   },
   // In the lobby this only persists; once the renderer exists it applies live.
@@ -160,7 +166,7 @@ function startLoadingQuotes(): () => void {
   return () => window.clearInterval(timer);
 }
 
-async function start(): Promise<void> {
+async function start(selection: ScenarioSelection): Promise<void> {
   const stopQuotes = startLoadingQuotes();
 
   // Keep the complete renderer/world module graph out of the lobby bundle.
@@ -395,6 +401,16 @@ async function start(): Promise<void> {
     window.setTimeout(() => { loading.hidden = true; }, 500);
     renderer.start();
 
+    // ---- Authoritative game session (Phase A wiring) -----------------
+    // The renderer is now a data source + presentation cache; GameSession owns
+    // gameplay state. Build WorldData from the loaded package and start the
+    // fixed-step simulation (§46).
+    try {
+      await bootstrapGameSession(renderer, selection);
+    } catch (sessionError) {
+      console.error('GameSession bootstrap failed; renderer stays up.', sessionError);
+    }
+
     // Hand the HUD its opening state from real renderer/game values.
     const clock = renderer.getTimeOfDay();
     uiStore.patch({
@@ -427,6 +443,106 @@ function updateTimeControls(state: TimeOfDayState): void {
   debugTimeState.textContent = `${state.stage} · ${state.clock}`;
   if (document.activeElement !== debugTime) debugTime.value = state.clock;
   if (document.activeElement !== debugTimeMultiplier) debugTimeMultiplier.value = state.multiplier.toFixed(1);
+}
+
+// --- Game session bootstrap + fixed-step simulation (Phase A) -----------
+/** Accelerated prototype rate: this much game time passes per real second. */
+const GAME_HOURS_PER_REAL_SECOND = 0.5;
+const SIM_HZ = 10;
+
+async function bootstrapGameSession(
+  renderer: WorldRenderer, selection: ScenarioSelection,
+): Promise<void> {
+  const [detailsJson, ownersBuf, surfaceBuf, connectionsBuf] = await Promise.all([
+    fetch('/world/province-details.json').then((r) => r.json()),
+    fetch('/world/province-owners.u32').then((r) => r.arrayBuffer()),
+    fetch('/world/surface.rgba8').then((r) => r.arrayBuffer()),
+    fetch('/world/connections.f32').then((r) => r.arrayBuffer()),
+  ]);
+
+  const world = buildWorldData({
+    worldWidth: renderer.worldWidth,
+    worldHeight: renderer.worldHeight,
+    provinceDetails: detailsJson.provinces,
+    countries: renderer.getCountries().map((c) => ({
+      id: c.id, name: c.name, color: c.color, capitalProvinceId: c.capitalProvinceId,
+    })),
+    provinceOwners: new Uint32Array(ownersBuf),
+    provinceIdRaster: renderer.provinceIdRaster,
+    provinceIdField: renderer.provinceIdField,
+    surface: new Uint8Array(surfaceBuf),
+    surfaceField: renderer.surfaceFieldSize,
+    connections: new Float32Array(connectionsBuf),
+    resourceNodes: renderer.resourceNodes.map((n) => ({
+      id: n.id, kind: n.kind, x: n.x, z: n.z, amount: n.amount,
+    })),
+  });
+
+  const session = GameSession.create(selection, world);
+  activeSession = session;
+  (window as Window & { __ironfrontsSession?: GameSession }).__ironfrontsSession = session;
+
+  // Player identity -> renderer flag/tint + HUD.
+  const player = session.state.countries[session.playerCountryId];
+  renderer.setPlayerCountryByName(player.name);
+  const { x, z } = session.diagnostics.startCamera;
+  renderer.focus(x, z, 1_100);
+
+  uiStore.patch({
+    playerCountry: { name: player.name, color: player.color },
+    resources: playerResourceLines(session),
+  });
+
+  // Fixed-step simulation, decoupled from the render frame (§46).
+  let lastSim = performance.now();
+  const simTimer = window.setInterval(() => {
+    const now = performance.now();
+    const dtRealSeconds = Math.min(0.5, (now - lastSim) / 1_000);
+    lastSim = now;
+    if (uiStore.get().paused) return;
+    session.tick(dtRealSeconds * GAME_HOURS_PER_REAL_SECOND);
+  }, 1_000 / SIM_HZ);
+  const hudTimer = window.setInterval(() => {
+    uiStore.patch({ resources: playerResourceLines(session) });
+  }, 500);
+  window.addEventListener('pagehide', (event) => {
+    if (!event.persisted) {
+      window.clearInterval(simTimer);
+      window.clearInterval(hudTimer);
+      if (activeSession === session) activeSession = undefined;
+    }
+  });
+
+  console.info(
+    `[game] ${activeSession?.state.countries[session.playerCountryId].name} — `
+    + `${session.diagnostics.playerProvinces} provinces, `
+    + `${session.diagnostics.playerArmies} armies, camera @ ${Math.round(x)},${Math.round(z)}`,
+  );
+}
+
+/**
+ * Map the player country's authoritative stockpile onto the HUD's resource
+ * slots (§25). The HUD currently has no STONE slot — tracked as a follow-up;
+ * stone is still authoritative in GameState.
+ */
+function playerResourceLines(session: GameSession): ResourceLine[] {
+  const country = session.state.countries[session.playerCountryId];
+  const s = country.stockpile;
+  const inc = country.income;
+  const line = (
+    id: ResourceLine['id'], label: string, value: number, delta?: number,
+  ): ResourceLine => ({
+    id, label, value: Math.round(value),
+    delta: delta === undefined ? undefined : Number(delta.toFixed(1)),
+  });
+  return [
+    line('money', 'Funds', s.funds, inc.funds),
+    line('manpower', 'Manpower', s.manpower, inc.manpower),
+    line('food', 'Food', s.food, inc.food),
+    line('metal', 'Metal', s.metal),
+    line('oil', 'Oil', s.oil),
+    line('industry', 'Industry', country.industryCapacity),
+  ];
 }
 
 function renderDiplomacyState(renderer: WorldRenderer, state: DiplomacyState): void {

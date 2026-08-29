@@ -4,10 +4,18 @@ import { phase, runChoreo, smooth } from './choreo';
 import {
   isQualityLevel, loadQuality, QUALITY_PRESETS, saveQuality, type QualityLevel,
 } from '../graphics/quality';
+import type { ScenarioSelection } from '../game/scenario';
+import {
+  buildScenarioSelection, resolvePlayableCountries, scenarioById,
+} from '../game/scenario-catalog';
+import { CATALOG_COUNTRY_BY_NAME, type CatalogCountry } from '../game/data/countries.generated';
 
 export interface MenuHandlers {
-  /** Called once the player commits to entering the world (campaign, continue, or sandbox). */
-  onLaunch: () => void;
+  /**
+   * Called once the player commits to entering the world, with the typed
+   * scenario + country selection (§2). Nothing downstream re-reads the DOM.
+   */
+  onLaunch: (selection: ScenarioSelection) => void;
   audio?: AudioManager;
   /**
    * Fired when the player changes the graphics-quality preset in Settings.
@@ -199,6 +207,74 @@ export function mountMenu(handlers: MenuHandlers): void {
     risk.className = `is-risk-${level}`;
   }
 
+  // ---- Country selection (Choose Your Nation) -------------------------
+  const countryGrid = document.getElementById('ifm-country-grid');
+  const countryHint = document.getElementById('ifm-country-hint');
+  const startButton = document.getElementById('ifm-start-operation') as HTMLButtonElement | null;
+  const DEFAULT_SCENARIO = 'OP-1939-01';
+  let selectedScenarioId = DEFAULT_SCENARIO;
+  let selectedCountryId: number | null = null;
+
+  const flagUrls = import.meta.glob('../ui/assets/flags/*.svg', {
+    eager: true, query: '?url', import: 'default',
+  }) as Record<string, string>;
+  const flagStyle = (country: CatalogCountry): string => {
+    const url = country.flag ? flagUrls[`../ui/assets/flags/${country.flag}.svg`] : undefined;
+    return url ? `background-image:url(${url})` : `background:${country.color}`;
+  };
+
+  function updateStartEnabled(): void {
+    if (startButton) startButton.disabled = selectedCountryId === null;
+    if (countryHint) {
+      countryHint.textContent = selectedCountryId === null
+        ? 'Select the country you will command.'
+        : 'Ready. Begin the operation when you are.';
+    }
+  }
+
+  function renderCountryGrid(scenarioId: string, preferCountryId: number | null): void {
+    if (!countryGrid) return;
+    const scenario = scenarioById(scenarioId);
+    const playable = resolvePlayableCountries(scenario).slice(0, 80);
+    countryGrid.replaceChildren();
+    const keep = preferCountryId !== null && playable.some((c) => c.id === preferCountryId);
+    selectedCountryId = keep ? preferCountryId : null;
+    for (const country of playable) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ifm__country';
+      button.setAttribute('role', 'option');
+      button.dataset.countryId = String(country.id);
+      button.setAttribute('aria-selected', String(country.id === selectedCountryId));
+      button.classList.toggle('is-selected', country.id === selectedCountryId);
+      const flag = document.createElement('span');
+      flag.className = 'ifm__country-flag';
+      flag.setAttribute('style', flagStyle(country));
+      const body = document.createElement('span');
+      body.className = 'ifm__country-body';
+      const name = document.createElement('span');
+      name.className = 'ifm__country-name';
+      name.textContent = country.name;
+      const meta = document.createElement('span');
+      meta.className = 'ifm__country-meta';
+      meta.textContent = `${country.provinceCount} provinces`;
+      body.append(name, meta);
+      button.append(flag, body);
+      button.addEventListener('click', () => {
+        selectedCountryId = country.id;
+        for (const other of countryGrid.querySelectorAll('.ifm__country')) {
+          const on = other === button;
+          other.classList.toggle('is-selected', on);
+          other.setAttribute('aria-selected', String(on));
+        }
+        playCue('select');
+        updateStartEnabled();
+      });
+      countryGrid.append(button);
+    }
+    updateStartEnabled();
+  }
+
   root.querySelectorAll<HTMLButtonElement>('.ifm__row').forEach((row) => {
     row.addEventListener('click', () => {
       const list = row.parentElement;
@@ -206,8 +282,15 @@ export function mountMenu(handlers: MenuHandlers): void {
       row.classList.add('is-selected');
       playCue('select');
       if (row.dataset.objective) updateBriefing(row);
+      if (row.dataset.op) {
+        selectedScenarioId = row.dataset.op;
+        renderCountryGrid(selectedScenarioId, selectedCountryId);
+      }
     });
   });
+
+  // Pre-select World at War + Spain so the acceptance path is one click away.
+  renderCountryGrid(DEFAULT_SCENARIO, CATALOG_COUNTRY_BY_NAME.get('spain')?.id ?? null);
 
   // Graphics quality selector. Reads/persists the choice locally and only
   // notifies handlers - it never initializes the world renderer from the lobby.
@@ -235,20 +318,34 @@ export function mountMenu(handlers: MenuHandlers): void {
     }
   }
 
-  function launch(): void {
+  function launch(selection: ScenarioSelection): void {
     playCue('confirm');
     root.style.transition = 'opacity .5s ease';
     root.style.opacity = '0';
     window.setTimeout(() => {
       root.hidden = true;
       if (brand) brand.hidden = false;
-      handlers.onLaunch();
+      handlers.onLaunch(selection);
     }, 500);
   }
 
-  document.getElementById('ifm-start-operation')?.addEventListener('click', launch);
-  document.getElementById('ifm-resume-operation')?.addEventListener('click', launch);
-  document.getElementById('ifm-enter-sandbox')?.addEventListener('click', launch);
+  const fallbackCountryId = (): number =>
+    selectedCountryId
+    ?? CATALOG_COUNTRY_BY_NAME.get('spain')?.id
+    ?? resolvePlayableCountries(scenarioById(selectedScenarioId))[0]?.id
+    ?? 1;
+
+  startButton?.addEventListener('click', () => {
+    if (selectedCountryId === null) return;
+    launch(buildScenarioSelection(selectedScenarioId, selectedCountryId));
+  });
+  // Continue is not implemented yet — fall back to the default campaign start.
+  document.getElementById('ifm-resume-operation')?.addEventListener('click', () => {
+    launch(buildScenarioSelection(DEFAULT_SCENARIO, fallbackCountryId()));
+  });
+  document.getElementById('ifm-enter-sandbox')?.addEventListener('click', () => {
+    launch(buildScenarioSelection('SANDBOX', fallbackCountryId()));
+  });
   document.getElementById('ifm-apply-settings')?.addEventListener('click', () => playCue('confirm'));
 }
 
