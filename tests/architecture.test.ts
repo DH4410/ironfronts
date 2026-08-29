@@ -121,6 +121,21 @@ describe('module architecture', () => {
     expect(violations).toEqual([]);
   });
 
+  it('keeps the game layer free of browser globals so it can run in Node', () => {
+    // The server-ready promise (§ multiplayer): GameSession + rules must import
+    // nothing browser-only AND touch no browser global. Guards against a stray
+    // `window.`/`document.`/`localStorage.` creeping into a rules module.
+    const gameRoot = path.join(sourceRoot, 'game');
+    const browserGlobal = /\b(?:window|document|localStorage|sessionStorage|navigator|requestAnimationFrame)\s*\./;
+    const violations = sourceFiles
+      .filter((filename) => filename.startsWith(gameRoot))
+      .filter((filename) => browserGlobal.test(
+        readFileSync(filename, 'utf8').replace(/\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, ''),
+      ))
+      .map(relativeName);
+    expect(violations).toEqual([]);
+  });
+
   it('keeps country domain modules independent from renderer orchestration', () => {
     const countryRoot = path.join(sourceRoot, 'country-labels');
     const violations = sourceFiles

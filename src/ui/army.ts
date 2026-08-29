@@ -31,20 +31,31 @@ export function createArmyCounter(army: ArmyStackView): HTMLElement {
   el.classList.toggle('is-selected', army.selected);
   el.style.setProperty('--counter-country', army.countryColor);
   el.setAttribute('role', 'img');
-  el.setAttribute('aria-label',
-    `${army.name}: ${army.unitCount} units, ${Math.round(army.strength * 100)}% strength, ${COMBAT_LABEL[army.combat]}`);
+  const unidentified = army.identified === false;
+  el.classList.toggle('is-unidentified', unidentified);
+  el.setAttribute('aria-label', unidentified
+    ? `Unidentified ${army.country} force — strength unknown`
+    : `${army.name}: ${army.unitCount} units, ${Math.round(army.strength * 100)}% strength, ${COMBAT_LABEL[army.combat]}`);
   el.innerHTML = `
     <span class="ifg-counter__corner ifg-counter__corner--tl"></span>
     <span class="ifg-counter__corner ifg-counter__corner--br"></span>
-    <b class="ifg-counter__count">${army.unitCount}</b>
+    <b class="ifg-counter__count">${unidentified ? '?' : army.unitCount}</b>
     ${iconMarkup('note-combat', 'ifg-counter__glyph')}
-    <span class="ifg-counter__bar"><i style="width:${Math.round(army.health * 100)}%"></i></span>
+    <span class="ifg-counter__bar"><i style="width:${unidentified ? 0 : Math.round(army.health * 100)}%"></i></span>
   `;
   return el;
 }
 
 /** Detailed selected-stack readout for the contextual panel. */
 export function describeArmy(army: ArmyStackView): Array<[string, string]> {
+  if (army.identified === false) {
+    // Contact only: we know where it is and whose it is, nothing more.
+    return [
+      ['Force', 'Unidentified'],
+      ['Command', army.country],
+      ['Intel', 'Position only — strength unknown'],
+    ];
+  }
   return [
     ['Force', army.name],
     ['Command', army.country],

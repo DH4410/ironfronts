@@ -129,6 +129,12 @@ export interface ArmyStackView {
   readonly health: number;
   readonly selected: boolean;
   readonly combat: CombatStatus;
+  /**
+   * False for a foreign stack seen only at contact range — position and owner
+   * are known, composition is not. The card shows an "unidentified" readout and
+   * `unitCount` / `health` / `groups` carry no real data (§ fog).
+   */
+  readonly identified?: boolean;
   /** Optional pending move order, world-space target. */
   readonly moveOrder?: { readonly x: number; readonly z: number } | null;
   /** Per-unit-type composition (§10, §44). */

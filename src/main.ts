@@ -21,14 +21,14 @@ import { LOADING_QUOTES } from './loadingQuotes';
 import type { ScenarioSelection } from './game/scenario';
 import { GameSession } from './game/game-session';
 import { buildWorldData } from './game/world-data-loader';
-import { computeArmyVisibility } from './game/visibility';
+import { computeArmyVisibility, type ContactLevel } from './game/visibility';
+import { projectArmyView, visibleResourceNodes } from './game/player-view';
 import {
-  canExtract as armyCanExtract, stackBaseSpeed, stackHealthFraction, stackUnitCount,
+  canExtract as armyCanExtract, stackHealthFraction, stackUnitCount,
 } from './game/units/army';
 import { unitType } from './game/units/unit-catalog';
 
 const gameUnitLabel = (typeId: string): string => unitType(typeId).name;
-const unitMaxHp = (typeId: string): number => unitType(typeId).maxHp;
 const unitCostLabel = (typeId: string): string => Object.entries(unitType(typeId).cost)
   .map(([k, v]) => `${v} ${k}`).join(' · ');
 
@@ -216,8 +216,13 @@ async function start(selection: ScenarioSelection): Promise<void> {
     // facing affordance.
     (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
   }
+  // Hover deposits come from the fog-aware GameSession projection once it
+  // exists; before that (and for water) show no deposit chips. The renderer's
+  // own natural-resource table bypasses fog and must not drive player hover.
   renderer.onHover = (info, x, y) =>
-    updateTooltip(info, x, y, info ? renderer.getProvinceResources(info.id) : null);
+    updateTooltip(info, x, y, info && activeSession
+      ? activeSession.describeProvince(info.id).resources
+      : null);
 
   // ---- Player HUD: typed state in, typed actions out -----------------
   const setMapModeUnified = (mode: MapMode): void => {
@@ -579,7 +584,7 @@ async function bootstrapGameSession(
   // default so the player can see where stone / metal / oil are (§4), and feed
   // the renderer the authoritative set (natural + scenario-guaranteed).
   renderer.setResourceOverlay(true);
-  syncResourceMarkers(session, renderer);
+  syncResourceMarkers(session, world, renderer);
 
   uiStore.patch({
     playerCountry: { name: player.name, color: player.color },
@@ -600,10 +605,13 @@ async function bootstrapGameSession(
     session.tick(dtRealSeconds * GAME_HOURS_PER_REAL_SECOND);
   }, 1_000 / SIM_HZ);
   const hudTimer = window.setInterval(() => {
+    // Fog visibility is O(foreignArmies × visionSources); compute it once per
+    // HUD tick and share it between the marker upload and the selection card.
+    const visibility = computeArmyVisibility(session.state, world);
     uiStore.patch({ resources: playerResourceLines(session) });
-    syncArmyMarkers(session, world, renderer);
-    syncResourceMarkers(session, renderer);
-    refreshSelectedArmy(session);
+    syncArmyMarkers(session, world, renderer, visibility);
+    syncResourceMarkers(session, world, renderer);
+    refreshSelectedArmy(session, visibility);
     drainSessionEvents(session);
   }, 400);
   const onKey = (event: KeyboardEvent): void => {
@@ -634,13 +642,16 @@ const armyMarkerScratch = new Float32Array(8 * 1_024);
 const resourceMarkerScratch = new Float32Array(4 * 4_096);
 const RESOURCE_KIND_INDEX: Record<'stone' | 'metal' | 'oil', number> = { stone: 0, metal: 1, oil: 2 };
 
-/** Push the authoritative resource-node set (natural + scenario-guaranteed) to
- *  the renderer's dynamic deposit-marker layer. Depleted nodes shrink; exhausted
- *  ones drop out. Cheap enough for the HUD cadence. */
-function syncResourceMarkers(session: GameSession, renderer: WorldRenderer): void {
+/** Push the deposit set the PLAYER may see (own-controlled + anything inside
+ *  friendly vision; all of it in sandbox) to the renderer's dynamic deposit-
+ *  marker layer. Depleted nodes shrink; exhausted ones drop out. Foreign
+ *  deposits are not globally revealed by the overlay (§ fog). */
+function syncResourceMarkers(
+  session: GameSession, world: import('./game/world-data').WorldData, renderer: WorldRenderer,
+): void {
   let cursor = 0;
   let count = 0;
-  for (const node of Object.values(session.state.resourceNodes)) {
+  for (const node of visibleResourceNodes(session.state, world)) {
     if (count >= 4_096 || node.remaining <= 0) continue;
     const depletion = node.initialAmount > 0 ? node.remaining / node.initialAmount : 1;
     const richness = Math.max(0.28, Math.min(1, (node.initialAmount / 260) * depletion));
@@ -669,8 +680,8 @@ const armyPickScratch: Array<{ id: string; x: number; z: number }> = [];
 
 function syncArmyMarkers(
   session: GameSession, world: import('./game/world-data').WorldData, renderer: WorldRenderer,
+  visibility: Map<string, ContactLevel> = computeArmyVisibility(session.state, world),
 ): void {
-  const visibility = computeArmyVisibility(session.state, world);
   let cursor = 0;
   let count = 0;
   armyPickScratch.length = 0;
@@ -678,13 +689,15 @@ function syncArmyMarkers(
     if (count >= 1_024) break;
     const level = visibility.get(army.id) ?? 'hidden';
     if (level === 'hidden') continue;
+    const identified = level === 'visible';
     const owner = session.state.countries[army.ownerCountryId];
     armyMarkerScratch[cursor] = army.x;
     armyMarkerScratch[cursor + 1] = army.z;
     armyMarkerScratch[cursor + 2] = packRgb(owner?.color ?? '#888888');
-    armyMarkerScratch[cursor + 3] = level === 'visible' ? 1 : 2;
-    armyMarkerScratch[cursor + 4] = stackUnitCount(army);
-    armyMarkerScratch[cursor + 5] = stackHealthFraction(army);
+    armyMarkerScratch[cursor + 3] = identified ? 1 : 2;
+    // Contact markers render as '?'; don't ship the real strength/health.
+    armyMarkerScratch[cursor + 4] = identified ? stackUnitCount(army) : 0;
+    armyMarkerScratch[cursor + 5] = identified ? stackHealthFraction(army) : 0;
     armyMarkerScratch[cursor + 6] = army.id === selectedArmyId ? 1 : 0;
     armyMarkerScratch[cursor + 7] = 0;
     cursor += 8;
@@ -763,36 +776,43 @@ function handleArmyCommand(command: 'move' | 'stop' | 'extract' | 'deselect'): v
   }
 }
 
-function refreshSelectedArmy(session: GameSession): void {
+function refreshSelectedArmy(
+  session: GameSession, visibility?: Map<string, ContactLevel>,
+): void {
   if (!selectedArmyId) { if (uiStore.get().selectedArmy) uiStore.patch({ selectedArmy: null }); return; }
-  const army = session.state.armies[selectedArmyId];
-  if (!army) { deselectArmy(); return; }
-  const owner = session.state.countries[army.ownerCountryId];
-  const own = army.ownerCountryId === session.playerCountryId;
-  const combat = army.status === 'moving' ? 'moving'
-    : army.status === 'engaged' ? 'engaged'
-    : army.status === 'retreating' ? 'retreating' : 'idle';
+  // Everything the card shows comes from the fog-aware projection — the raw
+  // ArmyStack (exact groups / hp / speed) never reaches the HUD for a foreign
+  // stack the player has not fully identified (§ fog leak: contact composition).
+  const view = activeWorld
+    ? projectArmyView(session.state, activeWorld, selectedArmyId, visibility)
+    : null;
+  if (!view) { deselectArmy(); return; } // gone, or degraded to hidden
+  const comp = view.composition;
+  const combat = view.status === 'moving' ? 'moving'
+    : view.status === 'engaged' ? 'engaged'
+    : view.status === 'retreating' ? 'retreating' : 'idle';
+  const ownArmy = view.own ? session.state.armies[view.id] : undefined;
   uiStore.patch({
     selectedArmy: {
-      id: army.id,
-      country: owner?.name ?? 'Unknown',
-      countryColor: owner?.color ?? '#888888',
-      name: army.name,
-      unitCount: stackUnitCount(army),
-      strength: Math.min(1, stackUnitCount(army) / 12),
-      health: stackHealthFraction(army),
+      id: view.id,
+      country: view.ownerName,
+      countryColor: view.ownerColor,
+      name: view.name,
+      identified: comp !== null,
+      unitCount: comp?.unitCount ?? 0,
+      strength: comp ? Math.min(1, comp.unitCount / 12) : 0,
+      health: comp?.health ?? 0,
       selected: true,
       combat,
-      moveOrder: army.order ? { x: army.order.destX, z: army.order.destZ } : null,
-      groups: army.units.map((g) => ({
-        label: gameUnitLabel(g.typeId),
-        count: g.count,
-        health: g.count > 0 ? Math.min(1, g.hp / (g.count * unitMaxHp(g.typeId))) : 0,
+      moveOrder: view.moveOrder,
+      groups: comp?.groups.map((g) => ({
+        label: gameUnitLabel(g.typeId), count: g.count, health: g.health,
       })),
-      speed: Math.round(stackBaseSpeed(army)),
-      own,
-      canExtract: own && !army.order && session.extractableNodeAt(army.id) !== null && armyCanExtract(army),
-      awaitingMoveTarget: own && awaitingMoveTarget,
+      speed: comp?.speed,
+      own: view.own,
+      canExtract: Boolean(ownArmy) && !ownArmy!.order
+        && session.extractableNodeAt(view.id) !== null && armyCanExtract(ownArmy!),
+      awaitingMoveTarget: view.own && awaitingMoveTarget,
     },
   });
 }

@@ -495,7 +495,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     armyCard.hidden = !showArmy;
     const groupsKey = army?.groups?.map((g) => `${g.label}${g.count}${g.health.toFixed(2)}`).join('|') ?? '';
     const nextArmyKey = showArmy && army
-      ? `${army.id}|${army.combat}|${army.selected}|${groupsKey}|${army.awaitingMoveTarget}|${army.canExtract}`
+      ? `${army.id}|${army.combat}|${army.selected}|${groupsKey}|${army.awaitingMoveTarget}|${army.canExtract}|${army.identified}`
       : '';
     if (nextArmyKey !== armyKey) {
       armyKey = nextArmyKey;

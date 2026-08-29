@@ -13,7 +13,8 @@
  * (sandbox / `fogOfWar === false`) everything is VISIBLE.
  *
  * Pure and cheap: O(foreignArmies × visionSources). Recomputed on the sim
- * cadence, not per render frame.
+ * cadence, not per render frame. `player-view.ts` reuses `friendlyVisionSources`
+ * / `pointContactLevel` to keep every fog decision on one implementation.
  */
 
 import type { GameState } from './game-state';
@@ -27,14 +28,14 @@ export type ContactLevel = 'hidden' | 'contact' | 'visible';
 /** Outer-vision radius a friendly province centre projects (no inner reveal). */
 const PROVINCE_VISION_OUTER = 130;
 
-interface VisionSource {
+export interface VisionSource {
   x: number;
   z: number;
   outerSq: number;
   innerSq: number;
 }
 
-function friendlyVisionSources(state: GameState, world: WorldData): VisionSource[] {
+export function friendlyVisionSources(state: GameState, world: WorldData): VisionSource[] {
   const player = state.playerCountryId;
   const sources: VisionSource[] = [];
   for (const army of Object.values(state.armies)) {
@@ -56,6 +57,19 @@ function friendlyVisionSources(state: GameState, world: WorldData): VisionSource
   return sources;
 }
 
+/** Highest contact level a world point reaches against the given vision set. */
+export function pointContactLevel(
+  sources: readonly VisionSource[], x: number, z: number, worldWidth: number,
+): ContactLevel {
+  let level: ContactLevel = 'hidden';
+  for (const source of sources) {
+    const distSq = wrappedDistanceSq(source.x, source.z, x, z, worldWidth);
+    if (distSq <= source.innerSq) return 'visible';
+    if (distSq <= source.outerSq) level = 'contact';
+  }
+  return level;
+}
+
 export function computeArmyVisibility(
   state: GameState, world: WorldData,
 ): Map<string, ContactLevel> {
@@ -73,13 +87,7 @@ export function computeArmyVisibility(
       result.set(army.id, 'visible');
       continue;
     }
-    let level: ContactLevel = 'hidden';
-    for (const source of sources) {
-      const distSq = wrappedDistanceSq(source.x, source.z, army.x, army.z, world.width);
-      if (distSq <= source.innerSq) { level = 'visible'; break; }
-      if (distSq <= source.outerSq) level = 'contact';
-    }
-    result.set(army.id, level);
+    result.set(army.id, pointContactLevel(sources, army.x, army.z, world.width));
   }
   return result;
 }
