@@ -11,7 +11,8 @@
 import type { SimContext } from './sim-context';
 import { relationOf, setRelation } from './game-state';
 import type { ArmyStack } from './units/army';
-import { stackUnitCount } from './units/army';
+import { stackHealthFraction, stackUnitCount } from './units/army';
+import { issueMoveOrder } from './units/movement';
 import { unitType } from './units/unit-catalog';
 import type { UnitCategory } from './units/unit-types';
 import { wrappedDistance } from './geometry';
@@ -28,9 +29,13 @@ const ARMOR_INDEX = { unarmored: 0, light: 1, heavy: 2 } as const;
 /** Only the strongest this-many units per side deal full damage. */
 const FRONTAGE = 10;
 const COMBAT_SNAP = 26;
+/** A stack this battered that is also being out-fought withdraws to safety. */
+const RETREAT_HEALTH = 0.3;
+/** ...where "out-fought" means it is taking this much more than it deals. */
+const RETREAT_ODDS = 1.5;
 
 export interface CombatEvent {
-  readonly kind: 'engaged' | 'destroyed';
+  readonly kind: 'engaged' | 'destroyed' | 'retreat';
   readonly attacker: number;
   readonly defender: number;
   readonly provinceHint?: string;
@@ -86,6 +91,24 @@ function applyDamage(stack: ArmyStack, amount: number): void {
   });
 }
 
+/** Send `army` back to its nearest owned province centre and mark it retreating.
+ *  Returns false (and does nothing) if it has nowhere to run. */
+function withdraw(session: SimContext, army: ArmyStack): boolean {
+  let best: readonly [number, number] | null = null;
+  let bestD = Infinity;
+  for (const province of session.world.provinces) {
+    if (session.state.provinceOwners[province.id] !== army.ownerCountryId) continue;
+    const d = wrappedDistance(
+      army.x, army.z, province.center[0], province.center[1], session.world.width,
+    );
+    if (d > 0 && d < bestD) { bestD = d; best = province.center; }
+  }
+  if (!best) return false;
+  if (!issueMoveOrder(session, army.id, best[0], best[1], 'move').ok) return false;
+  army.status = 'retreating';
+  return true;
+}
+
 /** One combat + capture pass. Returns notable events. */
 export function stepCombat(session: SimContext, dtHours: number): CombatEvent[] {
   const events: CombatEvent[] = [];
@@ -99,6 +122,9 @@ export function stepCombat(session: SimContext, dtHours: number): CombatEvent[] 
       const b = armies[j];
       if (!session.state.armies[b.id]) continue;
       if (a.ownerCountryId === b.ownerCountryId) continue;
+      // A stack that has broken off keeps moving — it does not re-engage while
+      // it clears the field.
+      if (a.status === 'retreating' || b.status === 'retreating') continue;
       const together = a.graphNodeId === b.graphNodeId
         || wrappedDistance(a.x, a.z, b.x, b.z, session.world.width) <= COMBAT_SNAP;
       if (!together) continue;
@@ -126,6 +152,20 @@ export function stepCombat(session: SimContext, dtHours: number): CombatEvent[] 
       if (session.state.armies[b.id] && stackUnitCount(b) === 0) {
         delete session.state.armies[b.id];
         events.push({ kind: 'destroyed', attacker: a.ownerCountryId, defender: b.ownerCountryId });
+      }
+
+      // A badly beaten, out-fought survivor breaks contact rather than dying in
+      // place. The winner is free to advance / capture next tick.
+      const survA = session.state.armies[a.id];
+      const survB = session.state.armies[b.id];
+      if (survA && survB) {
+        if (stackHealthFraction(survA) < RETREAT_HEALTH && dmgToA > dmgToB * RETREAT_ODDS
+          && withdraw(session, survA)) {
+          events.push({ kind: 'retreat', attacker: b.ownerCountryId, defender: a.ownerCountryId });
+        } else if (stackHealthFraction(survB) < RETREAT_HEALTH && dmgToB > dmgToA * RETREAT_ODDS
+          && withdraw(session, survB)) {
+          events.push({ kind: 'retreat', attacker: a.ownerCountryId, defender: b.ownerCountryId });
+        }
       }
       break; // a resolved this tick
     }
