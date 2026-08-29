@@ -22,16 +22,24 @@ export const RESOURCE_KEYS: readonly ResourceKey[] = [
 
 export type Stockpile = Record<ResourceKey, number>;
 
+/**
+ * Who drives a country. The player/AI/neutral split is authoritative here so
+ * nothing hardcodes "player vs everyone else" — AI countries issue the SAME
+ * GameSession commands the player does (§ AI rule).
+ */
+export type ControllerType = 'player' | 'ai' | 'neutral';
+
 export interface CountryState {
   readonly id: number;
   readonly name: string;
   readonly color: string;
+  controller: ControllerType;
   stockpile: Stockpile;
   /** Passive per-game-hour income, recomputed by the economy system (§26). */
   income: Stockpile;
   /** Abstract build-throughput stat, not a stockpile (§25). */
   industryCapacity: number;
-  /** True once the country is the human player's (§34). */
+  /** Convenience mirror of `controller === 'player'`. */
   readonly isPlayer: boolean;
 }
 
@@ -52,6 +60,9 @@ export interface ProductionOrder {
 
 export type ResourceNodeStatus = 'idle' | 'secured' | 'extracting' | 'exhausted';
 
+/** How a deposit came to exist (§ resource blocker fix, part B). */
+export type ResourceProvenance = 'generatedNatural' | 'scenarioGuarantee';
+
 export interface ResourceNodeState {
   readonly id: number;
   readonly kind: 'stone' | 'metal' | 'oil';
@@ -59,13 +70,21 @@ export interface ResourceNodeState {
   readonly z: number;
   remaining: number;
   readonly initialAmount: number;
-  /** Country that currently controls the node (province owner by default, §22). */
+  /**
+   * Country that currently controls the node. Initial value is the owner of
+   * the province the node physically sits in — point-in-province from the
+   * id raster, never nearest-centroid (§22, resource blocker fix part A).
+   * 0 = uncontrolled (node in water/void — should not happen after bootstrap).
+   */
   controllerCountryId: number;
+  /** Raw id of the province the node sits in, or -1 for water/void. */
+  readonly provinceId: number;
   /** Nearest reachable land movement-graph node (§20); -1 when unreachable. */
   readonly accessNodeId: number;
   /** Army currently extracting here, or null (§23). */
   extractorArmyId: string | null;
   status: ResourceNodeStatus;
+  readonly provenance: ResourceProvenance;
 }
 
 export type Relation = 'peace' | 'war';

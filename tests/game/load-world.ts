@@ -1,12 +1,13 @@
 /**
  * Shared test helper: assemble a `WorldData` from the built world output on
  * disk (public/world/**). `pretest` runs `build:world`, so these files exist
- * whenever the suite runs.
+ * whenever the suite runs. Uses the same pure builder as `main.ts`.
  */
 
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { WorldData, WorldProvince } from '../../src/game/world-data';
+import type { WorldData } from '../../src/game/world-data';
+import { buildWorldData } from '../../src/game/world-data-loader';
 import { generateResourceNodes } from '../../src/resource-nodes';
 
 const WORLD_DIR = path.resolve(__dirname, '../../public/world');
@@ -24,63 +25,39 @@ export async function loadWorld(): Promise<LoadedWorld> {
   const manifest = JSON.parse(await readFile(path.join(WORLD_DIR, 'world.json'), 'utf8'));
   const details = JSON.parse(
     await readFile(path.join(WORLD_DIR, 'province-details.json'), 'utf8'),
-  ).provinces as Array<{
-    id: number; center: [number, number]; terrainId: number; population: number; coastal: boolean;
-  }>;
-  const owners = new Uint32Array(await bin('province-owners.u32'));
-  const connections = new Float32Array(await bin('connections.f32'));
+  ).provinces;
+
   const surface = new Uint8Array(await bin('surface.rgba8'));
   const height = new Float32Array(await bin('height.f32'));
-
-  const width: number = manifest.world.width;
-  const heightUnits: number = manifest.world.height;
-  const surfaceField = manifest.fields.surface;
-  const heightField = manifest.fields.height;
-
-  const surfaceClassAt = (x: number, z: number): number => {
-    const px = ((Math.floor((((x % width) + width) % width) / width * surfaceField.width) % surfaceField.width) + surfaceField.width) % surfaceField.width;
-    const pz = Math.min(surfaceField.height - 1, Math.max(0, Math.floor(z / heightUnits * surfaceField.height)));
-    return surface[(pz * surfaceField.width + px) * 4];
-  };
-
-  const provinces: WorldProvince[] = details.map((detail) => ({
-    id: detail.id,
-    center: [detail.center[0], detail.center[1]] as const,
-    terrainId: detail.terrainId,
-    population: detail.population,
-    coastal: detail.coastal,
-    urban: surfaceClassAt(detail.center[0], detail.center[1]) === 4,
-  }));
-
-  const countries = manifest.politics.countries.map((country: {
-    id: number; name: string; color: string; capitalProvinceId: number;
-  }) => ({
-    id: country.id,
-    name: country.name,
-    color: country.color,
-    capitalProvinceId: country.capitalProvinceId,
-  }));
+  const worldWidth: number = manifest.world.width;
+  const worldHeight: number = manifest.world.height;
 
   const resourceNodes = generateResourceNodes({
     surface,
-    surfaceField,
+    surfaceField: manifest.fields.surface,
     height,
-    heightField,
-    world: { width, height: heightUnits },
+    heightField: manifest.fields.height,
+    world: { width: worldWidth, height: worldHeight },
   }).map((node) => ({ id: node.id, kind: node.kind, x: node.x, z: node.z, amount: node.amount }));
 
-  return {
-    width,
-    height: heightUnits,
-    provinces,
-    countries,
-    // `province-owners.u32` is indexed by ENCODED id (raw province_id + 1);
-    // the game layer works in raw province ids throughout (§ renderer public API).
-    provinceOwner: (provinceId: number) => owners[provinceId + 1] ?? 0,
-    connections,
+  const world = buildWorldData({
+    worldWidth,
+    worldHeight,
+    provinceDetails: details,
+    countries: manifest.politics.countries,
+    provinceOwners: new Uint32Array(await bin('province-owners.u32')),
+    provinceIdRaster: new Uint16Array(await bin('province-ids.u16')),
+    provinceIdField: manifest.fields.provinceIds,
+    surface,
+    surfaceField: manifest.fields.surface,
+    connections: new Float32Array(await bin('connections.f32')),
     resourceNodes,
-    countryByName: (name: string) => countries.find(
-      (country: { name: string }) => country.name.toLowerCase() === name.toLowerCase(),
+  });
+
+  return {
+    ...world,
+    countryByName: (name: string) => world.countries.find(
+      (country) => country.name.toLowerCase() === name.toLowerCase(),
     ),
   };
 }

@@ -13,14 +13,15 @@
 import type { ScenarioDef, ScenarioSelection } from './scenario';
 import type { WorldData, WorldProvince } from './world-data';
 import type {
-  CountryState, GameState, ProductionOrder, ProvinceBuildings, ResourceNodeState,
+  ControllerType, CountryState, GameState, ProductionOrder, ProvinceBuildings,
 } from './game-state';
 import { GAME_STATE_VERSION, emptyStockpile } from './game-state';
 import type { ArmyStack, UnitGroup } from './units/army';
 import { makeGroup } from './units/army';
 import { buildLandGraph, nearestNode, type LandGraph } from './movement/graph';
 import { mulberry32, hashString } from './rng';
-import { wrappedDistance } from './geometry';
+import { resolvePlayableCountries } from './scenario-catalog';
+import { bootstrapResources, type ResourceBootstrapResult } from './resource-bootstrap';
 
 /** Starting stockpile for a campaign player country (§37 step 6). */
 const PLAYER_START_STOCKPILE = {
@@ -32,10 +33,6 @@ const AI_START_STOCKPILE = {
 const SANDBOX_STOCKPILE = {
   funds: 99_999, manpower: 99_999, food: 99_999, stone: 99_999, metal: 99_999, oil: 99_999,
 };
-
-/** Resource-node access snapping tolerance (§20). Beyond this the node is
- *  flagged unreachable (accessNodeId -1) rather than snapped to a far road. */
-const ACCESS_SNAP_MAX = 260;
 
 /** Curated starting order of battle for the player's capital region (§36). */
 const PLAYER_CAPITAL_ARMY: Array<{ typeId: string; count: number }> = [
@@ -61,6 +58,7 @@ export interface InitResult {
     readonly playerUrbanProvinces: number;
     readonly reachableResourceNodes: number;
     readonly unreachableResourceNodes: number;
+    readonly guaranteedDeposits: ResourceBootstrapResult['guarantees'];
     readonly playerArmies: number;
     readonly totalArmies: number;
     readonly startCamera: { readonly x: number; readonly z: number };
@@ -78,8 +76,9 @@ function provincesByOwner(world: WorldData): Map<number, WorldProvince[]> {
 }
 
 function makeCountryState(
-  world: WorldData, countryId: number, isPlayer: boolean, sandbox: boolean,
+  world: WorldData, countryId: number, controller: ControllerType, sandbox: boolean,
 ): CountryState {
+  const isPlayer = controller === 'player';
   const record = world.countries.find((country) => country.id === countryId);
   const stockpile = sandbox
     ? { ...SANDBOX_STOCKPILE }
@@ -88,6 +87,7 @@ function makeCountryState(
     id: countryId,
     name: record?.name ?? `Country ${countryId}`,
     color: record?.color ?? '#888888',
+    controller,
     stockpile,
     income: emptyStockpile(),
     industryCapacity: isPlayer ? 10 : 6,
@@ -159,12 +159,15 @@ export function initGameState(
   const graph = buildLandGraph(world.connections, world.width, world.height);
 
   // ---- countries ---------------------------------------------------------
+  // ControllerType is authoritative (§ AI). Checkpoint 1: the player's country
+  // is 'player', every other country is 'neutral'. A later phase promotes one
+  // nearby hostile country to 'ai'.
   const byOwner = provincesByOwner(world);
   const countries: Record<number, CountryState> = {};
   for (const countryId of byOwner.keys()) {
-    countries[countryId] = makeCountryState(
-      world, countryId, countryId === selection.playerCountryId, sandbox,
-    );
+    const controller: ControllerType =
+      countryId === selection.playerCountryId ? 'player' : 'neutral';
+    countries[countryId] = makeCountryState(world, countryId, controller, sandbox);
   }
   if (!countries[selection.playerCountryId]) {
     // Player country has no territory in this world — caller should have
@@ -213,27 +216,16 @@ export function initGameState(
     if (cities[0]) provinceBuildings[cities[0].id] = { barracks: 1, tankPlant: 0, ordnance: 0 };
   }
 
-  // ---- resource nodes: access-node snapping + initial control --------
-  const resourceNodes: Record<number, ResourceNodeState> = {};
-  let reachable = 0;
-  let unreachable = 0;
-  for (const node of world.resourceNodes) {
-    const accessNodeId = nearestNode(graph, node.x, node.z, ACCESS_SNAP_MAX);
-    if (accessNodeId >= 0) reachable += 1; else unreachable += 1;
-    const provinceId = nearestProvinceId(world, node.x, node.z);
-    resourceNodes[node.id] = {
-      id: node.id,
-      kind: node.kind,
-      x: node.x,
-      z: node.z,
-      remaining: node.amount,
-      initialAmount: node.amount,
-      controllerCountryId: provinceId >= 0 ? (provinceOwners[provinceId] ?? 0) : 0,
-      accessNodeId,
-      extractorArmyId: null,
-      status: 'idle',
-    };
-  }
+  // ---- resource nodes: point-in-province assignment + strategic baseline
+  // Campaign guarantees each playable country >=1 reachable stone + metal it
+  // controls; sandbox skips the guarantee (no economy requirement, §4).
+  const playableIds = sandbox
+    ? []
+    : resolvePlayableCountries(scenario).map((country) => country.id);
+  const bootstrap = bootstrapResources(
+    world.resourceNodes, world, graph, provinceOwners, playableIds, seed,
+  );
+  const resourceNodes = bootstrap.nodes;
 
   // ---- starting armies (§36) ----------------------------------------
   const armies: Record<string, ArmyStack> = {};
@@ -317,23 +309,14 @@ export function initGameState(
       playerComponent,
       playerProvinces: playerProvinces.length,
       playerUrbanProvinces: playerCities.length,
-      reachableResourceNodes: reachable,
-      unreachableResourceNodes: unreachable,
+      reachableResourceNodes: bootstrap.diagnostics.reachable,
+      unreachableResourceNodes: bootstrap.diagnostics.unreachable,
+      guaranteedDeposits: bootstrap.guarantees,
       playerArmies,
       totalArmies: Object.keys(armies).length,
       startCamera,
     },
   };
-}
-
-function nearestProvinceId(world: WorldData, x: number, z: number): number {
-  let best = -1;
-  let bestDist = Infinity;
-  for (const province of world.provinces) {
-    const dist = wrappedDistance(x, z, province.center[0], province.center[1], world.width);
-    if (dist < bestDist) { bestDist = dist; best = province.id; }
-  }
-  return best;
 }
 
 function ordinalSuffix(value: number): string {

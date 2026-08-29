@@ -16,7 +16,7 @@ function minimalState(): GameState {
     clock: { gameTimeHours: 12.5, startDate: '1 Sep 1939' },
     countries: {
       24: {
-        id: 24, name: 'Spain', color: '#8EB0BB',
+        id: 24, name: 'Spain', color: '#8EB0BB', controller: 'player',
         stockpile: { ...emptyStockpile(), funds: 100 },
         income: emptyStockpile(), industryCapacity: 10, isPlayer: true,
       },
@@ -34,7 +34,8 @@ function minimalState(): GameState {
     resourceNodes: {
       7: {
         id: 7, kind: 'metal', x: 120, z: 210, remaining: 145, initialAmount: 145,
-        controllerCountryId: 24, accessNodeId: 5, extractorArmyId: null, status: 'idle',
+        controllerCountryId: 24, provinceId: 294, accessNodeId: 5,
+        extractorArmyId: null, status: 'idle', provenance: 'generatedNatural',
       },
     },
     relations: {},

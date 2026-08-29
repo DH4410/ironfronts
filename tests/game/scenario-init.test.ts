@@ -70,20 +70,19 @@ describe('Spain "World at War" initialisation (§37)', () => {
       }
     }
 
-    // §61 O–S needs a reachable extraction target the player controls. With
-    // the current world seed Spain's territory holds no such node — this is a
-    // known scenario-data blocker tracked for the §68 report, NOT a code bug,
-    // so it is asserted as a diagnostic rather than a hard requirement here.
-    const spainControlled = nodes.filter(
-      (node) => node.controllerCountryId === SPAIN_ID && node.accessNodeId >= 0,
+    // §61 O–S: Spain MUST control a reachable stone AND metal deposit so the
+    // vertical slice (move engineers -> deposit -> EXTRACT -> stockpile rises)
+    // is buildable. Guaranteed by the resource bootstrap if the seed's natural
+    // geography does not already provide them.
+    const spainStone = nodes.filter(
+      (n) => n.kind === 'stone' && n.controllerCountryId === SPAIN_ID && n.accessNodeId >= 0,
     );
-    // eslint-disable-next-line no-console
-    console.log(
-      `[scenario-init] Spain-controlled reachable resource nodes: ${spainControlled.length}`,
-      spainControlled.reduce<Record<string, number>>((acc, n) => {
-        acc[n.kind] = (acc[n.kind] ?? 0) + 1; return acc;
-      }, {}),
+    const spainMetal = nodes.filter(
+      (n) => n.kind === 'metal' && n.controllerCountryId === SPAIN_ID && n.accessNodeId >= 0,
     );
+    expect(spainStone.length).toBeGreaterThanOrEqual(1);
+    expect(spainMetal.length).toBeGreaterThanOrEqual(1);
+    expect(diagnostics.guaranteedDeposits.every((g) => g.provinceId >= 0)).toBe(true);
 
     // all peace at start (§40)
     expect(Object.keys(state.relations)).toHaveLength(0);
