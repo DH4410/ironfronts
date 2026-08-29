@@ -41,12 +41,12 @@
               <span class="ifm__card-foot"><i>01</i><span>Command</span></span>
             </button>
 
-            <button class="ifm__card" data-open="continue" aria-label="Continue">
+            <button class="ifm__card is-disabled" disabled aria-label="Continue (no saved campaigns)" title="No saved campaigns yet">
               <i class="ifm__corner ifm__corner--tl"></i><i class="ifm__corner ifm__corner--tr"></i>
               <i class="ifm__corner ifm__corner--bl"></i><i class="ifm__corner ifm__corner--br"></i>
               <span class="ifm__icon" style="--icon:url(/menu/icons/history.svg)"></span>
               <strong>Continue</strong>
-              <small>Resume your last campaign.</small>
+              <small>No saved campaigns.</small>
               <span class="ifm__card-foot"><i>02</i><span>Archive</span></span>
             </button>
 
@@ -82,7 +82,7 @@
             </header>
             <div class="ifm__body ifm__body--map-left">
               <div class="ifm__map-frame">
-                <div class="ifm__map-photo"><span>European Theater</span><i class="ifm__map-compass"></i></div>
+                <div class="ifm__map-photo"><span id="ifm-map-theater">Global</span><i class="ifm__map-compass"></i></div>
               </div>
               <div class="ifm__list">
                 <button class="ifm__row is-selected" data-op="OP-1939-01" data-objective="Coordinate a global mobilization and hold every theater at once." data-theater="Global" data-date="1 Sep 1939" data-duration="68 Months" data-risk="medium" data-readiness="3">
@@ -117,33 +117,6 @@
               <button class="ifm__primary" id="ifm-start-operation">Begin Operation <span>&rarr;</span></button>
             </div>
             <footer class="ifm__doc-footer"><span>Department of Military Operations</span><span>File IF-01</span></footer>
-          </article>
-        </section>
-
-        <section class="ifm__subpage" id="ifm-continue" data-screen="continue" hidden>
-          <article class="ifm__file">
-            <i class="ifm__file-grunge"></i>
-            <i class="ifm__file-corner ifm__file-corner--tl"></i><i class="ifm__file-corner ifm__file-corner--tr"></i>
-            <i class="ifm__file-corner ifm__file-corner--bl"></i><i class="ifm__file-corner ifm__file-corner--br"></i>
-            <header class="ifm__file-header">
-              <button class="ifm__back" data-back>&larr; Command</button>
-              <div><small>Archive // Active Operations</small><h2>Continue Campaign</h2><p>Resume a previously filed command.</p></div>
-              <div class="ifm__doc-code"><span>DMO File <b>IF-02</b></span><span>Clearance <b>Active</b></span></div>
-            </header>
-            <div class="ifm__body">
-              <div class="ifm__list">
-                <button class="ifm__row is-selected"><span><b>Autosave — Western Front</b><small>6 May 1944 · 08:00</small></span><em>68 Days</em></button>
-                <button class="ifm__row"><span><b>Smolensk Offensive</b><small>5 May 1944 · 22:15</small></span><em>67 Days</em></button>
-                <button class="ifm__row"><span><b>Prepare for Moscow</b><small>3 May 1944 · 18:42</small></span><em>65 Days</em></button>
-              </div>
-              <div class="ifm__list">
-                <div class="ifm__map-frame">
-                  <div class="ifm__map-photo"><span>Western Front</span><i class="ifm__map-compass"></i></div>
-                </div>
-                <button class="ifm__primary" id="ifm-resume-operation">Resume Operation <span>&rarr;</span></button>
-              </div>
-            </div>
-            <footer class="ifm__doc-footer"><span>Archive Record IF-02</span><span>HQ Central Records</span></footer>
           </article>
         </section>
 
@@ -209,11 +182,8 @@
       </div>
 
       <footer class="ifm__footer">
-        <button class="ifm__footer-item" id="ifm-language"><span class="ifm__footer-icon" style="--icon:url(/menu/icons/chat-bubble.svg)"></span><span><b>Language</b><small>English</small></span></button>
-        <span class="ifm__footer-divider"></span>
-        <button class="ifm__footer-item" id="ifm-news"><span class="ifm__footer-icon" style="--icon:url(/menu/icons/megaphone.svg)"></span><span><b>News</b><small>What's new</small></span></button>
         <div class="ifm__footer-spacer"></div>
-        <span class="ifm__footer-version">Version 1.0.0<br><small>Build 20260825</small></span>
+        <span class="ifm__footer-version">Prototype<br><small>v0.1.0</small></span>
         <span class="ifm__shield">I</span>
       </footer>
     </div>

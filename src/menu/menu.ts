@@ -192,11 +192,12 @@ export function mountMenu(handlers: MenuHandlers): void {
     date: document.getElementById('ifm-briefing-date'),
     duration: document.getElementById('ifm-briefing-duration'),
     risk: document.getElementById('ifm-briefing-risk'),
+    mapLabel: document.getElementById('ifm-map-theater'),
   };
 
   /** Campaign's operation rows carry briefing data; other rows have none and are skipped. */
   function updateBriefing(row: HTMLElement): void {
-    const { objective, theater, date, duration, risk } = briefing;
+    const { objective, theater, date, duration, risk, mapLabel } = briefing;
     if (!objective || !theater || !date || !duration || !risk) return;
     objective.textContent = row.dataset.objective ?? '';
     theater.textContent = row.dataset.theater ?? '';
@@ -205,6 +206,8 @@ export function mountMenu(handlers: MenuHandlers): void {
     const level = row.dataset.risk ?? 'medium';
     risk.textContent = level.charAt(0).toUpperCase() + level.slice(1);
     risk.className = `is-risk-${level}`;
+    // Keep the preview-map caption in step with the selected operation's theatre.
+    if (mapLabel) mapLabel.textContent = row.dataset.theater ?? mapLabel.textContent;
   }
 
   // ---- Country selection (Choose Your Nation) -------------------------
@@ -235,7 +238,7 @@ export function mountMenu(handlers: MenuHandlers): void {
   function renderCountryGrid(scenarioId: string, preferCountryId: number | null): void {
     if (!countryGrid) return;
     const scenario = scenarioById(scenarioId);
-    const playable = resolvePlayableCountries(scenario).slice(0, 80);
+    const playable = resolvePlayableCountries(scenario);
     countryGrid.replaceChildren();
     const keep = preferCountryId !== null && playable.some((c) => c.id === preferCountryId);
     selectedCountryId = keep ? preferCountryId : null;
@@ -338,10 +341,6 @@ export function mountMenu(handlers: MenuHandlers): void {
   startButton?.addEventListener('click', () => {
     if (selectedCountryId === null) return;
     launch(buildScenarioSelection(selectedScenarioId, selectedCountryId));
-  });
-  // Continue is not implemented yet — fall back to the default campaign start.
-  document.getElementById('ifm-resume-operation')?.addEventListener('click', () => {
-    launch(buildScenarioSelection(DEFAULT_SCENARIO, fallbackCountryId()));
   });
   document.getElementById('ifm-enter-sandbox')?.addEventListener('click', () => {
     launch(buildScenarioSelection('SANDBOX', fallbackCountryId()));

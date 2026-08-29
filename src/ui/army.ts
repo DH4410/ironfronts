@@ -1,10 +1,10 @@
 /**
- * Army / unit UI component architecture.
+ * Army / unit UI components: the map counter and the selected-stack readout.
  *
- * The army simulation does not exist yet. This module only provides the UI
- * component + data shapes so a future combat/movement layer has a defined
- * place to render. Nothing here injects armies into production gameplay; the
- * demo fixture is gated to dev / `?debug` by the caller.
+ * These render the fog-aware `ArmyStackView` projection that `main.ts` builds
+ * from authoritative GameState (see `game/player-view.ts`) — an unidentified
+ * contact shows a '?' counter and a strength-unknown readout. `DEMO_ARMY` is a
+ * dev / `?debug` fixture only, gated by the caller.
  */
 
 import { iconMarkup } from './icons';
