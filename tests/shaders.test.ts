@@ -106,6 +106,8 @@ describe('WGSL programs', () => {
     expect(polarCapShader).toContain('let angle = mapX / uniforms.map.x * TAU');
     expect(polarCapShader).toContain('channelCut');
     expect(polarCapShader).toContain('let polarFog = smoothstep');
+    expect(polarCapShader).toContain('valueNoise(input.worldPosition.xz / 150.0)');
+    expect(polarCapShader).not.toContain('valueNoise(input.worldPosition.xz / 16.0)');
     expect(polarCapShader).not.toContain('provinceAt(input');
     expect(polarCapShader).not.toContain('navigationAt(input');
   });
