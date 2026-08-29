@@ -106,6 +106,19 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let normal = terrainNormal(input.mapUv);
   let slope = 1.0 - normal.y;
   let elevation = input.worldPosition.y;
+  // The heightfield is nearly flat (max ~60 world units across a 13k-wide
+  // map), so rock terrain shades as a flat grey plateau. Perturb the shading
+  // normal with world-space noise on mountain/hill terrain to fake rugged
+  // relief - geometry and gameplay heights are untouched.
+  var shadeNormal = normal;
+  // Only near the ground, where the relief is actually visible - at overview
+  // rock covers most of the screen and this would just burn fill rate.
+  if ((terrain == 1u || terrain == 2u || biome == 6u || biome == 8u) && uniforms.interaction.y < 3200.0) {
+    let n = valueNoise(input.worldPosition.xz / 18.0) - 0.5;
+    let w = sin(input.worldPosition.x * 0.13 + input.worldPosition.z * 0.09) * 0.5;
+    let amp = mix(0.55, 1.4, slope);
+    shadeNormal = normalize(normal + vec3f(n * 1.2 + w * 0.4, 0.0, w * 1.2 - n * 0.4) * amp);
+  }
   let bakedSurface = textureSample(terrainAlbedoTexture, materialSampler, wrappedUv(input.mapUv));
   var baseColor = bakedSurface.rgb;
   var nightMapColor = vec3f(0.0);
@@ -113,7 +126,12 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   if (uniforms.interaction.y < 4500.0) {
     baseColor = sampleMaterial(0, input.worldPosition, 92.0);
     if (biome == 1u || biome == 7u) {
-      baseColor = sampleMaterial(2, input.worldPosition, 76.0);
+      // Desert sand read as a harsh saturated orange against the greens. Pull
+      // it toward a paler khaki so the contrast with neighbouring biomes is
+      // less of a jump.
+      let sand = sampleMaterial(2, input.worldPosition, 76.0);
+      let sandGrey = vec3f(dot(sand, vec3f(0.34, 0.40, 0.26)));
+      baseColor = mix(sand, mix(sandGrey, vec3f(0.70, 0.64, 0.49), 0.62), 0.34);
     } else if (biome == 2u && terrain != 3u) {
       baseColor = mix(sampleMaterial(0, input.worldPosition, 90.0), sampleMaterial(1, input.worldPosition, 74.0), 0.48);
     } else if (biome == 6u || biome == 8u) {
@@ -121,14 +139,19 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     }
 
     if (terrain == 1u) {
-      baseColor = mix(baseColor, sampleMaterial(4, input.worldPosition, 65.0), clamp(slope * 3.4 + 0.12, 0.0, 0.7));
+      // Lift the exposed-rock material off near-black so steep hills stay a
+      // readable slate rather than a dark blob.
+      let hillRock = sampleMaterial(4, input.worldPosition, 65.0) * 1.2 + vec3f(0.055, 0.055, 0.05);
+      baseColor = mix(baseColor, hillRock, clamp(slope * 3.4 + 0.12, 0.0, 0.7));
     } else if (terrain == 2u) {
-      let rock = sampleMaterial(4, input.worldPosition, 58.0);
+      let rock = sampleMaterial(4, input.worldPosition, 58.0) * 1.25 + vec3f(0.07, 0.07, 0.065);
       let snow = sampleMaterial(5, input.worldPosition, 80.0);
       let snowAmount = smoothstep(120.0, 205.0, elevation) * smoothstep(0.58, 0.92, normal.y);
       baseColor = mix(rock, snow, snowAmount);
     } else if (terrain == 3u) {
-      baseColor = sampleMaterial(3, input.worldPosition, 70.0);
+      // Forest floor was a very dark brown; between and under the canopy it
+      // read as burnt ground. Lift it to a shaded earth / moss tone.
+      baseColor = sampleMaterial(3, input.worldPosition, 70.0) * 1.5 + vec3f(0.06, 0.085, 0.05);
     } else if (terrain == 4u) {
       baseColor = mix(sampleMaterial(6, input.worldPosition, 54.0), sampleMaterial(1, input.worldPosition, 68.0), 0.22);
     }
@@ -171,7 +194,11 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
         ${POLITICAL_OVERVIEW_FULL_ALTITUDE.toFixed(1)},
         uniforms.camera.y
       );
-      let terrainLuminance = dot(baseColor, vec3f(0.24, 0.68, 0.08));
+      // Floor the terrain luminance the tint is matched against. Steep rock and
+      // dense forest land near-black here, and without a floor the
+      // luminance-matched political colour inherits that blackness, so overview
+      // zoom cannot recover an owned mountain or forest province.
+      let terrainLuminance = max(0.16, dot(baseColor, vec3f(0.24, 0.68, 0.08)));
       let tintLuminance = max(0.06, dot(overlayColor, vec3f(0.24, 0.68, 0.08)));
       let luminanceMatchedTint = overlayColor * (terrainLuminance / tintLuminance);
       let originalTint = overlayColor * (0.62 + terrainLuminance * 0.70);
@@ -239,7 +266,13 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   baseColor *= 0.92 + variation * 0.14;
   baseColor = mix(baseColor, baseColor * vec3f(0.74, 0.79, 0.83), uniforms.weather.x * 0.42);
   let sunDirection = normalize(uniforms.sunTime.xyz);
-  var lit = baseColor * surfaceLight(normal);
+  // Directional hillshade that grows with slope, so ridges and valleys read as
+  // 3D relief instead of a flat patch. Flat terrain (plains, forest floor) is
+  // untouched; the floor keeps shadowed steep faces lit, never the old black.
+  let sunFacing = clamp(dot(shadeNormal, sunDirection) * 0.5 + 0.5, 0.0, 1.0);
+  let reliefStrength = smoothstep(0.05, 0.36, slope) * uniforms.lighting.x;
+  let relief = mix(1.0, mix(0.5, 1.45, sunFacing), reliefStrength);
+  var lit = baseColor * max(surfaceLight(shadeNormal) * relief, vec3f(0.4));
   lit += vec3f(0.12, 0.15, 0.13) * pow(max(dot(normal, normalize(sunDirection + normalize(uniforms.camera.xyz - input.worldPosition))), 0.0), 24.0) * 0.08 * uniforms.lighting.x;
   lit += wetSurfaceSheen(normal, input.worldPosition);
   if (nightMapCompensation > 0.001) {
