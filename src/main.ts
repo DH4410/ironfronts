@@ -227,6 +227,7 @@ mountMenu({
   audio,
   lobby,
   username: authenticated.account!.username,
+  profile: authenticated.profile,
   onLogout: () => { void logout().finally(() => window.location.replace('/login.html')); },
   onLaunch: (countryId: number) => new Promise<void>((resolve, reject) => {
     if (rendererStarted) { resolve(); return; }

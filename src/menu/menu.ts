@@ -4,9 +4,10 @@ import { phase, runChoreo, smooth } from './choreo';
 import {
   isQualityLevel, loadQuality, QUALITY_PRESETS, saveQuality, type QualityLevel,
 } from '../graphics/quality';
-import type { GameLobby } from '@ironfronts/protocol';
+import type { CommanderProfile, GameLobby } from '@ironfronts/protocol';
 import { assignedCountry as resolveAssignedCountry, selectableCountries } from './lobby-state';
 import { resolveFlagUrl } from '../ui/flags';
+import { mountCommander } from './commander';
 
 export interface MenuHandlers {
   /**
@@ -15,6 +16,8 @@ export interface MenuHandlers {
    */
   lobby: GameLobby;
   username: string;
+  /** Persisted commander progression from the auth server's session response. */
+  profile?: CommanderProfile;
   onLaunch: (countryId: number) => void | Promise<void>;
   onLogout: () => void;
   audio?: AudioManager;
@@ -41,8 +44,11 @@ export function mountMenu(handlers: MenuHandlers): void {
   const newCampaign = requiredId<HTMLButtonElement>('ifm-new-campaign');
   const continueButton = requiredId<HTMLButtonElement>('ifm-continue');
   const assignedCountry = resolveAssignedCountry(handlers.lobby);
-  requiredId<HTMLElement>('ifm-account-name').textContent = handlers.username;
-  requiredId<HTMLButtonElement>('ifm-logout').addEventListener('click', handlers.onLogout);
+  mountCommander({
+    username: handlers.username,
+    profile: handlers.profile,
+    onLogout: handlers.onLogout,
+  });
   newCampaign.disabled = assignedCountry !== null;
   newCampaign.classList.toggle('is-disabled', assignedCountry !== null);
   continueButton.disabled = assignedCountry === null;

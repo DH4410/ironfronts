@@ -189,7 +189,56 @@ export interface GameLobby {
   countries: LobbyCountry[];
 }
 
-export interface SessionResponse { authenticated: boolean; account?: { id: string; username: string }; assignment?: { gameId: string; countryId: number } | null }
+/**
+ * Persisted commander progression. A brand-new account is genuinely
+ * `{ level: 1, xp: 0, achievements: [] }` — there is no gameplay XP award wired
+ * up yet, so every field is a real stored default, never a fabricated stat.
+ * `level` is always recomputed from `xp` on read (see `commanderLevelForXp`), so
+ * the two can never drift.
+ */
+export interface CommanderProfile {
+  level: number;
+  xp: number;
+  /** XP accumulated since reaching the current level. */
+  xpIntoLevel: number;
+  /** XP span of the current level (`xpIntoLevel / xpForNextLevel` fills the bar). */
+  xpForNextLevel: number;
+  achievements: string[];
+}
+
+/** Cumulative XP required to *reach* `level` (level 1 = 0). Quadratic ramp. */
+export function commanderXpForLevel(level: number): number {
+  const n = Math.max(1, Math.floor(level));
+  return 50 * (n - 1) * n;
+}
+
+/** Highest level whose XP threshold `xp` has cleared. Inverse of the above. */
+export function commanderLevelForXp(xp: number): number {
+  const safe = Math.max(0, Math.floor(xp));
+  let level = 1;
+  while (commanderXpForLevel(level + 1) <= safe) level += 1;
+  return level;
+}
+
+/** Derive the full profile view from the two stored fields. */
+export function commanderProfileFromXp(xp: number, achievements: string[]): CommanderProfile {
+  const level = commanderLevelForXp(xp);
+  const base = commanderXpForLevel(level);
+  return {
+    level,
+    xp,
+    xpIntoLevel: xp - base,
+    xpForNextLevel: commanderXpForLevel(level + 1) - base,
+    achievements,
+  };
+}
+
+export interface SessionResponse {
+  authenticated: boolean;
+  account?: { id: string; username: string };
+  assignment?: { gameId: string; countryId: number } | null;
+  profile?: CommanderProfile;
+}
 export interface ConnectResponse { ticket: string; websocketUrl: string; protocolVersion: 2 }
 
 export const credentialsSchema = z.object({
