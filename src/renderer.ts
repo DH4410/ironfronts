@@ -185,6 +185,10 @@ export class WorldRenderer {
   private frameHandle = 0;
   private previousTime = performance.now();
   private elapsed = 0;
+  /** While the tab is hidden the rAF loop keeps ticking (to resume instantly)
+   *  but does no GPU/pick/uniform work — the WS session and audio are elsewhere
+   *  and keep running. */
+  private renderingSuspended = typeof document !== 'undefined' && document.hidden;
   private quality: QualityLevel = DEFAULT_QUALITY;
   private readonly environment = new EnvironmentController();
   private reportedClock = '';
@@ -1094,6 +1098,10 @@ export class WorldRenderer {
     this.attachInteraction(this.interactionAbort.signal);
     this.resizeObserver ??= new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(this.canvas);
+    this.renderingSuspended = document.hidden;
+    document.addEventListener('visibilitychange', this.onVisibilityChange, {
+      signal: this.interactionAbort.signal,
+    });
   }
 
   private detachRuntimeBindings(): void {
@@ -1186,8 +1194,20 @@ export class WorldRenderer {
     this.camera.resize(width, height);
   }
 
+  private onVisibilityChange = (): void => {
+    this.renderingSuspended = document.hidden;
+    if (!document.hidden) this.previousTime = performance.now();
+  };
+
   private frame = (time: number): void => {
     if (!this.running) return;
+    // Tab hidden: keep the loop alive so a return to the tab resumes with the
+    // same camera/state and no reload, but skip all rendering and picking.
+    if (this.renderingSuspended) {
+      this.previousTime = time;
+      this.frameHandle = requestAnimationFrame(this.frame);
+      return;
+    }
     const frameStarted = performance.now();
     const frameMs = Math.max(0, time - this.previousTime);
     const deltaMs = Math.min(50, frameMs);
