@@ -13,15 +13,25 @@ describe('selected army presentation', () => {
 
   it('aggregates troop attack and defence from the public presentation catalog', () => {
     const catalog: Record<string, Record<string, unknown>> = {
-      infantry: { attack: 8, defense: 6 },
-      artillery: { attack: 26, defense: 3 },
+      infantry: {
+        attack: { soft: 8, light: 4.4, heavy: 2.4 },
+        defense: { soft: 6, light: 3.3, heavy: 1.8 },
+      },
+      artillery: {
+        attack: { soft: 29.9, light: 23.4, heavy: 32.5 },
+        defense: { soft: 3, light: 2.7, heavy: 3.75 },
+      },
     };
     const groups = [
       { typeId: 'infantry', count: 4 },
       { typeId: 'artillery', count: 2 },
     ];
-    expect(aggregateTroopStat(groups, 'attack', (id) => catalog[id])).toBe(84);
-    expect(aggregateTroopStat(groups, 'defense', (id) => catalog[id])).toBe(30);
+    expect(aggregateTroopStat(groups, 'attack', (id) => catalog[id])).toEqual({
+      soft: 91.8, light: 64.4, heavy: 74.6,
+    });
+    expect(aggregateTroopStat(groups, 'defense', (id) => catalog[id])).toEqual({
+      soft: 30, light: 18.6, heavy: 14.7,
+    });
     expect(aggregateTroopStat(undefined, 'attack', (id) => catalog[id])).toBeUndefined();
   });
 });

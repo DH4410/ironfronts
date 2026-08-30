@@ -6,8 +6,8 @@ describe('army map presentation LOD data', () => {
     expect(visualKindForUnit('infantry')).toBe(0);
     expect(visualKindForUnit('engineer')).toBe(0);
     expect(visualKindForUnit('light-tank')).toBe(1);
-    expect(visualKindForUnit('medium-tank')).toBe(1);
-    expect(visualKindForUnit('armored-car')).toBe(2);
+    expect(visualKindForUnit('armored-car')).toBe(1);
+    expect(visualKindForUnit('medium-tank')).toBe(2);
     expect(visualKindForUnit('artillery')).toBe(3);
   });
 
@@ -21,9 +21,25 @@ describe('army map presentation LOD data', () => {
     ]);
     expect(formation).toEqual([
       { kind: 0, count: 4, health: 0.875 },
-      { kind: 1, count: 3, health: 2 / 3 },
-      { kind: 2, count: 5, health: 0.8 },
+      { kind: 1, count: 7, health: 5.5 / 7 },
+      { kind: 1, count: 7, health: 5.5 / 7 },
+      { kind: 2, count: 1, health: 0.5 },
     ]);
-    expect(dominantVisualKind(formation)).toBe(2);
+    expect(dominantVisualKind(formation)).toBe(1);
+  });
+
+  it('uses at most four slots, guarantees each present category, and respects tiny armies', () => {
+    expect(buildArmyFormation([
+      { typeId: 'infantry', count: 1, health: 1 },
+      { typeId: 'artillery', count: 1, health: 1 },
+    ])).toHaveLength(2);
+    const mixed = buildArmyFormation([
+      { typeId: 'infantry', count: 7, health: 1 },
+      { typeId: 'armored-car', count: 2, health: 1 },
+      { typeId: 'medium-tank', count: 1, health: 1 },
+      { typeId: 'artillery', count: 1, health: 1 },
+    ]);
+    expect(mixed).toHaveLength(4);
+    expect(new Set(mixed.map((slot) => slot.kind))).toEqual(new Set([0, 1, 2, 3]));
   });
 });

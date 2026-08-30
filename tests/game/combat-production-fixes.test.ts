@@ -48,7 +48,7 @@ function baseState(): GameState {
   return {
     version: GAME_STATE_VERSION, seed: 1, scenarioId: 'OP-1939-01', mode: 'campaign',
     fogOfWar: false, economyEnabled: false,
-    clock: { gameTimeHours: 0, startDate: 'x' },
+    clock: { gameTimeHours: 0, startDate: 'x' }, simulationTick: 0,
     countries: {
       1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
       2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
@@ -59,7 +59,8 @@ function baseState(): GameState {
     armies: {},
     resourceNodes: {},
     relations: {},
-    nextArmyId: 1, nextOrderId: 1, nextEventId: 1,
+    battles: {}, battleFronts: {},
+    nextArmyId: 1, nextBattleId: 1, nextOrderId: 1, nextEventId: 1,
   };
 }
 
@@ -97,6 +98,7 @@ describe('bug 7 — production ownership survives capture', () => {
 describe('bug 6 — capture clears a stale enemy extractor', () => {
   it('releases both the node and the army when a mine is seized', () => {
     const s = baseState();
+    s.relations = { '1:2': 'war' };
     s.provinceOwners[10] = 2;
     s.resourceNodes[7] = {
       id: 7, kind: 'metal', x: 100, z: 100, remaining: 120, initialAmount: 120,
@@ -128,7 +130,7 @@ describe('bug 6 — capture clears a stale enemy extractor', () => {
 describe('bug 8 — pooled-hp casualty accounting is coherent', () => {
   it('keeps count === ceil(hp / maxHp) after combat, never phantom near-dead units', () => {
     const s = baseState();
-    s.relations = {};
+    s.relations = { '1:2': 'war' };
     // A crushing attacker vs a lone infantry group at full strength.
     s.armies.big = {
       id: 'big', ownerCountryId: 1, name: 'Fist', x: 100, z: 100, graphNodeId: 0,
@@ -150,6 +152,7 @@ describe('bug 8 — pooled-hp casualty accounting is coherent', () => {
       expect(g.count).toBe(Math.max(0, Math.ceil(g.hp / 100)));
       expect(g.count).toBeLessThanOrEqual(4);
       if (g.count > 0) expect(g.hp).toBeGreaterThan(0);
+      s.simulationTick += 18_000;
     }
     // And it did actually die rather than stalling with phantom HP.
     const survivor = s.armies.small?.units[0];

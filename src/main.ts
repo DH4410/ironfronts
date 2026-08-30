@@ -11,7 +11,7 @@ import { mountGameUi, type GameUiActions } from './ui/game-ui';
 import {
   createInitialState, createUiStore, type GameNotification, type ResourceLine,
 } from './ui/ui-state';
-import { DEMO_ARMY } from './ui/army';
+import { DEMO_ARMY, type ArmyPanelCommand } from './ui/army';
 import { aggregateTroopStat, armyActivityLabel } from './ui/army-presentation';
 import { iconMarkup } from './ui/icons';
 import type { ProvinceResources } from './resource-nodes';
@@ -175,6 +175,8 @@ let activeSession: RemoteGameSession | undefined;
 let activeConnection: GameConnection | undefined;
 let selectedArmyId: string | null = null;
 let awaitingMoveTarget = false;
+let targetingMode: 'move' | 'attack' | 'retreat' | 'split' | null = null;
+let pendingSplitGroups: Array<{ typeId: string; count: number }> | null = null;
 // Selected province: id + the renderer-supplied labels, kept so the card can be
 // re-projected from GameState (e.g. after a capture) without a reselect.
 let selectedProvinceId: number | null = null;
@@ -359,6 +361,8 @@ async function start(): Promise<void> {
       uiStore.patch({ selectedProvince: projectSelectedProvince(session, info.id) });
       selectedArmyId = null;
       awaitingMoveTarget = false;
+      targetingMode = null;
+      pendingSplitGroups = null;
       return;
     }
     uiStore.patch({
@@ -564,6 +568,8 @@ async function bootstrapGameSession(
 ): Promise<void> {
   selectedArmyId = null;
   awaitingMoveTarget = false;
+  targetingMode = null;
+  pendingSplitGroups = null;
   if (import.meta.env.DEV || debugEnabled) {
     // Authoritative-state inspection handle for QA / perf scripts. Exposing the
     // full GameState defeats fog of war, so it is DEV / ?debug only — never the
@@ -583,6 +589,16 @@ async function bootstrapGameSession(
   // Map-tap -> army selection / move order. Consumes the click so
   // it does not also select a province.
   renderer.onMapClick = (clientX, clientY) => handleMapClick(renderer, session, clientX, clientY);
+  session.addEventListener('war-confirmation', (event) => {
+    const detail = (event as CustomEvent<{
+      countryIds: number[]; respond: (confirmed: boolean) => void;
+    }>).detail;
+    const names = detail.countryIds.map((id) => session.state.countries[id]?.name ?? `Country ${id}`);
+    void showGameConfirmation(
+      'Declare war?',
+      `This order requires war with ${names.join(', ')}. Declaration and order will be committed together.`,
+    ).then(detail.respond);
+  });
 
   // Resource deposits are gameplay-relevant from turn 0 — show the overlay by
   // default so the player can see where stone / metal / oil are, and feed
@@ -624,8 +640,11 @@ async function bootstrapGameSession(
   }, 400);
   const onKey = (event: KeyboardEvent): void => {
     if (event.repeat || !selectedArmyId) return;
-    if (event.key === 'm' || event.key === 'M') { awaitingMoveTarget = true; refreshSelectedArmy(session); }
-    else if (event.key === 's' || event.key === 'S') { session.orderStop(selectedArmyId); awaitingMoveTarget = false; refreshSelectedArmy(session); }
+    if (event.key === 'm' || event.key === 'M') {
+      targetingMode = 'move'; awaitingMoveTarget = true; refreshSelectedArmy(session);
+    } else if (event.key === 's' || event.key === 'S') {
+      session.orderStop(selectedArmyId); targetingMode = null; awaitingMoveTarget = false; refreshSelectedArmy(session);
+    }
     else if (event.key === 'e' || event.key === 'E') { handleArmyCommand('extract'); }
     else if (event.key === 'Escape') { deselectArmy(); }
   };
@@ -714,18 +733,51 @@ function syncArmyMarkers(
     count += 1;
     armyPickScratch.push({ id: army.id, x: army.x, z: army.z });
 
+    if (identified && army.id === selectedArmyId && army.artillery && count < 1_024) {
+      armyMarkerScratch[cursor] = army.x;
+      armyMarkerScratch[cursor + 1] = army.z;
+      armyMarkerScratch[cursor + 2] = packRgb(army.ownerColor);
+      armyMarkerScratch[cursor + 3] = 3;
+      armyMarkerScratch[cursor + 4] = army.artillery.range;
+      armyMarkerScratch[cursor + 5] = 0;
+      armyMarkerScratch[cursor + 6] = 0;
+      armyMarkerScratch[cursor + 7] = 0;
+      cursor += 8;
+      count += 1;
+    }
+    if (army.id === selectedArmyId && army.status === 'engaged') {
+      for (const exit of army.legalRetreatExits ?? []) {
+        if (count >= 1_024) break;
+        armyMarkerScratch[cursor] = exit.x;
+        armyMarkerScratch[cursor + 1] = exit.z;
+        armyMarkerScratch[cursor + 2] = packRgb(army.ownerColor);
+        armyMarkerScratch[cursor + 3] = 3;
+        armyMarkerScratch[cursor + 4] = 18;
+        armyMarkerScratch[cursor + 5] = 0;
+        armyMarkerScratch[cursor + 6] = 0;
+        armyMarkerScratch[cursor + 7] = 0;
+        cursor += 8;
+        count += 1;
+      }
+    }
+
     if (identified && formation.length) {
       const target = army.moveOrder;
       const heading = target ? Math.atan2(target.x - army.x, -(target.z - army.z)) : 0;
-      const perpendicularX = Math.cos(heading);
-      const perpendicularZ = Math.sin(heading);
+      const forwardX = Math.sin(heading);
+      const forwardZ = -Math.cos(heading);
+      const rightX = Math.cos(heading);
+      const rightZ = Math.sin(heading);
+      const slots: ReadonlyArray<readonly [number, number]> = [
+        [-11, -9], [11, -9], [-11, 9], [11, 9],
+      ];
       for (let index = 0; index < formation.length && modelCount < 4_096; index += 1) {
         const group = formation[index];
-        const offset = (index - (formation.length - 1) / 2) * 24;
-        let x = army.x + perpendicularX * offset;
+        const [right, forward] = slots[index];
+        let x = army.x + rightX * right + forwardX * forward;
         if (renderer.manifest?.world.width) x = ((x % renderer.manifest.world.width) + renderer.manifest.world.width) % renderer.manifest.world.width;
-        const z = army.z + perpendicularZ * offset;
-        const modelKey = `${army.id}:${group.kind}`;
+        const z = army.z + rightZ * right + forwardZ * forward;
+        const modelKey = `${army.id}:${index}`;
         activeModelKeys.add(modelKey);
         const previous = previousArmyModelPositions.get(modelKey) ?? { x, z };
         let previousX = previous.x;
@@ -756,19 +808,146 @@ function syncArmyMarkers(
   renderer.setArmyMarkers(armyMarkerScratch, count, armyPickScratch, armyModelScratch, modelCount);
 }
 
+function showGameConfirmation(title: string, message: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'ifg-command-dialog';
+    const heading = document.createElement('h2');
+    heading.textContent = title;
+    const copy = document.createElement('p');
+    copy.textContent = message;
+    const actions = document.createElement('div');
+    actions.className = 'ifg-command-dialog__actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = 'Cancel';
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.textContent = 'Confirm';
+    confirm.className = 'is-primary';
+    const finish = (answer: boolean): void => {
+      dialog.close();
+      dialog.remove();
+      resolve(answer);
+    };
+    cancel.addEventListener('click', () => finish(false));
+    confirm.addEventListener('click', () => finish(true));
+    dialog.addEventListener('cancel', (event) => { event.preventDefault(); finish(false); });
+    actions.append(cancel, confirm);
+    dialog.append(heading, copy, actions);
+    document.body.append(dialog);
+    dialog.showModal();
+  });
+}
+
+function chooseSplitGroups(session: RemoteGameSession, armyId: string): Promise<Array<{ typeId: string; count: number }> | null> {
+  const army = session.army(armyId);
+  if (!army?.composition || !army.composition.groups.length) return Promise.resolve(null);
+  const groups = army.composition.groups;
+  const armyName = army.name;
+  const armyUnitCount = army.composition.unitCount;
+  return new Promise((resolve) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'ifg-command-dialog ifg-split-dialog';
+    const heading = document.createElement('h2');
+    heading.textContent = `Split ${armyName}`;
+    const copy = document.createElement('p');
+    copy.textContent = 'Choose units for the detachment. At least one unit must remain in the parent.';
+    const rows = document.createElement('div');
+    const inputs = groups.map((group) => {
+      const row = document.createElement('label');
+      row.textContent = gameUnitLabel(group.typeId);
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '0';
+      input.max = String(group.count);
+      input.step = '1';
+      input.value = '0';
+      row.append(input, document.createTextNode(` / ${group.count}`));
+      rows.append(row);
+      return { typeId: group.typeId, input };
+    });
+    const actions = document.createElement('div');
+    actions.className = 'ifg-command-dialog__actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = 'Cancel';
+    const confirm = document.createElement('button');
+    confirm.type = 'button';
+    confirm.textContent = 'Choose destination';
+    confirm.className = 'is-primary';
+    const finish = (value: Array<{ typeId: string; count: number }> | null): void => {
+      dialog.close();
+      dialog.remove();
+      resolve(value);
+    };
+    cancel.addEventListener('click', () => finish(null));
+    confirm.addEventListener('click', () => {
+      const selected = inputs.map(({ typeId, input }) => ({
+        typeId, count: Math.max(0, Math.trunc(Number(input.value))),
+      })).filter((group) => group.count > 0);
+      const total = selected.reduce((sum, group) => sum + group.count, 0);
+      if (total < 1 || total >= armyUnitCount) {
+        copy.textContent = 'The parent and detachment must each contain at least one unit.';
+        return;
+      }
+      finish(selected);
+    });
+    dialog.addEventListener('cancel', (event) => { event.preventDefault(); finish(null); });
+    actions.append(cancel, confirm);
+    dialog.append(heading, copy, rows, actions);
+    document.body.append(dialog);
+    dialog.showModal();
+  });
+}
+
 // ---- army selection + orders --------------------------
 
 function handleMapClick(
   renderer: WorldRenderer, session: RemoteGameSession, clientX: number, clientY: number,
 ): boolean {
-  // 1. Armed Move order -> issue to the clicked ground point.
-  if (awaitingMoveTarget && selectedArmyId && session.ownsArmy(selectedArmyId)) {
+  // 1. Armed destination order -> issue to the clicked ground point.
+  if ((targetingMode === 'move' || targetingMode === 'split')
+    && selectedArmyId && session.ownsArmy(selectedArmyId)) {
     const ground = renderer.groundPointAt(clientX, clientY);
     if (ground) {
-      const result = session.orderMove(selectedArmyId, ground[0], ground[1], 'move');
-      if (!result.ok) pushNotification('warning', 'Move order', result.reason ?? 'No route.');
+      const result = targetingMode === 'split' && pendingSplitGroups
+        ? session.orderSplit(selectedArmyId, pendingSplitGroups, ground[0], ground[1])
+        : session.orderMove(selectedArmyId, ground[0], ground[1], 'move');
+      if (!result.ok) pushNotification('warning', targetingMode === 'split' ? 'Split' : 'Move order', result.reason ?? 'No route.');
       awaitingMoveTarget = false;
+      targetingMode = null;
+      pendingSplitGroups = null;
       syncArmyMarkers(session, renderer);
+      refreshSelectedArmy(session);
+      return true;
+    }
+  }
+  if (targetingMode === 'attack' && selectedArmyId && session.ownsArmy(selectedArmyId)) {
+    const targetArmyId = renderer.pickArmyAt(clientX, clientY);
+    const result = targetArmyId && targetArmyId !== selectedArmyId
+      ? session.orderAttackArmy(selectedArmyId, targetArmyId)
+      : (() => {
+        const provinceId = renderer.provinceIdAt(clientX, clientY);
+        return provinceId >= 0
+          ? session.orderAttackProvince(selectedArmyId!, provinceId)
+          : { ok: false as const, reason: 'Select an army or province center.' };
+      })();
+    if (!result.ok) pushNotification('warning', 'Attack order', result.reason ?? 'Invalid target.');
+    targetingMode = null;
+    refreshSelectedArmy(session);
+    return true;
+  }
+  if (targetingMode === 'retreat' && selectedArmyId && session.ownsArmy(selectedArmyId)) {
+    const ground = renderer.groundPointAt(clientX, clientY);
+    const exits = session.army(selectedArmyId)?.legalRetreatExits ?? [];
+    if (ground && exits.length) {
+      const selected = [...exits].sort((a, b) =>
+        Math.hypot(a.x - ground[0], a.z - ground[1])
+        - Math.hypot(b.x - ground[0], b.z - ground[1]))[0];
+      const result = session.orderRetreat(selectedArmyId, selected.firstNodeId);
+      if (!result.ok) pushNotification('warning', 'Retreat', result.reason ?? 'No legal retreat.');
+      targetingMode = null;
       refreshSelectedArmy(session);
       return true;
     }
@@ -798,6 +977,8 @@ function handleMapClick(
 function selectArmy(session: RemoteGameSession, armyId: string): void {
   selectedArmyId = armyId;
   awaitingMoveTarget = false;
+  targetingMode = null;
+  pendingSplitGroups = null;
   awaitingRallyTarget = false;
   renderer_clearProvince();
   refreshSelectedArmy(session);
@@ -807,6 +988,8 @@ function selectArmy(session: RemoteGameSession, armyId: string): void {
 function deselectArmy(): void {
   selectedArmyId = null;
   awaitingMoveTarget = false;
+  targetingMode = null;
+  pendingSplitGroups = null;
   uiStore.patch({ selectedArmy: null });
   if (activeSession && activeRenderer) {
     syncArmyMarkers(activeSession, activeRenderer);
@@ -817,14 +1000,46 @@ function renderer_clearProvince(): void {
   activeRenderer?.clearProvinceSelection();
 }
 
-function handleArmyCommand(command: 'move' | 'stop' | 'extract' | 'deselect'): void {
+function handleArmyCommand(command: ArmyPanelCommand): void {
   const session = activeSession;
   if (!session || !selectedArmyId) { if (command === 'deselect') deselectArmy(); return; }
   if (command === 'deselect') { deselectArmy(); return; }
-  if (command === 'move') { awaitingMoveTarget = true; refreshSelectedArmy(session); return; }
+  if (command === 'move') {
+    targetingMode = 'move'; awaitingMoveTarget = true; refreshSelectedArmy(session); return;
+  }
+  if (command === 'attack') {
+    targetingMode = 'attack'; awaitingMoveTarget = false; refreshSelectedArmy(session); return;
+  }
+  if (command === 'split') {
+    void chooseSplitGroups(session, selectedArmyId).then((groups) => {
+      if (!groups || !selectedArmyId) return;
+      pendingSplitGroups = groups;
+      targetingMode = 'split';
+      awaitingMoveTarget = false;
+      refreshSelectedArmy(session);
+    });
+    return;
+  }
+  if (command === 'retreat' || command.startsWith('retreat:')) {
+    const view = session.army(selectedArmyId);
+    const exits = view?.legalRetreatExits ?? [];
+    const explicit = command.startsWith('retreat:') ? Number(command.slice('retreat:'.length)) : null;
+    const firstNodeId = explicit ?? (exits.length === 1 ? exits[0].firstNodeId : null);
+    if (firstNodeId === null) {
+      targetingMode = 'retreat';
+      pushNotification('information', 'Choose retreat direction', 'Select one of the highlighted exit edges on the map.');
+      refreshSelectedArmy(session);
+      return;
+    }
+    const result = session.orderRetreat(selectedArmyId, firstNodeId);
+    if (!result.ok) pushNotification('warning', 'Retreat', result.reason ?? 'No legal retreat.');
+    refreshSelectedArmy(session);
+    return;
+  }
   if (command === 'stop') {
     session.orderStop(selectedArmyId);
     awaitingMoveTarget = false;
+    targetingMode = null;
     refreshSelectedArmy(session);
     return;
   }
@@ -874,6 +1089,17 @@ function refreshSelectedArmy(
       own: view.own,
       canExtract: view.own && !view.moveOrder && session.extractableNodeAt(view.id) !== null,
       awaitingMoveTarget: view.own && awaitingMoveTarget,
+      targetingMode: view.own ? targetingMode : null,
+      canMove: view.own && view.status !== 'engaged' && view.status !== 'retreating',
+      canAttack: view.own && view.status !== 'engaged' && view.status !== 'retreating',
+      canRetreat: view.own && view.status === 'engaged' && Boolean(view.legalRetreatExits?.length),
+      canSplit: view.own && view.status !== 'engaged' && view.status !== 'retreating',
+      canStop: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+        && (Boolean(view.moveOrder) || view.status === 'extracting' || targetingMode !== null),
+      simulationTick: session.state.simulationTick,
+      legalRetreatExits: view.legalRetreatExits,
+      battleFronts: view.battleFronts,
+      artillery: view.artillery,
     },
   });
 }
@@ -955,9 +1181,16 @@ function drainSessionEvents(session: RemoteGameSession): void {
       pushNotification('combat', mine ? 'Forces withdrawing' : 'Enemy in retreat',
         mine ? 'A battered stack is pulling back to friendly ground.'
           : 'An enemy stack has broken off and is falling back.');
-    } else {
+    } else if (ev.kind === 'destroyed') {
       pushNotification('combat', mine ? 'Stack destroyed' : 'Enemy stack destroyed',
         mine ? 'One of your armies has been wiped out.' : 'You have annihilated an enemy army.');
+    } else if (ev.kind === 'bombardment') {
+      pushNotification('combat', mine ? 'Under bombardment' : 'Artillery firing',
+        mine ? 'Enemy artillery has struck one of your armies.' : 'Your artillery has fired a volley.');
+    } else if (ev.kind === 'reinforced') {
+      pushNotification('combat', 'Battle reinforced', 'Another army has joined an active direction.');
+    } else if (ev.kind === 'battleEnded') {
+      pushNotification('information', 'Battle ended', 'Surviving armies are resuming valid orders.');
     }
   }
   for (const cap of session.pendingCaptures.splice(0)) {

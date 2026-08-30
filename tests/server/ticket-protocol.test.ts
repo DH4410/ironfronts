@@ -24,6 +24,19 @@ describe('game tickets and command wire schema', () => {
     expect('countryId' in parsed).toBe(false);
   });
 
+  it('accepts typed v2 attack, retreat, and split commands', () => {
+    expect(commandPayloadSchema.parse({
+      type: 'attackArmy', armyId: 'army-1', target: { kind: 'army', armyId: 'army-2' },
+    })).toMatchObject({ target: { kind: 'army', armyId: 'army-2' } });
+    expect(commandPayloadSchema.parse({
+      type: 'retreatArmy', armyId: 'army-1', firstNodeId: 7,
+    }).type).toBe('retreatArmy');
+    expect(commandPayloadSchema.parse({
+      type: 'splitArmy', armyId: 'army-1', groups: [{ typeId: 'infantry', count: 2 }],
+      x: 10, z: 20,
+    }).type).toBe('splitArmy');
+  });
+
   it('accepts a ticket nonce once and rejects replay', () => {
     const nonces = new TicketNonceStore();
     expect(nonces.consume('one-time', Date.now() + 10_000)).toBe(true);

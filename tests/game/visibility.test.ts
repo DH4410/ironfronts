@@ -15,14 +15,15 @@ function state(fog: boolean, armies: ArmyStack[]): GameState {
   return {
     version: GAME_STATE_VERSION, seed: 1, scenarioId: 'OP-1939-01', mode: 'campaign',
     fogOfWar: fog, economyEnabled: true,
-    clock: { gameTimeHours: 0, startDate: 'x' },
+    clock: { gameTimeHours: 0, startDate: 'x' }, simulationTick: 0,
     countries: {
       1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
       2: { id: 2, name: 'B', color: '#000', controller: 'neutral', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
     },
     provinceOwners: {}, provinceBuildings: {}, productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: Object.fromEntries(armies.map((a) => [a.id, a])),
-    resourceNodes: {}, relations: {}, nextArmyId: 99, nextOrderId: 1, nextEventId: 1,
+    resourceNodes: {}, relations: {}, battles: {}, battleFronts: {},
+    nextArmyId: 99, nextBattleId: 1, nextOrderId: 1, nextEventId: 1,
   };
 }
 

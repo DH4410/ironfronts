@@ -97,6 +97,7 @@ export class GameSession {
   }
 
   private step(dtHours: number): void {
+    this.state.simulationTick += 1;
     this.state.clock.gameTimeHours += dtHours;
 
     // --- economy -------------------------------------------------
@@ -208,10 +209,14 @@ export class GameSession {
   }
 
   orderMove(countryId: number, armyId: string, x: number, z: number, intent: 'move' | 'attack' = 'move') {
-    return this.applyCommand({
-      type: intent === 'attack' ? 'attackArmy' : 'moveArmy',
-      countryId, armyId, x, z,
-    });
+    if (intent === 'attack') {
+      const provinceId = this.world.provinceAt(x, z);
+      if (provinceId < 0) return { ok: false, reason: 'No province at that location.' };
+      return this.applyCommand({
+        type: 'attackArmy', countryId, armyId, target: { kind: 'province', provinceId },
+      });
+    }
+    return this.applyCommand({ type: 'moveArmy', countryId, armyId, x, z });
   }
 
   orderStop(countryId: number, armyId: string): boolean {

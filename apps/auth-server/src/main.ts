@@ -73,7 +73,7 @@ async function gameRequest<T>(pathname: string, init?: RequestInit): Promise<T> 
 }
 
 async function assignment(accountId: string): Promise<{ gameId: string; countryId: number } | null> {
-  const lobby = await gameRequest<GameLobby>(`/internal/v1/lobby?accountId=${encodeURIComponent(accountId)}`);
+  const lobby = await gameRequest<GameLobby>(`/internal/v2/lobby?accountId=${encodeURIComponent(accountId)}`);
   return lobby.assignedCountryId === null ? null : { gameId: lobby.gameId, countryId: lobby.assignedCountryId };
 }
 
@@ -124,19 +124,19 @@ const server = createServer(async (request, response) => {
       return;
     }
     if (!account) { sendJson(response, 401, { error: 'Authentication required.' }); return; }
-    if (request.method === 'GET' && url.pathname === '/v1/game') {
-      sendJson(response, 200, await gameRequest<GameLobby>(`/internal/v1/lobby?accountId=${encodeURIComponent(account.id)}`));
+    if (request.method === 'GET' && url.pathname === '/v2/game') {
+      sendJson(response, 200, await gameRequest<GameLobby>(`/internal/v2/lobby?accountId=${encodeURIComponent(account.id)}`));
       return;
     }
-    if (request.method === 'POST' && url.pathname === '/v1/game/join') {
+    if (request.method === 'POST' && url.pathname === '/v2/game/join') {
       const input = joinGameSchema.parse(await body(request));
-      const joined = await gameRequest<{ ok: true; countryId: number }>('/internal/v1/join', {
+      const joined = await gameRequest<{ ok: true; countryId: number }>('/internal/v2/join', {
         method: 'POST', body: JSON.stringify({ accountId: account.id, countryId: input.countryId }),
       });
       sendJson(response, 200, { assignment: { gameId: GAME_ID, countryId: joined.countryId } });
       return;
     }
-    if (request.method === 'POST' && url.pathname === '/v1/game/connect') {
+    if (request.method === 'POST' && url.pathname === '/v2/game/connect') {
       const assigned = await assignment(account.id);
       if (!assigned) { sendJson(response, 409, { error: 'Choose a country before connecting.' }); return; }
       const ticket = signGameTicket({

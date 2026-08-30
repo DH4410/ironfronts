@@ -93,7 +93,6 @@ export class WorldRenderer {
   private mapMarkerPipeline!: GPURenderPipeline;
   private armyMarkerPipeline!: GPURenderPipeline;
   private armyModelPipeline!: GPURenderPipeline;
-  private armyKindCountPipeline!: GPURenderPipeline;
   private countryLabelPipeline!: GPURenderPipeline;
   private countryLabelBuffer?: GPUBuffer;
   private countryLabelParamsBuffer?: GPUBuffer;
@@ -786,7 +785,6 @@ export class WorldRenderer {
     this.mapMarkerPipeline = pipelines.mapMarkers;
     this.armyMarkerPipeline = pipelines.armyMarkers;
     this.armyModelPipeline = pipelines.armyModels;
-    this.armyKindCountPipeline = pipelines.armyKindCounts;
     this.countryLabelPipeline = pipelines.countryLabels;
   }
 
@@ -977,6 +975,11 @@ export class WorldRenderer {
       (x, z) => this.sampleHeight(x, z), this.pickPoint,
     );
     return point ? [point[0], point[2]] : null;
+  }
+
+  /** Raw province id under a screen point, for typed province attack orders. */
+  provinceIdAt(clientX: number, clientY: number): number {
+    return this.provinceAtScreenPoint(clientX, clientY);
   }
 
   /** Army stack marker under a screen coordinate (nearest within a
@@ -1371,10 +1374,6 @@ export class WorldRenderer {
       pass.setBindGroup(1, this.armyModels.bindGroup);
       pass.draw(WorldRenderer.ARMY_MODEL_VERTEX_COUNT, instances, 0, WORLD_COPY_INDICES[0] * this.armyModels.count);
       this.recordTriangleDraw('roadFurniture', WorldRenderer.ARMY_MODEL_VERTEX_COUNT / 3 * instances, instances);
-      pass.setPipeline(this.armyKindCountPipeline);
-      pass.setBindGroup(1, this.armyModels.bindGroup);
-      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.armyModels.count);
-      this.recordTriangleDraw('debugLines', instances * 2, instances);
     }
     if (this.armyMarkers && this.armyMarkers.count > 0 && this.camera.distance < 5_000) {
       pass.setPipeline(this.armyMarkerPipeline);

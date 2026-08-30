@@ -12,7 +12,7 @@
 
 import './game-ui.css';
 import { QUALITY_LEVELS, QUALITY_PRESETS, type QualityLevel } from '../graphics/quality';
-import { renderSelectedArmyPanel } from './army';
+import { renderSelectedArmyPanel, type ArmyPanelCommand } from './army';
 import { createFlag } from './flags';
 import { createIcon, type IconName } from './icons';
 import { buildNotification } from './notifications';
@@ -32,7 +32,7 @@ export interface GameUiActions {
   openDebugInspector(): void;
   focusSelected?: () => void;
   /** Selected-army orders. 'deselect' clears the selection. */
-  armyCommand(command: 'move' | 'stop' | 'extract' | 'deselect'): void;
+  armyCommand(command: ArmyPanelCommand): void;
   /** Queue a unit in the selected (own) province. */
   produceUnit(provinceId: number, unitTypeId: string): void;
   /** Start a building in the selected (own, urban) province. */

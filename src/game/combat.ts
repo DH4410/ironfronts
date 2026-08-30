@@ -1,197 +1,531 @@
-/**
- * Basic ground combat + province capture.
- *
- * When hostile stacks occupy the same movement node they are ENGAGED and trade
- * damage each tick until one is destroyed or withdraws. Damage is
- * armour-class-aware and frontage-capped (only the strongest N units per side
- * deal full damage; the rest add staying power). An unopposed stack on a
- * foreign province centre captures it.
- */
+/** Persistent directional close combat, artillery bombardment, and capture. */
 
+import type {
+  BattleFrontSideState, BattleFrontState, BattleRole,
+} from './game-state';
+import { relationOf } from './game-state';
 import type { SimContext } from './sim-context';
-import { relationOf, setRelation } from './game-state';
-import type { ArmyStack } from './units/army';
-import { stackHealthFraction, stackUnitCount } from './units/army';
-import { issueMoveOrder } from './units/movement';
-import { nearestNode } from './movement/graph';
+import type { ArmyStack, UnitGroup } from './units/army';
+import {
+  ensureArmyRuntimeState, stackHp, stackMaxHp, stackUnitCount,
+} from './units/army';
+import { issueRetreatOrder, retreatPaths, type RetreatPath } from './units/movement';
 import { unitType } from './units/unit-catalog';
-import type { UnitCategory } from './units/unit-types';
+import type { ArmorClass, DamageProfile } from './units/unit-types';
+import { computeArmyVisibility } from './visibility';
 import { wrappedDistance } from './geometry';
 
-/** Attacker category -> damage multiplier vs {unarmored, light, heavy}. */
-const DAMAGE_VS: Record<UnitCategory, [number, number, number]> = {
-  infantry: [1.0, 0.55, 0.3],
-  engineer: [0.6, 0.3, 0.15],
-  recon: [1.1, 0.7, 0.35],
-  armor: [1.2, 1.05, 0.7],
-  artillery: [1.15, 0.9, 1.25],
-};
-const ARMOR_INDEX = { unarmored: 0, light: 1, heavy: 2 } as const;
-/** Only the strongest this-many units per side deal full damage. */
-const FRONTAGE = 10;
+export const COMBAT_VOLLEY_TICKS = 18_000;
+export const COMBAT_FRONTAGE = 10;
 const COMBAT_SNAP = 26;
-/** A stack this battered that is also being out-fought withdraws to safety. */
-const RETREAT_HEALTH = 0.3;
-/** ...where "out-fought" means it is taking this much more than it deals. */
-const RETREAT_ODDS = 1.5;
 
 export interface CombatEvent {
-  readonly kind: 'engaged' | 'destroyed' | 'retreat';
+  readonly kind:
+    | 'engaged' | 'reinforced' | 'volley' | 'retreat'
+    | 'destroyed' | 'bombardment' | 'battleEnded';
   readonly attacker: number;
   readonly defender: number;
-  readonly provinceHint?: string;
+  readonly battleId?: string;
+  readonly frontId?: string;
+  readonly armyId?: string;
+  readonly targetArmyId?: string;
 }
 
-function effectiveAttack(stack: ArmyStack, targetArmor: 'unarmored' | 'light' | 'heavy'): number {
-  // Take the strongest FRONTAGE units by stackPriority.
-  const units: Array<{ atk: number; cat: UnitCategory; prio: number }> = [];
-  for (const g of stack.units) {
-    const t = unitType(g.typeId);
-    for (let i = 0; i < g.count; i += 1) {
-      units.push({ atk: t.attack, cat: t.category, prio: t.stackPriority });
+interface GroupRef {
+  readonly army: ArmyStack;
+  readonly group: UnitGroup;
+}
+
+interface PendingDamage {
+  readonly army: ArmyStack;
+  readonly group: UnitGroup;
+  amount: number;
+}
+
+function initializeState(session: SimContext): void {
+  session.state.simulationTick ??= 0;
+  session.state.battles ??= {};
+  session.state.battleFronts ??= {};
+  session.state.nextBattleId ??= 1;
+  for (const army of Object.values(session.state.armies)) ensureArmyRuntimeState(army);
+}
+
+function armorHealth(armies: readonly ArmyStack[]): Record<ArmorClass, number> {
+  const result: Record<ArmorClass, number> = { soft: 0, light: 0, heavy: 0 };
+  for (const army of armies) {
+    for (const group of army.units) result[unitType(group.typeId).armorClass] += group.hp;
+  }
+  return result;
+}
+
+function sideArmies(session: SimContext, side: BattleFrontSideState): ArmyStack[] {
+  return side.armyIds
+    .map((id) => session.state.armies[id])
+    .filter((army): army is ArmyStack => Boolean(army));
+}
+
+function sideHp(session: SimContext, side: BattleFrontSideState): number {
+  return sideArmies(session, side).reduce((sum, army) => sum + stackHp(army), 0);
+}
+
+function sideBaseline(side: BattleFrontSideState): number {
+  return Object.values(side.entryMaxHpByArmy).reduce((sum, hp) => sum + hp, 0);
+}
+
+function profileFor(role: BattleRole, group: UnitGroup): DamageProfile {
+  const type = unitType(group.typeId);
+  return role === 'attack' ? type.attack : type.defense;
+}
+
+/**
+ * Resolve one side's frontage against one opponent from the shared snapshot.
+ * Every unit above the ten selected candidates contributes zero fire, while
+ * remaining fully present in the armor-specific target pools.
+ */
+function calculateVolley(
+  attackers: readonly ArmyStack[], role: BattleRole, defenders: readonly ArmyStack[],
+): Array<{ ref: GroupRef; amount: number }> {
+  const hp = armorHealth(defenders);
+  const total = hp.soft + hp.light + hp.heavy;
+  if (total <= 0) return [];
+  const ratio: Record<ArmorClass, number> = {
+    soft: hp.soft / total, light: hp.light / total, heavy: hp.heavy / total,
+  };
+  const candidates: Array<{
+    profile: DamageProfile; health: number; typeId: string; armyId: string; ordinal: number; score: number;
+  }> = [];
+  const pooledByType = new Map<string, { hp: number; maxHp: number }>();
+  for (const army of attackers) {
+    for (const group of army.units) {
+      const pool = pooledByType.get(group.typeId) ?? { hp: 0, maxHp: 0 };
+      pool.hp += group.hp;
+      pool.maxHp += group.count * unitType(group.typeId).maxHp;
+      pooledByType.set(group.typeId, pool);
     }
   }
-  units.sort((a, b) => b.prio - a.prio);
-  let total = 0;
-  for (let i = 0; i < units.length; i += 1) {
-    const front = i < FRONTAGE ? 1 : 0.15; // overstack still adds a little
-    total += units[i].atk * DAMAGE_VS[units[i].cat][ARMOR_INDEX[targetArmor]] * front;
+  for (const army of attackers) {
+    for (const group of army.units) {
+      const pool = pooledByType.get(group.typeId)!;
+      const health = pool.maxHp > 0 ? Math.max(0, Math.min(1, pool.hp / pool.maxHp)) : 0;
+      const profile = profileFor(role, group);
+      const score = health * (
+        profile.soft * ratio.soft + profile.light * ratio.light + profile.heavy * ratio.heavy
+      );
+      for (let ordinal = 0; ordinal < group.count; ordinal += 1) {
+        candidates.push({ profile, health, typeId: group.typeId, armyId: army.id, ordinal, score });
+      }
+    }
   }
-  return total;
+  candidates.sort((a, b) => b.score - a.score
+    || a.typeId.localeCompare(b.typeId) || a.armyId.localeCompare(b.armyId)
+    || a.ordinal - b.ordinal);
+  const selected = candidates.slice(0, COMBAT_FRONTAGE);
+  const fire: Record<ArmorClass, number> = { soft: 0, light: 0, heavy: 0 };
+  for (const unit of selected) {
+    fire.soft += unit.profile.soft * unit.health;
+    fire.light += unit.profile.light * unit.health;
+    fire.heavy += unit.profile.heavy * unit.health;
+  }
+
+  const result: Array<{ ref: GroupRef; amount: number }> = [];
+  for (const armor of ['soft', 'light', 'heavy'] as const) {
+    const classDamage = fire[armor] * ratio[armor];
+    if (classDamage <= 0 || hp[armor] <= 0) continue;
+    for (const army of defenders) {
+      for (const group of army.units) {
+        if (unitType(group.typeId).armorClass !== armor) continue;
+        result.push({ ref: { army, group }, amount: classDamage * group.hp / hp[armor] });
+      }
+    }
+  }
+  return result;
 }
 
-/** Dominant armour class of a stack (what the enemy is mostly shooting at). */
-function dominantArmor(stack: ArmyStack): 'unarmored' | 'light' | 'heavy' {
-  const tally = { unarmored: 0, light: 0, heavy: 0 };
-  for (const g of stack.units) tally[unitType(g.typeId).armorClass] += g.count;
-  if (tally.heavy >= tally.light && tally.heavy >= tally.unarmored) return 'heavy';
-  if (tally.light >= tally.unarmored) return 'light';
-  return 'unarmored';
+function addDamage(
+  pending: Map<string, PendingDamage>,
+  entries: readonly { ref: GroupRef; amount: number }[],
+): void {
+  for (const entry of entries) {
+    const key = `${entry.ref.army.id}\0${entry.ref.group.typeId}`;
+    const item = pending.get(key);
+    if (item) item.amount += entry.amount;
+    else pending.set(key, { ...entry.ref, amount: entry.amount });
+  }
 }
 
-function applyDamage(stack: ArmyStack, amount: number): void {
-  let remaining = amount;
-  // Distribute proportionally to current hp, heaviest armour last.
-  const totalHp = stack.units.reduce((s, g) => s + g.hp, 0);
-  if (totalHp <= 0) { stack.units = []; return; }
-  for (const g of stack.units) {
-    const share = (g.hp / totalHp) * remaining;
-    const def = unitType(g.typeId).defense;
-    const mitigated = share * (100 / (100 + def * g.count * 0.05));
-    g.hp = Math.max(0, g.hp - mitigated);
+function applyPendingDamage(pending: ReadonlyMap<string, PendingDamage>): Set<string> {
+  const touched = new Set<string>();
+  for (const item of pending.values()) {
+    item.group.hp = Math.max(0, item.group.hp - item.amount);
+    touched.add(item.army.id);
   }
-  remaining = 0;
-  // Shed unit count as pooled hp drops: a group of N units is at full strength
-  // until its pool falls below (N-1)*maxHp, then it is down a man, and so on.
-  // count = "units with any hp left" = ceil(hp / maxHp). For 4 infantry at
-  // 100 maxHp this gives 4/4/3/2/1/0 as the pool drains 400→350→250→150→50→0.
-  stack.units = stack.units.filter((g) => {
-    const per = unitType(g.typeId).maxHp;
-    g.count = Math.max(0, Math.min(g.count, Math.ceil(g.hp / per)));
-    return g.count > 0 && g.hp > 0;
+  for (const item of pending.values()) {
+    if (!touched.has(item.army.id)) continue;
+    touched.delete(item.army.id);
+    item.army.units = item.army.units.filter((group) => {
+      const maxHp = unitType(group.typeId).maxHp;
+      group.count = Math.max(0, Math.min(group.count, Math.ceil(group.hp / maxHp)));
+      return group.count > 0 && group.hp > 0;
+    });
+  }
+  return touched;
+}
+
+function provinceAtNode(session: SimContext, nodeId: number): number | null {
+  const x = session.graph.nodeX[nodeId];
+  const z = session.graph.nodeZ[nodeId];
+  const province = session.world.provinces.find(
+    (p) => Math.round(p.center[0]) === Math.round(x) && Math.round(p.center[1]) === Math.round(z),
+  );
+  return province?.id ?? null;
+}
+
+function directionOf(army: ArmyStack): number {
+  return army.lastGraphNodeId ?? army.graphNodeId;
+}
+
+function roleOf(army: ArmyStack, provinceId: number | null): BattleRole {
+  if (provinceId !== null
+    && (army.order === null || army.status === 'idle' || army.status === 'extracting')) return 'defense';
+  return army.status === 'moving' ? 'attack' : 'defense';
+}
+
+function makeSide(
+  army: ArmyStack, role: BattleRole, simulationTick: number, directionNodeId = directionOf(army),
+): BattleFrontSideState {
+  return {
+    countryId: army.ownerCountryId,
+    directionNodeId,
+    role,
+    armyIds: [army.id],
+    entryMaxHpByArmy: { [army.id]: stackMaxHp(army) },
+    nextVolleyTick: simulationTick,
+  };
+}
+
+function joinArmy(army: ArmyStack, frontId: string): void {
+  ensureArmyRuntimeState(army);
+  if (!army.battleFrontIds!.includes(frontId)) army.battleFrontIds!.push(frontId);
+  if (army.status !== 'engaged') {
+    army.suspendedOrder = army.order;
+    army.order = null;
+    army.extractingNodeId = null;
+    army.status = 'engaged';
+  }
+}
+
+function matchingFront(
+  session: SimContext, a: ArmyStack, b: ArmyStack, anchorNodeId: number,
+): BattleFrontState | undefined {
+  return Object.values(session.state.battleFronts).find((front) => {
+    if (front.anchorNodeId !== anchorNodeId) return false;
+    const directionFor = (army: ArmyStack): number => {
+      const side = front.sideA.countryId === army.ownerCountryId ? front.sideA : front.sideB;
+      return front.kind === 'province' && side.role === 'defense'
+        ? front.anchorNodeId : directionOf(army);
+    };
+    const aDirection = directionFor(a);
+    const bDirection = directionFor(b);
+    const direct = front.sideA.countryId === a.ownerCountryId
+      && front.sideB.countryId === b.ownerCountryId
+      && front.sideA.directionNodeId === aDirection
+      && front.sideB.directionNodeId === bDirection;
+    const reverse = front.sideB.countryId === a.ownerCountryId
+      && front.sideA.countryId === b.ownerCountryId
+      && front.sideB.directionNodeId === aDirection
+      && front.sideA.directionNodeId === bDirection;
+    return direct || reverse;
   });
 }
 
-/** Send `army` back toward its nearest *other* owned province centre and mark it
- *  retreating. Returns false (and does nothing) if it has nowhere to run — no
- *  owned province reachable on this landmass except the node it is already on
- *  (a last stand on your only foothold, or an invader deep in enemy ground). */
-function withdraw(session: SimContext, army: ArmyStack): boolean {
-  const graph = session.graph;
-  const component = graph.component[army.graphNodeId] ?? -1;
-  let best: readonly [number, number] | null = null;
-  let bestD = Infinity;
-  for (const province of session.world.provinces) {
-    if (session.state.provinceOwners[province.id] !== army.ownerCountryId) continue;
-    const node = nearestNode(
-      graph, province.center[0], province.center[1], Infinity, component,
-    );
-    // Must land the stack on a *different* node, or the move order is a no-op
-    // ("Already there.") and the stack fights on where it stands.
-    if (node < 0 || node === army.graphNodeId) continue;
-    const d = wrappedDistance(
-      army.x, army.z, graph.nodeX[node], graph.nodeZ[node], session.world.width,
-    );
-    if (d < bestD) { bestD = d; best = [graph.nodeX[node], graph.nodeZ[node]]; }
+function findOrCreateFront(
+  session: SimContext, a: ArmyStack, b: ArmyStack, events: CombatEvent[],
+): BattleFrontState {
+  const anchorNodeId = a.graphNodeId === b.graphNodeId
+    ? a.graphNodeId
+    : (wrappedDistance(
+      a.x, a.z, session.graph.nodeX[a.graphNodeId], session.graph.nodeZ[a.graphNodeId],
+      session.world.width,
+    ) <= wrappedDistance(
+      b.x, b.z, session.graph.nodeX[b.graphNodeId], session.graph.nodeZ[b.graphNodeId],
+      session.world.width,
+    ) ? a.graphNodeId : b.graphNodeId);
+  const existing = matchingFront(session, a, b, anchorNodeId);
+  if (existing) {
+    for (const army of [a, b]) {
+      const side = existing.sideA.countryId === army.ownerCountryId ? existing.sideA : existing.sideB;
+      if (!side.armyIds.includes(army.id)) {
+        side.armyIds.push(army.id);
+        side.entryMaxHpByArmy[army.id] = stackMaxHp(army);
+        joinArmy(army, existing.id);
+        events.push({
+          kind: 'reinforced', attacker: army.ownerCountryId,
+          defender: side === existing.sideA ? existing.sideB.countryId : existing.sideA.countryId,
+          battleId: existing.battleId, frontId: existing.id, armyId: army.id,
+        });
+      }
+    }
+    return existing;
   }
-  if (!best) return false;
-  if (!issueMoveOrder(session, army.id, best[0], best[1], 'move').ok) return false;
-  army.status = 'retreating';
+
+  const provinceId = provinceAtNode(session, anchorNodeId);
+  const provinceOwner = provinceId === null ? 0 : session.state.provinceOwners[provinceId] ?? 0;
+  const aRole = provinceOwner === a.ownerCountryId ? 'defense'
+    : provinceOwner === b.ownerCountryId ? 'attack' : roleOf(a, provinceId);
+  const bRole = provinceOwner === b.ownerCountryId ? 'defense'
+    : provinceOwner === a.ownerCountryId ? 'attack' : roleOf(b, provinceId);
+  const bothMoving = aRole === 'attack' && bRole === 'attack';
+  const existingBattle = Object.values(session.state.battles).find((battle) =>
+    battle.frontIds.some((id) => session.state.battleFronts[id]?.anchorNodeId === anchorNodeId));
+  const serial = existingBattle ? Number(existingBattle.id.replace('battle-', '')) : session.state.nextBattleId++;
+  const battleId = existingBattle?.id ?? `battle-${serial}`;
+  const frontId = `front-${serial}-${(existingBattle?.frontIds.length ?? 0) + 1}`;
+  const front: BattleFrontState = {
+    id: frontId,
+    battleId,
+    anchorNodeId,
+    kind: provinceId === null ? 'road' : 'province',
+    provinceId,
+    x: (a.x + b.x) / 2,
+    z: (a.z + b.z) / 2,
+    sideA: makeSide(
+      a, bothMoving ? 'attack' : aRole, session.state.simulationTick,
+      aRole === 'defense' && provinceId !== null ? anchorNodeId : directionOf(a),
+    ),
+    sideB: makeSide(
+      b, bothMoving ? 'attack' : bRole, session.state.simulationTick,
+      bRole === 'defense' && provinceId !== null ? anchorNodeId : directionOf(b),
+    ),
+  };
+  if (existingBattle) existingBattle.frontIds.push(frontId);
+  else session.state.battles[battleId] = { id: battleId, frontIds: [frontId] };
+  session.state.battleFronts[frontId] = front;
+  joinArmy(a, frontId);
+  joinArmy(b, frontId);
+  events.push({
+    kind: 'engaged', attacker: a.ownerCountryId, defender: b.ownerCountryId,
+    battleId, frontId,
+  });
+  return front;
+}
+
+function detectEngagements(session: SimContext, events: CombatEvent[]): void {
+  const armies = Object.values(session.state.armies);
+  for (let i = 0; i < armies.length; i += 1) {
+    const a = armies[i];
+    if (a.retreat?.protected) continue;
+    for (let j = i + 1; j < armies.length; j += 1) {
+      const b = armies[j];
+      if (b.retreat?.protected || a.ownerCountryId === b.ownerCountryId) continue;
+      if (relationOf(session.state, a.ownerCountryId, b.ownerCountryId) !== 'war') continue;
+      if (wrappedDistance(a.x, a.z, b.x, b.z, session.world.width) > COMBAT_SNAP) continue;
+      findOrCreateFront(session, a, b, events);
+    }
+  }
+}
+
+function removeArmyFromFront(session: SimContext, front: BattleFrontState, armyId: string): void {
+  for (const side of [front.sideA, front.sideB]) {
+    side.armyIds = side.armyIds.filter((id) => id !== armyId);
+    delete side.entryMaxHpByArmy[armyId];
+  }
+  const army = session.state.armies[armyId];
+  if (army) army.battleFrontIds = army.battleFrontIds?.filter((id) => id !== front.id) ?? [];
+}
+
+function removeArmyFromAllFronts(session: SimContext, armyId: string): void {
+  for (const front of Object.values(session.state.battleFronts)) removeArmyFromFront(session, front, armyId);
+}
+
+function legalFirstNodes(session: SimContext, army: ArmyStack, front: BattleFrontState): number[] {
+  if (front.kind === 'road') {
+    return army.lastGraphNodeId === null || army.lastGraphNodeId === undefined
+      ? [] : [army.lastGraphNodeId];
+  }
+  const hostileApproaches = new Set<number>();
+  for (const other of Object.values(session.state.battleFronts)) {
+    if (other.battleId !== front.battleId) continue;
+    for (const side of [other.sideA, other.sideB]) {
+      if (side.countryId !== army.ownerCountryId) hostileApproaches.add(side.directionNodeId);
+    }
+  }
+  return session.graph.adjacency[army.graphNodeId].filter((id) => !hostileApproaches.has(id));
+}
+
+export function legalRetreatPaths(session: SimContext, armyId: string): RetreatPath[] {
+  const army = session.state.armies[armyId];
+  if (!army || army.status !== 'engaged') return [];
+  const front = army.battleFrontIds?.map((id) => session.state.battleFronts[id]).find(Boolean);
+  return front ? retreatPaths(session, army, legalFirstNodes(session, army, front)) : [];
+}
+
+export function issueManualRetreat(
+  session: SimContext, armyId: string, firstNodeId: number,
+): { ok: boolean; reason?: string } {
+  const army = session.state.armies[armyId];
+  if (!army || army.status !== 'engaged') return { ok: false, reason: 'Army is not in close combat.' };
+  const route = legalRetreatPaths(session, armyId).find((candidate) => candidate.firstNodeId === firstNodeId);
+  if (!route) return { ok: false, reason: 'That retreat direction is not legal.' };
+  removeArmyFromAllFronts(session, armyId);
+  issueRetreatOrder(session, army, route);
+  return { ok: true };
+}
+
+function autoRetreat(session: SimContext, front: BattleFrontState, side: BattleFrontSideState): boolean {
+  const armies = sideArmies(session, side);
+  if (armies.length === 0 || sideHp(session, side) >= sideBaseline(side) * 0.1) return false;
+  const routes = armies.map((army) => retreatPaths(
+    session, army, legalFirstNodes(session, army, front),
+  )[0]);
+  if (routes.some((route) => !route)) return false;
+  for (let i = 0; i < armies.length; i += 1) {
+    removeArmyFromAllFronts(session, armies[i].id);
+    issueRetreatOrder(session, armies[i], routes[i]);
+  }
   return true;
 }
 
-/** One combat + capture pass. Returns notable events. */
-export function stepCombat(session: SimContext, dtHours: number): CombatEvent[] {
-  const events: CombatEvent[] = [];
+function resumeArmyIfFree(army: ArmyStack): void {
+  ensureArmyRuntimeState(army);
+  if (army.battleFrontIds!.length > 0 || army.status === 'retreating') return;
+  if (army.suspendedOrder) {
+    army.order = army.suspendedOrder;
+    army.suspendedOrder = null;
+    army.status = 'moving';
+  } else if (army.status === 'engaged') {
+    army.status = 'idle';
+  }
+}
+
+function cleanupFronts(session: SimContext, events: CombatEvent[]): void {
+  for (const front of Object.values(session.state.battleFronts)) {
+    front.sideA.armyIds = front.sideA.armyIds.filter((id) => Boolean(session.state.armies[id]));
+    front.sideB.armyIds = front.sideB.armyIds.filter((id) => Boolean(session.state.armies[id]));
+    if (front.sideA.armyIds.length > 0 && front.sideB.armyIds.length > 0) continue;
+    for (const armyId of [...front.sideA.armyIds, ...front.sideB.armyIds]) {
+      const army = session.state.armies[armyId];
+      if (army) {
+        army.battleFrontIds = army.battleFrontIds?.filter((id) => id !== front.id) ?? [];
+        resumeArmyIfFree(army);
+      }
+    }
+    const battle = session.state.battles[front.battleId];
+    if (battle) {
+      battle.frontIds = battle.frontIds.filter((id) => id !== front.id);
+      if (battle.frontIds.length === 0) delete session.state.battles[battle.id];
+    }
+    events.push({
+      kind: 'battleEnded', attacker: front.sideA.countryId, defender: front.sideB.countryId,
+      battleId: front.battleId, frontId: front.id,
+    });
+    delete session.state.battleFronts[front.id];
+  }
+  for (const army of Object.values(session.state.armies)) resumeArmyIfFree(army);
+}
+
+function artilleryDamage(army: ArmyStack, target: ArmyStack): Array<{ ref: GroupRef; amount: number }> {
+  const artilleryOnly: ArmyStack = {
+    ...army,
+    units: army.units.filter((group) => unitType(group.typeId).category === 'artillery'),
+  };
+  return calculateVolley([artilleryOnly], 'attack', [target]);
+}
+
+function stepArtillery(session: SimContext, events: CombatEvent[]): void {
   const armies = Object.values(session.state.armies);
-
-  // --- engagements ---------------------------------------------------
-  for (let i = 0; i < armies.length; i += 1) {
-    const a = armies[i];
-    if (!session.state.armies[a.id]) continue;
-    for (let j = i + 1; j < armies.length; j += 1) {
-      const b = armies[j];
-      if (!session.state.armies[b.id]) continue;
-      if (a.ownerCountryId === b.ownerCountryId) continue;
-      // A stack that has broken off keeps moving — it does not re-engage while
-      // it clears the field.
-      if (a.status === 'retreating' || b.status === 'retreating') continue;
-      const together = a.graphNodeId === b.graphNodeId
-        || wrappedDistance(a.x, a.z, b.x, b.z, session.world.width) <= COMBAT_SNAP;
-      if (!together) continue;
-
-      if (relationOf(session.state, a.ownerCountryId, b.ownerCountryId) !== 'war') {
-        setRelation(session.state, a.ownerCountryId, b.ownerCountryId, 'war');
-      }
-      if (a.status !== 'engaged' || b.status !== 'engaged') {
-        events.push({ kind: 'engaged', attacker: a.ownerCountryId, defender: b.ownerCountryId });
-      }
-      a.status = 'engaged';
-      b.status = 'engaged';
-      a.order = null;
-      b.order = null;
-
-      const dmgToB = effectiveAttack(a, dominantArmor(b)) * dtHours * 0.5;
-      const dmgToA = effectiveAttack(b, dominantArmor(a)) * dtHours * 0.5;
-      applyDamage(b, dmgToB);
-      applyDamage(a, dmgToA);
-
-      if (stackUnitCount(a) === 0) {
-        delete session.state.armies[a.id];
-        events.push({ kind: 'destroyed', attacker: b.ownerCountryId, defender: a.ownerCountryId });
-      }
-      if (session.state.armies[b.id] && stackUnitCount(b) === 0) {
-        delete session.state.armies[b.id];
-        events.push({ kind: 'destroyed', attacker: a.ownerCountryId, defender: b.ownerCountryId });
-      }
-
-      // A badly beaten, out-fought survivor breaks contact rather than dying in
-      // place. The winner is free to advance / capture next tick.
-      const survA = session.state.armies[a.id];
-      const survB = session.state.armies[b.id];
-      if (survA && survB) {
-        if (stackHealthFraction(survA) < RETREAT_HEALTH && dmgToA > dmgToB * RETREAT_ODDS
-          && withdraw(session, survA)) {
-          events.push({ kind: 'retreat', attacker: b.ownerCountryId, defender: a.ownerCountryId });
-        } else if (stackHealthFraction(survB) < RETREAT_HEALTH && dmgToB > dmgToA * RETREAT_ODDS
-          && withdraw(session, survB)) {
-          events.push({ kind: 'retreat', attacker: a.ownerCountryId, defender: b.ownerCountryId });
-        }
-      }
-      break; // a resolved this tick
+  for (const army of armies) {
+    ensureArmyRuntimeState(army);
+    if (army.status !== 'idle' && army.status !== 'extracting') continue;
+    const artillery = army.units.filter((group) => unitType(group.typeId).category === 'artillery');
+    if (artillery.length === 0) continue;
+    const range = Math.max(...artillery.map((group) => unitType(group.typeId).engagementRange));
+    const visibility = computeArmyVisibility(session.state, session.world, army.ownerCountryId);
+    const validTargets = armies.filter((target) => target.id !== army.id
+      && relationOf(session.state, army.ownerCountryId, target.ownerCountryId) === 'war'
+      && !target.retreat?.protected
+      && visibility.get(target.id) !== 'hidden'
+      && wrappedDistance(army.x, army.z, target.x, target.z, session.world.width) <= range);
+    let target = army.artillery!.manualTarget
+      ? validTargets.find((candidate) => candidate.id === army.artillery!.targetArmyId)
+      : undefined;
+    if (!target) {
+      army.artillery!.manualTarget = false;
+      validTargets.sort((a, b) => wrappedDistance(
+        army.x, army.z, a.x, a.z, session.world.width,
+      ) - wrappedDistance(army.x, army.z, b.x, b.z, session.world.width) || a.id.localeCompare(b.id));
+      target = validTargets[0];
+      army.artillery!.targetArmyId = target?.id ?? null;
+    }
+    if (!target || session.state.simulationTick < army.artillery!.nextVolleyTick) continue;
+    const pending = new Map<string, PendingDamage>();
+    addDamage(pending, artilleryDamage(army, target));
+    applyPendingDamage(pending);
+    const destroyed = stackUnitCount(target) === 0;
+    army.artillery!.nextVolleyTick = destroyed
+      ? session.state.simulationTick
+      : session.state.simulationTick + COMBAT_VOLLEY_TICKS;
+    events.push({
+      kind: 'bombardment', attacker: army.ownerCountryId, defender: target.ownerCountryId,
+      armyId: army.id, targetArmyId: target.id,
+    });
+    if (destroyed) {
+      removeArmyFromAllFronts(session, target.id);
+      delete session.state.armies[target.id];
+      events.push({
+        kind: 'destroyed', attacker: army.ownerCountryId, defender: target.ownerCountryId,
+        armyId: target.id,
+      });
     }
   }
+}
 
-  // Anyone who was engaged but has no adjacent enemy returns to idle.
-  for (const army of Object.values(session.state.armies)) {
-    if (army.status !== 'engaged') continue;
-    const stillFighting = Object.values(session.state.armies).some(
-      (o) => o.id !== army.id && o.ownerCountryId !== army.ownerCountryId
-        && wrappedDistance(o.x, o.z, army.x, army.z, session.world.width) <= COMBAT_SNAP,
-    );
-    if (!stillFighting) army.status = 'idle';
+/** One fixed authoritative combat pass. All due fronts use one pre-damage snapshot. */
+export function stepCombat(session: SimContext, _dtHours: number): CombatEvent[] {
+  initializeState(session);
+  const events: CombatEvent[] = [];
+  detectEngagements(session, events);
+  const pending = new Map<string, PendingDamage>();
+  const due: BattleFrontState[] = [];
+  for (const front of Object.values(session.state.battleFronts)) {
+    const aDue = session.state.simulationTick >= front.sideA.nextVolleyTick;
+    const bDue = session.state.simulationTick >= front.sideB.nextVolleyTick;
+    if (!aDue && !bDue) continue;
+    const a = sideArmies(session, front.sideA);
+    const b = sideArmies(session, front.sideB);
+    if (aDue) {
+      addDamage(pending, calculateVolley(a, front.sideA.role, b));
+      front.sideA.nextVolleyTick = session.state.simulationTick + COMBAT_VOLLEY_TICKS;
+    }
+    if (bDue) {
+      addDamage(pending, calculateVolley(b, front.sideB.role, a));
+      front.sideB.nextVolleyTick = session.state.simulationTick + COMBAT_VOLLEY_TICKS;
+    }
+    due.push(front);
   }
-
+  applyPendingDamage(pending);
+  for (const front of due) {
+    events.push({
+      kind: 'volley', attacker: front.sideA.countryId, defender: front.sideB.countryId,
+      battleId: front.battleId, frontId: front.id,
+    });
+  }
+  for (const army of Object.values(session.state.armies)) {
+    if (stackUnitCount(army) > 0) continue;
+    removeArmyFromAllFronts(session, army.id);
+    delete session.state.armies[army.id];
+    events.push({ kind: 'destroyed', attacker: 0, defender: army.ownerCountryId, armyId: army.id });
+  }
+  for (const front of due) {
+    if (!session.state.battleFronts[front.id]) continue;
+    if (autoRetreat(session, front, front.sideA)) {
+      events.push({ kind: 'retreat', attacker: front.sideB.countryId, defender: front.sideA.countryId });
+    }
+    if (session.state.battleFronts[front.id] && autoRetreat(session, front, front.sideB)) {
+      events.push({ kind: 'retreat', attacker: front.sideA.countryId, defender: front.sideB.countryId });
+    }
+  }
+  stepArtillery(session, events);
+  cleanupFronts(session, events);
   return events;
 }
 
@@ -201,50 +535,40 @@ export interface CaptureEvent {
   readonly toCountryId: number;
 }
 
-/** Unopposed stack on a foreign province centre captures it. */
+/** Unopposed hostile stack on a foreign province centre captures it immediately. */
 export function stepCapture(session: SimContext): CaptureEvent[] {
   const events: CaptureEvent[] = [];
-  const world = session.world;
   for (const army of Object.values(session.state.armies)) {
-    if (army.status === 'engaged') continue;
-    // Which province centre is this node?
-    const province = world.provinces.find(
-      (p) => Math.round(session.graph.nodeX[army.graphNodeId]) === Math.round(p.center[0])
-        && Math.round(session.graph.nodeZ[army.graphNodeId]) === Math.round(p.center[1]),
-    );
-    if (!province) continue;
-    const owner = session.state.provinceOwners[province.id] ?? 0;
-    if (owner === army.ownerCountryId) continue;
-
-    const defended = Object.values(session.state.armies).some(
-      (o) => o.ownerCountryId === owner
-        && wrappedDistance(o.x, o.z, army.x, army.z, world.width) <= COMBAT_SNAP,
-    );
+    if (army.status === 'engaged' || army.status === 'retreating') continue;
+    const provinceId = provinceAtNode(session, army.graphNodeId);
+    if (provinceId === null) continue;
+    const owner = session.state.provinceOwners[provinceId] ?? 0;
+    if (owner === army.ownerCountryId || (
+      owner > 0 && relationOf(session.state, army.ownerCountryId, owner) !== 'war'
+    )) {
+      continue;
+    }
+    const defended = Object.values(session.state.armies).some((other) => (
+      other.id !== army.id && other.ownerCountryId === owner
+      && wrappedDistance(other.x, other.z, army.x, army.z, session.world.width) <= COMBAT_SNAP
+    ));
     if (defended) continue;
-
-    session.state.provinceOwners[province.id] = army.ownerCountryId;
-    setRelation(session.state, army.ownerCountryId, owner, 'war');
-    // Units and buildings the previous owner was working on here are forfeit,
-    // and their rally point no longer applies.
-    delete session.state.productionQueues[province.id];
-    delete session.state.constructionQueues[province.id];
-    delete session.state.rallyPoints[province.id];
-    // Resource nodes in the province change controller.
+    session.state.provinceOwners[provinceId] = army.ownerCountryId;
+    delete session.state.productionQueues[provinceId];
+    delete session.state.constructionQueues[provinceId];
+    delete session.state.rallyPoints[provinceId];
     for (const node of Object.values(session.state.resourceNodes)) {
-      if (node.provinceId !== province.id) continue;
+      if (node.provinceId !== provinceId) continue;
       node.controllerCountryId = army.ownerCountryId;
       const extractor = node.extractorArmyId ? session.state.armies[node.extractorArmyId] : undefined;
       if (extractor && extractor.ownerCountryId !== army.ownerCountryId) {
-        // Mine seized from under an enemy extractor: clear BOTH sides. Once the
-        // node leaves 'extracting', stepExtraction's own cleanup can't reach the
-        // army, so it would otherwise stay pinned in 'extracting' forever.
         extractor.extractingNodeId = null;
         if (extractor.status === 'extracting') extractor.status = 'idle';
         node.extractorArmyId = null;
         node.status = node.remaining > 0 ? 'idle' : 'exhausted';
       }
     }
-    events.push({ provinceId: province.id, fromCountryId: owner, toCountryId: army.ownerCountryId });
+    events.push({ provinceId, fromCountryId: owner, toCountryId: army.ownerCountryId });
   }
   return events;
 }

@@ -11,7 +11,11 @@
 import type { LandGraph } from './graph';
 import { wrappedDistance } from '../geometry';
 
-export function findPath(graph: LandGraph, start: number, goal: number): number[] | null {
+export type EdgeAllowed = (from: number, to: number) => boolean;
+
+export function findPath(
+  graph: LandGraph, start: number, goal: number, edgeAllowed?: EdgeAllowed,
+): number[] | null {
   if (start < 0 || goal < 0 || start >= graph.nodeCount || goal >= graph.nodeCount) return null;
   if (start === goal) return [start];
   if (graph.component[start] !== graph.component[goal]) return null;
@@ -77,6 +81,7 @@ export function findPath(graph: LandGraph, start: number, goal: number): number[
     for (let k = 0; k < neighbours.length; k += 1) {
       const next = neighbours[k];
       if (closed[next]) continue;
+      if (edgeAllowed && !edgeAllowed(current, next)) continue;
       const tentative = gScore[current] + costs[k];
       if (tentative < gScore[next]) {
         gScore[next] = tentative;
@@ -86,6 +91,46 @@ export function findPath(graph: LandGraph, start: number, goal: number): number[
     }
   }
   return null;
+}
+
+/** Reachable node geometrically closest to a target, plus the path to it. */
+export function closestReachablePath(
+  graph: LandGraph, start: number, targetX: number, targetZ: number,
+  edgeAllowed?: EdgeAllowed,
+): number[] {
+  if (start < 0 || start >= graph.nodeCount) return [];
+  const distance = new Float64Array(graph.nodeCount).fill(Infinity);
+  const parent = new Int32Array(graph.nodeCount).fill(-1);
+  const visited = new Uint8Array(graph.nodeCount);
+  distance[start] = 0;
+  let best = start;
+  let bestTarget = wrappedDistance(graph.nodeX[start], graph.nodeZ[start], targetX, targetZ, graph.width);
+  for (;;) {
+    let current = -1;
+    let currentDistance = Infinity;
+    for (let id = 0; id < graph.nodeCount; id += 1) {
+      if (!visited[id] && distance[id] < currentDistance) {
+        current = id;
+        currentDistance = distance[id];
+      }
+    }
+    if (current < 0) break;
+    visited[current] = 1;
+    const targetDistance = wrappedDistance(
+      graph.nodeX[current], graph.nodeZ[current], targetX, targetZ, graph.width,
+    );
+    if (targetDistance < bestTarget) { bestTarget = targetDistance; best = current; }
+    for (let i = 0; i < graph.adjacency[current].length; i += 1) {
+      const next = graph.adjacency[current][i];
+      if (edgeAllowed && !edgeAllowed(current, next)) continue;
+      const candidate = currentDistance + graph.edgeCost[current][i];
+      if (candidate < distance[next]) { distance[next] = candidate; parent[next] = current; }
+    }
+  }
+  const path = [best];
+  for (let node = best; parent[node] >= 0; node = parent[node]) path.push(parent[node]);
+  path.reverse();
+  return path;
 }
 
 /** Total world-distance length of a node path. */

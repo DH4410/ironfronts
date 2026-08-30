@@ -12,7 +12,7 @@
 
 import type { ArmyStack } from './units/army';
 
-export const GAME_STATE_VERSION = 1;
+export const GAME_STATE_VERSION = 2;
 
 export type ResourceKey = 'funds' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil';
 
@@ -103,6 +103,35 @@ export interface ResourceNodeState {
 
 export type Relation = 'peace' | 'war';
 
+export type BattleRole = 'attack' | 'defense';
+
+export interface BattleFrontSideState {
+  readonly countryId: number;
+  readonly directionNodeId: number;
+  role: BattleRole;
+  armyIds: string[];
+  /** Full HP brought into this front, retained after casualties. */
+  entryMaxHpByArmy: Record<string, number>;
+  nextVolleyTick: number;
+}
+
+export interface BattleFrontState {
+  readonly id: string;
+  readonly battleId: string;
+  readonly anchorNodeId: number;
+  readonly kind: 'road' | 'province';
+  readonly provinceId: number | null;
+  readonly x: number;
+  readonly z: number;
+  sideA: BattleFrontSideState;
+  sideB: BattleFrontSideState;
+}
+
+export interface BattleState {
+  readonly id: string;
+  frontIds: string[];
+}
+
 export interface GameClock {
   /** Monotonic game-time in hours since scenario start. Drives every system. */
   gameTimeHours: number;
@@ -118,6 +147,8 @@ export interface GameState {
   readonly economyEnabled: boolean;
 
   clock: GameClock;
+  /** Fixed authoritative 10 Hz step number; 18,000 ticks = 30 real minutes. */
+  simulationTick: number;
 
   /** Every country with territory, keyed by id. */
   countries: Record<number, CountryState>;
@@ -133,12 +164,15 @@ export interface GameState {
   rallyPoints: Record<number, { x: number; z: number }>;
 
   armies: Record<string, ArmyStack>;
+  battles: Record<string, BattleState>;
+  battleFronts: Record<string, BattleFrontState>;
   resourceNodes: Record<number, ResourceNodeState>;
 
   /** Directed-pair relation key "a:b" with a < b -> 'war' (absent = peace). */
   relations: Record<string, Relation>;
 
   nextArmyId: number;
+  nextBattleId: number;
   nextOrderId: number;
   nextEventId: number;
 }

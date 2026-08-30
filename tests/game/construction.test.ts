@@ -27,7 +27,7 @@ function state(): GameState {
   return {
     version: GAME_STATE_VERSION, seed: 1, scenarioId: 'OP-1939-01', mode: 'campaign',
     fogOfWar: false, economyEnabled: false,
-    clock: { gameTimeHours: 0, startDate: 'x' },
+    clock: { gameTimeHours: 0, startDate: 'x' }, simulationTick: 0,
     countries: {
       1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: { ...emptyStockpile(), funds: 5000, stone: 5000, metal: 5000 }, income: emptyStockpile(), industryCapacity: 1 },
       2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
@@ -36,7 +36,8 @@ function state(): GameState {
     provinceBuildings: {},
     productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: {}, resourceNodes: {}, relations: {},
-    nextArmyId: 1, nextOrderId: 1, nextEventId: 1,
+    battles: {}, battleFronts: {},
+    nextArmyId: 1, nextBattleId: 1, nextOrderId: 1, nextEventId: 1,
   };
 }
 

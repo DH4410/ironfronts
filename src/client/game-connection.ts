@@ -8,7 +8,7 @@ import { InterpolatedGameClock, type GameClockReading } from './game-clock';
 
 interface PendingCommand {
   timer: number;
-  settle: (ok: boolean, reason?: string) => void;
+  settle: (ok: boolean, reason?: string, requiredWarCountryIds?: readonly number[]) => void;
 }
 
 export class GameConnection extends EventTarget {
@@ -65,7 +65,7 @@ export class GameConnection extends EventTarget {
           if (pending) {
             clearTimeout(pending.timer);
             this.pending.delete(message.commandId);
-            pending.settle(message.ok, message.reason);
+            pending.settle(message.ok, message.reason, message.requiredWarCountryIds);
           }
         } else if (message.type === 'clockSync') {
           this.gameClock.synchronize(message.clock);
@@ -89,7 +89,10 @@ export class GameConnection extends EventTarget {
     catch { if (!this.closed) window.setTimeout(() => void this.reconnect(), 2_500); }
   }
 
-  command(command: CommandPayload, onResult: (ok: boolean, reason?: string) => void): string {
+  command(
+    command: CommandPayload,
+    onResult: (ok: boolean, reason?: string, requiredWarCountryIds?: readonly number[]) => void,
+  ): string {
     const commandId = `${Date.now().toString(36)}-${(++this.commandSequence).toString(36)}`;
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
       queueMicrotask(() => onResult(false, 'Connection unavailable.'));

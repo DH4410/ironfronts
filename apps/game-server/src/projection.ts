@@ -1,10 +1,14 @@
 import {
   computeArmyVisibility, projectArmyView, visibleResourceNodes,
-  type GameState, type WorldData,
+  legalRetreatPaths, type GameState, type LandGraph, type WorldData,
 } from '@ironfronts/game-core';
 import type { PlayerProjection, ProjectionDelta, PublicCountry } from '@ironfronts/protocol';
 
-export function projectFor(state: GameState, world: WorldData, viewerCountryId: number): PlayerProjection {
+export function projectFor(
+  state: GameState, world: WorldData, graphOrViewer: LandGraph | number, viewerId?: number,
+): PlayerProjection {
+  const graph = typeof graphOrViewer === 'number' ? null : graphOrViewer;
+  const viewerCountryId = typeof graphOrViewer === 'number' ? graphOrViewer : viewerId!;
   const countries: Record<number, PublicCountry> = {};
   for (const country of Object.values(state.countries)) {
     countries[country.id] = {
@@ -22,7 +26,19 @@ export function projectFor(state: GameState, world: WorldData, viewerCountryId: 
   const visibility = computeArmyVisibility(state, world, viewerCountryId);
   const armies = Object.fromEntries(Object.keys(state.armies).flatMap((armyId) => {
     const army = projectArmyView(state, world, viewerCountryId, armyId, visibility);
-    return army ? [[army.id, army]] : [];
+    if (!army) return [];
+    const projected = graph && army.own && army.status === 'engaged'
+      ? {
+        ...army,
+        legalRetreatExits: legalRetreatPaths({ state, world, graph }, army.id).map((route) => ({
+          firstNodeId: route.firstNodeId,
+          destinationProvinceId: route.destinationProvinceId,
+          x: graph.nodeX[route.firstNodeId],
+          z: graph.nodeZ[route.firstNodeId],
+        })),
+      }
+      : army;
+    return [[army.id, projected]];
   }));
   const resourceNodes = Object.fromEntries(
     visibleResourceNodes(state, world, viewerCountryId).map((node) => [node.id, node]),
@@ -32,6 +48,7 @@ export function projectFor(state: GameState, world: WorldData, viewerCountryId: 
   const capitalId = world.countries.find((country) => country.id === viewerCountryId)?.capitalProvinceId;
   const capital = world.provinces.find((province) => province.id === capitalId) ?? owned[0];
   return {
+    simulationTick: state.simulationTick,
     viewerCountryId,
     startCamera: capital
       ? { x: capital.center[0], z: capital.center[1], distance: Math.min(3_200, Math.max(900, Math.sqrt(owned.length) * 180)) }
@@ -63,6 +80,7 @@ function same(a: unknown, b: unknown): boolean {
 
 export function diffProjection(previous: PlayerProjection, next: PlayerProjection): ProjectionDelta | null {
   const delta: ProjectionDelta = { changed: {}, upserts: {}, removals: {}, redactions: [] };
+  if (previous.simulationTick !== next.simulationTick) delta.changed.simulationTick = next.simulationTick;
   if (!same(previous.ownCountry, next.ownCountry)) delta.changed.ownCountry = next.ownCountry;
   for (const key of COLLECTIONS) {
     const before = previous[key] as Record<string, unknown>;

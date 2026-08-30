@@ -47,9 +47,15 @@ interface ClientConnection {
 
 const loaded = await loadWorld(config.worldDirectory);
 const gamePersistence = new GamePersistence(config.gameDataPath);
-const persisted = await gamePersistence.load();
-if (persisted && (persisted.gameId !== GAME_ID || persisted.gameVersion !== GAME_VERSION || persisted.worldHash !== loaded.hash)) {
-  throw new Error('Persisted game does not match the configured game or world package.');
+let persisted = await gamePersistence.load();
+if (persisted && (
+  persisted.formatVersion !== 2 || persisted.runtime?.version !== 2
+  || persisted.gameId !== GAME_ID || persisted.gameVersion !== GAME_VERSION
+  || persisted.worldHash !== loaded.hash
+)) {
+  const archivePath = await gamePersistence.archiveExisting();
+  log('warn', 'incompatible_save_archived', { archivePath, previousGameId: persisted.gameId });
+  persisted = null;
 }
 const runtime = new GameRuntime(loaded.world, persisted?.runtime);
 const gameClock = new AuthoritativeGameClock(persisted?.gameStartedAtEpochMs);
@@ -60,7 +66,7 @@ let revision = 0;
 
 function persistedGame(): PersistedGame {
   return {
-    formatVersion: 1,
+    formatVersion: 2,
     gameId: GAME_ID,
     gameVersion: GAME_VERSION,
     worldHash: loaded.hash,
@@ -85,7 +91,7 @@ const server = createServer(async (request, response) => {
       sendJson(response, 200, { ok: true, service: 'game-server', gameId: GAME_ID, revision });
       return;
     }
-    if (!url.pathname.startsWith('/internal/v1/')) {
+    if (!url.pathname.startsWith('/internal/v2/')) {
       sendJson(response, 404, { error: 'Not found.' });
       return;
     }
@@ -93,11 +99,11 @@ const server = createServer(async (request, response) => {
       sendJson(response, 401, { error: 'Invalid service credentials.' });
       return;
     }
-    if (request.method === 'GET' && url.pathname === '/internal/v1/lobby') {
+    if (request.method === 'GET' && url.pathname === '/internal/v2/lobby') {
       sendJson(response, 200, runtime.lobby(url.searchParams.get('accountId') ?? undefined));
       return;
     }
-    if (request.method === 'POST' && url.pathname === '/internal/v1/join') {
+    if (request.method === 'POST' && url.pathname === '/internal/v2/join') {
       const input = await body(request);
       if (typeof input.accountId !== 'string' || !Number.isInteger(input.countryId)) {
         sendJson(response, 400, { error: 'accountId and countryId are required.' });
@@ -119,7 +125,7 @@ const server = createServer(async (request, response) => {
 const sockets = new WebSocketServer({ noServer: true, maxPayload: 32_768 });
 server.on('upgrade', (request, socket, head) => {
   const url = new URL(request.url ?? '/', `http://${request.headers.host ?? 'localhost'}`);
-  if (url.pathname !== '/v1/game' || request.headers.origin !== config.clientOrigin) {
+  if (url.pathname !== '/v2/game' || request.headers.origin !== config.clientOrigin) {
     socket.write('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n');
     socket.destroy();
     return;
@@ -184,6 +190,8 @@ sockets.on('connection', (socket) => {
       const ack: ServerMessage = {
         type: 'commandAck', commandId: message.commandId, ok: result.ok,
         ...(result.reason ? { reason: result.reason } : {}),
+        ...(result.requiredWarCountryIds?.length
+          ? { requiredWarCountryIds: result.requiredWarCountryIds } : {}),
       };
       accountCommands.set(message.commandId, ack);
       if (accountCommands.size > 256) accountCommands.delete(accountCommands.keys().next().value!);
@@ -236,7 +244,7 @@ const publishTimer = setInterval(() => {
       ...unitEvents.filter((entry) => entry.countryId === connection.countryId).map((entry) => entry.event),
       ...buildingEvents.filter((entry) => entry.countryId === connection.countryId).map((entry) => entry.event),
       ...combatEvents.filter((event) => event.attacker === connection.countryId || event.defender === connection.countryId)
-        .map((event, index) => ({ id: `combat-${revision}-${index}`, kind: event.kind, attacker: event.attacker, defender: event.defender })),
+        .map((event, index) => ({ id: `combat-${revision}-${index}`, ...event })),
       ...captureEvents,
     ];
     if (delta) send(connection.socket, { type: 'delta', fromRevision: connection.revision, revision, delta, events });

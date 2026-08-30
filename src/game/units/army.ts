@@ -33,6 +33,11 @@ export interface MoveOrder {
   readonly destZ: number;
   /** 'move' = cream route, 'attack' = red route. */
   readonly intent: 'move' | 'attack';
+  /** Typed strategic target. Unit targets are re-pathed while detected. */
+  target?:
+    | { readonly kind: 'position'; readonly x: number; readonly z: number }
+    | { readonly kind: 'province'; readonly provinceId: number }
+    | { readonly kind: 'army'; readonly armyId: string; lastKnownX: number; lastKnownZ: number };
   /** Progress along the edge to `path[0]`, world units. */
   edgeProgress: number;
 }
@@ -51,10 +56,41 @@ export interface ArmyStack {
   order: MoveOrder | null;
   /** Resource node id this stack is extracting, or null. */
   extractingNodeId: number | null;
+  /** Node occupied before graphNodeId; defines the back edge for retreat. */
+  lastGraphNodeId?: number | null;
+  /** Order paused by close combat and resumed when every joined front clears. */
+  suspendedOrder?: MoveOrder | null;
+  /** Close-combat front ids this army currently participates in. */
+  battleFrontIds?: string[];
+  /** Locked retreat metadata. */
+  retreat?: {
+    readonly destinationProvinceId: number;
+    readonly protectedUntilNodeId: number;
+    protected: boolean;
+  } | null;
+  /** Ranged artillery targeting/cadence state. */
+  artillery?: {
+    targetArmyId: string | null;
+    manualTarget: boolean;
+    nextVolleyTick: number;
+  };
 }
 
 export function groupMaxHp(group: UnitGroup): number {
   return group.count * unitType(group.typeId).maxHp;
+}
+
+export function groupHealthFraction(group: UnitGroup): number {
+  const max = groupMaxHp(group);
+  return max > 0 ? Math.max(0, Math.min(1, group.hp / max)) : 0;
+}
+
+export function ensureArmyRuntimeState(stack: ArmyStack): void {
+  stack.lastGraphNodeId ??= null;
+  stack.suspendedOrder ??= null;
+  stack.battleFrontIds ??= [];
+  stack.retreat ??= null;
+  stack.artillery ??= { targetArmyId: null, manualTarget: false, nextVolleyTick: 0 };
 }
 
 export function stackUnitCount(stack: ArmyStack): number {

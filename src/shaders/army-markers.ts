@@ -53,18 +53,25 @@ fn armyMarkerVertex(
   let copyIndex = instanceIndex / armyParams.count;
   let marker = armyMarkers[instanceIndex % armyParams.count];
   let copyOffset = f32(i32(copyIndex) - 1) * uniforms.map.x;
-
-  let worldXZ = vec2f(marker.a.x, marker.a.y);
-  let uv = worldXZ / uniforms.map.xy;
-  let ground = heightAt(uv);
-  let worldPos = vec3f(worldXZ.x + copyOffset, ground + 4.0, worldXZ.y);
-  let clip = uniforms.viewProjection * vec4f(worldPos, 1.0);
-
   let corners = array<vec2f, 6>(
     vec2f(-1.0, -1.0), vec2f(1.0, -1.0), vec2f(-1.0, 1.0),
     vec2f(-1.0, 1.0), vec2f(1.0, -1.0), vec2f(1.0, 1.0),
   );
   let corner = corners[vertexIndex];
+
+  let worldXZ = vec2f(marker.a.x, marker.a.y);
+  let uv = worldXZ / uniforms.map.xy;
+  let ground = heightAt(uv);
+  let rangeMarker = marker.a.w > 2.5;
+  let rangeOffset = select(vec2f(0.0), corner * marker.b.x, rangeMarker);
+  let rangeXZ = worldXZ + rangeOffset;
+  let rangeUv = rangeXZ / uniforms.map.xy;
+  let worldPos = vec3f(
+    rangeXZ.x + copyOffset,
+    select(ground + 4.0, heightAt(rangeUv) + 2.0, rangeMarker),
+    rangeXZ.y,
+  );
+  let clip = uniforms.viewProjection * vec4f(worldPos, 1.0);
 
   let zoom = uniforms.interaction.y;
   let contact = marker.a.w > 1.5;
@@ -89,7 +96,7 @@ fn armyMarkerVertex(
     return output;
   }
   let pixelOffset = corner * half * 2.0 / uniforms.viewport.xy;
-  output.position = clip + vec4f(pixelOffset * clip.w, 0.0, 0.0);
+  output.position = select(clip + vec4f(pixelOffset * clip.w, 0.0, 0.0), clip, rangeMarker);
   return output;
 }
 
@@ -147,7 +154,7 @@ fn dominantIcon(kind: i32, p: vec2f) -> f32 {
     ));
     return max(head, max(body, limbs));
   }
-  if (kind == 1) {
+  if (kind == 1 || kind == 2) {
     let hull = step(abs(q.x), 0.82) * step(abs(q.y + 0.18), 0.34);
     let turret = step(abs(q.x), 0.42) * step(abs(q.y - 0.30), 0.26);
     let barrel = step(abs(q.x), 0.10) * step(q.y, 0.95) * step(0.48, q.y);
@@ -168,6 +175,14 @@ fn dominantIcon(kind: i32, p: vec2f) -> f32 {
 fn armyMarkerFragment(input: ArmyOut) -> @location(0) vec4f {
   if (input.alpha < 0.01) { discard; }
   let uv = input.uv; // -1..1 across the plaque
+  if (input.state > 2.5) {
+    let radius = length(uv);
+    let angle = atan2(uv.y, uv.x);
+    let dash = step(0.42, fract((angle + 3.14159265) * 7.0));
+    let ring = (1.0 - smoothstep(0.018, 0.035, abs(radius - 0.985))) * dash;
+    if (ring < 0.02) { discard; }
+    return vec4f(vec3f(0.94, 0.82, 0.48), ring * 0.78);
+  }
 
   let contact = input.state > 1.5;
   let bodyCol = select(input.rgb, vec3f(0.44, 0.44, 0.42), contact);

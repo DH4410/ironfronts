@@ -77,9 +77,9 @@ describe('single authoritative game runtime', () => {
       expect(runtime.join('account-a', 1)).toMatchObject({ ok: true });
       runtime.tick(2);
       await persistence.save({
-        formatVersion: 1,
-        gameId: 'world-at-war-1',
-        gameVersion: 'world-at-war@1',
+        formatVersion: 2,
+        gameId: 'world-at-war-2',
+        gameVersion: 'world-at-war@2',
         worldHash: 'test-world',
         savedAtEpochMs: 2_000,
         gameStartedAtEpochMs: 1_000,

@@ -14,7 +14,14 @@
 export type UnitCategory = 'infantry' | 'engineer' | 'recon' | 'armor' | 'artillery';
 
 /** Coarse armour bucket used by the combat table. */
-export type ArmorClass = 'unarmored' | 'light' | 'heavy';
+export type ArmorClass = 'soft' | 'light' | 'heavy';
+
+/** Damage dealt to each target armour pool by one full-health unit. */
+export interface DamageProfile {
+  readonly soft: number;
+  readonly light: number;
+  readonly heavy: number;
+}
 
 /** Production buildings. */
 export type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
@@ -38,10 +45,10 @@ export interface UnitType {
   readonly maxHp: number;
   /** World units per game-hour on open plains with no road bonus. */
   readonly speed: number;
-  /** Base attack pool per combat tick, before armour-class modifiers. */
-  readonly attack: number;
-  /** Flat damage reduction / staying power contribution. */
-  readonly defense: number;
+  /** Offensive firepower used while advancing or bombarding. */
+  readonly attack: DamageProfile;
+  /** Return-fire profile used while holding ground. It is not mitigation. */
+  readonly defense: DamageProfile;
   /** Outer vision radius (contact) in world units. */
   readonly visionOuter: number;
   /** Inner vision radius (composition reveal) in world units. */

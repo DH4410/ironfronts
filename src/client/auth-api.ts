@@ -15,10 +15,10 @@ async function request<T>(pathname: string, init?: RequestInit): Promise<T> {
 }
 
 export const getSession = (): Promise<SessionResponse> => request('/v1/auth/session');
-export const getGame = (): Promise<GameLobby> => request('/v1/game');
+export const getGame = (): Promise<GameLobby> => request('/v2/game');
 export const joinGame = (countryId: number): Promise<{ assignment: { gameId: string; countryId: number } }> =>
-  request('/v1/game/join', { method: 'POST', body: JSON.stringify({ countryId }) });
-export const connectGame = (): Promise<ConnectResponse> => request('/v1/game/connect', { method: 'POST', body: '{}' });
+  request('/v2/game/join', { method: 'POST', body: JSON.stringify({ countryId }) });
+export const connectGame = (): Promise<ConnectResponse> => request('/v2/game/connect', { method: 'POST', body: '{}' });
 export const logout = (): Promise<void> => request('/v1/auth/logout', { method: 'POST', body: '{}' });
 export const login = (username: string, password: string): Promise<SessionResponse> =>
   request('/v1/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) });

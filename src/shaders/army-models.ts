@@ -49,7 +49,7 @@ fn modelPart(kind: u32, part: u32) -> ModelPart {
       default: { center = vec3f(0.80, 1.72, 0.0); halfSize = vec3f(0.72, 0.07, 0.07); shade = 0.35; }
     }
   } else if (kind == 1u) {
-    // Tank: hull, turret, cannon, tracks and hatch.
+    // Light armor: compact tank silhouette shared by cars and light tanks.
     switch part {
       case 0u: { center = vec3f(0.0, 0.72, 0.0); halfSize = vec3f(1.65, 0.46, 1.12); shade = 0.72; }
       case 1u: { center = vec3f(0.0, 1.35, 0.0); halfSize = vec3f(0.82, 0.34, 0.72); shade = 0.92; }
@@ -59,14 +59,14 @@ fn modelPart(kind: u32, part: u32) -> ModelPart {
       default: { center = vec3f(0.0, 1.82, 0.12); halfSize = vec3f(0.28, 0.14, 0.28); shade = 1.05; }
     }
   } else if (kind == 2u) {
-    // Armored car: chassis, sloped bonnet, cabin and four wheels.
+    // Heavy armor: broader medium-tank hull, turret, cannon and tracks.
     switch part {
-      case 0u: { center = vec3f(0.0, 0.62, 0.0); halfSize = vec3f(1.15, 0.36, 1.62); shade = 0.67; }
-      case 1u: { center = vec3f(0.0, 1.18, 0.42); halfSize = vec3f(0.92, 0.52, 0.78); shade = 0.92; }
-      case 2u: { center = vec3f(0.0, 0.92, -1.30); halfSize = vec3f(0.92, 0.25, 0.48); shade = 0.78; }
-      case 3u: { center = vec3f(-1.08, 0.42, -0.88); halfSize = vec3f(0.22, 0.38, 0.34); shade = 0.28; }
-      case 4u: { center = vec3f(1.08, 0.42, -0.88); halfSize = vec3f(0.22, 0.38, 0.34); shade = 0.28; }
-      default: { center = vec3f(0.0, 1.82, 0.24); halfSize = vec3f(0.28, 0.18, 0.28); shade = 1.05; }
+      case 0u: { center = vec3f(0.0, 0.78, 0.0); halfSize = vec3f(1.88, 0.52, 1.28); shade = 0.62; }
+      case 1u: { center = vec3f(0.0, 1.52, 0.0); halfSize = vec3f(1.02, 0.42, 0.88); shade = 0.88; }
+      case 2u: { center = vec3f(0.0, 1.58, -1.62); halfSize = vec3f(0.16, 0.16, 1.10); shade = 0.34; }
+      case 3u: { center = vec3f(-1.66, 0.48, 0.0); halfSize = vec3f(0.32, 0.38, 1.38); shade = 0.26; }
+      case 4u: { center = vec3f(1.66, 0.48, 0.0); halfSize = vec3f(0.32, 0.38, 1.38); shade = 0.26; }
+      default: { center = vec3f(0.0, 2.02, 0.12); halfSize = vec3f(0.32, 0.16, 0.32); shade = 1.0; }
     }
   } else {
     // Artillery: carriage, shield, long barrel, trail and wheels.

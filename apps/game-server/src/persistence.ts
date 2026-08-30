@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { GameRuntimeSnapshot } from './runtime';
 
 export interface PersistedGame {
-  formatVersion: 1;
+  formatVersion: 2;
   gameId: string;
   gameVersion: string;
   worldHash: string;
@@ -21,9 +21,6 @@ export class GamePersistence {
   async load(): Promise<PersistedGame | null> {
     try {
       const parsed = JSON.parse(await readFile(this.filePath, 'utf8')) as PersistedGame;
-      if (parsed.formatVersion !== 1 || parsed.runtime?.version !== 1) {
-        throw new Error('Unsupported persisted game format.');
-      }
       return parsed;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
@@ -50,4 +47,18 @@ export class GamePersistence {
   }
 
   async flush(): Promise<void> { await this.queue; }
+
+  /** Move an incompatible save aside before starting a fresh v2 world. */
+  async archiveExisting(): Promise<string | null> {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const archivePath = `${this.filePath}.v1-backup-${stamp}`;
+    try {
+      await mkdir(path.dirname(this.filePath), { recursive: true });
+      await rename(this.filePath, archivePath);
+      return archivePath;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+      throw error;
+    }
+  }
 }

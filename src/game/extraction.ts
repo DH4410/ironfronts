@@ -19,6 +19,8 @@ export interface ExtractResult {
 export function issueExtract(session: SimContext, armyId: string): ExtractResult {
   const army = session.state.armies[armyId];
   if (!army) return { ok: false, reason: 'No such army.' };
+  if (army.status === 'engaged') return { ok: false, reason: 'Army is in close combat.' };
+  if (army.status === 'retreating') return { ok: false, reason: 'Army is retreating.' };
   if (army.order) return { ok: false, reason: 'Army is moving.' };
   if (!canExtract(army)) return { ok: false, reason: 'Engineers or infantry required.' };
 

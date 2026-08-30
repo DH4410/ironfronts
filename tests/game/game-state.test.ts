@@ -12,7 +12,7 @@ function minimalState(): GameState {
     mode: 'campaign',
     fogOfWar: true,
     economyEnabled: true,
-    clock: { gameTimeHours: 12.5, startDate: '1 Sep 1939' },
+    clock: { gameTimeHours: 12.5, startDate: '1 Sep 1939' }, simulationTick: 0,
     countries: {
       24: {
         id: 24, name: 'Spain', color: '#8EB0BB', controller: 'player',
@@ -38,7 +38,8 @@ function minimalState(): GameState {
       },
     },
     relations: {},
-    nextArmyId: 2, nextOrderId: 1, nextEventId: 1,
+    battles: {}, battleFronts: {},
+    nextArmyId: 2, nextBattleId: 1, nextOrderId: 1, nextEventId: 1,
   };
 }
 

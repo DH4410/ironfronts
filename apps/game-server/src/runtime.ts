@@ -78,12 +78,14 @@ export class GameRuntime {
 
   seat(accountId: string): number | null { return this.seatsByAccount.get(accountId) ?? null; }
   snapshot(): GameRuntimeSnapshot {
-    return { version: 1, state: this.session.snapshot(), seats: [...this.seatsByAccount.entries()] };
+    return { version: 2, state: this.session.snapshot(), seats: [...this.seatsByAccount.entries()] };
   }
-  projection(countryId: number): PlayerProjection { return projectFor(this.session.state, this.world, countryId); }
+  projection(countryId: number): PlayerProjection {
+    return projectFor(this.session.state, this.world, this.session.graph, countryId);
+  }
 
   command(countryId: number, payload: CommandPayload) {
-    if ((payload.type === 'moveArmy' || payload.type === 'attackArmy')
+    if ((payload.type === 'moveArmy' || payload.type === 'splitArmy')
       && (payload.x < 0 || payload.x > this.world.width || payload.z < 0 || payload.z > this.world.height)) {
       return { ok: false, reason: 'Target is outside the world.' };
     }
@@ -93,7 +95,7 @@ export class GameRuntime {
 }
 
 export interface GameRuntimeSnapshot {
-  version: 1;
+  version: 2;
   state: GameState;
   seats: Array<[accountId: string, countryId: number]>;
 }

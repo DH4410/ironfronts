@@ -159,9 +159,9 @@ export interface ArmyStackView {
   readonly groups?: readonly ArmyUnitGroupView[];
   /** World units per game-hour (slowest unit). */
   readonly speed?: number;
-  /** Aggregate combat values across every surviving troop in the stack. */
-  readonly attack?: number;
-  readonly defense?: number;
+  /** Aggregate armor-specific firepower across every surviving troop. */
+  readonly attack?: { readonly soft: number; readonly light: number; readonly heavy: number };
+  readonly defense?: { readonly soft: number; readonly light: number; readonly heavy: number };
   /** Player-facing current activity, e.g. moving, extracting, or holding. */
   readonly activity: string;
   /** True when the player commands this stack (enables order buttons). */
@@ -170,6 +170,24 @@ export interface ArmyStackView {
   readonly canExtract?: boolean;
   /** UI is waiting for a map click to set the move destination. */
   readonly awaitingMoveTarget?: boolean;
+  readonly targetingMode?: 'move' | 'attack' | 'retreat' | 'split' | null;
+  readonly canMove?: boolean;
+  readonly canAttack?: boolean;
+  readonly canRetreat?: boolean;
+  readonly canSplit?: boolean;
+  readonly canStop?: boolean;
+  readonly simulationTick?: number;
+  readonly legalRetreatExits?: ReadonlyArray<{
+    firstNodeId: number; destinationProvinceId: number; x: number; z: number;
+  }>;
+  readonly battleFronts?: ReadonlyArray<{
+    id: string; directionNodeId: number; role: 'attack' | 'defense';
+    friendlyHp: number; friendlyBaselineHp: number; enemyHp: number; enemyBaselineHp: number;
+    friendlyNextVolleyTick: number; enemyNextVolleyTick: number; reinforcementCount: number;
+  }>;
+  readonly artillery?: {
+    range: number; targetArmyId: string | null; manualTarget: boolean; nextVolleyTick: number;
+  } | null;
 }
 
 export interface StrategicUiState {

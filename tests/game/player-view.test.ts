@@ -31,7 +31,7 @@ function state(fog: boolean, armies: ArmyStack[], nodes: ResourceNodeState[] = [
   return {
     version: GAME_STATE_VERSION, seed: 1, scenarioId: 'OP-1939-01', mode: 'campaign',
     fogOfWar: fog, economyEnabled: true,
-    clock: { gameTimeHours: 0, startDate: 'x' },
+    clock: { gameTimeHours: 0, startDate: 'x' }, simulationTick: 0,
     countries: {
       1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
       2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
@@ -39,7 +39,8 @@ function state(fog: boolean, armies: ArmyStack[], nodes: ResourceNodeState[] = [
     provinceOwners: {}, provinceBuildings: {}, productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: Object.fromEntries(armies.map((a) => [a.id, a])),
     resourceNodes: Object.fromEntries(nodes.map((n) => [n.id, n])),
-    relations: {}, nextArmyId: 99, nextOrderId: 1, nextEventId: 1,
+    relations: {}, battles: {}, battleFronts: {},
+    nextArmyId: 99, nextBattleId: 1, nextOrderId: 1, nextEventId: 1,
   };
 }
 

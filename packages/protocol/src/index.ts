@@ -1,12 +1,24 @@
 import { z } from 'zod';
 
-export const PROTOCOL_VERSION = 1 as const;
-export const GAME_ID = 'world-at-war-1' as const;
-export const GAME_VERSION = 'world-at-war@1' as const;
+export const PROTOCOL_VERSION = 2 as const;
+export const GAME_ID = 'world-at-war-2' as const;
+export const GAME_VERSION = 'world-at-war@2' as const;
+
+const confirmedWars = z.array(z.number().int().positive()).optional();
+const attackTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('province'), provinceId: z.number().int().nonnegative() }),
+  z.object({ kind: z.literal('army'), armyId: z.string().min(1) }),
+]);
 
 export const commandPayloadSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('moveArmy'), armyId: z.string(), x: z.number().finite(), z: z.number().finite() }),
-  z.object({ type: z.literal('attackArmy'), armyId: z.string(), x: z.number().finite(), z: z.number().finite() }),
+  z.object({ type: z.literal('moveArmy'), armyId: z.string(), x: z.number().finite(), z: z.number().finite(), confirmedWarCountryIds: confirmedWars }),
+  z.object({ type: z.literal('attackArmy'), armyId: z.string(), target: attackTargetSchema, confirmedWarCountryIds: confirmedWars }),
+  z.object({ type: z.literal('retreatArmy'), armyId: z.string(), firstNodeId: z.number().int().nonnegative() }),
+  z.object({
+    type: z.literal('splitArmy'), armyId: z.string(),
+    groups: z.array(z.object({ typeId: z.string(), count: z.number().int().nonnegative() })).min(1),
+    x: z.number().finite(), z: z.number().finite(), confirmedWarCountryIds: confirmedWars,
+  }),
   z.object({ type: z.literal('stopArmy'), armyId: z.string() }),
   z.object({ type: z.literal('extract'), armyId: z.string() }),
   z.object({ type: z.literal('produce'), provinceId: z.number().int().nonnegative(), unitTypeId: z.string() }),
@@ -48,9 +60,32 @@ export interface ProjectedArmy {
     groups: ReadonlyArray<{ typeId: string; count: number; health: number }>;
   };
   moveOrder: { x: number; z: number } | null;
+  suspendedOrder?: { x: number; z: number; intent: 'move' | 'attack' } | null;
+  battleFronts?: ReadonlyArray<{
+    id: string;
+    directionNodeId: number;
+    role: 'attack' | 'defense';
+    friendlyHp: number;
+    friendlyBaselineHp: number;
+    enemyHp: number;
+    enemyBaselineHp: number;
+    friendlyNextVolleyTick: number;
+    enemyNextVolleyTick: number;
+    reinforcementCount: number;
+  }>;
+  legalRetreatExits?: ReadonlyArray<{
+    firstNodeId: number; destinationProvinceId: number; x: number; z: number;
+  }>;
+  artillery?: {
+    range: number;
+    targetArmyId: string | null;
+    manualTarget: boolean;
+    nextVolleyTick: number;
+  } | null;
 }
 
 export interface PlayerProjection {
+  simulationTick: number;
   viewerCountryId: number;
   startCamera: { x: number; z: number; distance: number };
   countries: Record<number, PublicCountry>;
@@ -95,11 +130,11 @@ export type ProjectionDelta = {
 };
 
 export type ServerMessage =
-  | { type: 'hello'; gameId: string; gameVersion: string; protocolVersion: 1; capabilities: string[]; world: WorldDescriptor; countryId: number }
+  | { type: 'hello'; gameId: string; gameVersion: string; protocolVersion: 2; capabilities: string[]; world: WorldDescriptor; countryId: number }
   | { type: 'baseline'; revision: number; state: PlayerProjection; catalogs: PresentationCatalogs; clock: GameClockSync }
   | { type: 'delta'; fromRevision: number; revision: number; delta: ProjectionDelta; events: FilteredEvent[] }
   | { type: 'clockSync'; clock: GameClockSync }
-  | { type: 'commandAck'; commandId: string; ok: boolean; reason?: string }
+  | { type: 'commandAck'; commandId: string; ok: boolean; reason?: string; requiredWarCountryIds?: readonly number[] }
   | { type: 'event'; event: FilteredEvent }
   | { type: 'error'; code: string; message: string; retryable?: boolean };
 
@@ -127,7 +162,7 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
       utcOffsetMinutes: z.number().int(),
     }),
   }),
-  z.object({ type: z.literal('commandAck'), commandId: z.string(), ok: z.boolean(), reason: z.string().optional() }),
+  z.object({ type: z.literal('commandAck'), commandId: z.string(), ok: z.boolean(), reason: z.string().optional(), requiredWarCountryIds: z.array(z.number().int().positive()).optional() }),
   z.object({ type: z.literal('event'), event: z.custom<FilteredEvent>((value) => Boolean(value && typeof value === 'object')) }),
   z.object({ type: z.literal('error'), code: z.string(), message: z.string(), retryable: z.boolean().optional() }),
 ]);
@@ -139,7 +174,7 @@ export interface GameTicketClaims {
   gameId: string;
   countryId: number;
   audience: 'game-server';
-  protocolVersion: 1;
+  protocolVersion: 2;
   expiresAt: number;
   nonce: string;
 }
@@ -149,13 +184,13 @@ export interface GameLobby {
   gameId: string;
   name: string;
   gameVersion: string;
-  protocolVersion: 1;
+  protocolVersion: 2;
   assignedCountryId: number | null;
   countries: LobbyCountry[];
 }
 
 export interface SessionResponse { authenticated: boolean; account?: { id: string; username: string }; assignment?: { gameId: string; countryId: number } | null }
-export interface ConnectResponse { ticket: string; websocketUrl: string; protocolVersion: 1 }
+export interface ConnectResponse { ticket: string; websocketUrl: string; protocolVersion: 2 }
 
 export const credentialsSchema = z.object({
   username: z.string().trim().min(3).max(32),

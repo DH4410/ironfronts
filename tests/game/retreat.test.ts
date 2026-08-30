@@ -35,7 +35,7 @@ function ctx(homeOwnedBy2: boolean): SimContext {
   const state: GameState = {
     version: GAME_STATE_VERSION, seed: 1, scenarioId: 'OP-1939-01', mode: 'campaign',
     fogOfWar: false, economyEnabled: false,
-    clock: { gameTimeHours: 0, startDate: 'x' },
+    clock: { gameTimeHours: 0, startDate: 'x' }, simulationTick: 0,
     countries: {
       1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
       2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
@@ -45,7 +45,7 @@ function ctx(homeOwnedBy2: boolean): SimContext {
     armies: {
       fist: {
         id: 'fist', ownerCountryId: 1, name: 'Fist', x: 100, z: 100, graphNodeId: 0,
-        units: [{ typeId: 'medium-tank', count: 6, hp: 1140, experience: 0 }],
+        units: [{ typeId: 'medium-tank', count: 1, hp: 190, experience: 0 }],
         status: 'idle', order: null, extractingNodeId: null,
       } satisfies ArmyStack,
       weak: {
@@ -54,7 +54,8 @@ function ctx(homeOwnedBy2: boolean): SimContext {
         status: 'idle', order: null, extractingNodeId: null,
       } satisfies ArmyStack,
     },
-    resourceNodes: {}, relations: {}, nextArmyId: 1, nextOrderId: 1, nextEventId: 1,
+    resourceNodes: {}, relations: { '1:2': 'war' }, battles: {}, battleFronts: {},
+    nextArmyId: 1, nextBattleId: 1, nextOrderId: 1, nextEventId: 1,
   };
   return { state, graph: graph(), world };
 }
@@ -67,6 +68,7 @@ describe('retreat', () => {
       const events = stepCombat(c, 0.25);
       if (events.some((e) => e.kind === 'retreat' && e.defender === 2)) retreated = true;
       if (retreated) break;
+      c.state.simulationTick += 18_000;
     }
     expect(retreated).toBe(true);
     const weak = c.state.armies.weak;
@@ -79,7 +81,10 @@ describe('retreat', () => {
 
   it('fights to the end when there is nowhere to retreat', () => {
     const c = ctx(false); // country 2 owns no province
-    for (let i = 0; i < 20 && c.state.armies.weak; i += 1) stepCombat(c, 0.25);
+    for (let i = 0; i < 20 && c.state.armies.weak; i += 1) {
+      stepCombat(c, 0.25);
+      c.state.simulationTick += 18_000;
+    }
     // it died in place rather than retreating
     expect(c.state.armies.weak).toBeUndefined();
   });

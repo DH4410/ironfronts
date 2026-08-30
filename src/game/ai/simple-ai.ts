@@ -78,7 +78,7 @@ export function stepAi(session: SimContext, _dtHours: number): void {
     if (target) {
       applyCommand(session, {
         type: 'attackArmy', countryId: country.id, armyId: strongest.id,
-        x: target.e.x, z: target.e.z,
+        target: { kind: 'army', armyId: target.e.id },
       });
     }
   }

@@ -620,6 +620,32 @@
 .ifg-army-panel__activity-value[data-combat="retreating"] { border-left-color: #d9a441; }
 .ifg-army-panel__commands { display: flex; gap: 5px; }
 .ifg-army-panel__commands:empty { display: none; }
+.ifg-army-panel__center { min-width: 0; display: flex; flex-direction: column; }
+.ifg-army-panel__commands--primary {
+  padding: 9px 13px 0;
+  flex-wrap: wrap;
+  background: rgba(22, 20, 17, .78);
+}
+.ifg-army-panel__front { display: grid; gap: 2px; margin-top: 6px; padding: 6px 7px; border-left: 2px solid #a6543d; background: rgba(0,0,0,.18); }
+.ifg-army-panel__front span, .ifg-army-panel__front small { font-size: 10px; color: var(--ifg-ink-muted); }
+.ifg-army-panel__retreat-exits { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+
+.ifg-command-dialog {
+  width: min(440px, calc(100vw - 32px));
+  color: #ddd2b7;
+  background: #1d1b18;
+  border: 1px solid #8b7653;
+  box-shadow: 0 20px 70px rgba(0,0,0,.65);
+  font-family: Bitter, serif;
+}
+.ifg-command-dialog::backdrop { background: rgba(8, 8, 7, .74); backdrop-filter: blur(2px); }
+.ifg-command-dialog h2 { margin: 0 0 10px; font-family: Special Elite, serif; color: #efe3c5; }
+.ifg-command-dialog p { color: #bfb49c; line-height: 1.45; }
+.ifg-command-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.ifg-command-dialog button { padding: 8px 13px; color: #ded3ba; background: #302c25; border: 1px solid #665a47; }
+.ifg-command-dialog button.is-primary { background: #713c30; border-color: #a45a44; }
+.ifg-split-dialog label { display: grid; grid-template-columns: 1fr 76px auto; align-items: center; gap: 7px; margin: 7px 0; }
+.ifg-split-dialog input { width: 70px; color: #eee2c8; background: #141311; border: 1px solid #625744; padding: 5px; }
 .ifg-army-panel__command {
   flex: 1;
   min-width: 0;

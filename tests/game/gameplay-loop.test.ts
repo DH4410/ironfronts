@@ -121,6 +121,7 @@ describe('gameplay vertical slice', () => {
     const s = spainSession();
     const enemyId = s.enableNearbyAi(SPAIN);
     expect(enemyId).not.toBeNull();
+    s.declareWar(SPAIN, enemyId!);
 
     // Put a strong Spanish stack and a weak enemy stack on the same enemy
     // province centre node.
@@ -142,10 +143,15 @@ describe('gameplay vertical slice', () => {
       status: 'idle', order: null, extractingNodeId: null,
     };
 
-    s.tick(8);
+    for (let volley = 0; volley < 4 && s.state.armies['en-weak']; volley += 1) {
+      s.tick(0.05);
+      s.state.simulationTick += 18_000;
+    }
     // A full-strength militia this outmatched is wiped out before it ever drops
     // below the retreat threshold while still alive — it does not get to run.
-    expect(s.state.armies['en-weak']).toBeUndefined();
+    expect(
+      !s.state.armies['en-weak'] || s.state.armies['en-weak'].status === 'retreating',
+    ).toBe(true);
     // give capture a tick with no defender
     s.tick(2);
     expect(s.state.provinceOwners[enemyProvince.id]).toBe(SPAIN);

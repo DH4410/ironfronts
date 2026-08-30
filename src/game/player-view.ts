@@ -24,7 +24,7 @@ import type { GameState, ResourceNodeState } from './game-state';
 import type { WorldData } from './world-data';
 import type { ArmyStack, ArmyStatus } from './units/army';
 import {
-  stackBaseSpeed, stackHealthFraction, stackUnitCount,
+  stackBaseSpeed, stackHealthFraction, stackHp, stackUnitCount,
 } from './units/army';
 import { unitType } from './units/unit-catalog';
 
@@ -58,6 +58,28 @@ export interface PlayerArmyView {
   } | null;
   /** Destination of the active move order — own armies only. */
   readonly moveOrder: { readonly x: number; readonly z: number } | null;
+  readonly suspendedOrder?: { readonly x: number; readonly z: number; readonly intent: 'move' | 'attack' } | null;
+  readonly battleFronts?: ReadonlyArray<{
+    id: string;
+    directionNodeId: number;
+    role: 'attack' | 'defense';
+    friendlyHp: number;
+    friendlyBaselineHp: number;
+    enemyHp: number;
+    enemyBaselineHp: number;
+    friendlyNextVolleyTick: number;
+    enemyNextVolleyTick: number;
+    reinforcementCount: number;
+  }>;
+  readonly legalRetreatExits?: ReadonlyArray<{
+    firstNodeId: number; destinationProvinceId: number; x: number; z: number;
+  }>;
+  readonly artillery?: {
+    range: number;
+    targetArmyId: string | null;
+    manualTarget: boolean;
+    nextVolleyTick: number;
+  } | null;
 }
 
 function groupHealthFraction(typeId: string, count: number, hp: number): number {
@@ -101,6 +123,33 @@ export function projectArmyView(
 
   const owner = state.countries[army.ownerCountryId];
   const fullyVisible = own || level === 'visible';
+  const fronts = own ? (army.battleFrontIds ?? []).flatMap((frontId) => {
+    const front = state.battleFronts?.[frontId];
+    if (!front) return [];
+    const friendly = front.sideA.countryId === army.ownerCountryId ? front.sideA : front.sideB;
+    const enemy = friendly === front.sideA ? front.sideB : front.sideA;
+    const hp = (ids: readonly string[]): number => ids.reduce(
+      (sum, id) => sum + (state.armies[id] ? stackHp(state.armies[id]) : 0), 0,
+    );
+    const baseline = (values: Record<string, number>): number => Object.values(values)
+      .reduce((sum, value) => sum + value, 0);
+    return [{
+      id: front.id,
+      directionNodeId: friendly.directionNodeId,
+      role: friendly.role,
+      friendlyHp: hp(friendly.armyIds),
+      friendlyBaselineHp: baseline(friendly.entryMaxHpByArmy),
+      enemyHp: hp(enemy.armyIds),
+      enemyBaselineHp: baseline(enemy.entryMaxHpByArmy),
+      friendlyNextVolleyTick: friendly.nextVolleyTick,
+      enemyNextVolleyTick: enemy.nextVolleyTick,
+      reinforcementCount: Math.max(0, friendly.armyIds.length - 1),
+    }];
+  }) : undefined;
+  const artilleryGroups = fullyVisible
+    ? army.units.filter((group) => unitType(group.typeId).category === 'artillery') : [];
+  const artilleryRange = artilleryGroups.length
+    ? Math.max(...artilleryGroups.map((group) => unitType(group.typeId).engagementRange)) : 0;
   return {
     id: army.id,
     name: fullyVisible ? army.name : 'Unidentified force',
@@ -114,6 +163,18 @@ export function projectArmyView(
     status: fullyVisible ? army.status : 'unknown',
     composition: fullyVisible ? composition(army) : null,
     moveOrder: own && army.order ? { x: army.order.destX, z: army.order.destZ } : null,
+    suspendedOrder: own && army.suspendedOrder
+      ? { x: army.suspendedOrder.destX, z: army.suspendedOrder.destZ, intent: army.suspendedOrder.intent }
+      : null,
+    battleFronts: fronts,
+    // The server projection, which also owns the movement graph, fills these.
+    legalRetreatExits: [],
+    artillery: artilleryRange > 0 ? {
+      range: artilleryRange,
+      targetArmyId: own ? army.artillery?.targetArmyId ?? null : null,
+      manualTarget: own ? army.artillery?.manualTarget ?? false : false,
+      nextVolleyTick: own ? army.artillery?.nextVolleyTick ?? 0 : 0,
+    } : null,
   };
 }
 

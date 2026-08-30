@@ -66,7 +66,9 @@ export function describeArmy(army: ArmyStackView): Array<[string, string]> {
   ];
 }
 
-type ArmyPanelCommand = 'move' | 'stop' | 'extract' | 'deselect';
+export type ArmyPanelCommand =
+  | 'move' | 'attack' | 'retreat' | 'split' | 'stop' | 'extract' | 'deselect'
+  | `retreat:${number}`;
 
 const UNIT_GLYPHS: Readonly<Record<string, string>> = {
   infantry: '<circle cx="24" cy="10" r="5"/><path d="M17 42l2-17 5-7 5 7 2 17M12 25l12 5 13-12M29 26l9 16"/>',
@@ -137,6 +139,26 @@ export function renderSelectedArmyPanel(
     health.append(healthTrack, node('span', 'ifg-army-panel__health-caption', `${healthPercent} / 100 readiness`));
   }
 
+  const commands = node('div', 'ifg-army-panel__commands ifg-army-panel__commands--primary');
+  const command = (label: string, key: ArmyPanelCommand, enabled: boolean, active = false): HTMLButtonElement => {
+    const button = node('button', 'ifg-army-panel__command', label);
+    button.type = 'button';
+    button.disabled = !enabled;
+    button.classList.toggle('is-active', active);
+    if (enabled) button.addEventListener('click', () => onCommand(key));
+    return button;
+  };
+  if (army.own) {
+    commands.append(
+      command(army.targetingMode === 'move' ? 'Select destination' : 'Move', 'move', army.canMove === true, army.targetingMode === 'move'),
+      command(army.targetingMode === 'attack' ? 'Select target' : 'Attack', 'attack', army.canAttack === true, army.targetingMode === 'attack'),
+      command(army.targetingMode === 'retreat' ? 'Select exit' : 'Retreat', 'retreat', army.canRetreat === true, army.targetingMode === 'retreat'),
+      command(army.targetingMode === 'split' ? 'Select destination' : 'Split', 'split', army.canSplit === true, army.targetingMode === 'split'),
+      command('Stop', 'stop', army.canStop === true),
+      command('Extract', 'extract', army.canExtract === true),
+    );
+  }
+
   const composition = node('section', 'ifg-army-panel__composition');
   composition.append(node('small', 'ifg-army-panel__eyebrow', 'Composition'));
   const unitRow = node('div', 'ifg-army-panel__units');
@@ -172,38 +194,54 @@ export function renderSelectedArmyPanel(
     appendStat(statGrid, 'Speed', '--');
   } else {
     appendStat(statGrid, 'Troops', String(army.unitCount));
-    appendStat(statGrid, 'Attack', String(Math.round(army.attack ?? 0)));
-    appendStat(statGrid, 'Defence', String(Math.round(army.defense ?? 0)));
+    const profile = (value: typeof army.attack): string => value
+      ? `${Math.round(value.soft)} / ${Math.round(value.light)} / ${Math.round(value.heavy)}` : '--';
+    appendStat(statGrid, 'Attack S/L/H', profile(army.attack));
+    appendStat(statGrid, 'Defence S/L/H', profile(army.defense));
     appendStat(statGrid, 'Speed', army.speed === undefined ? '--' : String(Math.round(army.speed)));
   }
   stats.append(statGrid);
 
   const activity = node('div', 'ifg-army-panel__activity');
-  activity.append(node('small', 'ifg-army-panel__eyebrow', 'Activity'));
-  const activityValue = node('strong', 'ifg-army-panel__activity-value', army.activity);
-  activityValue.dataset.combat = army.combat;
-  activity.append(activityValue);
-
-  const commands = node('div', 'ifg-army-panel__commands');
-  const command = (label: string, key: Exclude<ArmyPanelCommand, 'deselect'>, enabled: boolean, active = false): HTMLButtonElement => {
-    const button = node('button', 'ifg-army-panel__command', label);
-    button.type = 'button';
-    button.disabled = !enabled;
-    button.classList.toggle('is-active', active);
-    if (enabled) button.addEventListener('click', () => onCommand(key));
-    return button;
+  const remaining = (tick: number): string => {
+    const seconds = Math.max(0, Math.ceil((tick - (army.simulationTick ?? 0)) / 10));
+    return seconds === 0 ? 'Ready' : `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   };
-  if (army.own) {
-    commands.append(
-      command(army.awaitingMoveTarget ? 'Select destination' : 'Move', 'move', true, army.awaitingMoveTarget === true),
-      command('Stop', 'stop', army.combat !== 'idle' || army.awaitingMoveTarget === true),
-      command('Extract', 'extract', army.canExtract === true),
-    );
+  if (army.combat === 'engaged' && army.battleFronts?.length) {
+    activity.append(node('small', 'ifg-army-panel__eyebrow', 'Combat overview'));
+    for (const front of army.battleFronts) {
+      const line = node('article', 'ifg-army-panel__front');
+      line.append(
+        node('strong', undefined, `${front.role === 'attack' ? 'Attack' : 'Defence'} · direction ${front.directionNodeId}`),
+        node('span', undefined, `Friendly ${Math.ceil(front.friendlyHp)} / ${Math.ceil(front.friendlyBaselineHp)} HP · ${remaining(front.friendlyNextVolleyTick)}`),
+        node('span', undefined, `Enemy ${Math.ceil(front.enemyHp)} / ${Math.ceil(front.enemyBaselineHp)} HP · ${remaining(front.enemyNextVolleyTick)}`),
+        node('small', undefined, front.reinforcementCount ? `${front.reinforcementCount} reinforcing army(s)` : 'No reinforcements'),
+      );
+      activity.append(line);
+    }
+    if (army.legalRetreatExits && army.legalRetreatExits.length > 1) {
+      const exits = node('div', 'ifg-army-panel__retreat-exits');
+      for (const [index, exit] of army.legalRetreatExits.entries()) {
+        exits.append(command(`Retreat exit ${index + 1}`, `retreat:${exit.firstNodeId}`, true));
+      }
+      activity.append(exits);
+    }
+  } else {
+    activity.append(node('small', 'ifg-army-panel__eyebrow', 'Activity'));
+    const activityValue = node('strong', 'ifg-army-panel__activity-value', army.activity);
+    activityValue.dataset.combat = army.combat;
+    activity.append(activityValue);
+    if (army.artillery?.targetArmyId) {
+      activity.append(node('span', undefined,
+        `${army.artillery.manualTarget ? 'Selected' : 'Automatic'} bombardment: ${army.artillery.targetArmyId} · ${remaining(army.artillery.nextVolleyTick)}`));
+    }
   }
-  report.append(stats, activity, commands);
+  report.append(stats, activity);
 
   const body = node('div', 'ifg-army-panel__body');
-  body.append(health, composition, report);
+  const center = node('div', 'ifg-army-panel__center');
+  center.append(commands, composition);
+  body.append(health, center, report);
   host.replaceChildren(header, body);
 }
 
@@ -240,8 +278,8 @@ export const DEMO_ARMY: ArmyStackView = {
   activity: 'Holding position',
   moveOrder: null,
   speed: 90,
-  attack: 52,
-  defense: 44,
+  attack: { soft: 52, light: 31, heavy: 19 },
+  defense: { soft: 44, light: 26, heavy: 14 },
   own: true,
   canExtract: true,
   groups: [

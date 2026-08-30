@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import type { GameTicketClaims } from './index';
+import { PROTOCOL_VERSION, type GameTicketClaims } from './index';
 
 function encode(value: string): string {
   return Buffer.from(value, 'utf8').toString('base64url');
@@ -23,7 +23,7 @@ export function verifyGameTicket(token: string, secret: string): GameTicketClaim
   if (a.length !== b.length || !timingSafeEqual(a, b)) throw new Error('Invalid game ticket signature.');
   const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as GameTicketClaims;
   if (claims.audience !== 'game-server') throw new Error('Invalid game ticket audience.');
-  if (claims.protocolVersion !== 1) throw new Error('Unsupported protocol version.');
+  if (claims.protocolVersion !== PROTOCOL_VERSION) throw new Error('Unsupported protocol version.');
   if (!Number.isFinite(claims.expiresAt) || claims.expiresAt <= Date.now()) throw new Error('Game ticket expired.');
   return claims;
 }

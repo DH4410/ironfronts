@@ -128,10 +128,16 @@ function spawnUnit(
   const nz = node >= 0 ? session.graph.nodeZ[node] : cz;
 
   // Auto-stack onto a friendly idle army already at that node.
-  const existing = Object.values(session.state.armies).find(
-    (a) => a.ownerCountryId === ownerCountryId
-      && a.graphNodeId === node && !a.order && a.extractingNodeId === null,
-  );
+  const existing = Object.values(session.state.armies)
+    .filter((a) => a.ownerCountryId === ownerCountryId
+      && a.graphNodeId === node && !a.order && a.extractingNodeId === null
+      && a.status !== 'engaged' && a.status !== 'retreating')
+    .sort((a, b) => {
+      const an = Number(a.id.replace(/^army-/, ''));
+      const bn = Number(b.id.replace(/^army-/, ''));
+      return (Number.isFinite(an) ? an : Number.MAX_SAFE_INTEGER)
+        - (Number.isFinite(bn) ? bn : Number.MAX_SAFE_INTEGER) || a.id.localeCompare(b.id);
+    })[0];
   const group = makeGroup(unitTypeId, 1);
   if (existing) {
     const fresh: ArmyStack = {
