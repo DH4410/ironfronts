@@ -97,7 +97,15 @@ export function chooseTrack(
   if (!pool.length) return undefined;
   const recent = new Set(recentIds);
   const candidates = pool.filter((candidate) => !recent.has(candidate.id));
-  const usable = candidates.length ? candidates : [...pool];
+
+  // When every track in a small pool is already in recent history (menu/war),
+  // start a new cycle without immediately replaying the track that just ended.
+  // A one-track pool is the only case where an immediate repeat is unavoidable.
+  const mostRecentId = recentIds[0];
+  const cycleFallback = pool.length > 1 && mostRecentId
+    ? pool.filter((candidate) => candidate.id !== mostRecentId)
+    : [...pool];
+  const usable = candidates.length ? candidates : cycleFallback;
   const index = Math.min(usable.length - 1, Math.floor(Math.max(0, Math.min(0.999999, random())) * usable.length));
   return usable[index];
 }
