@@ -124,9 +124,18 @@ export function issueMoveOrder(
 
   const component = session.graph.component[army.graphNodeId] ?? -1;
   const goal = nearestNode(session.graph, destX, destZ, 600, component);
-  if (goal < 0) return { ok: false, reason: 'No land route to that location.' };
+  if (goal < 0) {
+    // No reachable land-graph node near the point: it is water/void, or on a
+    // landmass this army cannot walk to.
+    const anyGoal = nearestNode(session.graph, destX, destZ, 600, -1);
+    return anyGoal < 0
+      ? { ok: false, reason: 'That destination is off the road network — pick a spot on land.' }
+      : { ok: false, reason: 'That destination is on a separate landmass this army cannot reach.' };
+  }
   const unrestricted = findPath(session.graph, army.graphNodeId, goal);
-  if (!unrestricted) return { ok: false, reason: 'No land route to that location.' };
+  if (!unrestricted) {
+    return { ok: false, reason: 'No land route to that location.' };
+  }
   const alreadyThere = unrestricted.length < 2;
   if (alreadyThere && intent === 'move') return { ok: false, reason: 'Already there.' };
 

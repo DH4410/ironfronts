@@ -423,8 +423,10 @@ async function startGame(token: number): Promise<void> {
   activeConnection = connection;
   configureWorldAssetBase(connection.world.assetBaseUrl);
   const session = new RemoteGameSession(connection, (reason) => {
-    // 'warning' toasts auto-dismiss on their own timer now — no title-based sweep.
-    pushNotification('warning', 'Command failed', reason);
+    // Server rejected an order. Show a concise, specific headline derived from
+    // the reason (not a flat "Command failed") with the full reason beneath.
+    const { title, body } = describeOrderFailure(reason);
+    pushNotification('warning', title, body);
   });
   activeSession = session;
 
@@ -880,6 +882,16 @@ function packRgb(hex: string): number {
   return value & 0xffffff;
 }
 
+/** Deterministic 0..1 from a string — used for stable per-unit formation jitter. */
+function hashUnit(key: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i += 1) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 100000) / 100000;
+}
+
 /**
  * Rebuild the renderer's army-stack marker buffer from authoritative GameState,
  * fog-gated: own stacks always shown; foreign stacks only when in
@@ -944,17 +956,33 @@ function syncArmyMarkers(
 
     if (identified && formation.length) {
       const target = army.moveOrder;
+      const marching = Boolean(target);
       const heading = target ? Math.atan2(target.x - army.x, -(target.z - army.z)) : 0;
       const forwardX = Math.sin(heading);
       const forwardZ = -Math.cos(heading);
       const rightX = Math.cos(heading);
       const rightZ = Math.sin(heading);
-      const slots: ReadonlyArray<readonly [number, number]> = [
-        [-11, -9], [11, -9], [-11, 9], [11, 9],
+      // Two layouts, 0 A.D.-style: a tight box at rest, and a narrow column
+      // strung along the heading while marching so the stack hugs the road
+      // instead of sprawling across it. A small deterministic per-unit jitter
+      // (0 A.D. calls it "sloppiness") keeps it from reading as a rigid grid.
+      const restSlots: ReadonlyArray<readonly [number, number]> = [
+        [-5, -4], [5, -3], [-4, 5], [4, 4.5],
       ];
+      const marchSlots: ReadonlyArray<readonly [number, number]> = [
+        [0, 7], [-2.5, 1], [2.5, -3], [-1, -8],
+      ];
+      const slots = marching ? marchSlots : restSlots;
+      const jitterR = marching ? 1.8 : 3.0;
+      const jitterF = marching ? 3.6 : 3.0;
+      const armyJitter = hashUnit(army.id);
       for (let index = 0; index < formation.length && modelCount < 4_096; index += 1) {
         const group = formation[index];
-        const [right, forward] = slots[index];
+        const [slotR, slotF] = slots[index];
+        const jr = (hashUnit(`${army.id}:${index}:r`) - 0.5) * jitterR;
+        const jf = (hashUnit(`${army.id}:${index}:f`) - 0.5) * jitterF + (armyJitter - 0.5) * 1.5;
+        const right = slotR + jr;
+        const forward = slotF + jf;
         let x = army.x + rightX * right + forwardX * forward;
         if (renderer.manifest?.world.width) x = ((x % renderer.manifest.world.width) + renderer.manifest.world.width) % renderer.manifest.world.width;
         const z = army.z + rightZ * right + forwardZ * forward;
@@ -1095,7 +1123,10 @@ function handleMapClick(
       const result = targetingMode === 'split' && pendingSplitGroups
         ? session.orderSplit(selectedArmyId, pendingSplitGroups, ground[0], ground[1])
         : session.orderMove(selectedArmyId, ground[0], ground[1], 'move');
-      if (!result.ok) pushNotification('warning', targetingMode === 'split' ? 'Split' : 'Move order', result.reason ?? 'No route.');
+      if (!result.ok) {
+        const { title, body } = describeOrderFailure(result.reason ?? 'No route.');
+        pushNotification('warning', targetingMode === 'split' ? 'Split failed' : title, body);
+      }
       awaitingMoveTarget = false;
       targetingMode = null;
       pendingSplitGroups = null;
@@ -1112,9 +1143,12 @@ function handleMapClick(
         const provinceId = renderer.provinceIdAt(clientX, clientY);
         return provinceId >= 0
           ? session.orderAttackProvince(selectedArmyId!, provinceId)
-          : { ok: false as const, reason: 'Select an army or province center.' };
+          : { ok: false as const, reason: 'Aim at an enemy army or a province centre to attack.' };
       })();
-    if (!result.ok) pushNotification('warning', 'Attack order', result.reason ?? 'Invalid target.');
+    if (!result.ok) {
+      const { title, body } = describeOrderFailure(result.reason ?? 'Invalid target.');
+      pushNotification('warning', title, body);
+    }
     targetingMode = null;
     refreshSelectedArmy(session);
     return true;
@@ -1156,6 +1190,26 @@ function handleMapClick(
 }
 
 /**
+ * Turn a raw server/engine rejection reason into a concise headline + detail so
+ * the player learns *why* an order failed instead of seeing "Command failed".
+ */
+function describeOrderFailure(reason: string): { title: string; body?: string } {
+  const r = reason.toLowerCase();
+  if (r.includes('not your army')) return { title: 'Not your army', body: 'You can only order armies you command.' };
+  if (r.includes('not your province')) return { title: 'Not your province', body: reason };
+  if (r.includes('close combat') || r.includes('is engaged')) return { title: 'Army is fighting', body: 'It cannot take new orders until the battle ends.' };
+  if (r.includes('retreating')) return { title: 'Army is retreating', body: 'Wait for it to disengage before giving new orders.' };
+  if (r.includes('war declaration')) return { title: 'War not declared', body: 'That route crosses a country you are not at war with.' };
+  if (r.includes('separate landmass')) return { title: 'Unreachable', body: reason };
+  if (r.includes('off the road network') || r.includes('not on land')) return { title: 'No path there', body: reason };
+  if (r.includes('no legal route') || r.includes('no land route')) return { title: 'No route', body: reason };
+  if (r.includes('already there')) return { title: 'Already there', body: 'The army is already at that location.' };
+  if (r.includes('retreat direction')) return { title: 'Bad retreat', body: reason };
+  if (r.includes('not in close combat')) return { title: 'Not in combat', body: 'Only an engaged army can be ordered to retreat.' };
+  return { title: 'Order rejected', body: reason };
+}
+
+/**
  * Right-click order for the selected army: attack a visible hostile army under
  * the cursor, otherwise move to the ground point. War confirmation and routing
  * rules are the same ones the armed Move/Attack buttons use — this is just a
@@ -1170,12 +1224,17 @@ function handleMapCommand(
   awaitingMoveTarget = false;
   pendingSplitGroups = null;
 
+  const orderFeedback = (reason: string): void => {
+    const { title, body } = describeOrderFailure(reason);
+    pushNotification('warning', title, body);
+  };
+
   const targetArmyId = renderer.pickArmyAt(clientX, clientY);
   if (targetArmyId && targetArmyId !== selectedArmyId) {
     const target = session.army(targetArmyId);
     if (target && !target.own) {
       const result = session.orderAttackArmy(selectedArmyId, targetArmyId);
-      if (!result.ok) pushNotification('warning', 'Attack order', result.reason ?? 'Invalid target.');
+      if (!result.ok) orderFeedback(result.reason ?? 'Invalid target.');
       refreshSelectedArmy(session);
       if (activeRenderer) syncArmyMarkers(session, activeRenderer);
       return true;
@@ -1183,9 +1242,12 @@ function handleMapCommand(
   }
 
   const ground = renderer.groundPointAt(clientX, clientY);
-  if (!ground) return false;
+  if (!ground) {
+    pushNotification('warning', 'No path there', 'Right-click on your own territory or a discovered area to move.');
+    return true;
+  }
   const result = session.orderMove(selectedArmyId, ground[0], ground[1], 'move');
-  if (!result.ok) pushNotification('warning', 'Move order', result.reason ?? 'No route.');
+  if (!result.ok) orderFeedback(result.reason ?? 'No route.');
   refreshSelectedArmy(session);
   if (activeRenderer) syncArmyMarkers(session, activeRenderer);
   return true;

@@ -101,7 +101,10 @@ fn armyModelVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_in
   let heading = model.b.w;
   let cosine = cos(heading);
   let sine = sin(heading);
-  let scale = 4.4;
+  // Map-scale strategic units: kept deliberately small so roads and towns still
+  // read. Selection/pick hitbox is on the flat marker, not the model, so this
+  // does not hurt selectability.
+  let scale = 2.85;
   let local = (part.center + cube.position * part.halfSize) * scale;
   let rotated = vec3f(local.x * cosine - local.z * sine, local.y, local.x * sine + local.z * cosine);
   let motion = smoothstep(0.0, 1.0, (uniforms.sunTime.w - model.c.z) / 0.42);

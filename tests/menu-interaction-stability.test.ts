@@ -52,7 +52,20 @@ describe('menu interaction stability', () => {
     expect(menu).toContain("root.classList.add('is-dossier-open')");
     expect(menu).toContain("root.classList.remove('is-dossier-open')");
     const css = readFileSync(path.join(root, 'src/menu/menu.css'), 'utf8');
-    expect(css).toContain('.ifm.is-dossier-open .ifm__screen { pointer-events: none; }');
+    expect(css).toMatch(/\.ifm\.is-dossier-open \.ifm__screen \{[^}]*pointer-events:\s*none/);
+  });
+
+  it('animates the desk/menu parallax with compositor-only CSS transitions', () => {
+    const css = readFileSync(path.join(root, 'src/menu/menu.css'), 'utf8');
+    // The desk pans down and the main screen eases up+out when a dossier opens —
+    // pure CSS `transition: transform`, no rAF, no filters/blend layers.
+    expect(css).toMatch(/\.ifm__map \{[^}]*transition:\s*transform/);
+    expect(css).toMatch(/\.ifm\.is-dossier-open \.ifm__map \{[^}]*translate3d/);
+    expect(css).toMatch(/\.ifm\.is-dossier-open \.ifm__screen \{[^}]*translate3d/);
+    // no expensive full-viewport paint hazards crept back in
+    expect(css).not.toContain('mix-blend-mode: overlay');
+    expect(css).not.toMatch(/\.ifm__map \{[^}]*filter:/);
+    expect(menu).not.toContain('requestAnimationFrame');
   });
 
   it('provides a hard reset to the main screen for an abandoned launch', () => {

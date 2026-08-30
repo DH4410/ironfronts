@@ -24,18 +24,23 @@
 .ifm button { font: inherit; color: inherit; }
 
 /* ---------- backdrop ----------
-   The desk photo is the transition: it sits at plain cover scale (no extra
-   zoom — that just softens it) framed on the top of the desk at rest, and
-   opening a dossier pans it down like a camera settling onto the map,
-   driven frame-by-frame from menu.ts so it shares the same single clock as
-   the rest of the choreography. */
+   Opening a dossier pans the desk photo down a touch and eases the main menu
+   screen up + out, so it reads as a camera settling onto the map / a page being
+   opened on the desk. This is a single compositor-only CSS transform per layer
+   keyed off `.is-dossier-open` — no rAF, no filters, no blend layers, no forced
+   layout. (The rAF+blend version of this was what stalled the browser.) */
 .ifm__backdrop { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
-/* Static, unfiltered desk photo. A CSS `filter` here forced the whole
-   full-viewport image to re-raster on any compositor change; the tone is baked
-   into the asset / the wash below instead. */
 .ifm__map {
   position: absolute; inset: -8%;
   background: url('/menu/desk-scene.jpg') center top/cover no-repeat;
+  /* No persistent `will-change` — the browser promotes a layer for the duration
+     of the transform transition on its own, and a permanent hint on a
+     full-viewport element just keeps a large layer resident. */
+  transition: transform .5s cubic-bezier(.22, .76, .19, 1);
+}
+.ifm.is-dossier-open .ifm__map { transform: translate3d(0, 4.5vh, 0) scale(1.035); }
+@media (prefers-reduced-motion: reduce) {
+  .ifm__map { transition: none; }
 }
 .ifm__wash {
   position: absolute; inset: 0;
@@ -47,12 +52,24 @@
 
 /* ---------- main area (menu screen + subpages share this) ---------- */
 .ifm__main-area { position: relative; grid-row: 1; min-height: 0; overflow: hidden; }
-.ifm__screen { position: absolute; inset: 0; z-index: 2; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3.2vh; padding: 3vh 3vw; }
+.ifm__screen {
+  position: absolute; inset: 0; z-index: 2; overflow: auto; display: flex;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 3.2vh; padding: 3vh 3vw;
+  transition: transform .5s cubic-bezier(.22, .76, .19, 1), opacity .42s ease;
+}
 .ifm__screen[hidden] { display: none; }
 /* While a dossier is open the primary menu cards behind it are inert. Driven by
    a class (toggled with `openScreen`) rather than an imperative inline style so
    an interrupted transition can never strand the menu non-interactive. */
-.ifm.is-dossier-open .ifm__screen { pointer-events: none; }
+.ifm.is-dossier-open .ifm__screen {
+  pointer-events: none;
+  transform: translate3d(0, -3.2vh, 0);
+  opacity: .32;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ifm__screen { transition: none; }
+}
 /* Dossier controls are inert only for the brief slide itself. */
 .ifm.is-transitioning .ifm__subpage { pointer-events: none; }
 
@@ -347,7 +364,7 @@
   background: rgba(0,0,0,.18);
 }
 .ifm__briefing-head { display: flex; align-items: center; gap: .6em; margin-bottom: .7em; color: var(--hud-gold-bright); font: 700 .68em/1 var(--ifm-sans); letter-spacing: .12em; text-transform: uppercase; }
-.ifm__briefing-objective { margin: 0 0 .9em; color: var(--hud-text-dim); font: 400 .92em/1.4 var(--ifm-sans); }
+.ifm__briefing-objective { margin: 0 0 .9em; color: var(--hud-text-dim); font: 400 .88em/1.5 var(--ifm-sans); }
 .ifm__briefing-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1em; }
 .ifm__briefing-grid div { display: flex; flex-direction: column; gap: .3em; }
 .ifm__briefing-grid span { font: 700 .6em/1 var(--ifm-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--hud-text-dim); }
@@ -357,14 +374,18 @@
 .ifm__briefing-grid b.is-risk-low { color: #9ec79a; }
 
 /* ---------- operation dossier (full-viewport briefing, no country list) ---------- */
-.ifm__subpage--dossier { padding: 2.4vh 2.4vw; overflow: hidden; }
+.ifm__subpage--dossier { padding: 2vh 2vw; overflow: hidden; }
 .ifm__file--dossier {
-  width: min(1180px, 94vw); height: min(860px, 95vh); max-height: 95vh; margin: auto;
+  width: min(1520px, 96vw); height: min(880px, 94vh); max-height: 94vh; margin: auto;
 }
+/* Roomier header inside the wide dossier: a touch smaller type, more air. */
+.ifm__file--dossier .ifm__file-header { padding: 1.2em 2.8em; }
+.ifm__file--dossier .ifm__file-header h2 { font-size: 1.85em; }
+.ifm__file--dossier .ifm__file-header p { font-size: .95em; }
 .ifm__dossier {
   flex: 1 1 auto; min-height: 0; overflow: auto;
-  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 1.6em;
-  padding: 1.5em 2.3em;
+  display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 2.2em;
+  padding: 1.9em 2.8em;
 }
 .ifm__dossier-map { display: flex; flex-direction: column; gap: .9em; min-height: 0; }
 .ifm__dossier-map .ifm__map-frame { flex: 1 1 auto; min-height: 0; }
@@ -377,14 +398,14 @@
 .ifm__op-stamp b { font: 700 .62em/1.4 var(--ifm-sans); letter-spacing: .12em; color: var(--hud-gold); text-transform: uppercase; }
 .ifm__dossier-info { display: flex; flex-direction: column; gap: 1.2em; min-height: 0; }
 .ifm__dossier-info .ifm__briefing { grid-column: auto; margin: 0; }
-.ifm__op-detail { padding: 1em 1.2em; border: 1px solid var(--hud-line); background: rgba(0,0,0,.18); }
+.ifm__op-detail { padding: 1.1em 1.4em; border: 1px solid var(--hud-line); background: rgba(0,0,0,.18); }
 .ifm__op-detail h3 {
   margin: 0 0 .6em; font: 700 .66em/1 var(--ifm-sans); letter-spacing: .12em;
   text-transform: uppercase; color: var(--hud-gold-bright);
 }
-.ifm__op-detail p { margin: 0 0 .7em; font: 400 .9em/1.5 var(--ifm-sans); color: var(--hud-text-dim); }
-.ifm__op-detail ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: .35em; }
-.ifm__op-detail li { font: 400 .86em/1.45 var(--ifm-sans); color: var(--hud-text-dim); }
+.ifm__op-detail p { margin: 0 0 .7em; font: 400 .86em/1.55 var(--ifm-sans); color: var(--hud-text-dim); }
+.ifm__op-detail ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: .4em; }
+.ifm__op-detail li { font: 400 .84em/1.5 var(--ifm-sans); color: var(--hud-text-dim); }
 
 .ifm__file-actions {
   flex: 0 0 auto; position: relative; display: flex; align-items: center; gap: 1.2em;
