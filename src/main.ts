@@ -169,17 +169,23 @@ let audioPlaybackRecovered = false;
 const recoverAudioAfterGesture = (): void => {
   if (audioActivationInFlight || (audioPlaybackRecovered && audio.isMusicPlaying())) return;
   audioActivationInFlight = true;
-  void (async () => {
-    try {
-      if (!await audio.unlock()) return;
-      if (!audio.isMusicPlaying()) await music.resyncPlayback();
-      if (audio.isMusicPlaying()) audioPlaybackRecovered = true;
-    } catch {
-      // Audio failure degrades to silence, never to a broken UI.
-    } finally {
-      audioActivationInFlight = false;
-    }
-  })();
+  // Yield a macrotask first: the gesture's own button action (and any paint it
+  // causes) must land before we touch the AudioContext, whose construction /
+  // resume can briefly block on some platforms. The gesture still counts as the
+  // activation gesture — the browser attributes it to this task chain.
+  window.setTimeout(() => {
+    void (async () => {
+      try {
+        if (!await audio.unlock()) return;
+        if (!audio.isMusicPlaying()) await music.resyncPlayback();
+        if (audio.isMusicPlaying()) audioPlaybackRecovered = true;
+      } catch {
+        // Audio failure degrades to silence, never to a broken UI.
+      } finally {
+        audioActivationInFlight = false;
+      }
+    })();
+  }, 0);
 };
 document.addEventListener('pointerdown', recoverAudioAfterGesture, { capture: true });
 document.addEventListener('keydown', recoverAudioAfterGesture, { capture: true });
@@ -1403,6 +1409,9 @@ function playerResourceLines(session: RemoteGameSession): ResourceLine[] {
   const country = session.ownCountry;
   const s = country.stockpile;
   const inc = country.income;
+  // Live extraction rate per game hour for stone/metal/oil (0 when nothing is
+  // being extracted). Server-projected; `?? 0` covers an older projection.
+  const ext = (country.extraction ?? {}) as Partial<Record<'stone' | 'metal' | 'oil', number>>;
   const line = (
     id: ResourceLine['id'], label: string, value: number, delta?: number,
   ): ResourceLine => ({
@@ -1413,10 +1422,10 @@ function playerResourceLines(session: RemoteGameSession): ResourceLine[] {
     line('money', 'Funds', s.funds, inc.funds),
     line('manpower', 'Manpower', s.manpower, inc.manpower),
     line('food', 'Food', s.food, inc.food),
-    // stone/metal/oil have no passive rate — physical extraction only.
-    line('stone', 'Stone', s.stone),
-    line('metal', 'Metal', s.metal),
-    line('oil', 'Oil', s.oil),
+    // stone/metal/oil have no passive income — the rate is current extraction.
+    line('stone', 'Stone', s.stone, ext.stone ?? 0),
+    line('metal', 'Metal', s.metal, ext.metal ?? 0),
+    line('oil', 'Oil', s.oil, ext.oil ?? 0),
   ];
 }
 

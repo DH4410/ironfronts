@@ -30,20 +30,20 @@
    driven frame-by-frame from menu.ts so it shares the same single clock as
    the rest of the choreography. */
 .ifm__backdrop { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+/* Static, unfiltered desk photo. A CSS `filter` here forced the whole
+   full-viewport image to re-raster on any compositor change; the tone is baked
+   into the asset / the wash below instead. */
 .ifm__map {
   position: absolute; inset: -8%;
   background: url('/menu/desk-scene.jpg') center top/cover no-repeat;
-  filter: brightness(.86) saturate(.92) contrast(1.02);
 }
 .ifm__wash {
   position: absolute; inset: 0;
-  background: radial-gradient(ellipse 92% 78% at 50% 42%, rgba(6,8,7,.32) 0%, rgba(6,8,7,.5) 55%, rgba(6,8,7,.82) 100%);
+  background: radial-gradient(ellipse 92% 78% at 50% 42%, rgba(6,8,7,.4) 0%, rgba(6,8,7,.58) 55%, rgba(6,8,7,.86) 100%);
 }
-.ifm__grain {
-  position: absolute; inset: 0; opacity: .045; mix-blend-mode: overlay; pointer-events: none;
-  background-image: radial-gradient(rgba(255,255,255,.9) .6px, transparent .9px);
-  background-size: 3px 3px;
-}
+/* `.ifm__grain` removed: a full-viewport blend layer forced the browser to
+   re-blend the whole page on every paint, which stalled the compositor during
+   menu transitions. */
 
 /* ---------- main area (menu screen + subpages share this) ---------- */
 .ifm__main-area { position: relative; grid-row: 1; min-height: 0; overflow: hidden; }
@@ -204,8 +204,21 @@
 }
 
 /* ---------- subpages ---------- */
-.ifm__subpage { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; padding: 3vh 3vw; overflow: auto; }
+.ifm__subpage {
+  position: absolute; inset: 0; z-index: 5; display: flex; align-items: center;
+  justify-content: center; padding: 3vh 3vw; overflow: auto;
+  /* Compositor-only crossfade, driven by the `.is-open` class from menu.ts.
+     Runs on the compositor thread, so a stalled main thread / starved rAF
+     cannot freeze it (the earlier rAF-driven transition could). */
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+  transition: opacity .28s ease, transform .28s ease;
+}
+.ifm__subpage.is-open { opacity: 1; transform: none; }
 .ifm__subpage[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .ifm__subpage { transition: none; }
+}
 .ifm__file {
   position: relative; width: min(1280px, 92vw); max-height: 100%; margin: auto; display: flex; flex-direction: column;
   background:

@@ -1,6 +1,7 @@
 import {
   computeArmyVisibility, projectArmyView, visibleResourceNodes,
-  legalRetreatPaths, type GameState, type LandGraph, type WorldData,
+  legalRetreatPaths, stackExtractionRate,
+  type GameState, type LandGraph, type WorldData,
 } from '@ironfronts/game-core';
 import type { PlayerProjection, ProjectionDelta, PublicCountry } from '@ironfronts/protocol';
 
@@ -44,6 +45,19 @@ export function projectFor(
     visibleResourceNodes(state, world, viewerCountryId).map((node) => [node.id, node]),
   );
   const own = state.countries[viewerCountryId];
+  // Live per-game-hour extraction rate for the viewer's own stacks, by resource
+  // kind. The passive `income` map only covers funds/manpower/food; stone/metal/
+  // oil come from physical extraction, so the HUD needs this to show a rate.
+  const extraction = { stone: 0, metal: 0, oil: 0 };
+  for (const army of Object.values(state.armies)) {
+    if (army.ownerCountryId !== viewerCountryId || army.status !== 'extracting') continue;
+    if (army.extractingNodeId === null) continue;
+    const node = state.resourceNodes[army.extractingNodeId];
+    if (!node || node.status !== 'extracting' || node.remaining <= 0) continue;
+    if (node.kind === 'stone' || node.kind === 'metal' || node.kind === 'oil') {
+      extraction[node.kind] += stackExtractionRate(army);
+    }
+  }
   const owned = world.provinces.filter((province) => state.provinceOwners[province.id] === viewerCountryId);
   const capitalId = world.countries.find((country) => country.id === viewerCountryId)?.capitalProvinceId;
   const capital = world.provinces.find((province) => province.id === capitalId) ?? owned[0];
@@ -64,6 +78,7 @@ export function projectFor(
     ownCountry: own ? {
       id: own.id, name: own.name, color: own.color, controller: own.controller,
       stockpile: { ...own.stockpile }, income: { ...own.income }, industryCapacity: own.industryCapacity,
+      extraction,
     } : null,
     relations: { ...state.relations },
   };

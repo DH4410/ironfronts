@@ -8,7 +8,12 @@ type OptimisticMutation = (state: PlayerProjection) => void;
 type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
 
 interface Stockpile { funds: number; manpower: number; food: number; stone: number; metal: number; oil: number }
-interface OwnCountry { id: number; name: string; color: string; controller: string; stockpile: Stockpile; income: Stockpile; industryCapacity: number }
+interface OwnCountry {
+  id: number; name: string; color: string; controller: string;
+  stockpile: Stockpile; income: Stockpile; industryCapacity: number;
+  /** Live per-game-hour extraction rate by kind (stone/metal/oil); 0 when idle. */
+  extraction?: { stone: number; metal: number; oil: number };
+}
 interface QueueOrder { id: string; unitTypeId: string; buildingId?: BuildingId; progressHours: number; totalHours: number }
 
 export class RemoteGameSession extends EventTarget {

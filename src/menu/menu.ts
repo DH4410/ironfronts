@@ -1,6 +1,5 @@
 import './menu.css';
 import type { AudioManager, UiAudioCue } from '../audio/audio-manager';
-import { phase, runChoreo, smooth } from './choreo';
 import {
   isQualityLevel, loadQuality, QUALITY_PRESETS, saveQuality, type QualityLevel,
 } from '../graphics/quality';
@@ -29,16 +28,17 @@ export interface MenuHandlers {
   onGraphicsQuality?: (level: QualityLevel) => void;
 }
 
-const OPEN_DURATION = 760;
-
-/** Natural aspect (height/width) of public/menu/desk-scene.jpg, for computing its cover-fit pixel size. */
-const MAP_ASPECT = 2620 / 2402;
+/**
+ * Hard ceiling on how long a dossier open/close may hold `busy`. The visual
+ * transition is a pure CSS `transition` on the compositor (see menu.css), so it
+ * keeps running even if the main thread or rAF is momentarily starved; this
+ * timeout only bounds the JS-side `busy` flag if `transitionend` never fires.
+ */
+const TRANSITION_TIMEOUT_MS = 360;
 
 export function mountMenu(handlers: MenuHandlers): void {
   const root = requiredId<HTMLElement>('menu-root');
   const brand = document.querySelector<HTMLElement>('.brand');
-  const main = requiredId<HTMLElement>('ifm-main');
-  const map = requiredChild<HTMLElement>(root, '.ifm__map');
   const masterVolume = document.getElementById('ifm-master-volume') as HTMLInputElement | null;
   const musicVolume = document.getElementById('ifm-music-volume') as HTMLInputElement | null;
   const newCampaign = requiredId<HTMLButtonElement>('ifm-new-campaign');
@@ -59,9 +59,6 @@ export function mountMenu(handlers: MenuHandlers): void {
 
   let busy = false;
   let openScreen: string | null = null;
-  let transitionPage: HTMLElement | null = null;
-  let riseDistance = 0;
-  let panOffsetPx = 0;
 
   const playCue = (cue: UiAudioCue): void => {
     if (!handlers.audio) return;
@@ -90,71 +87,44 @@ export function mountMenu(handlers: MenuHandlers): void {
   }
 
   /**
-   * One update() drives every sub-motion from the same t (0=on the menu,
-   * 1=dossier open). The desk photo pans down (no extra zoom — the source
-   * is already at cover-fit scale, and zooming further just softens it).
-   * The logo/cards are measured to move by the exact same pixel amount the
-   * backdrop's visible window shifts, so they read as scrolling with the
-   * desk rather than drifting at their own independent speed. The dossier
-   * page rides the same pan curve, sliding up fully opaque from below the
-   * fold so it reads as having been on the desk the whole time rather than
-   * fading into place.
+   * Play the dossier open (`direction === 1`) or close (`-1`) transition.
+   *
+   * The desk backdrop and the main menu screen never move. The revealed dossier
+   * layer crossfades via a plain CSS `transition` (opacity + a tiny translate) —
+   * that runs on the compositor and cannot be stalled by main-thread or rAF
+   * starvation, which is exactly the failure the earlier rAF-driven version hit.
+   * JS only flips a class and waits for `transitionend`, with a short timeout so
+   * `busy` is released even if the event is missed.
    */
-  function update(t: number): void {
-    const panT = smooth(phase(t, 0, 0.92));
-    const offsetPx = panOffsetPx * panT;
-
-    // Keep transitions compositor-only. Animating background-position and
-    // CSS filters on the full-screen desk image forced expensive repaints on
-    // every frame and could stall/crash the browser GPU process.
-    main.style.transform = `translate3d(0, ${(-offsetPx).toFixed(2)}px, 0)`;
-
-    if (transitionPage) {
-      transitionPage.style.transform =
-        `translate3d(0, ${((1 - panT) * riseDistance).toFixed(2)}px, 0)`;
-    }
-  }
-
-  async function playTransition(page: HTMLElement, direction: 1 | -1): Promise<void> {
-    transitionPage = page;
-    // `is-transitioning` gates dossier pointer-events via CSS — a single source
-    // of truth that a stuck imperative `style.pointerEvents` cannot strand.
+  function playTransition(page: HTMLElement, direction: 1 | -1): Promise<void> {
     root.classList.add('is-transitioning');
-    page.style.transform = 'none';
-    main.style.willChange = 'transform';
-    page.style.willChange = 'transform';
 
-    // Measure once before animation. The previous implementation called
-    // getBoundingClientRect() every frame, forcing repeated layout work while
-    // moving large full-screen menu layers.
-    const pageBox = page.getBoundingClientRect();
-    const mapBox = map.getBoundingClientRect();
-    riseDistance = pageBox.height;
-    const renderedHeight = mapBox.width * MAP_ASPECT;
-    const excess = Math.max(0, renderedHeight - mapBox.height);
-    panOffsetPx = excess * 0.62;
-
-    const target = direction === 1 ? 1 : 0;
-
-    try {
-      update(direction === 1 ? 0 : 1);
-      await runChoreo(OPEN_DURATION, direction, update);
-    } catch (error) {
-      // A menu transition must never leave the interface permanently frozen.
-      // If animation work fails, snap to the requested final state and keep
-      // the control flow moving.
-      console.error('Menu dossier transition failed; snapping to end state.', error);
-      try {
-        update(target);
-      } catch (snapError) {
-        console.error('Unable to snap dossier transition to end state.', snapError);
-      }
-    } finally {
-      root.classList.remove('is-transitioning');
-      main.style.willChange = '';
-      page.style.willChange = '';
-      transitionPage = null;
+    if (direction === 1) {
+      // display:none -> visible needs a reflow before the class flip so the
+      // browser has a "from" state to animate out of.
+      page.hidden = false;
+      void page.offsetWidth;
+      page.classList.add('is-open');
+    } else {
+      page.classList.remove('is-open');
     }
+
+    return new Promise<void>((resolve) => {
+      let done = false;
+      const finish = (): void => {
+        if (done) return;
+        done = true;
+        page.removeEventListener('transitionend', onEnd);
+        window.clearTimeout(timer);
+        root.classList.remove('is-transitioning');
+        resolve();
+      };
+      const onEnd = (event: TransitionEvent): void => {
+        if (event.target === page && event.propertyName === 'opacity') finish();
+      };
+      page.addEventListener('transitionend', onEnd);
+      const timer = window.setTimeout(finish, TRANSITION_TIMEOUT_MS);
+    });
   }
 
   async function openDossier(card: HTMLButtonElement): Promise<void> {
@@ -171,7 +141,6 @@ export function mountMenu(handlers: MenuHandlers): void {
     root.classList.add('is-dossier-open');
     playCue('dossier-open');
 
-    page.hidden = false;
     try {
       await playTransition(page, 1);
     } finally {
@@ -196,6 +165,7 @@ export function mountMenu(handlers: MenuHandlers): void {
       await playTransition(page, -1);
     } finally {
       page.hidden = true;
+      page.classList.remove('is-open');
       openScreen = null;
       root.classList.remove('is-dossier-open');
       busy = false;
@@ -214,15 +184,12 @@ export function mountMenu(handlers: MenuHandlers): void {
       const page = document.getElementById(`ifm-${openScreen}`);
       if (page) {
         page.hidden = true;
-        page.style.transform = '';
-        page.style.willChange = '';
+        page.classList.remove('is-open');
       }
       openScreen = null;
     }
-    transitionPage = null;
     root.classList.remove('is-dossier-open', 'is-transitioning');
-    main.style.transform = '';
-    main.style.willChange = '';
+    // The desk backdrop and #ifm-main are never transformed; nothing to unwind.
   }
 
   root.querySelectorAll<HTMLButtonElement>('[data-open]').forEach((card) => {
@@ -447,11 +414,5 @@ export function mountMenu(handlers: MenuHandlers): void {
 function requiredId<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);
   if (!el) throw new Error(`Missing menu element: #${id}`);
-  return el as unknown as T;
-}
-
-function requiredChild<T extends HTMLElement>(parent: Element, selector: string): T {
-  const el = parent.querySelector(selector);
-  if (!el) throw new Error(`Missing menu element: ${selector}`);
   return el as unknown as T;
 }

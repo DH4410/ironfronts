@@ -409,7 +409,9 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         chip.dataset.res = line.id;
         const ic = resourceIcon[line.id];
         if (ic) chip.append(createIcon(ic, 'ifg-res__icon'));
-        chip.append(el('b', 'ifg-res__value', ''));
+        const stack = el('span', 'ifg-res__stack');
+        stack.append(el('b', 'ifg-res__value', ''), el('i', 'ifg-res__rate', ''));
+        chip.append(stack);
         return chip;
       }));
       resourceSlots = slots;
@@ -422,9 +424,23 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       chip.classList.toggle('is-demo', Boolean(line.demo));
       chip.querySelector('.ifg-res__value')!.textContent =
         pending ? '--' : numberFormat.format(line.value as number);
+      // Income rate, per game hour. `null`/undefined = no rate model for this
+      // resource yet (blank); a number (incl. 0) is authoritative.
+      const rateEl = chip.querySelector<HTMLElement>('.ifg-res__rate')!;
+      const rate = line.delta;
+      if (pending || rate === null || rate === undefined) {
+        rateEl.textContent = '';
+        rateEl.classList.remove('is-positive', 'is-negative');
+      } else {
+        const rounded = Number(rate.toFixed(1));
+        rateEl.textContent = `${rounded >= 0 ? '+' : ''}${rounded} /h`;
+        rateEl.classList.toggle('is-positive', rounded > 0);
+        rateEl.classList.toggle('is-negative', rounded < 0);
+      }
       chip.title = pending
         ? `${line.label} — economy not implemented yet`
-        : `${line.label}${line.demo ? ' (demo)' : ''}`;
+        : `${line.label}${line.demo ? ' (demo)' : ''}${
+          rate === null || rate === undefined ? '' : ` · ${Number(rate.toFixed(1))} per game hour`}`;
     }
 
     // Clock + weather.

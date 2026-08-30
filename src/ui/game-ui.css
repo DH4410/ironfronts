@@ -104,7 +104,15 @@
   width: 23px; height: 23px;
   filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.75)) brightness(1.06);
 }
+.ifg-res__stack { display: inline-flex; flex-direction: column; line-height: 1.05; }
 .ifg-res__value { font-weight: 700; font-variant-numeric: tabular-nums; font-size: 13.5px; color: var(--ifg-text); }
+.ifg-res__rate {
+  font-style: normal; font-weight: 600; font-variant-numeric: tabular-nums;
+  font-size: 9.5px; letter-spacing: .02em; color: #9aa196;
+}
+.ifg-res__rate:empty { display: none; }
+.ifg-res__rate.is-positive { color: #8fbf7f; }
+.ifg-res__rate.is-negative { color: #d98a5f; }
 .ifg-res.is-pending .ifg-res__icon { filter: grayscale(0.55) brightness(0.82) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6)); opacity: 0.78; }
 .ifg-res.is-pending .ifg-res__value { color: #aab0a5; font-weight: 600; }
 .ifg-res.is-demo .ifg-res__value { color: var(--ifg-brass-lit); }

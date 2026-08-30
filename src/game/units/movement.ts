@@ -20,6 +20,14 @@ const TERRAIN_SPEED: Record<number, number> = {
   [TERRAIN_CLASS.urban]: 0.9,
 };
 const ROAD_BONUS = 1.35;
+/**
+ * Global pacing multiplier on how far a stack travels per simulation hour.
+ * Tuned purely for feel (strategic movement across a country, not units
+ * sliding across the map) — it scales every stack equally, so relative speeds,
+ * terrain ordering (plain > hill > mountain) and the road bonus are unchanged.
+ * Does NOT touch the simulation tick.
+ */
+const STRATEGIC_MOVEMENT_SCALE = 0.42;
 const EDGE_SAMPLE_DISTANCE = 18;
 const edgeProvinceCache = new WeakMap<object, Map<string, number[]>>();
 
@@ -281,7 +289,8 @@ export function stepMovement(session: SimContext, dtHours: number): void {
     const order = army.order;
     if (!order || order.path.length === 0 || army.status === 'engaged') continue;
     revalidateOrder(session, army, order);
-    let budget = stackBaseSpeed(army) * dtHours * (army.status === 'retreating' ? 3 : 1);
+    let budget = stackBaseSpeed(army) * dtHours * STRATEGIC_MOVEMENT_SCALE
+      * (army.status === 'retreating' ? 3 : 1);
 
     while (budget > 0 && order.path.length > 0) {
       const targetNode = order.path[0];

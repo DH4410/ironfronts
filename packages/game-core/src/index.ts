@@ -6,6 +6,7 @@ export { projectArmyView, visibleResourceNodes } from '../../../src/game/player-
 export { computeArmyVisibility } from '../../../src/game/visibility';
 export { legalRetreatPaths } from '../../../src/game/combat';
 export { UNIT_TYPES, unitType } from '../../../src/game/units/unit-catalog';
+export { stackExtractionRate } from '../../../src/game/units/army';
 export { BUILDINGS } from '../../../src/game/construction';
 export type { GameState, CountryState, ResourceNodeState } from '../../../src/game/game-state';
 export type { GameCommand, CommandResult } from '../../../src/game/commands';
