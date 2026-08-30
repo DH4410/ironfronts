@@ -31,7 +31,16 @@ export function issueAttack(ctx: SimContext, command: AttackCommand): CommandRes
   const target = ctx.state.armies[command.target.armyId];
   if (!target) return { ok: false, reason: 'No such target army.' };
   const contact = computeArmyVisibility(ctx.state, ctx.world, army.ownerCountryId).get(target.id);
-  if (contact === 'hidden') return { ok: false, reason: 'Target is no longer detected.' };
+  // Only a fully identified force can be attacked by name. A distant "contact"
+  // exposes no exact position, so ordering a strike on one would leak it.
+  if (contact !== 'visible') {
+    return {
+      ok: false,
+      reason: contact === 'contact'
+        ? 'Target is only a contact — move a force into direct view before striking it.'
+        : 'Target is no longer detected.',
+    };
+  }
   const required = relationOf(ctx.state, army.ownerCountryId, target.ownerCountryId) === 'war'
     ? [] : [target.ownerCountryId];
   if (required.some((id) => !command.confirmedWarCountryIds?.includes(id))) {

@@ -1137,7 +1137,15 @@ function handleMapClick(
   }
   if (targetingMode === 'attack' && selectedArmyId && session.ownsArmy(selectedArmyId)) {
     const targetArmyId = renderer.pickArmyAt(clientX, clientY);
-    const result = targetArmyId && targetArmyId !== selectedArmyId
+    const pickedTarget = targetArmyId && targetArmyId !== selectedArmyId ? session.army(targetArmyId) : null;
+    if (pickedTarget && !pickedTarget.own && pickedTarget.contact !== 'visible') {
+      pushNotification('warning', 'Target not identified',
+        'Only a force in direct view can be attacked. Move a unit into contact first.');
+      targetingMode = null;
+      refreshSelectedArmy(session);
+      return true;
+    }
+    const result = targetArmyId && targetArmyId !== selectedArmyId && pickedTarget?.contact === 'visible'
       ? session.orderAttackArmy(selectedArmyId, targetArmyId)
       : (() => {
         const provinceId = renderer.provinceIdAt(clientX, clientY);
@@ -1232,11 +1240,18 @@ function handleMapCommand(
   const targetArmyId = renderer.pickArmyAt(clientX, clientY);
   if (targetArmyId && targetArmyId !== selectedArmyId) {
     const target = session.army(targetArmyId);
-    if (target && !target.own) {
+    if (target && !target.own && target.contact === 'visible') {
       const result = session.orderAttackArmy(selectedArmyId, targetArmyId);
       if (!result.ok) orderFeedback(result.reason ?? 'Invalid target.');
       refreshSelectedArmy(session);
       if (activeRenderer) syncArmyMarkers(session, activeRenderer);
+      return true;
+    }
+    if (target && !target.own) {
+      // An unidentified contact: don't strike it (that would confirm its exact
+      // position) and don't silently march onto it either.
+      pushNotification('warning', 'Target not identified',
+        'Only a force in direct view can be attacked. Move a unit into contact first.');
       return true;
     }
   }
