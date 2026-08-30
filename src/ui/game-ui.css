@@ -636,7 +636,17 @@
 }
 .ifg-army-panel__front { display: grid; gap: 2px; margin-top: 6px; padding: 6px 7px; border-left: 2px solid #a6543d; background: rgba(0,0,0,.18); }
 .ifg-army-panel__front span, .ifg-army-panel__front small { font-size: 10px; color: var(--ifg-ink-muted); }
-.ifg-army-panel__retreat-exits { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.ifg-army-panel__retreat { margin-top: 8px; }
+.ifg-army-panel__retreat > .ifg-army-panel__eyebrow { display: block; margin-bottom: 5px; }
+.ifg-army-panel__retreat-exits { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 0; }
+/* Direction chips must not collapse to slivers the way `flex: 1` command
+   buttons do — they size to their label and wrap as whole chips. */
+.ifg-army-panel__retreat-chip {
+  flex: 0 0 auto;
+  min-width: 82px;
+  padding: 5px 9px;
+  white-space: nowrap;
+}
 
 .ifg-command-dialog {
   width: min(440px, calc(100vw - 32px));

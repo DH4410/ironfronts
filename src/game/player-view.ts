@@ -73,6 +73,7 @@ export interface PlayerArmyView {
   }>;
   readonly legalRetreatExits?: ReadonlyArray<{
     firstNodeId: number; destinationProvinceId: number; x: number; z: number;
+    readonly bearing?: string;
   }>;
   readonly artillery?: {
     range: number;

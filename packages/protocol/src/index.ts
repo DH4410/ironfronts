@@ -75,6 +75,8 @@ export interface ProjectedArmy {
   }>;
   legalRetreatExits?: ReadonlyArray<{
     firstNodeId: number; destinationProvinceId: number; x: number; z: number;
+    /** 8-point compass label for the withdrawal direction (server-computed). */
+    bearing?: string;
   }>;
   artillery?: {
     range: number;

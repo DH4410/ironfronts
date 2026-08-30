@@ -181,6 +181,7 @@ export interface ArmyStackView {
   readonly simulationTick?: number;
   readonly legalRetreatExits?: ReadonlyArray<{
     firstNodeId: number; destinationProvinceId: number; x: number; z: number;
+    readonly bearing?: string;
   }>;
   readonly battleFronts?: ReadonlyArray<{
     id: string; directionNodeId: number; role: 'attack' | 'defense';

@@ -140,19 +140,30 @@ export function renderSelectedArmyPanel(
   }
 
   const commands = node('div', 'ifg-army-panel__commands ifg-army-panel__commands--primary');
-  const command = (label: string, key: ArmyPanelCommand, enabled: boolean, active = false): HTMLButtonElement => {
+  const command = (
+    label: string, key: ArmyPanelCommand, enabled: boolean, active = false, title?: string,
+  ): HTMLButtonElement => {
     const button = node('button', 'ifg-army-panel__command', label);
     button.type = 'button';
     button.disabled = !enabled;
     button.classList.toggle('is-active', active);
+    if (title) button.title = title;
     if (enabled) button.addEventListener('click', () => onCommand(key));
     return button;
   };
   if (army.own) {
+    // Why Retreat is unavailable, so the player understands it before clicking.
+    const retreatHint = army.combat === 'engaged'
+      ? (army.legalRetreatExits?.length
+        ? 'Break contact and withdraw along a friendly road.'
+        : 'No open line of retreat — the stack is encircled.')
+      : army.combat === 'retreating'
+        ? 'The stack is already withdrawing.'
+        : 'Retreat opens once the stack is locked in close combat.';
     commands.append(
       command(army.targetingMode === 'move' ? 'Select destination' : 'Move', 'move', army.canMove === true, army.targetingMode === 'move'),
       command(army.targetingMode === 'attack' ? 'Select target' : 'Attack', 'attack', army.canAttack === true, army.targetingMode === 'attack'),
-      command(army.targetingMode === 'retreat' ? 'Select exit' : 'Retreat', 'retreat', army.canRetreat === true, army.targetingMode === 'retreat'),
+      command(army.targetingMode === 'retreat' ? 'Select exit' : 'Retreat', 'retreat', army.canRetreat === true, army.targetingMode === 'retreat', retreatHint),
       command(army.targetingMode === 'split' ? 'Select destination' : 'Split', 'split', army.canSplit === true, army.targetingMode === 'split'),
       command('Stop', 'stop', army.canStop === true),
       command('Extract', 'extract', army.canExtract === true),
@@ -219,12 +230,21 @@ export function renderSelectedArmyPanel(
       );
       activity.append(line);
     }
+    // One button per *distinct* escape direction (the server already collapses
+    // the raw per-province routes and tags each with a compass bearing), not one
+    // per graph node — that used to spill 25 look-alike buttons into the panel.
     if (army.legalRetreatExits && army.legalRetreatExits.length > 1) {
+      const box = node('div', 'ifg-army-panel__retreat');
+      box.append(node('small', 'ifg-army-panel__eyebrow', `Retreat routes · ${army.legalRetreatExits.length} open`));
       const exits = node('div', 'ifg-army-panel__retreat-exits');
       for (const [index, exit] of army.legalRetreatExits.entries()) {
-        exits.append(command(`Retreat exit ${index + 1}`, `retreat:${exit.firstNodeId}`, true));
+        const label = exit.bearing ? `Withdraw ${exit.bearing}` : `Route ${index + 1}`;
+        const chip = command(label, `retreat:${exit.firstNodeId}`, true);
+        chip.classList.add('ifg-army-panel__retreat-chip');
+        exits.append(chip);
       }
-      activity.append(exits);
+      box.append(exits);
+      activity.append(box);
     }
   } else {
     activity.append(node('small', 'ifg-army-panel__eyebrow', 'Activity'));

@@ -31,12 +31,9 @@ export function projectFor(
     const projected = graph && army.own && army.status === 'engaged'
       ? {
         ...army,
-        legalRetreatExits: legalRetreatPaths({ state, world, graph }, army.id).map((route) => ({
-          firstNodeId: route.firstNodeId,
-          destinationProvinceId: route.destinationProvinceId,
-          x: graph.nodeX[route.firstNodeId],
-          z: graph.nodeZ[route.firstNodeId],
-        })),
+        legalRetreatExits: retreatExitsForClient(
+          legalRetreatPaths({ state, world, graph }, army.id), graph, world.width, army.x, army.z,
+        ),
       }
       : army;
     return [[army.id, projected]];
@@ -82,6 +79,47 @@ export function projectFor(
     } : null,
     relations: { ...state.relations },
   };
+}
+
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'] as const;
+
+/** 8-point compass label for a world-space delta (north is -z, east is +x). */
+export function bearingLabel(dx: number, dz: number): string {
+  const deg = (Math.atan2(dx, -dz) * 180) / Math.PI;
+  const index = Math.round(((deg % 360) + 360) % 360 / 45) % 8;
+  return COMPASS[index];
+}
+
+/**
+ * `legalRetreatPaths` returns one route per (escape edge x owned province) pair,
+ * which for a large country is dozens of entries that all mean the same thing to
+ * the player: break contact through this edge. Collapse them to the distinct
+ * first nodes (the list is already shortest-first, so the first hit per node is
+ * the nearest safe destination) and tag each with a compass bearing so the UI
+ * can offer "withdraw NE / withdraw S" instead of 25 numbered buttons.
+ */
+export function retreatExitsForClient(
+  routes: ReadonlyArray<{ firstNodeId: number; destinationProvinceId: number }>,
+  graph: { nodeX: ArrayLike<number>; nodeZ: ArrayLike<number> },
+  worldWidth: number, armyX: number, armyZ: number,
+): Array<{ firstNodeId: number; destinationProvinceId: number; x: number; z: number; bearing: string }> {
+  const seen = new Set<number>();
+  const exits: Array<{ firstNodeId: number; destinationProvinceId: number; x: number; z: number; bearing: string }> = [];
+  for (const route of routes) {
+    if (seen.has(route.firstNodeId)) continue;
+    seen.add(route.firstNodeId);
+    const x = graph.nodeX[route.firstNodeId];
+    const z = graph.nodeZ[route.firstNodeId];
+    let dx = x - armyX;
+    if (dx > worldWidth / 2) dx -= worldWidth;
+    if (dx < -worldWidth / 2) dx += worldWidth;
+    exits.push({
+      firstNodeId: route.firstNodeId,
+      destinationProvinceId: route.destinationProvinceId,
+      x, z, bearing: bearingLabel(dx, z - armyZ),
+    });
+  }
+  return exits;
 }
 
 const COLLECTIONS = [
