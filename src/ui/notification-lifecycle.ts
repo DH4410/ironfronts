@@ -3,14 +3,16 @@ import type { NotificationKind } from './ui-state';
 /**
  * Per-kind toast lifetime in ms. `null` means action-required: the toast stays
  * until the player dismisses it. Timings are deliberate, not magic numbers:
- * info is glanceable, warnings need a beat longer, combat is a call to action.
+ * info is glanceable, warnings need a beat longer, combat war-news sits longest
+ * because it is easy to miss mid-battle — but it is still news, not a prompt, so
+ * it clears itself. A genuinely action-required toast passes `{ sticky: true }`.
  */
 export const NOTIFICATION_TTL_MS: Record<NotificationKind, number | null> = {
   information: 5_000,
   completed: 6_000,
   diplomacy: 6_000,
   warning: 8_000,
-  combat: null,
+  combat: 11_000,
 };
 
 /** Lifetime to use when a normally-sticky kind is explicitly made transient. */

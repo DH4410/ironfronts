@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
-  NOTIFICATION_TTL_MS, NOTIFICATION_FALLBACK_TTL_MS, isSticky, autoDismissDelay,
+  NOTIFICATION_TTL_MS, isSticky, autoDismissDelay,
 } from '../src/ui/notification-lifecycle';
 
 /**
@@ -11,26 +11,27 @@ import {
  * deliberate lifetime; action-required kinds stay until dismissed.
  */
 describe('notification lifecycle', () => {
-  it('auto-dismisses the transient kinds on a sensible ramp', () => {
+  it('auto-dismisses every default kind on a sensible ramp', () => {
     expect(autoDismissDelay('information')).toBe(5_000);
     expect(autoDismissDelay('completed')).toBe(6_000);
     expect(autoDismissDelay('diplomacy')).toBe(6_000);
     expect(autoDismissDelay('warning')).toBe(8_000);
-    // info < success <= warning
+    // combat war-news sits longest but still clears itself — it is news, not a prompt
+    expect(autoDismissDelay('combat')).toBe(11_000);
+    expect(isSticky('combat')).toBe(false);
+    // info < success <= warning < combat
     expect(NOTIFICATION_TTL_MS.information!).toBeLessThan(NOTIFICATION_TTL_MS.completed!);
     expect(NOTIFICATION_TTL_MS.completed!).toBeLessThanOrEqual(NOTIFICATION_TTL_MS.warning!);
+    expect(NOTIFICATION_TTL_MS.warning!).toBeLessThan(NOTIFICATION_TTL_MS.combat!);
   });
 
-  it('keeps action-required (combat) toasts until dismissed', () => {
-    expect(isSticky('combat')).toBe(true);
-    expect(autoDismissDelay('combat')).toBeNull();
-  });
-
-  it('honours an explicit sticky override in both directions', () => {
+  it('makes a toast sticky only on an explicit override', () => {
     expect(isSticky('information', true)).toBe(true);
     expect(autoDismissDelay('information', true)).toBeNull();
-    expect(isSticky('combat', false)).toBe(false);
-    expect(autoDismissDelay('combat', false)).toBe(NOTIFICATION_FALLBACK_TTL_MS);
+    expect(isSticky('combat', true)).toBe(true);
+    expect(autoDismissDelay('combat', true)).toBeNull();
+    // and the override can force a normally-transient kind transient too
+    expect(autoDismissDelay('combat', false)).toBe(11_000);
   });
 
   it('the HUD wiring dismisses by id and clears timers on teardown', () => {
