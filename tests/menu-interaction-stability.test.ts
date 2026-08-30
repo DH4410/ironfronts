@@ -29,4 +29,34 @@ describe('menu interaction stability', () => {
   it('does not activate audio from passive hover before unlock', () => {
     expect(audio).toContain("if (cue === 'hover' && !this.unlocked) return");
   });
+
+  it('drives menu-card inertness from a class, not a strandable inline style', () => {
+    // The old code set `main.style.pointerEvents = 'none'` in a transition
+    // finally block and relied on close to undo it — a stuck transition left
+    // the menu dead. State is now a class toggled with `openScreen`.
+    expect(menu).not.toContain("main.style.pointerEvents");
+    expect(menu).toContain("root.classList.add('is-dossier-open')");
+    expect(menu).toContain("root.classList.remove('is-dossier-open')");
+    const css = readFileSync(path.join(root, 'src/menu/menu.css'), 'utf8');
+    expect(css).toContain('.ifm.is-dossier-open .ifm__screen { pointer-events: none; }');
+  });
+
+  it('provides a hard reset to the main screen for an abandoned launch', () => {
+    const start = menu.indexOf('function resetToMainScreen()');
+    const end = menu.indexOf('\n  }', start);
+    const reset = menu.slice(start, end);
+    expect(reset).toContain('busy = false');
+    expect(reset).toContain("root.classList.remove('is-dossier-open', 'is-transitioning')");
+    expect(reset).toContain("main.style.transform = ''");
+    // launch() calls it when onLaunch rejects (Return to Command).
+    const launchBody = menu.slice(menu.indexOf('async function launch('), menu.indexOf('async function deploy('));
+    expect(launchBody).toContain('catch (error)');
+    expect(launchBody).toContain('resetToMainScreen();');
+  });
+
+  it('will not start a launch while a menu transition is animating', () => {
+    const start = menu.indexOf('async function deploy(');
+    const end = menu.indexOf('\n  }', start);
+    expect(menu.slice(start, end)).toContain('if (busy) return');
+  });
 });

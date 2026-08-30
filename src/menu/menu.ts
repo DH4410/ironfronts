@@ -110,6 +110,9 @@ export function mountMenu(handlers: MenuHandlers): void {
 
   async function playTransition(page: HTMLElement, direction: 1 | -1): Promise<void> {
     transitionPage = page;
+    // `is-transitioning` gates dossier pointer-events via CSS — a single source
+    // of truth that a stuck imperative `style.pointerEvents` cannot strand.
+    root.classList.add('is-transitioning');
     page.style.transform = 'none';
     main.style.willChange = 'transform';
     page.style.willChange = 'transform';
@@ -140,6 +143,7 @@ export function mountMenu(handlers: MenuHandlers): void {
         console.error('Unable to snap dossier transition to end state.', snapError);
       }
     } finally {
+      root.classList.remove('is-transitioning');
       main.style.willChange = '';
       page.style.willChange = '';
       transitionPage = null;
@@ -155,15 +159,15 @@ export function mountMenu(handlers: MenuHandlers): void {
 
     busy = true;
     openScreen = name;
+    // Menu-card interactivity is now driven purely by this class (see menu.css),
+    // so it cannot be left stranded by an interrupted transition.
+    root.classList.add('is-dossier-open');
     playCue('dossier-open');
 
     page.hidden = false;
-    page.style.pointerEvents = 'none';
     try {
       await playTransition(page, 1);
     } finally {
-      page.style.pointerEvents = '';
-      main.style.pointerEvents = 'none';
       busy = false;
     }
   }
@@ -172,20 +176,45 @@ export function mountMenu(handlers: MenuHandlers): void {
     if (busy || !openScreen) return;
     const name = openScreen;
     const page = document.getElementById(`ifm-${name}`);
-    if (!page?.querySelector<HTMLElement>('.ifm__file')) return;
+    if (!page?.querySelector<HTMLElement>('.ifm__file')) {
+      // Nothing to animate — still clear the state so the menu stays usable.
+      openScreen = null;
+      root.classList.remove('is-dossier-open');
+      return;
+    }
 
     busy = true;
     playCue('dossier-close');
-    main.style.pointerEvents = '';
-    page.style.pointerEvents = 'none';
     try {
       await playTransition(page, -1);
     } finally {
       page.hidden = true;
-      page.style.pointerEvents = '';
       openScreen = null;
+      root.classList.remove('is-dossier-open');
       busy = false;
     }
+  }
+
+  /**
+   * Hard reset to the primary menu screen. Used when a launch attempt started
+   * from an open dossier is abandoned (Return to Command), so the menu never
+   * comes back panned, half-open, or with dead cards.
+   */
+  function resetToMainScreen(): void {
+    busy = false;
+    if (openScreen) {
+      const page = document.getElementById(`ifm-${openScreen}`);
+      if (page) {
+        page.hidden = true;
+        page.style.transform = '';
+        page.style.willChange = '';
+      }
+      openScreen = null;
+    }
+    transitionPage = null;
+    root.classList.remove('is-dossier-open', 'is-transitioning');
+    main.style.transform = '';
+    main.style.willChange = '';
   }
 
   root.querySelectorAll<HTMLButtonElement>('[data-open]').forEach((card) => {
@@ -332,6 +361,9 @@ export function mountMenu(handlers: MenuHandlers): void {
       if (brand) brand.hidden = false;
       await handlers.onLaunch(countryId);
     } catch (error) {
+      // The launch was abandoned (e.g. "Return to Command"). Bring the menu
+      // back on its primary screen with interaction fully restored.
+      resetToMainScreen();
       root.hidden = false;
       root.style.opacity = '1';
       if (brand) brand.hidden = true;
@@ -340,6 +372,7 @@ export function mountMenu(handlers: MenuHandlers): void {
   }
 
   async function deploy(countryId: number): Promise<void> {
+    if (busy) return; // don't launch while a menu transition is still animating
     try {
       await launch(countryId);
     } catch (error) {

@@ -20,6 +20,10 @@ body { user-select: none; }
 }
 
 #world:active { cursor: grabbing; }
+/* The `#world` id rule above out-specifies the UA `[hidden]` rule, so without
+   this the full-viewport canvas stays laid out (and composited) behind the
+   menu before launch. */
+#world[hidden] { display: none; }
 
 .country-labels {
   position: fixed;

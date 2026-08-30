@@ -49,6 +49,12 @@
 .ifm__main-area { position: relative; grid-row: 1; min-height: 0; overflow: hidden; }
 .ifm__screen { position: absolute; inset: 0; z-index: 2; overflow: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3.2vh; padding: 3vh 3vw; }
 .ifm__screen[hidden] { display: none; }
+/* While a dossier is open the primary menu cards behind it are inert. Driven by
+   a class (toggled with `openScreen`) rather than an imperative inline style so
+   an interrupted transition can never strand the menu non-interactive. */
+.ifm.is-dossier-open .ifm__screen { pointer-events: none; }
+/* Dossier controls are inert only for the brief slide itself. */
+.ifm.is-transitioning .ifm__subpage { pointer-events: none; }
 
 .ifm__logo { display: flex; flex-direction: column; align-items: center; margin-top: -3vh; pointer-events: none; }
 .ifm__logo img { display: block; width: min(36vw, 560px); height: auto; filter: drop-shadow(0 8px 20px rgba(0,0,0,.6)); }
