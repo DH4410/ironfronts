@@ -1,61 +1,156 @@
 # Ironfronts
 
-An authoritative multiplayer strategy game with a native WebGPU client. The repository is an npm-workspace monorepo: `apps/client` is the stable browser entry, `apps/auth-server` owns accounts and sessions, `apps/game-server` owns the single always-running World at War simulation, and `packages/protocol` / `packages/game-core` define the shared boundaries.
+Ironfronts is an authoritative multiplayer grand-strategy prototype with a native WebGPU world renderer. It combines a persistent server simulation, account/country-seat flow, fog-filtered real-time replication, directional combat, and a deterministic offline compiler for a 3,303-province world.
 
-## Run locally
+## What is implemented
 
-Requirements: Node.js 22+ and a current desktop Chrome or Edge release with WebGPU enabled.
+- Persistent single-world multiplayer simulation at 10 authoritative ticks per second
+- Account registration/login with SQLite-backed HttpOnly sessions
+- Permanent country selection and short-lived, single-use gameplay tickets
+- Protocol-v2 WebSocket baselines, change-only deltas, resync, events, and command acknowledgements
+- Graph-based army movement, neutral-territory confirmation, pursuit, splitting, extraction, production, and construction
+- Directional close combat with ten-unit frontage, 30-minute volleys, armor-specific damage, retreats, and artillery bombardment
+- Per-country fog-of-war projections and contact markers
+- WebGPU terrain, water, infrastructure, cities/props, political overlays, labels, weather, armies, and diagnostics
+- Deterministic world compiler with recoverable promotion and generation reports
+- Structured game/auth logs, durable server state, and browser visual/performance tooling
+
+## Architecture
+
+The repository is an npm-workspace monorepo:
+
+| Component | Role |
+|---|---|
+| `apps/client` + `src/client`, `src/ui`, `src/renderer*` | Browser login/menu, authoritative replica, HUD, audio, WebGPU presentation |
+| `apps/auth-server` | Accounts, sessions, public lobby facade, gameplay-ticket issuance |
+| `apps/game-server` | Country seats, commands, simulation, fog projections, game persistence |
+| `packages/protocol` | Shared v2 schemas/types and ticket signing |
+| `packages/game-core` + `src/game` | Browser-free authoritative rules and plain game state |
+| `scripts/world`, `scripts/infrastructure` | Offline world compiler |
+| `material` | Immutable source geometry/topology/movement/metadata |
+
+Default local ports are client `5173`, auth `3001`, and game `3002`. The browser authenticates with the auth service, claims a country, receives a 30-second game ticket, then connects directly to the authoritative gameplay WebSocket. The game server sends only that country's filtered projection.
+
+Read [Repository architecture](docs/architecture.md) for the complete ownership/data flow.
+
+## Requirements
+
+- Node.js 22+
+- npm
+- Current desktop Chrome or Edge with WebGPU and hardware acceleration
+
+The auth server uses Node's built-in SQLite API. There is no WebGL renderer fallback.
+
+## Local setup
+
+Install dependencies:
 
 ```sh
 npm install
+```
+
+Review `.env.example`. Vite reads `VITE_*` values from its environment/files; the Node services read `process.env` and need variables exported by your shell/process manager when overriding defaults.
+
+Run these from the repository root in separate terminals:
+
+```sh
+npm run build:world
 npm run game:dev
 npm run auth:dev
 npm run dev
 ```
 
-Copy `.env.example` to `.env` or export the same variables before starting the processes. Local defaults use client `5173`, auth `3001`, and game `3002`. Runtime state is durable under `data/` by default: accounts and hashed sessions use SQLite at `data/auth.sqlite`, while the authoritative simulation and permanent country assignments use atomic JSON snapshots at `data/game.json`. The client/static host serves the heavy generated world package under `/world`; the game server keeps a local copy only for authoritative simulation and declares the browser-facing package URL and hash during its handshake. Future game versions can select different client/CDN-hosted packages with `WORLD_PUBLIC_URL`. Use `npm run build` for a production build and `npm run check` for workspace type checks plus the complete automated suite.
+Then open:
 
-With the dev server running, `npm run visual-check` launches Chrome through Playwright and writes world, mountain, city, lake-road, and diagnostic captures plus `artifacts/visual-report.json`. On Windows it defaults to a short-lived headed browser because Chrome headless does not reliably expose the hardware WebGPU adapter. Set `IRONFRONTS_BROWSER` to select another Chromium executable or `IRONFRONTS_HEADLESS=true` when a CI GPU adapter is available.
+```text
+http://127.0.0.1:5173/login.html
+```
 
-`npm run performance-check` runs a repeatable world/regional, dense-scene, pan, orbit, zoom, and layer-ablation benchmark. It writes `artifacts/performance-report.json` for tooling and `artifacts/performance-report.md` for review. Set `IRONFRONTS_BENCHMARK_MS` and `IRONFRONTS_BENCHMARK_WARMUP_MS` to adjust its measurement and warmup windows.
+Create an account, choose an unclaimed living country, and begin the operation.
+
+Local defaults use insecure development secrets. When `NODE_ENV=production`, both services refuse to start until `TICKET_SECRET` and `INTERNAL_SERVICE_SECRET` are changed.
+
+## Runtime data
+
+| Path | Contents |
+|---|---|
+| `data/auth.sqlite*` | Accounts, password hashes, browser sessions |
+| `data/game.json` | Authoritative simulation and permanent account-country seats |
+| `public/world` | Generated world package used by client and server |
+| `artifacts` | Road cache and QA reports/screenshots |
+
+These paths are gitignored. Game saves use serialized atomic JSON replacement; auth uses strict SQLite tables in WAL mode. The world compiler promotes through a staging directory and restores the previous package if promotion is interrupted.
+
+Deleting the game save resets the world and country assignments. Deleting auth SQLite resets accounts/sessions. Back up before doing either.
+
+## Main commands
+
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start Vite client |
+| `npm run game:dev` | Watch authoritative game server |
+| `npm run auth:dev` | Watch auth server |
+| `npm run build:world` | Generate `public/world` |
+| `npm run build` | Generate world, check workspaces/root TypeScript, build production client |
+| `npm run check` | Workspace/root checks, script lint, architecture test, full Vitest suite |
+| `npm test` | Generate world and run Vitest |
+| `npm run visual-check` | Playwright renderer captures/report |
+| `npm run performance-check` | Playwright renderer benchmark/report |
+
+See [Development and QA](docs/development.md) for environment details, focused checks, debug mode, output paths, and the current QA authentication-harness limitation.
 
 ## Controls
 
-- Left drag: pan
-- Mouse wheel: zoom
-- Right drag: rotate and tilt
-- WASD or arrow keys: pan
-- Map overlay island: switch between Political, Diplomacy, Clear, and Balanced views
-- F3: world inspector with terrain, infrastructure, waterway, coastline, and navigation views
-- [ / ] while F3 is open: cycle diagnostic views
+| Input | Action |
+|---|---|
+| Left drag / one-finger drag | Pan |
+| Right drag | Orbit and tilt |
+| Wheel / pinch | Cursor-centered zoom |
+| WASD or arrow keys | Pan relative to camera |
+| M with army selected | Move targeting |
+| S with army selected | Stop |
+| E with army selected | Extract |
+| Escape | Deselect/cancel context |
 
-## Generation pipeline
+Move, Attack, Retreat, Split, Stop, and Extract are also available from the army action panel. Map modes, production/construction, rally points, resources, battle summaries, and artillery state are exposed through the HUD.
 
-World generation is staged and deterministic:
+Append `?debug` to enable the inspector. F3 toggles it and `[`/`]` cycle renderer views while open.
 
-1. Rasterize immutable land, lake, and ocean masks.
-2. Generate capped continuous topography with broad hill and mountain envelopes.
-3. Use direct province-to-province movement paths to shape broad traversable passes.
-4. Reconstruct movement and visual river surfaces, lower only the nearby terrain needed to seat those surfaces naturally, and reconcile local terrain slopes.
-5. Freeze the final heightfield, then route and drape visible roads onto it; impossible physical roads are hidden and reported without changing logical connectivity.
-6. Place visual city layouts, buildings, trees, lamps, fences, and signs after road and river clearances are final.
-7. Precompute terrain normals, faithful terrain albedo with baked prop occlusion, and a packed road/waterway navigation field.
-8. Package initial province ownership, country colors, province adjacency, and label metrics for the dynamic political overlay.
+## World pipeline
 
-`scripts/build-world.mjs` is the generation entrypoint. Source loading/rasterization, deterministic noise, chunk packing, typed-artifact writing, topography phases, and waterway selection live under `scripts/world/`. `scripts/build-infrastructure.mjs` coordinates direct province-center routing while cache and audit phases live under `scripts/infrastructure/`. Mountain terrain uses a broad regional uplift plus tighter shoulder/core fields, with a 60-unit cap and a strict local slope reconciliation. Movement-path conditioning targets only segments that exceed the 24% dirt-trail grade target, so ordinary routes no longer flatten unrelated mountain terrain. River seating is lower-only and local: both movement-graph and visual-only channels receive a subtle 0.35-unit cut with a short sandy bank fade, without rerouting rivers or imposing a hydrology simulation. Expensive route results are cached under ignored `artifacts/road-cache/`.
+`npm run build:world` compiles immutable `material/` data into a version-12 static package. The pipeline rasterizes province topology, generates terrain, preserves/drapes movement and visual waterways, compiles direct dirt roads/cities, places props, precomputes normals/navigation/albedo/AO, chunks render data, writes audit reports, and atomically promotes the result.
 
-The compact `world.json` contains runtime-critical province hover and country catalog data. Population, centers, biome tags, and source terrain IDs live in the lazy `province-details.json` sidecar. Initial owners, political adjacency, and label metrics are compact binary buffers; the mutable province-to-country table lets territory colors and borders change without rebuilding terrain or border geometry. The generated `world-generation-report.json` records topography statistics and every hidden road with its reason, endpoints, ID, and affected source connections. The source `material/` directory remains untouched.
+The game server loads a local copy for province lookup/pathfinding/resources; the browser loads the package URL announced during its handshake. They must be identical.
 
-## Rendering
+See [World generator](docs/world-generator/README.md) and [artifact reference](docs/world-generator/artifacts.md).
 
-`src/renderer.ts` keeps the stable `WorldRenderer` façade used by the app and browser automation. GPU/fetch helpers, asset loading, political mutation, picking, sampling, pipeline construction, and renderer-owned types are separate runtime modules. Country labels are divided into atlas, topology, projection, and color modules under `src/country-labels/`; each WGSL program lives in `src/shaders/` and remains available through the existing `src/shaders.ts` barrel. Visual and performance checks share browser, error, and report utilities under `scripts/qa/`. Run `npm run check` for TypeScript unused-code checks, `.mjs` linting, dependency-boundary tests, and the unit suite.
+## Documentation
 
-Terrain materials blend by gameplay terrain, biome, slope, and macro variation. Forest, plain, hill, mountain, and visual-biome boundaries use a narrow filtered-albedo transition band instead of exposing square categorical texels. A default-on political layer applies a restrained, zoom-aware country tint without replacing terrain detail; a coherent map-space political texture and country-boundary flags are cached, with territory changes patching only affected province rectangles and incident borders. Country names follow the largest connected owned region, are rasterized once into an atlas, and render as one instanced WebGPU batch without a second full-screen composited canvas. Beach sand is restricted to the actual shoreline mask, while low inland regions retain their biome. Forests use five low-poly tree silhouettes with compact light/dark foliage and bark textures; suitable non-arid plains receive a much sparser light-green-only scattering. Forest ground transitions to a cheap canopy-green signal as individual trees fade. A signed-distance bank field smooths ocean, lake, and visual-river edges without blurring narrow channels closed. Visual-only one- and two-texel river channels are expanded to a strategy-readable 7.6-unit minimum in a presentation-only mask, while movement rivers keep their independent 11-unit minimum and graph semantics. Ocean and lake water combines slowly varying directional wave packets, domain-warped wind ripples, broken shoreline foam, Fresnel reflection, and sun sparkle.
+The full handbook is indexed at [docs/README.md](docs/README.md):
 
-The renderer keeps the full-resolution source data but submits only the work visible to the current camera. Terrain uses a GPU visible-chunk indirection list and four skirted grid LODs. Close terrain retains the original tiled materials, while regional and overview distances blend into a faithful 2048-pixel-wide baked albedo with precomputed mipmaps instead of a simplified palette. Terrain lighting reads one precomputed signed normal sample rather than reconstructing a normal from the heightfield per fragment. Tree and building grounding is baked into the albedo alpha as ambient occlusion, replacing geometric contact-shadow draws. Roads and waterways share one packed RGBA navigation texture, reducing texture bindings and duplicate sampling. Generated prop records are ordered into 32×16 spatial chunks, with separate tree-family and building-archetype ranges; camera changes rebuild small visible-instance lists that batch each family/LOD into one draw. Cities retain roofed silhouettes through the regional view instead of switching to a box-only intermediate tier, while their existing far-distance cutoff remains unchanged. Distant prop geometry is never submitted. Horizontal world copies are selected consistently across terrain, props, roads, waterways, and borders. Country label instances and prop/terrain visibility are revision-cached, while hover raycasts run only after pointer or camera changes. F3 reports visible chunk and LOD counts alongside timing and triangle categories. Render resolution remains fixed apart from the existing device-pixel-ratio cap; there is no dynamic-resolution scaling.
+- [Auth server](docs/auth-server/README.md)
+- [Game server](docs/game-server/README.md)
+- [Browser client](docs/client/README.md)
+- [WebGPU renderer](docs/client/rendering.md)
+- [World generator](docs/world-generator/README.md)
+- [Development and QA](docs/development.md)
+- [Deployment](docs/deployment.md)
 
-Supplied movement rivers use dense five-lane explicit ribbons, while visual-only rivers use a twice-subdivided terrain-aware support mesh rather than the sea-level ocean plane. Both river classes share a subtle two-band flow-aligned shimmer driven by their existing direction and speed data. The visual-river fragment contour samples the linearly filtered source mask, removing whole-texel stair steps, and a guarded inner terrain cut prevents coarse terrain LOD triangles from bridging across either river class. A local lower-only terrain pass seats the surrounding sandy banks before the final road bake, so mountain crossings remain terrain-following valleys instead of holes or submerged water. The two authored canals remain in diagnostics but use the province-zero ocean-water channels directly, avoiding duplicate ribbons or offshore caps.
+Third-party asset terms are recorded in [visual/UI credits](docs/ASSET_CREDITS.md) and [audio credits](AUDIO_CREDITS.md).
 
-There is one road type in this milestone: a narrow dirt path. Each unique land-adjacent province pair receives one independent path between its two province centers. There are no infrastructure levels, importance classes, shared corridors, shared stems, gateway roads, plazas, or emitted local city streets. The two-channel strategic road field stores only core and verge coverage. Full-width route audits reject static-water incursions, and every road vertex independently samples the frozen terrain with a small deterministic lift.
+## Production notes
 
-Excessive incline is reported as a warning but no longer suppresses a road: steep trails use dense point-by-point terrain draping across hills and mountains. When a physical dirt road is omitted by the water or crossing audit, its logical connection remains visible as a thin floating amber dotted line. These indicators do not enter the road field, reserve clearance, or represent constructed infrastructure.
+The two Node services bind loopback only and expect a reverse proxy. Production needs HTTPS/WSS, exact `CLIENT_ORIGIN`, private internal game routes, high-entropy independent shared secrets, writable auth/game persistence, and an immutable world package/CDN with appropriate CORS.
+
+There is currently one authoritative game process, no horizontal scaling/leader election, no offline simulation catch-up, and no supplied container/proxy/service manifests. See [Deployment](docs/deployment.md) before exposing a build.
+
+## Source-of-truth rules
+
+- The game server is the sole gameplay writer.
+- The auth server is the sole credentials/session writer.
+- The client is a filtered replica and presentation layer.
+- The generated world package is immutable runtime input.
+- Shared wire changes start in `packages/protocol`.
+- Domain rules stay browser-free under `src/game` / `packages/game-core`.
+
+These boundaries are documented and partly enforced by architecture tests.

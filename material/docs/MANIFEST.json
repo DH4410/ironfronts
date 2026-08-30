@@ -17,11 +17,6 @@
       "sha256": "e6820941e570ac2db2dd74b121433ae635fd097ba3a67a11171cc2b979c442e4"
     },
     {
-      "path": "docs/PROVENANCE.md",
-      "bytes": 670,
-      "sha256": "c8a0008b54ba6ae8264e3bf0f7777bf1fe1794d4f85125479ede0428d92bb288"
-    },
-    {
       "path": "docs/TOPOLOGY_NOTES.md",
       "bytes": 1009,
       "sha256": "0a6886d81bab6f411851647e3782f9c6ef6825cd5634d6b765d8d8067e5f85a3"
