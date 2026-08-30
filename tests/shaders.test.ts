@@ -21,6 +21,16 @@ describe('WGSL programs', () => {
     expect(scale).toBeLessThanOrEqual(2.1);
   });
 
+  it('pulls towns and forests down to a strategic map scale', () => {
+    const footprint = Number(/BUILDING_FOOTPRINT_SCALE = ([\d.]+)/.exec(propShader)?.[1]);
+    const tree = Number(/TREE_MAP_SCALE = ([\d.]+)/.exec(propShader)?.[1]);
+    expect(footprint).toBeGreaterThan(0);
+    expect(footprint).toBeLessThanOrEqual(0.7);
+    expect(tree).toBeLessThanOrEqual(0.75);
+    // landmark buildings keep more of their bulk so a capital still reads
+    expect(propShader).toContain('archetype == 4u');
+  });
+
   it('draws order routes as a terrain-draped line mode with move / attack / retreat colours', () => {
     expect(lineShader).toContain('lineParams.mode == 3u');
     // draped along terrain, not floating at a fixed height
