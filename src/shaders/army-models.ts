@@ -101,16 +101,17 @@ fn armyModelVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_in
   let heading = model.b.w;
   let cosine = cos(heading);
   let sine = sin(heading);
-  // Map-scale strategic units: kept deliberately small so roads and towns still
-  // read. Selection/pick hitbox is on the flat marker, not the model, so this
-  // does not hurt selectability.
-  let scale = 2.85;
+  // Map-scale strategic units: kept deliberately small so roads, towns and the
+  // movement path still read at strategic zoom. Selection/pick hitbox is on the
+  // flat marker, not the model, so this does not hurt selectability.
+  let scale = 1.95;
   let local = (part.center + cube.position * part.halfSize) * scale;
   let rotated = vec3f(local.x * cosine - local.z * sine, local.y, local.x * sine + local.z * cosine);
   let motion = smoothstep(0.0, 1.0, (uniforms.sunTime.w - model.c.z) / 0.42);
   let centerXZ = mix(model.c.xy, model.a.xy, motion) + vec2f(copyOffset, 0.0);
   let ground = heightAt(centerXZ / uniforms.map.xy);
-  let worldPosition = vec3f(centerXZ.x + rotated.x, ground + rotated.y + 0.6, centerXZ.y + rotated.z);
+  // Ground lift tracks model scale so shrinking the unit doesn't leave it hovering.
+  let worldPosition = vec3f(centerXZ.x + rotated.x, ground + rotated.y + scale * 0.2, centerXZ.y + rotated.z);
   let normal = normalize(vec3f(cube.normal.x * cosine - cube.normal.z * sine, cube.normal.y, cube.normal.x * sine + cube.normal.z * cosine));
   var output: ModelOut;
   output.position = uniforms.viewProjection * vec4f(worldPosition, 1.0);

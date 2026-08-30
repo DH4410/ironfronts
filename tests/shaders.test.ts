@@ -15,6 +15,12 @@ describe('WGSL programs', () => {
     expect(armyMarkerShader).toContain('smoothstep(4400.0, 5000.0, zoom)');
   });
 
+  it('keeps strategic troop models small relative to roads and towns', () => {
+    const scale = Number(/let scale = ([\d.]+);/.exec(armyModelShader)?.[1]);
+    expect(scale).toBeGreaterThan(0);
+    expect(scale).toBeLessThanOrEqual(2.1);
+  });
+
   it('limits beach material to the actual shoreline mask', () => {
     expect(terrainShader).toContain('let bankField = bankFieldAt(input.mapUv)');
     expect(terrainShader).toContain('let shoreline = bankField.g');

@@ -966,15 +966,18 @@ function syncArmyMarkers(
       // strung along the heading while marching so the stack hugs the road
       // instead of sprawling across it. A small deterministic per-unit jitter
       // (0 A.D. calls it "sloppiness") keeps it from reading as a rigid grid.
+      // Tight so the stack reads as one force sitting on the road, not a mob
+      // sprawled across it. Marching = a near-single-file column along the
+      // heading with barely any lateral spread; resting = a small loose clump.
       const restSlots: ReadonlyArray<readonly [number, number]> = [
-        [-5, -4], [5, -3], [-4, 5], [4, 4.5],
+        [-3, -2.6], [3, -1.8], [-2.4, 3], [2.4, 2.8],
       ];
       const marchSlots: ReadonlyArray<readonly [number, number]> = [
-        [0, 7], [-2.5, 1], [2.5, -3], [-1, -8],
+        [0, 5.5], [-1.4, 1], [1.4, -2.5], [-0.5, -6],
       ];
       const slots = marching ? marchSlots : restSlots;
-      const jitterR = marching ? 1.8 : 3.0;
-      const jitterF = marching ? 3.6 : 3.0;
+      const jitterR = marching ? 0.9 : 1.9;
+      const jitterF = marching ? 2.8 : 2.2;
       const armyJitter = hashUnit(army.id);
       for (let index = 0; index < formation.length && modelCount < 4_096; index += 1) {
         const group = formation[index];
