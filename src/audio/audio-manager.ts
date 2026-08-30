@@ -87,11 +87,6 @@ export class AudioManager {
     );
   }
 
-  /** True once the AudioContext is running — i.e. the browser has let audio in. */
-  isAudioRunning(): boolean {
-    return this.context?.state === 'running';
-  }
-
   setVolume(bus: AudioBus, value: number): number {
     const volume = clampVolume(value);
     this.preferences = { ...this.preferences, [bus]: volume };
