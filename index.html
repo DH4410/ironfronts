@@ -217,8 +217,8 @@
 
       <div class="diagnostics__panel" data-debug-panel="world">
         <div class="time-controls">
-          <div class="time-controls__heading"><strong>TIME OF DAY</strong><output id="debug-time-state">Morning · 08:00</output></div>
-          <label class="time-controls__clock" for="debug-time">World clock
+          <div class="time-controls__heading"><strong>LIGHTING &mdash; VISUAL ONLY</strong><output id="debug-time-state">Morning · 08:00</output></div>
+          <label class="time-controls__clock" for="debug-time">Lighting clock
             <input id="debug-time" type="time" value="08:00" step="60" />
           </label>
           <div class="time-controls__presets" aria-label="Jump to time of day">
@@ -230,7 +230,7 @@
           <label class="time-controls__speed" for="debug-time-multiplier">Cycle multiplier
             <span><input id="debug-time-multiplier" type="number" value="1.0" min="0" max="999.9" step="0.1" inputmode="decimal" /><b>×</b></span>
           </label>
-          <small>1.0× completes a full day in 10 minutes. 0.0× freezes time.</small>
+          <small>Sun, sky and shadows only &mdash; the game clock, movement, combat and economy are unaffected. 1.0× = a full day in 10 min; 0.0× freezes the light.</small>
         </div>
         <div class="diagnostics__group weather-controls">
           <strong>WEATHER</strong>

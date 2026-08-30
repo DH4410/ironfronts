@@ -307,7 +307,10 @@ function showLoader(): void {
   loadingError.hidden = true;
   loadingFoot.hidden = false;
   loading.hidden = false;
-  debugToggle.hidden = !debugEnabled;
+  // The panel itself still starts closed (so `npm run dev` opens on the real
+  // player view), but in dev the toggle is visible so the visual lighting /
+  // time controls are one click away without needing the ?debug URL param.
+  debugToggle.hidden = !(debugEnabled || import.meta.env.DEV);
   mapModes.hidden = true;
 }
 
