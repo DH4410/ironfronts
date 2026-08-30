@@ -204,6 +204,7 @@ let currentLaunchCountryId = 0;
 const launchDisposers: Array<() => void> = [];
 let launchOutcome: { resolve: () => void; reject: (error: Error) => void } | null = null;
 let activeStopQuotes: (() => void) | null = null;
+let loaderHideTimer: number | undefined;
 let selectedArmyId: string | null = null;
 let awaitingMoveTarget = false;
 let targetingMode: 'move' | 'attack' | 'retreat' | 'split' | null = null;
@@ -285,7 +286,15 @@ function setLoadingStage(stage: string, progress?: number): void {
   }
 }
 
+function cancelLoaderHide(): void {
+  if (loaderHideTimer === undefined) return;
+  window.clearTimeout(loaderHideTimer);
+  loaderHideTimer = undefined;
+}
+
 function showLoader(): void {
+  cancelLoaderHide();
+  unsupported.hidden = true;
   loading.classList.remove('is-done');
   loadingError.hidden = true;
   loadingFoot.hidden = false;
@@ -295,11 +304,16 @@ function showLoader(): void {
 }
 
 function hideLoader(): void {
+  cancelLoaderHide();
   loading.classList.add('is-done');
-  window.setTimeout(() => { loading.hidden = true; }, 500);
+  loaderHideTimer = window.setTimeout(() => {
+    loaderHideTimer = undefined;
+    loading.hidden = true;
+  }, 500);
 }
 
 function showLaunchError(message: string): void {
+  cancelLoaderHide();
   loading.classList.remove('is-done');
   loading.hidden = false;
   loadingFoot.hidden = true;
@@ -321,6 +335,7 @@ async function teardownPartialLaunch(): Promise<void> {
   activeStopQuotes = null;
   void audio.setWindEnabled(false);
   void audio.setOceanEnabled(false);
+  void audio.setRainEnabled(false);
 }
 
 /**
@@ -348,7 +363,11 @@ async function runLaunch(countryId: number): Promise<void> {
       hideLoader();
       canvas.hidden = true;
       unsupported.hidden = false;
-      return; // onLaunch promise stays pending; there is nothing to enter.
+      // The unsupported screen is the terminal UI for this launch attempt, so
+      // settle the menu's launch promise instead of leaking it forever.
+      launchOutcome?.resolve();
+      launchOutcome = null;
+      return;
     }
 
     canvas.hidden = false;
@@ -408,6 +427,14 @@ async function startGame(token: number): Promise<void> {
   if (token !== launchToken) return;
   const renderer = new WorldRenderer(canvas, countryLabels, loadQuality());
   activeRenderer = renderer;
+
+  // Every DOM/debug listener below belongs to this renderer attempt. Retry or
+  // Return to Command aborts them in one shot so failed launches cannot retain
+  // an old renderer or stack duplicate handlers onto the next attempt.
+  const attemptEvents = new AbortController();
+  const attemptListener = { signal: attemptEvents.signal } as const;
+  launchDisposers.push(() => attemptEvents.abort());
+
   const disposeRendererOnPagehide = (event: PageTransitionEvent): void => {
     if (!event.persisted) renderer.dispose();
   };
@@ -529,32 +556,32 @@ async function startGame(token: number): Promise<void> {
   debugTime.addEventListener('change', () => {
     const hour = parseClock(debugTime.value);
     if (hour !== undefined) renderer.setTimeOfDay(hour);
-  });
+  }, attemptListener);
   for (const preset of debugTimePresets) {
-    preset.addEventListener('click', () => renderer.setTimeOfDay(Number(preset.dataset.debugTime)));
+    preset.addEventListener('click', () => renderer.setTimeOfDay(Number(preset.dataset.debugTime)), attemptListener);
   }
   const applyTimeMultiplier = () => {
     if (debugTimeMultiplier.value === '') return;
     const multiplier = renderer.setTimeMultiplier(Number(debugTimeMultiplier.value));
     debugTimeMultiplier.value = multiplier.toFixed(1);
   };
-  debugTimeMultiplier.addEventListener('change', applyTimeMultiplier);
-  debugTimeMultiplier.addEventListener('blur', applyTimeMultiplier);
+  debugTimeMultiplier.addEventListener('change', applyTimeMultiplier, attemptListener);
+  debugTimeMultiplier.addEventListener('blur', applyTimeMultiplier, attemptListener);
   debugRain.addEventListener('change', () => {
     renderer.setRainEnabled(debugRain.checked);
     void audio.setRainEnabled(debugRain.checked);
     uiStore.patch({ weather: { raining: debugRain.checked, label: debugRain.checked ? 'Rain' : 'Clear' } });
-  });
+  }, attemptListener);
   debugThunder.addEventListener('click', () => {
     void audio.playThunder();
-  });
+  }, attemptListener);
 
   for (const tab of debugTabs) {
     tab.addEventListener('click', () => {
       const selected = tab.dataset.debugTab;
       for (const candidate of debugTabs) candidate.setAttribute('aria-selected', String(candidate === tab));
       for (const panel of debugPanels) panel.hidden = panel.dataset.debugPanel !== selected;
-    });
+    }, attemptListener);
   }
 
   debugPlayerForm.addEventListener('submit', (event) => {
@@ -566,7 +593,7 @@ async function startGame(token: number): Promise<void> {
     }
     debugPlayerInput.value = '';
     setDiplomacyStatus(`Country flag switched to ${country.name}. Diplomatic placeholders were cleared.`);
-  });
+  }, attemptListener);
 
   const bindRelationForm = (
     form: HTMLFormElement,
@@ -584,7 +611,7 @@ async function startGame(token: number): Promise<void> {
       setDiplomacyStatus(relation === 'war'
         ? `${country.name} is now at war with you. Click its provinces to take them.`
         : `${country.name} is now allied with you.`);
-    });
+    }, attemptListener);
   };
   bindRelationForm(debugWarForm, debugWarInput, 'war');
   bindRelationForm(debugAlliedForm, debugAlliedInput, 'allied');
@@ -602,7 +629,7 @@ async function startGame(token: number): Promise<void> {
     diagnostics.hidden = !diagnostics.hidden;
     debugToggle.setAttribute('aria-expanded', String(!diagnostics.hidden));
   };
-  debugToggle.addEventListener('click', toggleDiagnostics);
+  debugToggle.addEventListener('click', toggleDiagnostics, attemptListener);
   window.addEventListener('keydown', (event) => {
     if (event.code === 'F3') {
       if (!debugEnabled) return;
@@ -616,17 +643,17 @@ async function startGame(token: number): Promise<void> {
     const count = debugView.options.length;
     debugView.selectedIndex = (debugView.selectedIndex + direction + count) % count;
     applyDebugView();
-  });
-  for (const input of mapModeInputs) input.addEventListener('change', applyMapMode);
+  }, attemptListener);
+  for (const input of mapModeInputs) input.addEventListener('change', applyMapMode, attemptListener);
   applyMapMode();
-  debugView.addEventListener('change', applyDebugView);
-  debugWireframe.addEventListener('change', () => renderer.setWireframe(debugWireframe.checked));
-  debugCountries.addEventListener('change', () => renderer.setCountryOverlayVisible(debugCountries.checked));
-  debugBorders.addEventListener('change', () => renderer.setBordersVisible(debugBorders.checked));
-  debugRoads.addEventListener('change', () => renderer.setRoadsVisible(debugRoads.checked));
-  debugHidden.addEventListener('change', () => renderer.setHiddenConnectionsVisible(debugHidden.checked));
-  debugWaterways.addEventListener('change', () => renderer.setWaterwaysVisible(debugWaterways.checked));
-  debugProps.addEventListener('change', () => renderer.setPropsVisible(debugProps.checked));
+  debugView.addEventListener('change', applyDebugView, attemptListener);
+  debugWireframe.addEventListener('change', () => renderer.setWireframe(debugWireframe.checked), attemptListener);
+  debugCountries.addEventListener('change', () => renderer.setCountryOverlayVisible(debugCountries.checked), attemptListener);
+  debugBorders.addEventListener('change', () => renderer.setBordersVisible(debugBorders.checked), attemptListener);
+  debugRoads.addEventListener('change', () => renderer.setRoadsVisible(debugRoads.checked), attemptListener);
+  debugHidden.addEventListener('change', () => renderer.setHiddenConnectionsVisible(debugHidden.checked), attemptListener);
+  debugWaterways.addEventListener('change', () => renderer.setWaterwaysVisible(debugWaterways.checked), attemptListener);
+  debugProps.addEventListener('change', () => renderer.setPropsVisible(debugProps.checked), attemptListener);
   debugConnections.addEventListener('change', async () => {
     debugConnections.disabled = true;
     try {
@@ -634,7 +661,7 @@ async function startGame(token: number): Promise<void> {
     } finally {
       debugConnections.disabled = false;
     }
-  });
+  }, attemptListener);
   debugRivers.addEventListener('change', async () => {
     debugRivers.disabled = true;
     try {
@@ -642,7 +669,7 @@ async function startGame(token: number): Promise<void> {
     } finally {
       debugRivers.disabled = false;
     }
-  });
+  }, attemptListener);
   // Any failure from here on propagates to runLaunch(), which tears the partial
   // attempt down and shows the loader's Retry / Return-to-Command error state.
   await withTimeout(
