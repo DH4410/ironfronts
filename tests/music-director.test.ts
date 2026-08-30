@@ -87,6 +87,26 @@ describe('music director', () => {
     expect(player.calls.at(-1)?.url).toContain('Ammon-Ra.ogg');
   });
 
+  it('plays every war track once before starting another cycle', async () => {
+    const player = new FakeMusicPlayer();
+    const director = new MusicDirector(player, { random: () => 0 });
+
+    await director.setState('war');
+    await director.setState('war', { force: true });
+    await director.setState('war', { force: true });
+    await director.setState('war', { force: true });
+
+    expect(player.calls.map((call) => call.url)).toEqual([
+      '/audio/music/Elusive_Predator.mp3',
+      expect.stringContaining('Helen_Leaves_Sparta.ogg'),
+      expect.stringContaining('Karmic_Confluence.ogg'),
+      expect.stringContaining('Rise_of_Macedon.ogg'),
+    ]);
+
+    await director.setState('war', { force: true });
+    expect(player.calls.at(-1)?.url).not.toContain('Rise_of_Macedon.ogg');
+  });
+
   it('stops and invalidates the current soundtrack state', async () => {
     const player = new FakeMusicPlayer();
     const director = new MusicDirector(player);
@@ -104,11 +124,9 @@ describe('music director', () => {
     player.failedFragments.add('Land_between_the_two_Seas');
     const director = new MusicDirector(player, { random: () => 0 });
 
-    // Autoplay blocked: state advances to "opening" but nothing actually plays.
     await director.setState('opening');
     expect(director.getState()).toBe('opening');
 
-    // Browser finally allows audio — recovery must resume OPENING, not menu.
     player.failedFragments.clear();
     player.calls.length = 0;
     await director.resyncPlayback();
