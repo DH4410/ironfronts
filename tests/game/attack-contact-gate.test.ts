@@ -39,21 +39,21 @@ const ctx = (armies: ArmyStack[]): { state: GameState; world: WorldData } => ({ 
 describe('direct army attack requires a fully identified target', () => {
   it('rejects a strike on a contact-range detection without leaking its position', () => {
     const c = ctx([army('p', 1, 0, 0), army('e', 2, 130, 0)]);
-    const result = issueAttack(c as never, { type: 'attackArmy', armyId: 'p', target: { kind: 'army', armyId: 'e' } });
+    const result = issueAttack(c as never, { type: 'attackArmy', countryId: 1, armyId: 'p', target: { kind: 'army', armyId: 'e' } });
     expect(result.ok).toBe(false);
     expect(result.reason).toMatch(/only a contact/i);
   });
 
   it('rejects a strike on an undetected target', () => {
     const c = ctx([army('p', 1, 0, 0), army('e', 2, 5_000, 0)]);
-    const result = issueAttack(c as never, { type: 'attackArmy', armyId: 'p', target: { kind: 'army', armyId: 'e' } });
+    const result = issueAttack(c as never, { type: 'attackArmy', countryId: 1, armyId: 'p', target: { kind: 'army', armyId: 'e' } });
     expect(result.ok).toBe(false);
     expect(result.reason).toMatch(/no longer detected/i);
   });
 
   it('passes the identification gate for a target in direct view', () => {
     const c = ctx([army('p', 1, 0, 0), army('e', 2, 60, 0)]);
-    const result = issueAttack(c as never, { type: 'attackArmy', armyId: 'p', target: { kind: 'army', armyId: 'e' } });
+    const result = issueAttack(c as never, { type: 'attackArmy', countryId: 1, armyId: 'p', target: { kind: 'army', armyId: 'e' } });
     // It may still fail later for lack of a movement graph, but not on identification.
     expect(result.reason ?? '').not.toMatch(/contact|detected/i);
   });
