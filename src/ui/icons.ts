@@ -34,7 +34,9 @@ export type IconName =
   | 'resource-overlay' | 'close' | 'focus' | 'expand' | 'system'
   | 'weather-clear' | 'weather-rain'
   | 'note-warning' | 'note-combat' | 'note-completed' | 'note-diplomacy' | 'note-information'
-  | 'node-stone' | 'node-metal' | 'node-oil' | 'resource-water';
+  | 'node-stone' | 'node-metal' | 'node-oil' | 'resource-water'
+  | 'cmd-move' | 'cmd-attack' | 'cmd-retreat' | 'cmd-split' | 'cmd-stop' | 'cmd-extract'
+  | 'stat-health' | 'stat-attack' | 'stat-defence' | 'stat-speed' | 'stat-troops';
 
 interface IconDef { readonly kind: 'img' | 'svg'; readonly value: string; }
 
@@ -70,6 +72,18 @@ const ICONS: Record<IconName, IconDef> = {
   'node-metal': { kind: 'img', value: png('metal') },
   'node-oil': { kind: 'svg', value: svg('oil') },
   'resource-water': { kind: 'img', value: ironfrontsPng('water') },
+  // Authored monochrome army command + stat glyphs (inherit currentColor).
+  'cmd-move': { kind: 'svg', value: svg('move') },
+  'cmd-attack': { kind: 'svg', value: svg('attack') },
+  'cmd-retreat': { kind: 'svg', value: svg('retreat') },
+  'cmd-split': { kind: 'svg', value: svg('split') },
+  'cmd-stop': { kind: 'svg', value: svg('stop') },
+  'cmd-extract': { kind: 'svg', value: svg('pickaxe') },
+  'stat-health': { kind: 'svg', value: svg('heart') },
+  'stat-attack': { kind: 'svg', value: svg('crossed-blades') },
+  'stat-defence': { kind: 'svg', value: svg('shield') },
+  'stat-speed': { kind: 'svg', value: svg('speed') },
+  'stat-troops': { kind: 'svg', value: svg('troops') },
 };
 
 export function createIcon(name: IconName, className = ''): HTMLElement {

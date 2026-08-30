@@ -7,7 +7,7 @@
  * dev / `?debug` fixture only, gated by the caller.
  */
 
-import { createIcon, iconMarkup } from './icons';
+import { createIcon, iconMarkup, type IconName } from './icons';
 import type { ArmyStackView, CombatStatus } from './ui-state';
 
 export type { ArmyStackView, CombatStatus } from './ui-state';
@@ -98,9 +98,27 @@ function createUnitGlyph(typeId: string, label: string): SVGSVGElement {
   return svg;
 }
 
-function appendStat(host: HTMLElement, label: string, value: string): void {
+/** A labelled proportion bar for the combat overview (ours vs enemy strength). */
+function strengthBar(label: string, current: number, baseline: number, modifier: string): HTMLElement {
+  const pct = baseline > 0 ? Math.max(0, Math.min(100, Math.round((current / baseline) * 100))) : 0;
+  const row = node('div', `ifg-army-panel__front-bar ${modifier}`);
+  row.append(node('span', 'ifg-army-panel__front-bar-label', label));
+  const track = node('span', 'ifg-army-panel__front-bar-track');
+  const fill = node('i');
+  fill.style.width = `${pct}%`;
+  track.append(fill);
+  row.append(track, node('b', undefined, `${pct}%`));
+  row.title = `${label}: ${Math.ceil(current)} / ${Math.ceil(baseline)} HP`;
+  return row;
+}
+
+function appendStat(host: HTMLElement, label: string, value: string, icon?: IconName): void {
   const stat = node('span', 'ifg-army-stat');
-  stat.append(node('small', undefined, label), node('b', undefined, value));
+  stat.title = `${label}: ${value}`;
+  const key = node('span', 'ifg-army-stat__key');
+  if (icon) key.append(createIcon(icon, 'ifg-army-stat__icon'));
+  key.append(node('small', undefined, label));
+  stat.append(key, node('b', undefined, value));
   host.append(stat);
 }
 
@@ -126,7 +144,9 @@ export function renderSelectedArmyPanel(
   header.append(node('span', 'ifg-army-panel__header-spacer'), identity, close);
 
   const health = node('section', 'ifg-army-panel__health');
-  health.append(node('small', 'ifg-army-panel__eyebrow', 'Health'));
+  const healthEyebrow = node('small', 'ifg-army-panel__eyebrow');
+  healthEyebrow.append(createIcon('stat-health', 'ifg-army-panel__eyebrow-icon'), document.createTextNode('Health'));
+  health.append(healthEyebrow);
   if (army.identified === false) {
     health.append(node('b', 'ifg-army-panel__health-value', '--'), node('span', 'ifg-army-panel__unknown', 'Unknown strength'));
   } else {
@@ -140,14 +160,19 @@ export function renderSelectedArmyPanel(
   }
 
   const commands = node('div', 'ifg-army-panel__commands ifg-army-panel__commands--primary');
+  // Icon-first: the glyph carries the meaning, a short caption sits under it, and
+  // the full label + explanation live on aria-label / title for a11y and hover.
   const command = (
-    label: string, key: ArmyPanelCommand, enabled: boolean, active = false, title?: string,
+    label: string, caption: string, icon: IconName, key: ArmyPanelCommand,
+    enabled: boolean, active = false, title?: string,
   ): HTMLButtonElement => {
-    const button = node('button', 'ifg-army-panel__command', label);
+    const button = node('button', 'ifg-army-panel__command');
     button.type = 'button';
     button.disabled = !enabled;
     button.classList.toggle('is-active', active);
-    if (title) button.title = title;
+    button.setAttribute('aria-label', label);
+    button.title = title ? `${label} — ${title}` : label;
+    button.append(createIcon(icon, 'ifg-army-panel__command-icon'), node('span', 'ifg-army-panel__command-label', caption));
     if (enabled) button.addEventListener('click', () => onCommand(key));
     return button;
   };
@@ -160,13 +185,20 @@ export function renderSelectedArmyPanel(
       : army.combat === 'retreating'
         ? 'The stack is already withdrawing.'
         : 'Retreat opens once the stack is locked in close combat.';
+    const moveActive = army.targetingMode === 'move';
+    const attackActive = army.targetingMode === 'attack';
+    const retreatActive = army.targetingMode === 'retreat';
+    const splitActive = army.targetingMode === 'split';
     commands.append(
-      command(army.targetingMode === 'move' ? 'Select destination' : 'Move', 'move', army.canMove === true, army.targetingMode === 'move'),
-      command(army.targetingMode === 'attack' ? 'Select target' : 'Attack', 'attack', army.canAttack === true, army.targetingMode === 'attack'),
-      command(army.targetingMode === 'retreat' ? 'Select exit' : 'Retreat', 'retreat', army.canRetreat === true, army.targetingMode === 'retreat', retreatHint),
-      command(army.targetingMode === 'split' ? 'Select destination' : 'Split', 'split', army.canSplit === true, army.targetingMode === 'split'),
-      command('Stop', 'stop', army.canStop === true),
-      command('Extract', 'extract', army.canExtract === true),
+      command('Move', moveActive ? 'Pick spot' : 'Move', 'cmd-move', 'move', army.canMove === true, moveActive,
+        'Right-click a destination in your territory or a discovered area.'),
+      command('Attack', attackActive ? 'Pick target' : 'Attack', 'cmd-attack', 'attack', army.canAttack === true, attackActive,
+        'Advance to contact against an enemy force or province.'),
+      command('Retreat', retreatActive ? 'Pick exit' : 'Retreat', 'cmd-retreat', 'retreat', army.canRetreat === true, retreatActive, retreatHint),
+      command('Split', splitActive ? 'Pick spot' : 'Split', 'cmd-split', 'split', army.canSplit === true, splitActive,
+        'Detach part of the stack into a new force.'),
+      command('Stop', 'Stop', 'cmd-stop', 'stop', army.canStop === true, false, 'Cancel the current order and hold.'),
+      command('Extract', 'Extract', 'cmd-extract', 'extract', army.canExtract === true, false, 'Work the resource deposit under this stack.'),
     );
   }
 
@@ -199,17 +231,17 @@ export function renderSelectedArmyPanel(
   stats.append(node('small', 'ifg-army-panel__eyebrow', 'Troop stats'));
   const statGrid = node('div', 'ifg-army-panel__stat-grid');
   if (army.identified === false) {
-    appendStat(statGrid, 'Troops', '--');
-    appendStat(statGrid, 'Attack', '--');
-    appendStat(statGrid, 'Defence', '--');
-    appendStat(statGrid, 'Speed', '--');
+    appendStat(statGrid, 'Troops', '--', 'stat-troops');
+    appendStat(statGrid, 'Attack', '--', 'stat-attack');
+    appendStat(statGrid, 'Defence', '--', 'stat-defence');
+    appendStat(statGrid, 'Speed', '--', 'stat-speed');
   } else {
-    appendStat(statGrid, 'Troops', String(army.unitCount));
+    appendStat(statGrid, 'Troops', String(army.unitCount), 'stat-troops');
     const profile = (value: typeof army.attack): string => value
       ? `${Math.round(value.soft)} / ${Math.round(value.light)} / ${Math.round(value.heavy)}` : '--';
-    appendStat(statGrid, 'Attack S/L/H', profile(army.attack));
-    appendStat(statGrid, 'Defence S/L/H', profile(army.defense));
-    appendStat(statGrid, 'Speed', army.speed === undefined ? '--' : String(Math.round(army.speed)));
+    appendStat(statGrid, 'Attack S/L/H', profile(army.attack), 'stat-attack');
+    appendStat(statGrid, 'Defence S/L/H', profile(army.defense), 'stat-defence');
+    appendStat(statGrid, 'Speed', army.speed === undefined ? '--' : String(Math.round(army.speed)), 'stat-speed');
   }
   stats.append(statGrid);
 
@@ -222,25 +254,34 @@ export function renderSelectedArmyPanel(
     activity.append(node('small', 'ifg-army-panel__eyebrow', 'Combat overview'));
     for (const front of army.battleFronts) {
       const line = node('article', 'ifg-army-panel__front');
-      line.append(
-        node('strong', undefined, `${front.role === 'attack' ? 'Attack' : 'Defence'} · direction ${front.directionNodeId}`),
-        node('span', undefined, `Friendly ${Math.ceil(front.friendlyHp)} / ${Math.ceil(front.friendlyBaselineHp)} HP · ${remaining(front.friendlyNextVolleyTick)}`),
-        node('span', undefined, `Enemy ${Math.ceil(front.enemyHp)} / ${Math.ceil(front.enemyBaselineHp)} HP · ${remaining(front.enemyNextVolleyTick)}`),
-        node('small', undefined, front.reinforcementCount ? `${front.reinforcementCount} reinforcing army(s)` : 'No reinforcements'),
+      const head = node('div', 'ifg-army-panel__front-head');
+      head.append(
+        node('strong', undefined, front.role === 'attack' ? 'Attacking' : 'Defending'),
+        node('span', 'ifg-army-panel__front-volley', `Next volley ${remaining(front.friendlyNextVolleyTick)}`),
       );
+      line.append(head);
+      line.append(strengthBar('Ours', front.friendlyHp, front.friendlyBaselineHp, 'is-friendly'));
+      line.append(strengthBar('Enemy', front.enemyHp, front.enemyBaselineHp, 'is-enemy'));
+      if (front.reinforcementCount) {
+        line.append(node('small', 'ifg-army-panel__front-note', `+${front.reinforcementCount} reinforcing`));
+      }
       activity.append(line);
     }
-    // One button per *distinct* escape direction (the server already collapses
-    // the raw per-province routes and tags each with a compass bearing), not one
-    // per graph node — that used to spill 25 look-alike buttons into the panel.
+    // One chip per *distinct* escape direction (the server already collapses the
+    // raw per-province routes and tags each with a compass bearing), not one per
+    // graph node — that used to spill 25 look-alike buttons into the panel.
     if (army.legalRetreatExits && army.legalRetreatExits.length > 1) {
       const box = node('div', 'ifg-army-panel__retreat');
       box.append(node('small', 'ifg-army-panel__eyebrow', `Retreat routes · ${army.legalRetreatExits.length} open`));
       const exits = node('div', 'ifg-army-panel__retreat-exits');
       for (const [index, exit] of army.legalRetreatExits.entries()) {
         const label = exit.bearing ? `Withdraw ${exit.bearing}` : `Route ${index + 1}`;
-        const chip = command(label, `retreat:${exit.firstNodeId}`, true);
-        chip.classList.add('ifg-army-panel__retreat-chip');
+        const chip = node('button', 'ifg-army-panel__command ifg-army-panel__retreat-chip');
+        chip.type = 'button';
+        chip.append(createIcon('cmd-retreat', 'ifg-army-panel__command-icon'), node('span', 'ifg-army-panel__command-label', label));
+        chip.setAttribute('aria-label', label);
+        chip.title = label;
+        chip.addEventListener('click', () => onCommand(`retreat:${exit.firstNodeId}`));
         exits.append(chip);
       }
       box.append(exits);

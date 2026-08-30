@@ -635,18 +635,13 @@
   background: rgba(22, 20, 17, .78);
 }
 .ifg-army-panel__front { display: grid; gap: 2px; margin-top: 6px; padding: 6px 7px; border-left: 2px solid #a6543d; background: rgba(0,0,0,.18); }
-.ifg-army-panel__front span, .ifg-army-panel__front small { font-size: 10px; color: var(--ifg-ink-muted); }
 .ifg-army-panel__retreat { margin-top: 8px; }
 .ifg-army-panel__retreat > .ifg-army-panel__eyebrow { display: block; margin-bottom: 5px; }
 .ifg-army-panel__retreat-exits { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 0; }
-/* Direction chips must not collapse to slivers the way `flex: 1` command
-   buttons do — they size to their label and wrap as whole chips. */
-.ifg-army-panel__retreat-chip {
-  flex: 0 0 auto;
-  min-width: 82px;
-  padding: 5px 9px;
-  white-space: nowrap;
-}
+/* Direction chips size to their label and wrap as whole chips — they must not
+   collapse to slivers the way `flex: 1` command buttons do. (Row layout + final
+   sizing is set alongside `.ifg-army-panel__command` further down.) */
+.ifg-army-panel__retreat-chip { white-space: nowrap; }
 
 .ifg-command-dialog {
   width: min(440px, calc(100vw - 32px));
@@ -667,19 +662,48 @@
 .ifg-army-panel__command {
   flex: 1;
   min-width: 0;
-  padding: 6px 5px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 4px 5px;
   color: var(--ifg-text);
   background: var(--ifg-chip);
   border: 1px solid var(--ifg-rule-soft);
   border-radius: 2px;
-  font-size: 8.5px;
-  letter-spacing: 0.08em;
+}
+.ifg-army-panel__command-icon { width: 17px; height: 17px; color: inherit; }
+.ifg-army-panel__command-label {
+  font-size: 8px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  color: var(--ifg-dim);
 }
 .ifg-army-panel__command:not(:disabled):hover,
 .ifg-army-panel__command.is-active { color: var(--ifg-brass-lit); border-color: var(--ifg-brass); }
+.ifg-army-panel__command:not(:disabled):hover .ifg-army-panel__command-label,
+.ifg-army-panel__command.is-active .ifg-army-panel__command-label { color: var(--ifg-brass-lit); }
 .ifg-army-panel__command.is-active { background: rgba(201, 164, 99, 0.18); }
 .ifg-army-panel__command:disabled { opacity: 0.32; }
+
+/* stat rows: small key icon + label on the left, value on the right */
+.ifg-army-stat__key { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.ifg-army-stat__icon { width: 12px; height: 12px; color: var(--ifg-dim); flex: none; }
+.ifg-army-panel__eyebrow-icon { width: 11px; height: 11px; margin-right: 4px; vertical-align: -1px; color: inherit; }
+
+/* combat overview: visual strength bars instead of raw HP text */
+.ifg-army-panel__front-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ifg-army-panel__front-head strong { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: #e6a088; }
+.ifg-army-panel__front-volley { font-size: 9px; color: var(--ifg-dim); font-variant-numeric: tabular-nums; }
+.ifg-army-panel__front-bar { display: grid; grid-template-columns: 34px 1fr 30px; align-items: center; gap: 6px; margin-top: 4px; }
+.ifg-army-panel__front-bar-label { font-size: 8px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ifg-dim); }
+.ifg-army-panel__front-bar-track { height: 6px; background: #090b08; border: 1px solid var(--ifg-rule-soft); }
+.ifg-army-panel__front-bar-track i { display: block; height: 100%; }
+.ifg-army-panel__front-bar.is-friendly i { background: linear-gradient(90deg, #677f49, #9eb66a); }
+.ifg-army-panel__front-bar.is-enemy i { background: linear-gradient(90deg, #8a3d30, #c9603f); }
+.ifg-army-panel__front-bar b { font-size: 9px; font-variant-numeric: tabular-nums; text-align: right; }
+.ifg-army-panel__front-note { display: block; margin-top: 4px; color: var(--ifg-dim); font-size: 9px; }
+.ifg-army-panel__retreat-chip { flex: 0 0 auto; flex-direction: row; gap: 5px; padding: 5px 9px; min-width: 88px; }
 
 /* ---- province card: deposit abundance (not production/day) ---- */
 .ifg-card__resources {
