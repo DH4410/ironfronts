@@ -129,5 +129,29 @@ describe('reload / Continue lockout', () => {
       expect(handler).toContain('rendererStarted = false');
       expect(handler).toContain('.reject(');
     });
+
+    it('settles the launch promise on the no-WebGPU terminal path', () => {
+      const start = main.indexOf('if (!navigator.gpu)');
+      const block = main.slice(start, start + 500);
+      expect(block).toContain('launchOutcome?.resolve()');
+      expect(block).toContain('launchOutcome = null');
+    });
+
+    it('cancels stale loader-hide timers before a retry can show the loader again', () => {
+      expect(main).toContain('let loaderHideTimer: number | undefined');
+      expect(main).toContain('function cancelLoaderHide(): void');
+      const showStart = main.indexOf('function showLoader(): void');
+      const show = main.slice(showStart, showStart + 350);
+      expect(show).toContain('cancelLoaderHide()');
+    });
+
+    it('aborts renderer-attempt DOM listeners during teardown', () => {
+      const start = main.indexOf('const attemptEvents = new AbortController()');
+      const body = main.slice(start, start + 6000);
+      expect(body).toContain('launchDisposers.push(() => attemptEvents.abort())');
+      expect(body).toContain('attemptListener');
+      expect(body).toContain("debugToggle.addEventListener('click', toggleDiagnostics, attemptListener)");
+      expect(body).toContain("window.addEventListener('keydown'");
+    });
   });
 });
