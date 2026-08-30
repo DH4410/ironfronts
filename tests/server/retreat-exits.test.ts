@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bearingLabel, retreatExitsForClient } from '../../apps/game-server/src/projection';
+import { bearingLabel, orderRouteForClient, retreatExitsForClient } from '../../apps/game-server/src/projection';
 
 describe('bearingLabel', () => {
   it('maps world deltas to an 8-point compass (north = -z, east = +x)', () => {
@@ -50,5 +50,20 @@ describe('retreatExitsForClient', () => {
       { nodeX: [99_990], nodeZ: [0] }, 100_000, 5, 0,
     );
     expect(exits[0].bearing).toBe('W');
+  });
+});
+
+describe('orderRouteForClient', () => {
+  const graph = { nodeX: [10, 40, 40, 80], nodeZ: [0, 0, 30, 30] };
+
+  it('prefixes the live army position and walks the remaining path nodes', () => {
+    const route = orderRouteForClient({ path: [1, 2, 3] }, graph, 5, -2);
+    expect(route).toEqual([
+      { x: 5, z: -2 }, { x: 40, z: 0 }, { x: 40, z: 30 }, { x: 80, z: 30 },
+    ]);
+  });
+
+  it('returns null for an order whose path has been consumed', () => {
+    expect(orderRouteForClient({ path: [] }, graph, 0, 0)).toBeNull();
   });
 });

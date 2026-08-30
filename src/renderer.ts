@@ -162,6 +162,10 @@ export class WorldRenderer {
    *  The static `mapMarkers` layer carries junctions/towns only. */
   private gameResourceMarkers?: InstanceLayer;
   private static readonly RESOURCE_MARKER_CAPACITY = 4_096;
+  /** Own-army movement/attack routes (line mode 3), one LineRecord per segment. */
+  private routeLines?: InstanceLayer;
+  private static readonly ROUTE_SEGMENT_CAPACITY = 4_096;
+  private static readonly ROUTE_MAX_DISTANCE = 6_400;
   /** Flat (ax, az, bx, bz) edges of the movement/road graph — junction input. */
   private connectionGraph?: Float32Array;
   /** World-space centres of the more populous provinces (junction spacing). */
@@ -922,6 +926,31 @@ export class WorldRenderer {
     this.gameResourceMarkers = this.createInstanceLayer(
       'game resource markers', zeroR.buffer as ArrayBuffer, 0, 0, this.lineLayout,
     );
+    const zeroRoutes = new Float32Array(WorldRenderer.ROUTE_SEGMENT_CAPACITY * 8);
+    this.routeLines = this.createInstanceLayer(
+      'order routes', zeroRoutes.buffer as ArrayBuffer, 0, 3, this.lineLayout,
+    );
+  }
+
+  /**
+   * Replace the drawn order-route polylines. `records` is 8 floats per segment
+   * (LineRecord: a = x0,z0,x1,z1; b = colorFlag, dim, retreatFlag, 0), where
+   * colorFlag 0 = move / 1 = attack, dim > 0.5 = a non-selected army's route,
+   * retreatFlag > 0.5 = withdrawal. One buffer write, no pipeline churn.
+   */
+  setOrderRoutes(records: Float32Array, count: number): void {
+    if (!this.routeLines) return;
+    const capped = Math.min(count, WorldRenderer.ROUTE_SEGMENT_CAPACITY);
+    if (capped > 0) {
+      this.device.queue.writeBuffer(
+        this.routeLines.buffer, 0,
+        records.buffer as ArrayBuffer, records.byteOffset, capped * 8 * 4,
+      );
+    }
+    this.device.queue.writeBuffer(
+      this.routeLines.params, 0, new Uint32Array([Math.max(1, capped), 3, 1, 0]),
+    );
+    this.routeLines.count = capped;
   }
 
   /** Replace the authoritative resource-deposit markers. `records` is 4 floats
@@ -1364,6 +1393,15 @@ export class WorldRenderer {
       pass.setBindGroup(1, this.waterwayNetwork.bindGroup);
       const instances = this.waterwayNetwork.count * WORLD_COPY_INDICES.length;
       pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.waterwayNetwork.count);
+      this.recordTriangleDraw('debugLines', instances * 2, instances);
+    }
+    // Own-army movement / attack routes: authoritative road path, terrain-draped,
+    // only below strategic altitude (declutters the overview).
+    if (this.routeLines && this.routeLines.count > 0
+      && this.camera.distance < WorldRenderer.ROUTE_MAX_DISTANCE) {
+      pass.setBindGroup(1, this.routeLines.bindGroup);
+      const instances = this.routeLines.count * WORLD_COPY_INDICES.length;
+      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.routeLines.count);
       this.recordTriangleDraw('debugLines', instances * 2, instances);
     }
 

@@ -28,14 +28,20 @@ export function projectFor(
   const armies = Object.fromEntries(Object.keys(state.armies).flatMap((armyId) => {
     const army = projectArmyView(state, world, viewerCountryId, armyId, visibility);
     if (!army) return [];
-    const projected = graph && army.own && army.status === 'engaged'
-      ? {
-        ...army,
+    let projected = army;
+    if (graph && army.own && army.status === 'engaged') {
+      projected = {
+        ...projected,
         legalRetreatExits: retreatExitsForClient(
           legalRetreatPaths({ state, world, graph }, army.id), graph, world.width, army.x, army.z,
         ),
-      }
-      : army;
+      };
+    }
+    if (graph && army.own) {
+      const order = state.armies[army.id]?.order;
+      const route = order && orderRouteForClient(order, graph, army.x, army.z);
+      if (route) projected = { ...projected, moveRoute: route, moveIntent: order!.intent };
+    }
     return [[army.id, projected]];
   }));
   const resourceNodes = Object.fromEntries(
@@ -98,6 +104,23 @@ export function bearingLabel(dx: number, dz: number): string {
  * the nearest safe destination) and tag each with a compass bearing so the UI
  * can offer "withdraw NE / withdraw S" instead of 25 numbered buttons.
  */
+/**
+ * World-space polyline for an own army's active order: its live position, then
+ * every remaining road-graph node up to the destination. Returns null when the
+ * order carries no path (e.g. an already-arrived order still being cleaned up).
+ */
+export function orderRouteForClient(
+  order: { path: readonly number[] },
+  graph: { nodeX: ArrayLike<number>; nodeZ: ArrayLike<number> },
+  armyX: number, armyZ: number,
+): Array<{ x: number; z: number }> | null {
+  if (!order.path.length) return null;
+  return [
+    { x: armyX, z: armyZ },
+    ...Array.from(order.path, (nodeId) => ({ x: graph.nodeX[nodeId], z: graph.nodeZ[nodeId] })),
+  ];
+}
+
 export function retreatExitsForClient(
   routes: ReadonlyArray<{ firstNodeId: number; destinationProvinceId: number }>,
   graph: { nodeX: ArrayLike<number>; nodeZ: ArrayLike<number> },

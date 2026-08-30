@@ -60,6 +60,11 @@ export interface ProjectedArmy {
     groups: ReadonlyArray<{ typeId: string; count: number; health: number }>;
   };
   moveOrder: { x: number; z: number } | null;
+  /** Authoritative road-graph route for an own army's active order (world-space
+   *  points, army position first, destination last). Absent/[] for foreign or
+   *  idle stacks. */
+  moveRoute?: ReadonlyArray<{ x: number; z: number }>;
+  moveIntent?: 'move' | 'attack';
   suspendedOrder?: { x: number; z: number; intent: 'move' | 'attack' } | null;
   battleFronts?: ReadonlyArray<{
     id: string;

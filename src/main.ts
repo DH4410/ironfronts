@@ -853,6 +853,8 @@ async function bootstrapGameSession(
 const armyMarkerScratch = new Float32Array(8 * 1_024);
 const armyModelScratch = new Float32Array(12 * 4_096);
 const resourceMarkerScratch = new Float32Array(4 * 4_096);
+/** LineRecord (8 f32) per own-army route segment — see renderer.setOrderRoutes. */
+const routeScratch = new Float32Array(8 * 4_096);
 const RESOURCE_KIND_INDEX: Record<'stone' | 'metal' | 'oil', number> = { stone: 0, metal: 1, oil: 2 };
 
 /** Push the deposit set the PLAYER may see (own-controlled + anything inside
@@ -910,11 +912,36 @@ function syncArmyMarkers(
   let count = 0;
   let modelCursor = 0;
   let modelCount = 0;
+  let routeCursor = 0;
+  let routeCount = 0;
   const activeModelKeys = new Set<string>();
   armyPickScratch.length = 0;
   for (const army of Object.values(session.state.armies)) {
     if (count >= 1_024) break;
     const identified = army.contact === 'visible';
+
+    // Own-army authoritative route polyline (move = cream, attack = red,
+    // retreating = amber; the selected army's route is bright, others faint).
+    if (army.own && army.moveRoute && army.moveRoute.length >= 2) {
+      const colorFlag = army.moveIntent === 'attack' ? 1 : 0;
+      const dim = army.id === selectedArmyId ? 0 : 1;
+      const retreatFlag = army.status === 'retreating' ? 1 : 0;
+      for (let i = 0; i + 1 < army.moveRoute.length && routeCount < 4_096; i += 1) {
+        const a = army.moveRoute[i];
+        const b = army.moveRoute[i + 1];
+        routeScratch[routeCursor] = a.x;
+        routeScratch[routeCursor + 1] = a.z;
+        routeScratch[routeCursor + 2] = b.x;
+        routeScratch[routeCursor + 3] = b.z;
+        routeScratch[routeCursor + 4] = colorFlag;
+        routeScratch[routeCursor + 5] = dim;
+        routeScratch[routeCursor + 6] = retreatFlag;
+        routeScratch[routeCursor + 7] = 0;
+        routeCursor += 8;
+        routeCount += 1;
+      }
+    }
+
     const formation = identified ? buildArmyFormation(army.composition?.groups ?? []) : [];
     armyMarkerScratch[cursor] = army.x;
     armyMarkerScratch[cursor + 1] = army.z;
@@ -960,7 +987,22 @@ function syncArmyMarkers(
     if (identified && formation.length) {
       const target = army.moveOrder;
       const marching = Boolean(target);
-      const heading = target ? Math.atan2(target.x - army.x, -(target.z - army.z)) : 0;
+      // Head along the actual first leg of the authoritative road route (own
+      // armies only) so the column sits on the road even where it bends;
+      // fall back to a straight line at the destination.
+      const route = army.moveRoute;
+      const worldW = renderer.manifest?.world.width ?? 0;
+      let heading = 0;
+      if (route && route.length >= 2) {
+        let legDx = route[1].x - route[0].x;
+        if (worldW) {
+          if (legDx > worldW / 2) legDx -= worldW;
+          else if (legDx < -worldW / 2) legDx += worldW;
+        }
+        heading = Math.atan2(legDx, -(route[1].z - route[0].z));
+      } else if (target) {
+        heading = Math.atan2(target.x - army.x, -(target.z - army.z));
+      }
       const forwardX = Math.sin(heading);
       const forwardZ = -Math.cos(heading);
       const rightX = Math.cos(heading);
@@ -1021,6 +1063,7 @@ function syncArmyMarkers(
     if (!activeModelKeys.has(key)) previousArmyModelPositions.delete(key);
   }
   renderer.setArmyMarkers(armyMarkerScratch, count, armyPickScratch, armyModelScratch, modelCount);
+  renderer.setOrderRoutes(routeScratch, routeCount);
 }
 
 function showGameConfirmation(title: string, message: string): Promise<boolean> {

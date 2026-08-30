@@ -58,6 +58,11 @@ export interface PlayerArmyView {
   } | null;
   /** Destination of the active move order — own armies only. */
   readonly moveOrder: { readonly x: number; readonly z: number } | null;
+  /** Authoritative road-graph route for an own army's active order, world-space
+   *  points from the army's position to the destination. Server projection fills
+   *  it (it owns the graph); [] here. */
+  readonly moveRoute?: ReadonlyArray<{ readonly x: number; readonly z: number }>;
+  readonly moveIntent?: 'move' | 'attack';
   readonly suspendedOrder?: { readonly x: number; readonly z: number; readonly intent: 'move' | 'attack' } | null;
   readonly battleFronts?: ReadonlyArray<{
     id: string;
@@ -164,6 +169,8 @@ export function projectArmyView(
     status: fullyVisible ? army.status : 'unknown',
     composition: fullyVisible ? composition(army) : null,
     moveOrder: own && army.order ? { x: army.order.destX, z: army.order.destZ } : null,
+    moveRoute: [],
+    moveIntent: own && army.order ? army.order.intent : undefined,
     suspendedOrder: own && army.suspendedOrder
       ? { x: army.suspendedOrder.destX, z: army.suspendedOrder.destZ, intent: army.suspendedOrder.intent }
       : null,

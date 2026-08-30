@@ -21,6 +21,16 @@ describe('WGSL programs', () => {
     expect(scale).toBeLessThanOrEqual(2.1);
   });
 
+  it('draws order routes as a terrain-draped line mode with move / attack / retreat colours', () => {
+    expect(lineShader).toContain('lineParams.mode == 3u');
+    // draped along terrain, not floating at a fixed height
+    expect(lineShader).toMatch(/mode == 3u\)?\s*\{[\s\S]*heightAt\(uv0\) \+ 2\.1/);
+    // move vs attack select + a retreat override branch
+    expect(lineShader).toMatch(/line\.b\.x > 0\.5/);
+    expect(lineShader).toContain('if (line.b.z > 0.5)');
+    expect(lineShader).toContain('if (line.b.y > 0.5)');
+  });
+
   it('limits beach material to the actual shoreline mask', () => {
     expect(terrainShader).toContain('let bankField = bankFieldAt(input.mapUv)');
     expect(terrainShader).toContain('let shoreline = bankField.g');
