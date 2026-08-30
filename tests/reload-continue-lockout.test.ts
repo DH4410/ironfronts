@@ -147,11 +147,12 @@ describe('reload / Continue lockout', () => {
 
     it('aborts renderer-attempt DOM listeners during teardown', () => {
       const start = main.indexOf('const attemptEvents = new AbortController()');
-      const body = main.slice(start, start + 6000);
-      expect(body).toContain('launchDisposers.push(() => attemptEvents.abort())');
-      expect(body).toContain('attemptListener');
-      expect(body).toContain("debugToggle.addEventListener('click', toggleDiagnostics, attemptListener)");
-      expect(body).toContain("window.addEventListener('keydown'");
+      const setup = main.slice(start, start + 400);
+      expect(setup).toContain('launchDisposers.push(() => attemptEvents.abort())');
+      expect(setup).toContain('const attemptListener = { signal: attemptEvents.signal }');
+      // The renderer-scoped debug listeners opt into the attempt's AbortSignal.
+      expect(main).toContain("debugToggle.addEventListener('click', toggleDiagnostics, attemptListener)");
+      expect(main).toMatch(/window\.addEventListener\('keydown', \(event\) => \{[\s\S]{0,700}\}, attemptListener\);/);
     });
   });
 });
