@@ -44,6 +44,17 @@ export class MusicDirector {
     return this.state;
   }
 
+  /**
+   * Re-attempt playback for the CURRENT logical state after the browser finally
+   * allowed audio (the initial autoplay attempt may have set the state without
+   * a track ever starting). Does not change state and is safe to call
+   * repeatedly; a no-op when no state is active.
+   */
+  async resyncPlayback(): Promise<void> {
+    if (this.state === null) return;
+    await this.setState(this.state, { force: true });
+  }
+
   async setState(next: MusicState, options: { force?: boolean } = {}): Promise<void> {
     if (this.state === next && next !== 'victory' && !options.force) return;
 

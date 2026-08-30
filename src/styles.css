@@ -60,6 +60,10 @@ body { user-select: none; }
   transition: opacity .5s ease;
 }
 .loading.is-done { opacity: 0; pointer-events: none; }
+/* `hidden` must actually hide the loader. Without this the fixed, full-bleed
+   `.loading` layer renders from first paint (behind the menu) and is revealed
+   with its stale initial markup the moment the menu is hidden on launch. */
+.loading[hidden] { display: none; }
 
 .loading__backdrop { position: absolute; inset: -6%; }
 .loading__backdrop::before {
@@ -123,6 +127,26 @@ body { user-select: none; }
 .loading__line { display: flex; justify-content: space-between; margin-bottom: 9px; font-size: 10px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; color: #d8cdb2; text-shadow: 0 2px 12px #20383c; }
 .loading__track { height: 2px; overflow: hidden; background: rgba(255,255,255,.18); }
 .loading__track span { display: block; width: 0; height: 100%; background: #c9a463; transition: width .25s ease; }
+
+/* Launch failure state — shown in place of the progress line so the player is
+   never left staring at a frozen loader. */
+.loading__error { position: relative; z-index: 1; width: min(520px, calc(100vw - 48px)); margin-bottom: 5vh; text-align: center; }
+.loading__error[hidden] { display: none; }
+.loading__error-eyebrow { margin: 0 0 .5em; font-family: "Cinzel Decorative", Georgia, serif; font-size: 11px; font-weight: 700; letter-spacing: .3em; text-transform: uppercase; color: #d08c5a; }
+.loading__error-message { margin: 0 0 1.4em; font-family: "Special Elite", "Courier New", monospace; font-size: .95em; line-height: 1.55; color: #e6dcc4; }
+.loading__error-actions { display: flex; gap: 10px; justify-content: center; }
+.loading__error-actions button {
+  padding: 9px 16px;
+  font: 650 11px/1 "Cinzel Decorative", Georgia, serif;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: #ded3ba;
+  background: #302c25;
+  border: 1px solid #665a47;
+  cursor: pointer;
+}
+.loading__error-actions button.is-primary { background: #713c30; border-color: #a45a44; color: #f1ead6; }
+.loading__error-actions button:focus-visible { outline: 2px solid rgba(242, 223, 174, .76); outline-offset: 2px; }
 
 .tooltip {
   position: fixed;

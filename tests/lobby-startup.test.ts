@@ -13,7 +13,9 @@ describe('lightweight lobby startup', () => {
 
   it('loads the renderer only after the player launches an operation', () => {
     const main = readFileSync(path.join(root, 'src/main.ts'), 'utf8');
-    expect(main).toContain("await import('./renderer')");
+    // The renderer module graph is still loaded lazily, only once the player
+    // commits to an operation (now wrapped in a launch-timeout guard).
+    expect(main).toMatch(/(await |withTimeout\()import\('\.\/renderer'\)/);
     expect(main).toContain("import type { WorldRenderer, MapMode, TimeOfDayState } from './renderer';");
     expect(main).not.toMatch(/import\s+\{\s*WorldRenderer[,}]/);
   });

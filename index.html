@@ -156,9 +156,17 @@
         <blockquote id="loading-quote-text"></blockquote>
         <cite id="loading-quote-source"></cite>
       </div>
-      <div class="loading__foot">
-        <div class="loading__line"><span id="loading-stage">Preparing WebGPU</span><span id="loading-value">0%</span></div>
+      <div class="loading__foot" id="loading-foot">
+        <div class="loading__line"><span id="loading-stage">Connecting to command server</span><span id="loading-value">0%</span></div>
         <div class="loading__track"><span id="loading-bar"></span></div>
+      </div>
+      <div class="loading__error" id="loading-error" hidden>
+        <p class="loading__error-eyebrow">Deployment failed</p>
+        <p class="loading__error-message" id="loading-error-message">The operation could not be reached.</p>
+        <div class="loading__error-actions">
+          <button type="button" id="loading-retry" class="is-primary">Retry</button>
+          <button type="button" id="loading-return">Return to command</button>
+        </div>
       </div>
     </section>
 

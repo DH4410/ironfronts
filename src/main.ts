@@ -88,6 +88,11 @@ const loadingBar = required<HTMLElement>('loading-bar');
 const loadingKind = required<HTMLElement>('loading-kind');
 const loadingQuoteText = required<HTMLElement>('loading-quote-text');
 const loadingQuoteSource = required<HTMLElement>('loading-quote-source');
+const loadingFoot = required<HTMLElement>('loading-foot');
+const loadingError = required<HTMLElement>('loading-error');
+const loadingErrorMessage = required<HTMLElement>('loading-error-message');
+const loadingRetry = required<HTMLButtonElement>('loading-retry');
+const loadingReturn = required<HTMLButtonElement>('loading-return');
 const tooltip = required<HTMLElement>('tooltip');
 const tooltipName = required<HTMLElement>('tooltip-name');
 const tooltipTerrain = required<HTMLElement>('tooltip-terrain');
@@ -148,19 +153,36 @@ const firstMenuTrack = TRACK_BY_ID.get('honor-bound');
 audio.prime(firstMenuTrack ? trackSources(firstMenuTrack).slice(0, 1) : []);
 audio.installLifecycle();
 
-// Try to start the lobby soundtrack immediately when the page opens. Browsers
-// may still block audible autoplay, so the first user gesture retries only if
-// playback did not actually begin.
-void music.setState('menu');
+// Try to start the lobby soundtrack immediately when the page opens. This is
+// fire-and-forget: the browser is allowed to block audible autoplay after a
+// navigation/refresh, and nothing in the app may ever wait on it.
+void music.setState('menu').catch(() => undefined);
 
-let autoplayRetryDone = false;
-const retryMenuMusicAfterAutoplayBlock = (): void => {
-  if (autoplayRetryDone || audio.isMusicPlaying()) return;
-  autoplayRetryDone = true;
-  void music.setState('menu', { force: true });
+// Refresh-safe audio activation (concept adapted from PR #46). The listeners
+// stay attached rather than firing once: an early resume() can be rejected or
+// left pending by the autoplay policy, so every genuine gesture gets a chance
+// to activate audio — and to recover playback for whatever musical state is
+// current now, not always "menu". The gesture still does its normal job; this
+// runs alongside it and never blocks it.
+let audioActivationInFlight = false;
+let audioPlaybackRecovered = false;
+const recoverAudioAfterGesture = (): void => {
+  if (audioActivationInFlight || (audioPlaybackRecovered && audio.isMusicPlaying())) return;
+  audioActivationInFlight = true;
+  void (async () => {
+    try {
+      if (!await audio.unlock()) return;
+      if (!audio.isMusicPlaying()) await music.resyncPlayback();
+      if (audio.isMusicPlaying()) audioPlaybackRecovered = true;
+    } catch {
+      // Audio failure degrades to silence, never to a broken UI.
+    } finally {
+      audioActivationInFlight = false;
+    }
+  })();
 };
-document.addEventListener('pointerdown', retryMenuMusicAfterAutoplayBlock, { capture: true, once: true });
-document.addEventListener('keydown', retryMenuMusicAfterAutoplayBlock, { capture: true, once: true });
+document.addEventListener('pointerdown', recoverAudioAfterGesture, { capture: true });
+document.addEventListener('keydown', recoverAudioAfterGesture, { capture: true });
 
 window.addEventListener('pagehide', (event) => {
   if (!event.persisted) {
@@ -173,6 +195,15 @@ let rendererStarted = false;
 let activeRenderer: WorldRenderer | undefined;
 let activeSession: RemoteGameSession | undefined;
 let activeConnection: GameConnection | undefined;
+// Launch lifecycle: a monotonically increasing token invalidates a superseded
+// attempt (Retry / Return to Command), a disposer list tears an aborted attempt
+// down cleanly, and `launchOutcome` bridges to the menu's `onLaunch` promise so
+// "Return to Command" restores the menu via its existing rejection path.
+let launchToken = 0;
+let currentLaunchCountryId = 0;
+const launchDisposers: Array<() => void> = [];
+let launchOutcome: { resolve: () => void; reject: (error: Error) => void } | null = null;
+let activeStopQuotes: (() => void) | null = null;
 let selectedArmyId: string | null = null;
 let awaitingMoveTarget = false;
 let targetingMode: 'move' | 'attack' | 'retreat' | 'split' | null = null;
@@ -196,41 +227,143 @@ mountMenu({
   lobby,
   username: authenticated.account!.username,
   onLogout: () => { void logout().finally(() => window.location.replace('/login.html')); },
-  onLaunch: async (countryId: number) => {
-    if (rendererStarted) return;
+  onLaunch: (countryId: number) => new Promise<void>((resolve, reject) => {
+    if (rendererStarted) { resolve(); return; }
     rendererStarted = true;
-    try {
-      if (lobby.assignedCountryId === null) await joinGame(countryId);
-      await music.setState('opening');
-
-    // The lobby is deliberately lightweight. The world canvas, loading scene,
-    // renderer module graph, WebGPU device and world assets are all deferred
-    // until the player actually commits to an operation.
-    if (!navigator.gpu) {
-      loading.hidden = true;
-      canvas.hidden = true;
-      unsupported.hidden = false;
-    } else {
-      canvas.hidden = false;
-      loading.hidden = false;
-      loadingStage.textContent = 'Loading renderer';
-      loadingValue.textContent = '0%';
-      loadingBar.style.width = '0%';
-      debugToggle.hidden = !debugEnabled;
-      // The legacy MAP OVERLAY fieldset stays in the DOM (main.ts reads its
-      // radios) but is superseded by the in-game map-mode toolbar.
-      mapModes.hidden = true;
-      uiStore.patch({ phase: 'loading' });
-      await start();
-    }
-    } catch (error) {
-      rendererStarted = false;
-      throw error;
-    }
-  },
+    currentLaunchCountryId = countryId;
+    launchOutcome = { resolve, reject };
+    // Audio must NEVER gate entering the game — a silent game beats a stuck one.
+    void music.setState('opening').catch(() => undefined);
+    void runLaunch(countryId);
+  }),
   // In the lobby this only persists; once the renderer exists it applies live.
   onGraphicsQuality: (level) => activeRenderer?.setQuality(level),
 });
+
+loadingRetry.addEventListener('click', () => {
+  loadingError.hidden = true;
+  loadingFoot.hidden = false;
+  void runLaunch(currentLaunchCountryId);
+});
+loadingReturn.addEventListener('click', () => {
+  void (async () => {
+    launchToken += 1;
+    await teardownPartialLaunch();
+    loadingError.hidden = true;
+    loadingFoot.hidden = false;
+    hideLoader();
+    canvas.hidden = true;
+    uiStore.patch({ phase: 'lobby' });
+    rendererStarted = false;
+    const outcome = launchOutcome;
+    launchOutcome = null;
+    // Rejecting the menu's onLaunch promise triggers its own menu-restore path.
+    outcome?.reject(new Error('Returned to command.'));
+  })();
+});
+
+/** Reject a promise if it has not settled within `ms`. */
+function withTimeout<T>(work: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(
+      () => reject(new Error(`${label} timed out after ${Math.round(ms / 1_000)}s.`)),
+      ms,
+    );
+    work.then(
+      (value) => { window.clearTimeout(timer); resolve(value); },
+      (error: unknown) => { window.clearTimeout(timer); reject(error instanceof Error ? error : new Error(String(error))); },
+    );
+  });
+}
+
+function setLoadingStage(stage: string, progress?: number): void {
+  loadingStage.textContent = stage;
+  if (progress !== undefined) {
+    const percentage = Math.max(0, Math.min(100, Math.round(progress * 100)));
+    loadingValue.textContent = `${percentage}%`;
+    loadingBar.style.width = `${percentage}%`;
+  }
+}
+
+function showLoader(): void {
+  loading.classList.remove('is-done');
+  loadingError.hidden = true;
+  loadingFoot.hidden = false;
+  loading.hidden = false;
+  debugToggle.hidden = !debugEnabled;
+  mapModes.hidden = true;
+}
+
+function hideLoader(): void {
+  loading.classList.add('is-done');
+  window.setTimeout(() => { loading.hidden = true; }, 500);
+}
+
+function showLaunchError(message: string): void {
+  loading.classList.remove('is-done');
+  loading.hidden = false;
+  loadingFoot.hidden = true;
+  loadingErrorMessage.textContent = message || 'The operation could not be reached.';
+  loadingError.hidden = false;
+}
+
+/** Roll back everything a failed / abandoned launch attempt created. */
+async function teardownPartialLaunch(): Promise<void> {
+  for (const dispose of launchDisposers.splice(0)) {
+    try { dispose(); } catch (error) { console.warn('[launch] disposer failed', error); }
+  }
+  try { activeConnection?.close(); } catch (error) { console.warn('[launch] connection close failed', error); }
+  activeConnection = undefined;
+  try { activeRenderer?.dispose(); } catch (error) { console.warn('[launch] renderer dispose failed', error); }
+  activeRenderer = undefined;
+  activeSession = undefined;
+  activeStopQuotes?.();
+  activeStopQuotes = null;
+  void audio.setWindEnabled(false);
+  void audio.setOceanEnabled(false);
+}
+
+/**
+ * Full launch lifecycle. Every awaited step is time-bounded and any failure —
+ * from joinGame through bootstrapGameSession — lands on the loader's error
+ * state (Retry / Return to Command) instead of an indefinite hang.
+ */
+async function runLaunch(countryId: number): Promise<void> {
+  const token = (launchToken += 1);
+  showLoader();
+  if (!activeStopQuotes) activeStopQuotes = startLoadingQuotes();
+  uiStore.patch({ phase: 'loading' });
+  setLoadingStage('Connecting to command server', 0);
+
+  try {
+    if (lobby.assignedCountryId === null) {
+      setLoadingStage('Registering for the operation', 0.02);
+      await withTimeout(joinGame(countryId), 15_000, 'Joining the campaign');
+      lobby.assignedCountryId = countryId;
+    }
+
+    // Renderer module graph, WebGPU device and world assets are all deferred
+    // until the player actually commits to an operation.
+    if (!navigator.gpu) {
+      hideLoader();
+      canvas.hidden = true;
+      unsupported.hidden = false;
+      return; // onLaunch promise stays pending; there is nothing to enter.
+    }
+
+    canvas.hidden = false;
+    await startGame(token);
+    if (token !== launchToken) return; // superseded by Retry / Return
+
+    launchOutcome?.resolve();
+    launchOutcome = null;
+  } catch (error) {
+    if (token !== launchToken) return; // superseded — ignore this attempt's failure
+    console.error('[launch] failed', error);
+    await teardownPartialLaunch();
+    showLaunchError(error instanceof Error ? error.message : String(error));
+  }
+}
 
 function startLoadingQuotes(): () => void {
   const order = LOADING_QUOTES.map((_, i) => i);
@@ -251,9 +384,13 @@ function startLoadingQuotes(): () => void {
   return () => window.clearInterval(timer);
 }
 
-async function start(): Promise<void> {
-  const stopQuotes = startLoadingQuotes();
-  const connection = await GameConnection.open();
+async function startGame(token: number): Promise<void> {
+  const connection = await withTimeout(
+    GameConnection.open((stage) => setLoadingStage(stage, 0.08)),
+    20_000,
+    'Connecting to command server',
+  );
+  if (token !== launchToken) { connection.close(); return; }
   activeConnection = connection;
   configureWorldAssetBase(connection.world.assetBaseUrl);
   const session = new RemoteGameSession(connection, (reason) => {
@@ -266,12 +403,16 @@ async function start(): Promise<void> {
 
   // Keep the complete renderer/world module graph out of the lobby bundle.
   // This import is the first point at which world rendering code is loaded.
-  const { WorldRenderer } = await import('./renderer');
+  setLoadingStage('Loading renderer', 0.12);
+  const { WorldRenderer } = await withTimeout(import('./renderer'), 30_000, 'Loading the renderer');
+  if (token !== launchToken) return;
   const renderer = new WorldRenderer(canvas, countryLabels, loadQuality());
   activeRenderer = renderer;
-  window.addEventListener('pagehide', (event) => {
+  const disposeRendererOnPagehide = (event: PageTransitionEvent): void => {
     if (!event.persisted) renderer.dispose();
-  });
+  };
+  window.addEventListener('pagehide', disposeRendererOnPagehide);
+  launchDisposers.push(() => window.removeEventListener('pagehide', disposeRendererOnPagehide));
   if (import.meta.env.DEV || debugEnabled) {
     // Invisible automation handle (QA capture / perf scripts). Not a player-
     // facing affordance.
@@ -319,8 +460,13 @@ async function start(): Promise<void> {
     rallyPoint: (provinceId, action) => handleRally(provinceId, action),
   };
   const gameUi = mountGameUi(uiStore, gameUiActions);
-  window.addEventListener('pagehide', (event) => {
+  const destroyGameUiOnPagehide = (event: PageTransitionEvent): void => {
     if (!event.persisted) gameUi.destroy();
+  };
+  window.addEventListener('pagehide', destroyGameUiOnPagehide);
+  launchDisposers.push(() => {
+    window.removeEventListener('pagehide', destroyGameUiOnPagehide);
+    try { gameUi.destroy(); } catch (error) { console.warn('[launch] gameUi destroy failed', error); }
   });
 
   let oceanAudible = false;
@@ -497,63 +643,52 @@ async function start(): Promise<void> {
       debugRivers.disabled = false;
     }
   });
-  try {
-    await renderer.initialize((stage, progress) => {
-      const percentage = Math.round(progress * 100);
-      loadingStage.textContent = stage;
-      loadingValue.textContent = `${percentage}%`;
-      loadingBar.style.width = `${percentage}%`;
-    });
-    debugCountryNames.replaceChildren(...renderer.getCountries()
-      .slice()
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((country) => {
-        const option = document.createElement('option');
-        option.value = country.name;
-        return option;
-      }));
-    applyDebugView();
-    void audio.setWindEnabled(true);
-    loading.classList.add('is-done');
-    stopQuotes();
-    window.setTimeout(() => { loading.hidden = true; }, 500);
-    renderer.start();
+  // Any failure from here on propagates to runLaunch(), which tears the partial
+  // attempt down and shows the loader's Retry / Return-to-Command error state.
+  await withTimeout(
+    renderer.initialize((stage, progress) => setLoadingStage(stage, 0.12 + progress * 0.8)),
+    90_000,
+    'Preparing the renderer',
+  );
+  if (token !== launchToken) return;
+  debugCountryNames.replaceChildren(...renderer.getCountries()
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((country) => {
+      const option = document.createElement('option');
+      option.value = country.name;
+      return option;
+    }));
+  applyDebugView();
+  void audio.setWindEnabled(true);
+  setLoadingStage('Deploying forces', 0.95);
+  renderer.start();
 
-    // ---- Authoritative game session (Phase A wiring) -----------------
-    // The renderer is now a data source + presentation cache; GameSession owns
-    // gameplay state. Build WorldData from the loaded package and start the
-    // fixed-step simulation.
-    try {
-      await bootstrapGameSession(renderer, session);
-    } catch (sessionError) {
-      console.error('GameSession bootstrap failed; renderer stays up.', sessionError);
-    }
+  // ---- Authoritative game session (Phase A wiring) -----------------
+  // The renderer is now a data source + presentation cache; GameSession owns
+  // gameplay state. Build WorldData from the loaded package and start the
+  // fixed-step simulation.
+  await withTimeout(bootstrapGameSession(renderer, session), 30_000, 'Deploying forces');
+  if (token !== launchToken) return;
 
-    // Hand the HUD its opening state from real renderer/game values.
-    const clock = session.readClock();
-    uiStore.patch({
-      phase: 'in-game',
-      clock,
-      quality: renderer.graphicsQuality,
-      effectiveRenderScale: renderer.effectiveRenderScale,
-      weather: { raining: renderer.isRainEnabled(), label: renderer.isRainEnabled() ? 'Rain' : 'Clear' },
-    });
-    if (debugEnabled) {
-      // Dev-only fixtures so screenshots / component tests have content. Never
-      // shown in production gameplay.
-      uiStore.patch({ notifications: DEMO_NOTIFICATIONS, selectedArmy: DEMO_ARMY });
-    }
-  } catch (error) {
-    stopQuotes();
-    void audio.setWindEnabled(false);
-    void audio.setOceanEnabled(false);
-    console.error(error);
-    loading.hidden = true;
-    unsupported.hidden = false;
-    const title = unsupported.querySelector('h1');
-    const message = unsupported.querySelector('p:last-child');
-    if (title) title.textContent = 'The world could not be rendered.';
-    if (message) message.textContent = error instanceof Error ? error.message : String(error);
+  setLoadingStage('Entering operation', 1);
+  activeStopQuotes?.();
+  activeStopQuotes = null;
+  hideLoader();
+
+  // Hand the HUD its opening state from real renderer/game values.
+  const clock = session.readClock();
+  uiStore.patch({
+    phase: 'in-game',
+    clock,
+    quality: renderer.graphicsQuality,
+    effectiveRenderScale: renderer.effectiveRenderScale,
+    weather: { raining: renderer.isRainEnabled(), label: renderer.isRainEnabled() ? 'Rain' : 'Clear' },
+  });
+  if (debugEnabled) {
+    // Dev-only fixtures so screenshots / component tests have content. Never
+    // shown in production gameplay.
+    uiStore.patch({ notifications: DEMO_NOTIFICATIONS, selectedArmy: DEMO_ARMY });
   }
 }
 
@@ -649,14 +784,20 @@ async function bootstrapGameSession(
     else if (event.key === 'Escape') { deselectArmy(); }
   };
   window.addEventListener('keydown', onKey);
-  window.addEventListener('pagehide', (event) => {
-    if (!event.persisted) {
-      window.clearInterval(hudTimer);
-      window.clearInterval(civilClockTimer);
-      window.removeEventListener('keydown', onKey);
-      if (activeSession === session) activeSession = undefined;
-      activeConnection?.close();
-    }
+  const teardownSession = (): void => {
+    window.clearInterval(hudTimer);
+    window.clearInterval(civilClockTimer);
+    window.removeEventListener('keydown', onKey);
+    if (activeSession === session) activeSession = undefined;
+  };
+  const teardownSessionOnPagehide = (event: PageTransitionEvent): void => {
+    if (!event.persisted) { teardownSession(); activeConnection?.close(); }
+  };
+  window.addEventListener('pagehide', teardownSessionOnPagehide);
+  // Also reachable from Retry / Return to Command before the game is entered.
+  launchDisposers.push(() => {
+    window.removeEventListener('pagehide', teardownSessionOnPagehide);
+    teardownSession();
   });
 
   console.info(

@@ -77,7 +77,19 @@ export class AudioManager {
   }
 
   isMusicPlaying(): boolean {
-    return Boolean(this.currentMusic && !this.currentMusic.element.paused);
+    // The <audio> element can report "not paused" while the Web Audio graph it
+    // routes through is suspended (silent). Treat playback as real only when the
+    // context is actually running.
+    return Boolean(
+      this.context?.state === 'running'
+      && this.currentMusic
+      && !this.currentMusic.element.paused,
+    );
+  }
+
+  /** True once the AudioContext is running — i.e. the browser has let audio in. */
+  isAudioRunning(): boolean {
+    return this.context?.state === 'running';
   }
 
   setVolume(bus: AudioBus, value: number): number {
@@ -94,14 +106,32 @@ export class AudioManager {
   }
 
   async unlock(): Promise<boolean> {
-    if (this.unlocked && this.context?.state === 'running') return true;
+    const context = this.ensureContext();
+    if (!context) return false;
+
+    // If the browser already resumed the context (its own autoplay unlock on a
+    // real gesture, or a prior attempt that finally landed), reflect that now
+    // and drop any stale in-flight attempt. A single early resume() that never
+    // settles must not be able to poison every later caller.
+    if (context.state === 'running') {
+      this.unlocked = true;
+      this.unlockInFlight = undefined;
+      return true;
+    }
+    this.unlocked = false;
     if (this.unlockInFlight) return this.unlockInFlight;
 
     this.unlockInFlight = (async () => {
       try {
-        const context = this.ensureContext();
-        if (!context) return false;
-        if (context.state === 'suspended') await context.resume();
+        if (context.state === 'suspended') {
+          // Under the autoplay policy a resume() issued without an activation
+          // can stay pending indefinitely. Bound it: whatever the outcome,
+          // report the real context state and let the next gesture try again.
+          await Promise.race([
+            context.resume().catch(() => undefined),
+            new Promise<void>((resolve) => { window.setTimeout(resolve, 2_000); }),
+          ]);
+        }
         this.unlocked = context.state === 'running';
         return this.unlocked;
       } catch {
@@ -121,13 +151,12 @@ export class AudioManager {
    * not also pay the network/decode cost.
    */
   prime(musicUrls: readonly string[] = []): void {
-    // Lobby music gets first claim on bandwidth. The two large paper samples
-    // are intentionally left lazy so they cannot delay the first soundtrack.
+    // Lobby music gets first claim on bandwidth.
     for (const url of musicUrls) this.prepareMusic(url);
-    for (const cue of ['hover', 'confirm', 'back'] as const) {
-      const url = UI_SAMPLE_URLS[cue];
-      if (url) void this.loadBuffer(url);
-    }
+
+    // Do not decode UI samples here: loadBuffer() calls ensureContext(), and we
+    // want zero Web Audio work on the passive page-load path. UI cues are small
+    // and decode lazily on the first activated click. (Adapted from PR #46.)
   }
 
   prepareMusic(url: string): void {
@@ -360,11 +389,16 @@ export class AudioManager {
     this.visibilityCleanup?.();
     const onVisibilityChange = () => {
       const context = this.context;
-      if (!context || !this.unlocked) return;
-      if (targetDocument.hidden) {
-        void context.suspend().catch(() => undefined);
-      } else {
-        void context.resume().catch(() => undefined);
+      if (!context) return;
+      // Deliberately do NOT suspend the context when the tab is hidden: the
+      // soundtrack is meant to keep playing in a background tab. Only re-assert
+      // a running context when the tab comes back (the OS/browser may have
+      // suspended it under power-saving) and keep `unlocked` in step with the
+      // real state.
+      if (!targetDocument.hidden) {
+        void context.resume()
+          .then(() => { this.unlocked = context.state === 'running'; })
+          .catch(() => undefined);
       }
     };
     targetDocument.addEventListener('visibilitychange', onVisibilityChange);

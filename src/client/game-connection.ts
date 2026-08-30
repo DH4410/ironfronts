@@ -22,13 +22,14 @@ export class GameConnection extends EventTarget {
   private commandSequence = 0;
   private readonly pending = new Map<string, PendingCommand>();
 
-  static async open(): Promise<GameConnection> {
+  static async open(onStage?: (stage: string) => void): Promise<GameConnection> {
     const connection = new GameConnection();
-    await connection.connect();
+    await connection.connect(onStage);
     return connection;
   }
 
-  private async connect(): Promise<void> {
+  private async connect(onStage?: (stage: string) => void): Promise<void> {
+    onStage?.('Contacting command server');
     const descriptor = await connectGame();
     if (descriptor.protocolVersion !== PROTOCOL_VERSION) throw new Error('The game uses an unsupported protocol version.');
     await new Promise<void>((resolve, reject) => {
@@ -36,13 +37,17 @@ export class GameConnection extends EventTarget {
       this.socket = socket;
       let ready = false;
       const timeout = window.setTimeout(() => reject(new Error('Game connection timed out.')), 10_000);
-      socket.addEventListener('open', () => socket.send(JSON.stringify({
-        type: 'authenticate', protocolVersion: PROTOCOL_VERSION, ticket: descriptor.ticket,
-      })));
+      socket.addEventListener('open', () => {
+        onStage?.('Authenticating operation');
+        socket.send(JSON.stringify({
+          type: 'authenticate', protocolVersion: PROTOCOL_VERSION, ticket: descriptor.ticket,
+        }));
+      });
       socket.addEventListener('message', (event) => {
         const message: ServerMessage = serverMessageSchema.parse(JSON.parse(String(event.data)));
         if (message.type === 'hello') {
           if (message.protocolVersion !== PROTOCOL_VERSION) { reject(new Error('Protocol mismatch.')); socket.close(); return; }
+          onStage?.('Receiving battlefield state');
           this.world = message.world;
         } else if (message.type === 'baseline') {
           this.state = message.state;
