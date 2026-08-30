@@ -50,12 +50,34 @@ from `lipis/flag-icons` at ref `main`, path `flags/4x3/<code>.svg`.
 Codes vendored: `at be bg ch cz de dk eg es et fi fr gb gr ie ir is it jp
 lu nl no nz pl pt ro sa se tr za`.
 
-**Note on historical accuracy:** these are **modern** national flags used as
-a first pass. `src/ui/flags.ts` is a registry keyed by in-game country name,
-so scenario-specific / 1939-era flags can be substituted later without
-touching the components. In particular `de.svg` is the modern
-black-red-gold tricolour — Ironfronts deliberately does **not** vendor
-1933–1945 German state symbology.
+**Historical accuracy:** `src/ui/flags.ts` maps each in-game country to a
+**September 1939** flag. Where a nation's flag is unchanged since 1939 (plain
+tricolours, Nordic crosses, the Hinomaru, the Union Jack) the flag-icons file
+above is used directly. Where it differs, a period flag is vendored from
+Wikimedia Commons — see the next section and `docs/flags.md`. The leftover
+modern flag-icons files (`de.svg`, `it.svg`, `gr.svg`, …) stay vendored only as
+fallbacks and are not referenced for those countries.
+
+---
+
+## Historical national flags — Wikimedia Commons
+
+**Source:** Wikimedia Commons, retrieved 2026-08-30 via
+`commons.wikimedia.org/wiki/Special:FilePath/`.
+**Licence:** Public domain (PD-old — pre-1929 designs and/or expired government
+works). Each file carries its source URL and licence in a leading XML comment.
+
+Vendored under `src/ui/assets/flags/`, unmodified:
+`de-1935-1945` (Germany, 1935–45 national flag — period-accurate for the
+scenario, incl. the swastika, per the campaign brief),
+`it-1861-1946` (Kingdom of Italy), `su-1936-1955` (USSR),
+`gr-1935-1970` (Greece, royalist land flag), `yu-1918-1941` (Kingdom of
+Yugoslavia), `eg-1922-1958` (Kingdom of Egypt), `iq-1921-1959` (Kingdom of
+Iraq), `ir-1925-1979` (Imperial Persia, Lion and Sun),
+`za-1928-1994` (Union of South Africa), `et-empire` (Ethiopian Empire),
+`cn-roc` (Republic of China), `manchukuo` (Manchukuo).
+
+Full per-entity rationale, colony→metropole mapping and known gaps: `docs/flags.md`.
 
 ---
 

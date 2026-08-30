@@ -6,6 +6,7 @@ import {
 } from '../graphics/quality';
 import type { GameLobby } from '@ironfronts/protocol';
 import { assignedCountry as resolveAssignedCountry, selectableCountries } from './lobby-state';
+import { resolveFlagUrl } from '../ui/flags';
 
 export interface MenuHandlers {
   /**
@@ -291,7 +292,15 @@ export function mountMenu(handlers: MenuHandlers): void {
       button.classList.toggle('is-selected', selected);
       const flag = document.createElement('span');
       flag.className = 'ifm__country-flag';
-      flag.setAttribute('style', `background:${country.color}`);
+      const flagUrl = resolveFlagUrl(country.name);
+      if (flagUrl) {
+        flag.style.backgroundImage = `url("${flagUrl}")`;
+      } else {
+        // No period-accurate flag for this entity — a colour standard, not a
+        // wrong flag. (docs/flags.md explains which entities these are.)
+        flag.classList.add('is-standard');
+        flag.style.background = country.color;
+      }
       const body = document.createElement('span');
       body.className = 'ifm__country-body';
       const name = document.createElement('span');
