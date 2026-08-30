@@ -24,11 +24,15 @@
 .ifm button { font: inherit; color: inherit; }
 
 /* ---------- backdrop ----------
-   Opening a dossier pans the desk photo down a touch and eases the main menu
-   screen up + out, so it reads as a camera settling onto the map / a page being
-   opened on the desk. This is a single compositor-only CSS transform per layer
-   keyed off `.is-dossier-open` — no rAF, no filters, no blend layers, no forced
-   layout. (The rAF+blend version of this was what stalled the browser.) */
+   Opening a dossier reads as the command camera craning down the desk: the desk
+   photo pans up and pushes in, the main menu screen travels a long way up and
+   out, and the dossier rides up from below the fold to settle in view. Every
+   layer is one compositor-only CSS transform keyed off `.is-dossier-open` — no
+   rAF, no filters, no blend layers, no forced layout. (The rAF+blend version of
+   this was what stalled the browser; a large *transform* is cheap — the layer
+   is rastered once and the GPU just resamples it.) The layers move at
+   different rates so the scene reads with depth: the desk drifts, the
+   foreground sweeps. */
 .ifm__backdrop { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
 .ifm__map {
   position: absolute; inset: -8%;
@@ -36,9 +40,9 @@
   /* No persistent `will-change` — the browser promotes a layer for the duration
      of the transform transition on its own, and a permanent hint on a
      full-viewport element just keeps a large layer resident. */
-  transition: transform .5s cubic-bezier(.22, .76, .19, 1);
+  transition: transform .62s cubic-bezier(.22, .76, .19, 1);
 }
-.ifm.is-dossier-open .ifm__map { transform: translate3d(0, 4.5vh, 0) scale(1.035); }
+.ifm.is-dossier-open .ifm__map { transform: translate3d(0, -11vh, 0) scale(1.11); }
 @media (prefers-reduced-motion: reduce) {
   .ifm__map { transition: none; }
 }
@@ -56,16 +60,17 @@
   position: absolute; inset: 0; z-index: 2; overflow: auto; display: flex;
   flex-direction: column; align-items: center; justify-content: center;
   gap: 3.2vh; padding: 3vh 3vw;
-  transition: transform .5s cubic-bezier(.22, .76, .19, 1), opacity .42s ease;
+  transition: transform .62s cubic-bezier(.22, .76, .19, 1), opacity .5s ease;
 }
 .ifm__screen[hidden] { display: none; }
 /* While a dossier is open the primary menu cards behind it are inert. Driven by
    a class (toggled with `openScreen`) rather than an imperative inline style so
-   an interrupted transition can never strand the menu non-interactive. */
+   an interrupted transition can never strand the menu non-interactive. The
+   screen sweeps a long way up and clears out so the dossier owns the view. */
 .ifm.is-dossier-open .ifm__screen {
   pointer-events: none;
-  transform: translate3d(0, -3.2vh, 0);
-  opacity: .32;
+  transform: translate3d(0, -52vh, 0);
+  opacity: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .ifm__screen { transition: none; }
@@ -224,12 +229,14 @@
 .ifm__subpage {
   position: absolute; inset: 0; z-index: 5; display: flex; align-items: center;
   justify-content: center; padding: 3vh 3vw; overflow: auto;
-  /* Compositor-only crossfade, driven by the `.is-open` class from menu.ts.
-     Runs on the compositor thread, so a stalled main thread / starved rAF
-     cannot freeze it (the earlier rAF-driven transition could). */
+  /* Compositor-only motion, driven by the `.is-open` class from menu.ts. Runs on
+     the compositor thread, so a stalled main thread / starved rAF cannot freeze
+     it (the earlier rAF-driven transition could). The dossier starts well below
+     the fold and rides up to centre, so it reads as a file that was already on
+     the desk lower down rather than a panel fading in. */
   opacity: 0;
-  transform: translate3d(0, 16px, 0);
-  transition: opacity .28s ease, transform .28s ease;
+  transform: translate3d(0, 46vh, 0);
+  transition: opacity .5s ease, transform .6s cubic-bezier(.22, .76, .19, 1);
 }
 .ifm__subpage.is-open { opacity: 1; transform: none; }
 .ifm__subpage[hidden] { display: none; }

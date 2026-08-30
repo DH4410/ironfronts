@@ -34,7 +34,7 @@ export interface MenuHandlers {
  * keeps running even if the main thread or rAF is momentarily starved; this
  * timeout only bounds the JS-side `busy` flag if `transitionend` never fires.
  */
-const TRANSITION_TIMEOUT_MS = 360;
+const TRANSITION_TIMEOUT_MS = 680;
 
 export function mountMenu(handlers: MenuHandlers): void {
   const root = requiredId<HTMLElement>('menu-root');
@@ -89,12 +89,13 @@ export function mountMenu(handlers: MenuHandlers): void {
   /**
    * Play the dossier open (`direction === 1`) or close (`-1`) transition.
    *
-   * The desk backdrop and the main menu screen never move. The revealed dossier
-   * layer crossfades via a plain CSS `transition` (opacity + a tiny translate) —
-   * that runs on the compositor and cannot be stalled by main-thread or rAF
-   * starvation, which is exactly the failure the earlier rAF-driven version hit.
-   * JS only flips a class and waits for `transitionend`, with a short timeout so
-   * `busy` is released even if the event is missed.
+   * All three moving layers — the desk backdrop, the main menu screen, and the
+   * dossier — animate via plain CSS `transition`s keyed off the `.is-dossier-open`
+   * / `.is-open` classes (see menu.css). Those run on the compositor and cannot
+   * be stalled by main-thread or rAF starvation, which is exactly the failure the
+   * earlier rAF-driven version hit. JS only flips a class and waits for
+   * `transitionend`, with a timeout so `busy` is released even if the event is
+   * missed.
    */
   function playTransition(page: HTMLElement, direction: 1 | -1): Promise<void> {
     root.classList.add('is-transitioning');
@@ -189,7 +190,9 @@ export function mountMenu(handlers: MenuHandlers): void {
       openScreen = null;
     }
     root.classList.remove('is-dossier-open', 'is-transitioning');
-    // The desk backdrop and #ifm-main are never transformed; nothing to unwind.
+    // The pan is entirely class-driven: dropping `is-dossier-open` lets the desk
+    // backdrop and #ifm-main ease back on their own transitions — no inline
+    // styles to unwind.
   }
 
   root.querySelectorAll<HTMLButtonElement>('[data-open]').forEach((card) => {
