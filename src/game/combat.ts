@@ -5,19 +5,22 @@ import type {
 } from './game-state';
 import { relationOf } from './game-state';
 import type { SimContext } from './sim-context';
-import type { ArmyStack, UnitGroup } from './units/army';
+import type { ArmyStack } from './units/army';
 import {
   ensureArmyRuntimeState, stackHp, stackMaxHp, stackUnitCount,
 } from './units/army';
 import { issueRetreatOrder, retreatPaths, type RetreatPath } from './units/movement';
 import { unitType } from './units/unit-catalog';
-import type { ArmorClass, DamageProfile } from './units/unit-types';
 import { computeArmyVisibility } from './visibility';
 import { wrappedDistance } from './geometry';
+import { COMBAT_SNAP, COMBAT_VOLLEY_TICKS } from './combat/constants';
+import {
+  addDamage, applyPendingDamage, calculateVolley, type GroupRef, type PendingDamage,
+} from './combat/damage';
+import { provinceAtNode } from './combat/location';
 
-export const COMBAT_VOLLEY_TICKS = 18_000;
-export const COMBAT_FRONTAGE = 10;
-const COMBAT_SNAP = 26;
+export { COMBAT_FRONTAGE, COMBAT_VOLLEY_TICKS } from './combat/constants';
+export { stepCapture, type CaptureEvent } from './combat/capture';
 
 export interface CombatEvent {
   readonly kind:
@@ -31,31 +34,12 @@ export interface CombatEvent {
   readonly targetArmyId?: string;
 }
 
-interface GroupRef {
-  readonly army: ArmyStack;
-  readonly group: UnitGroup;
-}
-
-interface PendingDamage {
-  readonly army: ArmyStack;
-  readonly group: UnitGroup;
-  amount: number;
-}
-
 function initializeState(session: SimContext): void {
   session.state.simulationTick ??= 0;
   session.state.battles ??= {};
   session.state.battleFronts ??= {};
   session.state.nextBattleId ??= 1;
   for (const army of Object.values(session.state.armies)) ensureArmyRuntimeState(army);
-}
-
-function armorHealth(armies: readonly ArmyStack[]): Record<ArmorClass, number> {
-  const result: Record<ArmorClass, number> = { soft: 0, light: 0, heavy: 0 };
-  for (const army of armies) {
-    for (const group of army.units) result[unitType(group.typeId).armorClass] += group.hp;
-  }
-  return result;
 }
 
 function sideArmies(session: SimContext, side: BattleFrontSideState): ArmyStack[] {
@@ -70,114 +54,6 @@ function sideHp(session: SimContext, side: BattleFrontSideState): number {
 
 function sideBaseline(side: BattleFrontSideState): number {
   return Object.values(side.entryMaxHpByArmy).reduce((sum, hp) => sum + hp, 0);
-}
-
-function profileFor(role: BattleRole, group: UnitGroup): DamageProfile {
-  const type = unitType(group.typeId);
-  return role === 'attack' ? type.attack : type.defense;
-}
-
-/**
- * Resolve one side's frontage against one opponent from the shared snapshot.
- * Every unit above the ten selected candidates contributes zero fire, while
- * remaining fully present in the armor-specific target pools.
- */
-function calculateVolley(
-  attackers: readonly ArmyStack[], role: BattleRole, defenders: readonly ArmyStack[],
-): Array<{ ref: GroupRef; amount: number }> {
-  const hp = armorHealth(defenders);
-  const total = hp.soft + hp.light + hp.heavy;
-  if (total <= 0) return [];
-  const ratio: Record<ArmorClass, number> = {
-    soft: hp.soft / total, light: hp.light / total, heavy: hp.heavy / total,
-  };
-  const candidates: Array<{
-    profile: DamageProfile; health: number; typeId: string; armyId: string; ordinal: number; score: number;
-  }> = [];
-  const pooledByType = new Map<string, { hp: number; maxHp: number }>();
-  for (const army of attackers) {
-    for (const group of army.units) {
-      const pool = pooledByType.get(group.typeId) ?? { hp: 0, maxHp: 0 };
-      pool.hp += group.hp;
-      pool.maxHp += group.count * unitType(group.typeId).maxHp;
-      pooledByType.set(group.typeId, pool);
-    }
-  }
-  for (const army of attackers) {
-    for (const group of army.units) {
-      const pool = pooledByType.get(group.typeId)!;
-      const health = pool.maxHp > 0 ? Math.max(0, Math.min(1, pool.hp / pool.maxHp)) : 0;
-      const profile = profileFor(role, group);
-      const score = health * (
-        profile.soft * ratio.soft + profile.light * ratio.light + profile.heavy * ratio.heavy
-      );
-      for (let ordinal = 0; ordinal < group.count; ordinal += 1) {
-        candidates.push({ profile, health, typeId: group.typeId, armyId: army.id, ordinal, score });
-      }
-    }
-  }
-  candidates.sort((a, b) => b.score - a.score
-    || a.typeId.localeCompare(b.typeId) || a.armyId.localeCompare(b.armyId)
-    || a.ordinal - b.ordinal);
-  const selected = candidates.slice(0, COMBAT_FRONTAGE);
-  const fire: Record<ArmorClass, number> = { soft: 0, light: 0, heavy: 0 };
-  for (const unit of selected) {
-    fire.soft += unit.profile.soft * unit.health;
-    fire.light += unit.profile.light * unit.health;
-    fire.heavy += unit.profile.heavy * unit.health;
-  }
-
-  const result: Array<{ ref: GroupRef; amount: number }> = [];
-  for (const armor of ['soft', 'light', 'heavy'] as const) {
-    const classDamage = fire[armor] * ratio[armor];
-    if (classDamage <= 0 || hp[armor] <= 0) continue;
-    for (const army of defenders) {
-      for (const group of army.units) {
-        if (unitType(group.typeId).armorClass !== armor) continue;
-        result.push({ ref: { army, group }, amount: classDamage * group.hp / hp[armor] });
-      }
-    }
-  }
-  return result;
-}
-
-function addDamage(
-  pending: Map<string, PendingDamage>,
-  entries: readonly { ref: GroupRef; amount: number }[],
-): void {
-  for (const entry of entries) {
-    const key = `${entry.ref.army.id}\0${entry.ref.group.typeId}`;
-    const item = pending.get(key);
-    if (item) item.amount += entry.amount;
-    else pending.set(key, { ...entry.ref, amount: entry.amount });
-  }
-}
-
-function applyPendingDamage(pending: ReadonlyMap<string, PendingDamage>): Set<string> {
-  const touched = new Set<string>();
-  for (const item of pending.values()) {
-    item.group.hp = Math.max(0, item.group.hp - item.amount);
-    touched.add(item.army.id);
-  }
-  for (const item of pending.values()) {
-    if (!touched.has(item.army.id)) continue;
-    touched.delete(item.army.id);
-    item.army.units = item.army.units.filter((group) => {
-      const maxHp = unitType(group.typeId).maxHp;
-      group.count = Math.max(0, Math.min(group.count, Math.ceil(group.hp / maxHp)));
-      return group.count > 0 && group.hp > 0;
-    });
-  }
-  return touched;
-}
-
-function provinceAtNode(session: SimContext, nodeId: number): number | null {
-  const x = session.graph.nodeX[nodeId];
-  const z = session.graph.nodeZ[nodeId];
-  const province = session.world.provinces.find(
-    (p) => Math.round(p.center[0]) === Math.round(x) && Math.round(p.center[1]) === Math.round(z),
-  );
-  return province?.id ?? null;
 }
 
 function directionOf(army: ArmyStack): number {
@@ -526,49 +402,5 @@ export function stepCombat(session: SimContext, _dtHours: number): CombatEvent[]
   }
   stepArtillery(session, events);
   cleanupFronts(session, events);
-  return events;
-}
-
-export interface CaptureEvent {
-  readonly provinceId: number;
-  readonly fromCountryId: number;
-  readonly toCountryId: number;
-}
-
-/** Unopposed hostile stack on a foreign province centre captures it immediately. */
-export function stepCapture(session: SimContext): CaptureEvent[] {
-  const events: CaptureEvent[] = [];
-  for (const army of Object.values(session.state.armies)) {
-    if (army.status === 'engaged' || army.status === 'retreating') continue;
-    const provinceId = provinceAtNode(session, army.graphNodeId);
-    if (provinceId === null) continue;
-    const owner = session.state.provinceOwners[provinceId] ?? 0;
-    if (owner === army.ownerCountryId || (
-      owner > 0 && relationOf(session.state, army.ownerCountryId, owner) !== 'war'
-    )) {
-      continue;
-    }
-    const defended = Object.values(session.state.armies).some((other) => (
-      other.id !== army.id && other.ownerCountryId === owner
-      && wrappedDistance(other.x, other.z, army.x, army.z, session.world.width) <= COMBAT_SNAP
-    ));
-    if (defended) continue;
-    session.state.provinceOwners[provinceId] = army.ownerCountryId;
-    delete session.state.productionQueues[provinceId];
-    delete session.state.constructionQueues[provinceId];
-    delete session.state.rallyPoints[provinceId];
-    for (const node of Object.values(session.state.resourceNodes)) {
-      if (node.provinceId !== provinceId) continue;
-      node.controllerCountryId = army.ownerCountryId;
-      const extractor = node.extractorArmyId ? session.state.armies[node.extractorArmyId] : undefined;
-      if (extractor && extractor.ownerCountryId !== army.ownerCountryId) {
-        extractor.extractingNodeId = null;
-        if (extractor.status === 'extracting') extractor.status = 'idle';
-        node.extractorArmyId = null;
-        node.status = node.remaining > 0 ? 'idle' : 'exhausted';
-      }
-    }
-    events.push({ provinceId, fromCountryId: owner, toCountryId: army.ownerCountryId });
-  }
   return events;
 }
