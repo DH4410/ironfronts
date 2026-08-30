@@ -67,9 +67,11 @@ export function projectFor(
   return {
     simulationTick: state.simulationTick,
     viewerCountryId,
-    startCamera: capital
-      ? { x: capital.center[0], z: capital.center[1], distance: Math.min(3_200, Math.max(900, Math.sqrt(owned.length) * 180)) }
-      : { x: world.width / 2, z: world.height / 2, distance: 3_000 },
+    startCamera: homelandCamera(
+      owned.map((province) => province.center),
+      capital?.center ?? null,
+      world.width, world.height,
+    ),
     countries,
     provinceOwners: { ...state.provinceOwners },
     provinceBuildings: privateMap(state.provinceBuildings),
@@ -84,6 +86,58 @@ export function projectFor(
       extraction,
     } : null,
     relations: { ...state.relations },
+  };
+}
+
+/**
+ * Frame the player's whole homeland at spawn, not just the capital: centre on
+ * the owned-province centroid (nudged toward the capital so it stays in shot)
+ * and pull the camera back to fit the homeland's larger axis. Handles the
+ * world-x seam by unwrapping every province around an anchor. Falls back to the
+ * capital, then the map centre, when a country holds no provinces.
+ */
+export function homelandCamera(
+  ownedCenters: ReadonlyArray<readonly [number, number] | readonly number[]>,
+  capitalCenter: readonly number[] | null,
+  worldWidth: number, worldHeight: number,
+): { x: number; z: number; distance: number } {
+  if (!ownedCenters.length) {
+    return capitalCenter
+      ? { x: capitalCenter[0], z: capitalCenter[1], distance: 1_600 }
+      : { x: worldWidth / 2, z: worldHeight / 2, distance: 3_000 };
+  }
+  const anchorX = capitalCenter?.[0] ?? ownedCenters[0][0];
+  const unwrap = (x: number): number => {
+    let d = x - anchorX;
+    if (d > worldWidth / 2) d -= worldWidth;
+    else if (d < -worldWidth / 2) d += worldWidth;
+    return anchorX + d;
+  };
+  let sumX = 0;
+  let sumZ = 0;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const center of ownedCenters) {
+    const ux = unwrap(center[0]);
+    sumX += ux;
+    sumZ += center[1];
+    minX = Math.min(minX, ux);
+    maxX = Math.max(maxX, ux);
+    minZ = Math.min(minZ, center[1]);
+    maxZ = Math.max(maxZ, center[1]);
+  }
+  const centroidX = sumX / ownedCenters.length;
+  const centroidZ = sumZ / ownedCenters.length;
+  // Keep the capital comfortably in frame by biasing the look-at toward it.
+  const x = capitalCenter ? centroidX * 0.68 + unwrap(capitalCenter[0]) * 0.32 : centroidX;
+  const z = capitalCenter ? centroidZ * 0.68 + capitalCenter[1] * 0.32 : centroidZ;
+  const span = Math.max(maxX - minX, maxZ - minZ);
+  const distance = Math.min(4_200, Math.max(1_100, span * 0.95 + 700));
+  return {
+    x: ((x % worldWidth) + worldWidth) % worldWidth,
+    z, distance,
   };
 }
 

@@ -10,11 +10,17 @@ const MIN_STARTING_CITIES = 3;
  * flag, and fictional subdivisions); this trims the picker to sovereign 1939
  * powers a player would actually recognise and want to command. The server
  * still accepts any eligible country — this is a menu-only curation.
+ *
+ * Deliberately absent: the USSR is not a single world entity in this scenario
+ * (it is split into Central Russia / Siberia / Ukraine / Belarus / Caucasus /
+ * East Siberia with no unified period flag), so — like the split US/Canada
+ * entities — it stays out rather than being faked. Every name below is verified
+ * present in the shipped world.
  */
 const CURATED_NATIONS = new Set<string>([
   'Germany', 'Italy', 'Japan', 'United Kingdom', 'France', 'Spain', 'Turkey',
   'Poland', 'Finland', 'Sweden', 'Romania', 'Yugoslavia', 'Greece', 'Bulgaria',
-  'Hungary', 'Czechoslovakia', 'Norway', 'Netherlands', 'Belgium', 'Portugal',
+  'Czechoslovakia', 'Norway', 'Netherlands', 'Belgium', 'Portugal',
   'Switzerland', 'Austria', 'Denmark', 'Ireland',
   'Egypt', 'Ethiopia', 'Iraq', 'Saudi Arabia', 'Persia',
   'Nationalist China', 'Manchukuo', 'South Africa', 'New Zealand',

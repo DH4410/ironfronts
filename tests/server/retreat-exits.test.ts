@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { bearingLabel, orderRouteForClient, retreatExitsForClient } from '../../apps/game-server/src/projection';
+import {
+  bearingLabel, homelandCamera, orderRouteForClient, retreatExitsForClient,
+} from '../../apps/game-server/src/projection';
 
 describe('bearingLabel', () => {
   it('maps world deltas to an 8-point compass (north = -z, east = +x)', () => {
@@ -65,5 +67,31 @@ describe('orderRouteForClient', () => {
 
   it('returns null for an order whose path has been consumed', () => {
     expect(orderRouteForClient({ path: [] }, graph, 0, 0)).toBeNull();
+  });
+});
+
+describe('homelandCamera', () => {
+  it('frames the whole homeland, not just the capital, and pulls back for a larger country', () => {
+    const compact = homelandCamera([[100, 100], [120, 110], [110, 130]], [100, 100], 10_000, 5_000);
+    const sprawling = homelandCamera(
+      [[100, 100], [900, 100], [1_700, 100], [900, 800]], [100, 100], 10_000, 5_000,
+    );
+    expect(sprawling.distance).toBeGreaterThan(compact.distance);
+    // look-at sits between the capital and the far edge, not on the capital
+    expect(sprawling.x).toBeGreaterThan(100);
+    expect(sprawling.x).toBeLessThan(1_700);
+  });
+
+  it('unwraps a country that straddles the world-x seam', () => {
+    const cam = homelandCamera(
+      [[50, 100], [9_950, 100], [9_800, 100]], [50, 100], 10_000, 5_000,
+    );
+    // centroid of {50, -50, -200} around anchor 50 is ~ -66 -> wrapped to ~9934
+    expect(cam.x).toBeGreaterThan(9_800);
+  });
+
+  it('falls back to the capital, then the map centre, with no owned land', () => {
+    expect(homelandCamera([], [400, 250], 10_000, 5_000)).toMatchObject({ x: 400, z: 250 });
+    expect(homelandCamera([], null, 10_000, 5_000)).toMatchObject({ x: 5_000, z: 2_500 });
   });
 });
