@@ -43,6 +43,10 @@ import { loadWorldAssetBuffers, worldAssetUrl } from './world-assets';
 import { getVisibleInstanceView, updateVisibleInstanceView } from './visible-instance-cache';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
+
+/** Player-start camera: north-up, near top-down (~83°; a true 90° breaks picking). */
+const PLAYER_START_YAW = 0;
+const PLAYER_START_PITCH = 1.45;
 // Strategic markers are a regional / close-zoom aid; above this orbit distance
 // the overview map stays clean and the marker draw is skipped entirely.
 const MAP_MARKER_MAX_DISTANCE = 5_000;
@@ -64,6 +68,8 @@ export class WorldRenderer {
   /** Gameplay-layer map tap handler. Return true to consume the click
    *  (army selection / move order) and suppress province selection. */
   onMapClick?: (clientX: number, clientY: number) => boolean;
+  /** Right-click / secondary tap: issue a move/attack order for the selected army. */
+  onMapCommand?: (clientX: number, clientY: number) => boolean;
   onTimeOfDayChange?: (state: TimeOfDayState) => void;
 
   private readonly canvas: HTMLCanvasElement;
@@ -728,6 +734,15 @@ export class WorldRenderer {
     this.camera.update(0);
   }
 
+  /**
+   * Deterministic player-start view: centred on the player's homeland, north-up,
+   * near top-down. No prior camera orientation leaks in. The player can orbit
+   * away afterwards (the orbit clamp now reaches this pitch).
+   */
+  focusPlayerStart(x: number, z: number, distance: number): void {
+    this.focus(x, z, distance, PLAYER_START_YAW, PLAYER_START_PITCH);
+  }
+
   getPerformanceSnapshot(): PerformanceSnapshot {
     return this.performanceMonitor.snapshot();
   }
@@ -1066,6 +1081,13 @@ export class WorldRenderer {
   }
 
   private attachInteraction(signal: AbortSignal): void {
+    // Right-click issues an order for the selected army (see main.ts). The
+    // browser context menu is already suppressed by the camera; this makes the
+    // gameplay layer act on it.
+    this.canvas.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      this.onMapCommand?.(event.clientX, event.clientY);
+    }, { signal });
     this.canvas.addEventListener('pointerdown', (event) => {
       if (event.button !== 0) return;
       if (event.pointerType === 'touch' && !event.isPrimary) {

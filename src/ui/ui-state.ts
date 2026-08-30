@@ -123,6 +123,8 @@ export interface GameNotification {
   readonly body?: string;
   /** epoch ms */
   readonly at: number;
+  /** When true the toast stays until dismissed (action-required); else it auto-expires. */
+  readonly sticky?: boolean;
 }
 
 export type CombatStatus = 'idle' | 'moving' | 'engaged' | 'retreating';

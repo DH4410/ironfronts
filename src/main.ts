@@ -11,6 +11,7 @@ import { mountGameUi, type GameUiActions } from './ui/game-ui';
 import {
   createInitialState, createUiStore, type GameNotification, type ResourceLine,
 } from './ui/ui-state';
+import { autoDismissDelay, isSticky } from './ui/notification-lifecycle';
 import { DEMO_ARMY, type ArmyPanelCommand } from './ui/army';
 import { aggregateTroopStat, armyActivityLabel } from './ui/army-presentation';
 import { iconMarkup } from './ui/icons';
@@ -422,10 +423,8 @@ async function startGame(token: number): Promise<void> {
   activeConnection = connection;
   configureWorldAssetBase(connection.world.assetBaseUrl);
   const session = new RemoteGameSession(connection, (reason) => {
+    // 'warning' toasts auto-dismiss on their own timer now — no title-based sweep.
     pushNotification('warning', 'Command failed', reason);
-    window.setTimeout(() => {
-      uiStore.patch({ notifications: uiStore.get().notifications.filter((entry) => entry.title !== 'Command failed') });
-    }, 4_000);
   });
   activeSession = session;
 
@@ -478,9 +477,7 @@ async function startGame(token: number): Promise<void> {
       uiStore.patch({ quality: level, effectiveRenderScale: renderer.effectiveRenderScale });
     },
     navSelect: () => { /* No player-facing system is implemented yet. */ },
-    dismissNotification: (id) => uiStore.patch({
-      notifications: uiStore.get().notifications.filter((entry) => entry.id !== id),
-    }),
+    dismissNotification: (id) => removeNotification(id),
     togglePause: (open) => uiStore.patch({ paused: open }),
     toggleResourceOverlay: (on) => {
       renderer.setResourceOverlay(on);
@@ -722,9 +719,11 @@ async function startGame(token: number): Promise<void> {
     weather: { raining: renderer.isRainEnabled(), label: renderer.isRainEnabled() ? 'Rain' : 'Clear' },
   });
   if (debugEnabled) {
-    // Dev-only fixtures so screenshots / component tests have content. Never
-    // shown in production gameplay.
-    uiStore.patch({ notifications: DEMO_NOTIFICATIONS, selectedArmy: DEMO_ARMY });
+    // Dev-only fixtures so screenshots have content. Routed through the normal
+    // lifecycle so they auto-expire like any real toast — they used to be
+    // patched in raw and sat on screen forever.
+    for (const demo of DEMO_NOTIFICATIONS) pushNotification(demo.kind, demo.title, demo.body);
+    uiStore.patch({ selectedArmy: DEMO_ARMY });
   }
 }
 
@@ -755,11 +754,15 @@ async function bootstrapGameSession(
   const player = session.ownCountry;
   renderer.setPlayerCountryByName(player.name);
   const { x, z, distance } = session.state.startCamera;
-  renderer.focus(x, z, distance);
+  // Deterministic near-top-down view centred on the player's homeland; no prior
+  // orbit orientation carries over. The player can orbit away afterwards.
+  renderer.focusPlayerStart(x, z, distance);
 
-  // Map-tap -> army selection / move order. Consumes the click so
-  // it does not also select a province.
+  // Left-tap -> army selection / armed-order placement (does not also select a
+  // province if it was consumed). Right-click -> direct move/attack order for
+  // the selected army, the primary fast interaction.
   renderer.onMapClick = (clientX, clientY) => handleMapClick(renderer, session, clientX, clientY);
+  renderer.onMapCommand = (clientX, clientY) => handleMapCommand(renderer, session, clientX, clientY);
   session.addEventListener('war-confirmation', (event) => {
     const detail = (event as CustomEvent<{
       countryIds: number[]; respond: (confirmed: boolean) => void;
@@ -824,6 +827,7 @@ async function bootstrapGameSession(
     window.clearInterval(hudTimer);
     window.clearInterval(civilClockTimer);
     window.removeEventListener('keydown', onKey);
+    clearAllNotificationTimers();
     if (activeSession === session) activeSession = undefined;
   };
   const teardownSessionOnPagehide = (event: PageTransitionEvent): void => {
@@ -1151,6 +1155,42 @@ function handleMapClick(
   return false;
 }
 
+/**
+ * Right-click order for the selected army: attack a visible hostile army under
+ * the cursor, otherwise move to the ground point. War confirmation and routing
+ * rules are the same ones the armed Move/Attack buttons use — this is just a
+ * faster way to reach them.
+ */
+function handleMapCommand(
+  renderer: WorldRenderer, session: RemoteGameSession, clientX: number, clientY: number,
+): boolean {
+  if (!selectedArmyId || !session.ownsArmy(selectedArmyId)) return false;
+  // A direct order supersedes any armed targeting mode.
+  targetingMode = null;
+  awaitingMoveTarget = false;
+  pendingSplitGroups = null;
+
+  const targetArmyId = renderer.pickArmyAt(clientX, clientY);
+  if (targetArmyId && targetArmyId !== selectedArmyId) {
+    const target = session.army(targetArmyId);
+    if (target && !target.own) {
+      const result = session.orderAttackArmy(selectedArmyId, targetArmyId);
+      if (!result.ok) pushNotification('warning', 'Attack order', result.reason ?? 'Invalid target.');
+      refreshSelectedArmy(session);
+      if (activeRenderer) syncArmyMarkers(session, activeRenderer);
+      return true;
+    }
+  }
+
+  const ground = renderer.groundPointAt(clientX, clientY);
+  if (!ground) return false;
+  const result = session.orderMove(selectedArmyId, ground[0], ground[1], 'move');
+  if (!result.ok) pushNotification('warning', 'Move order', result.reason ?? 'No route.');
+  refreshSelectedArmy(session);
+  if (activeRenderer) syncArmyMarkers(session, activeRenderer);
+  return true;
+}
+
 function selectArmy(session: RemoteGameSession, armyId: string): void {
   selectedArmyId = armyId;
   awaitingMoveTarget = false;
@@ -1391,12 +1431,42 @@ function drainSessionEvents(session: RemoteGameSession): void {
   }
 }
 
-function pushNotification(kind: GameNotification['kind'], title: string, body?: string): void {
-  const notifications = [...uiStore.get().notifications, {
-    id: `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    kind, title, body, at: Date.now(),
-  }].slice(-4);
+/** id -> auto-dismiss timer handle. Cleared on manual dismiss and on teardown. */
+const notificationTimers = new Map<string, number>();
+
+function clearNotificationTimer(id: string): void {
+  const timer = notificationTimers.get(id);
+  if (timer !== undefined) { window.clearTimeout(timer); notificationTimers.delete(id); }
+}
+
+/** Remove one notification by id (not by title) and clear its timer. */
+function removeNotification(id: string): void {
+  clearNotificationTimer(id);
+  const next = uiStore.get().notifications.filter((entry) => entry.id !== id);
+  if (next.length !== uiStore.get().notifications.length) uiStore.patch({ notifications: next });
+}
+
+function clearAllNotificationTimers(): void {
+  for (const timer of notificationTimers.values()) window.clearTimeout(timer);
+  notificationTimers.clear();
+}
+
+function pushNotification(
+  kind: GameNotification['kind'], title: string, body?: string,
+  options: { sticky?: boolean } = {},
+): void {
+  const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const sticky = isSticky(kind, options.sticky);
+  const previous = uiStore.get().notifications;
+  const notifications = [...previous, { id, kind, title, body, at: Date.now(), sticky }].slice(-4);
+  // Anything the last-4 cap just dropped no longer needs its auto-dismiss timer.
+  const kept = new Set(notifications.map((entry) => entry.id));
+  for (const entry of previous) if (!kept.has(entry.id)) clearNotificationTimer(entry.id);
   uiStore.patch({ notifications });
+  const delay = autoDismissDelay(kind, options.sticky);
+  if (delay !== null) {
+    notificationTimers.set(id, window.setTimeout(() => removeNotification(id), delay));
+  }
 }
 
 /**
