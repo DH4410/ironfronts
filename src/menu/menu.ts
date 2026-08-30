@@ -202,6 +202,7 @@ export function mountMenu(handlers: MenuHandlers): void {
    */
   function resetToMainScreen(): void {
     busy = false;
+    closeNationPicker();
     if (openScreen) {
       const page = document.getElementById(`ifm-${openScreen}`);
       if (page) {
@@ -224,54 +225,59 @@ export function mountMenu(handlers: MenuHandlers): void {
     button.addEventListener('click', () => void closeDossier());
   });
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') void closeDossier();
+    if (event.key !== 'Escape') return;
+    // The nation overlay is layered above the dossier: Escape backs out of it
+    // first, only closing the dossier once nothing is stacked on top.
+    if (pickerOpen) { closeNationPicker(); return; }
+    void closeDossier();
   });
 
-  const briefing = {
-    objective: document.getElementById('ifm-briefing-objective'),
-    theater: document.getElementById('ifm-briefing-theater'),
-    date: document.getElementById('ifm-briefing-date'),
-    duration: document.getElementById('ifm-briefing-duration'),
-    risk: document.getElementById('ifm-briefing-risk'),
-    mapLabel: document.getElementById('ifm-map-theater'),
-  };
-
-  /** Campaign's operation rows carry briefing data; other rows have none and are skipped. */
-  function updateBriefing(row: HTMLElement): void {
-    const { objective, theater, date, duration, risk, mapLabel } = briefing;
-    if (!objective || !theater || !date || !duration || !risk) return;
-    objective.textContent = row.dataset.objective ?? '';
-    theater.textContent = row.dataset.theater ?? '';
-    date.textContent = row.dataset.date ?? '';
-    duration.textContent = row.dataset.duration ?? '';
-    const level = row.dataset.risk ?? 'medium';
-    risk.textContent = level.charAt(0).toUpperCase() + level.slice(1);
-    risk.className = `is-risk-${level}`;
-    // Keep the preview-map caption in step with the selected operation's theatre.
-    if (mapLabel) mapLabel.textContent = row.dataset.theater ?? mapLabel.textContent;
-  }
-
-  // ---- Country selection (Choose Your Nation) -------------------------
-  const countryGrid = document.getElementById('ifm-country-grid');
+  // ---- Nation selection overlay (Mobilization Registry) --------------
+  // The operation dossier no longer carries the country list; "Begin Operation"
+  // opens this dedicated overlay, and only an explicit Confirm launches.
+  const nationPicker = document.getElementById('ifm-nation-picker');
+  const beginOperation = document.getElementById('ifm-begin-operation') as HTMLButtonElement | null;
+  const confirmNation = document.getElementById('ifm-confirm-nation') as HTMLButtonElement | null;
+  const nationCancel = document.getElementById('ifm-nation-cancel');
+  const nationSelected = document.getElementById('ifm-nation-selected');
+  const roster = document.getElementById('ifm-country-grid');
   const countryHint = document.getElementById('ifm-country-hint');
-  const startButton = document.getElementById('ifm-start-operation') as HTMLButtonElement | null;
-  const DEFAULT_SCENARIO = 'OP-1939-01';
   let selectedCountryId: number | null = null;
-  void DEFAULT_SCENARIO;
+  let pickerOpen = false;
 
-  function updateStartEnabled(): void {
-    if (startButton) startButton.disabled = selectedCountryId === null;
+  function updateConfirmEnabled(): void {
+    const country = selectedCountryId === null
+      ? null
+      : selectableCountries(handlers.lobby).find((c) => c.id === selectedCountryId) ?? null;
+    if (confirmNation) confirmNation.disabled = country === null;
+    if (nationSelected) {
+      nationSelected.textContent = country ? `Assigned: ${country.name}` : 'No nation selected';
+      nationSelected.classList.toggle('is-ready', country !== null);
+    }
     if (countryHint) {
-      countryHint.textContent = selectedCountryId === null
-        ? 'Select the country you will command.'
-        : 'Ready. Begin the operation when you are.';
+      countryHint.textContent = country === null
+        ? 'Select the nation you will command.'
+        : `${country.name} — confirm to take command for the whole campaign.`;
     }
   }
 
-  function renderCountryGrid(preferCountryId: number | null): void {
-    if (!countryGrid) return;
+  function selectRosterEntry(button: HTMLButtonElement): void {
+    if (!roster || button.classList.contains('is-unavailable')) return;
+    selectedCountryId = Number(button.dataset.countryId);
+    for (const other of roster.querySelectorAll('.ifm__country')) {
+      const on = other === button;
+      other.classList.toggle('is-selected', on);
+      other.setAttribute('aria-selected', String(on));
+    }
+    button.scrollIntoView({ block: 'nearest' });
+    playCue('select');
+    updateConfirmEnabled();
+  }
+
+  function renderRoster(preferCountryId: number | null): void {
+    if (!roster) return;
     const playable = selectableCountries(handlers.lobby);
-    countryGrid.replaceChildren();
+    roster.replaceChildren();
     const keep = preferCountryId !== null && playable.some((c) => c.id === preferCountryId);
     selectedCountryId = keep ? preferCountryId : null;
     for (const country of playable) {
@@ -280,8 +286,9 @@ export function mountMenu(handlers: MenuHandlers): void {
       button.className = 'ifm__country';
       button.setAttribute('role', 'option');
       button.dataset.countryId = String(country.id);
-      button.setAttribute('aria-selected', String(country.id === selectedCountryId));
-      button.classList.toggle('is-selected', country.id === selectedCountryId);
+      const selected = country.id === selectedCountryId;
+      button.setAttribute('aria-selected', String(selected));
+      button.classList.toggle('is-selected', selected);
       const flag = document.createElement('span');
       flag.className = 'ifm__country-flag';
       flag.setAttribute('style', `background:${country.color}`);
@@ -295,35 +302,74 @@ export function mountMenu(handlers: MenuHandlers): void {
       meta.textContent = `${country.startingCities} starting cities`;
       body.append(name, meta);
       button.append(flag, body);
-      button.addEventListener('click', () => {
-        selectedCountryId = country.id;
-        for (const other of countryGrid.querySelectorAll('.ifm__country')) {
-          const on = other === button;
-          other.classList.toggle('is-selected', on);
-          other.setAttribute('aria-selected', String(on));
-        }
-        playCue('select');
-        updateStartEnabled();
-      });
-      countryGrid.append(button);
+      button.addEventListener('click', () => selectRosterEntry(button));
+      roster.append(button);
     }
-    updateStartEnabled();
+    updateConfirmEnabled();
   }
 
-  root.querySelectorAll<HTMLButtonElement>('.ifm__row').forEach((row) => {
-    row.addEventListener('click', () => {
-      const list = row.parentElement;
-      list?.querySelectorAll('.ifm__row').forEach((sibling) => sibling.classList.remove('is-selected'));
-      row.classList.add('is-selected');
-      playCue('select');
-      if (row.dataset.objective) updateBriefing(row);
-      if (row.dataset.op) {
-        renderCountryGrid(selectedCountryId);
-      }
-    });
-  });
+  /** Count roster columns from layout so Up/Down move a visual row, not one cell. */
+  function rosterColumns(entries: HTMLElement[]): number {
+    if (entries.length < 2) return 1;
+    const top = entries[0].offsetTop;
+    let columns = 1;
+    while (columns < entries.length && entries[columns].offsetTop === top) columns += 1;
+    return columns;
+  }
 
-  renderCountryGrid(null);
+  /** Arrow-key navigation across the roster grid; Enter/Space confirms. */
+  function onRosterKeydown(event: KeyboardEvent): void {
+    if (!roster) return;
+    const entries = [...roster.querySelectorAll<HTMLButtonElement>('.ifm__country')];
+    if (!entries.length) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      if (selectedCountryId !== null && !confirmNation?.disabled) { event.preventDefault(); void deploy(selectedCountryId); }
+      return;
+    }
+    const columns = rosterColumns(entries);
+    const deltas: Record<string, number> = {
+      ArrowRight: 1, ArrowLeft: -1, ArrowDown: columns, ArrowUp: -columns,
+    };
+    const step = deltas[event.key];
+    if (step === undefined) return;
+    event.preventDefault();
+    const current = entries.findIndex((entry) => entry.classList.contains('is-selected'));
+    let next = current < 0 ? (step > 0 ? 0 : entries.length - 1) : current + step;
+    // Skip unavailable entries; stop at the ends rather than wrapping.
+    while (next >= 0 && next < entries.length && entries[next].classList.contains('is-unavailable')) next += step;
+    if (next < 0 || next >= entries.length) return;
+    selectRosterEntry(entries[next]);
+    entries[next].focus();
+  }
+  roster?.addEventListener('keydown', onRosterKeydown);
+
+  function openNationPicker(): void {
+    if (pickerOpen || !nationPicker) return;
+    renderRoster(selectedCountryId);
+    pickerOpen = true;
+    nationPicker.hidden = false;
+    document.getElementById('ifm-campaign')?.setAttribute('inert', '');
+    playCue('dossier-open');
+    (roster?.querySelector<HTMLButtonElement>('.ifm__country.is-selected')
+      ?? roster?.querySelector<HTMLButtonElement>('.ifm__country:not(.is-unavailable)')
+      ?? roster)?.focus();
+  }
+
+  function closeNationPicker(): void {
+    if (!pickerOpen || !nationPicker) return;
+    pickerOpen = false;
+    nationPicker.hidden = true;
+    document.getElementById('ifm-campaign')?.removeAttribute('inert');
+    playCue('dossier-close');
+    beginOperation?.focus();
+  }
+
+  beginOperation?.addEventListener('click', () => openNationPicker());
+  nationCancel?.addEventListener('click', () => closeNationPicker());
+  confirmNation?.addEventListener('click', () => {
+    if (selectedCountryId === null) return;
+    void deploy(selectedCountryId);
+  });
 
   // Graphics quality selector. Reads/persists the choice locally and only
   // notifies handlers - it never initializes the world renderer from the lobby.
@@ -380,10 +426,6 @@ export function mountMenu(handlers: MenuHandlers): void {
     }
   }
 
-  startButton?.addEventListener('click', () => {
-    if (selectedCountryId === null) return;
-    void deploy(selectedCountryId);
-  });
   document.getElementById('ifm-apply-settings')?.addEventListener('click', () => playCue('confirm'));
 }
 
