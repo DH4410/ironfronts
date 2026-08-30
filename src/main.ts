@@ -345,10 +345,12 @@ async function teardownPartialLaunch(): Promise<void> {
  */
 async function runLaunch(countryId: number): Promise<void> {
   const token = (launchToken += 1);
-  showLoader();
+  // Populate the Field Note and first stage BEFORE the loader is unhidden so it
+  // never appears for a frame with an empty quote / stale bar.
   if (!activeStopQuotes) activeStopQuotes = startLoadingQuotes();
-  uiStore.patch({ phase: 'loading' });
   setLoadingStage('Connecting to command server', 0);
+  showLoader();
+  uiStore.patch({ phase: 'loading' });
 
   try {
     if (lobby.assignedCountryId === null) {

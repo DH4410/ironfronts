@@ -91,6 +91,24 @@ describe('reload / Continue lockout', () => {
       expect(html).toContain('id="loading-retry"');
       expect(html).toContain('id="loading-return"');
     });
+
+    it('paints an opaque base so it never flashes the blue :root behind it', () => {
+      // The loader has no image until desk-scene.jpg decodes; without an opaque
+      // background the blue `:root` (and the just-revealed brand) show through.
+      expect(styles).toMatch(/\.loading\s*\{[^}]*\bbackground:\s*#060807\b[^}]*\}/);
+    });
+
+    it('fills in the Field Note and first stage before unhiding the loader', () => {
+      const start = main.indexOf('async function runLaunch(');
+      const body = main.slice(start, main.indexOf('\n}', start));
+      const quoteAt = body.indexOf('startLoadingQuotes()');
+      const stageAt = body.indexOf("setLoadingStage('Connecting to command server'");
+      const showAt = body.indexOf('showLoader()');
+      expect(quoteAt).toBeGreaterThan(-1);
+      expect(showAt).toBeGreaterThan(-1);
+      expect(quoteAt).toBeLessThan(showAt);
+      expect(stageAt).toBeLessThan(showAt);
+    });
   });
 
   describe('launch lifecycle is fully guarded', () => {
