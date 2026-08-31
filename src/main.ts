@@ -476,6 +476,13 @@ async function startGame(token: number): Promise<void> {
   // attack affordance, so hovering never confirms an unseen force is there.
   const updateWorldCursor = (clientX: number, clientY: number): void => {
     const session = activeSession;
+    // Rally-point placement is province-scoped, not army-scoped: 0 A.D. rally
+    // cursor while it is armed.
+    if (session && awaitingRallyTarget && selectedProvinceId !== null
+      && session.ownsProvince(selectedProvinceId)) {
+      canvas.style.cursor = 'url(/cursors/cursor-rally.png) 5 31, crosshair';
+      return;
+    }
     if (!session || !selectedArmyId || !session.ownsArmy(selectedArmyId)) {
       canvas.style.cursor = '';
       return;
@@ -487,6 +494,10 @@ async function startGame(token: number): Promise<void> {
       canvas.style.cursor = 'url(/cursors/action-attack.png) 1 1, crosshair';
     } else if (targetingMode === 'attack') {
       canvas.style.cursor = 'url(/cursors/cursor-no.png) 13 14, not-allowed';
+    } else if (targetingMode === 'move' || targetingMode === 'split' || targetingMode === 'retreat' || awaitingMoveTarget) {
+      // Aiming a ground order — a plain precision cursor (0 A.D. has no bare
+      // "move" cursor clean enough to vendor).
+      canvas.style.cursor = 'crosshair';
     } else {
       canvas.style.cursor = '';
     }

@@ -79,7 +79,7 @@ sidecar) noted for the CSS `cursor: url(...) x y` fallback.
 | `action-attack-move.png` | `cursors/action-attack-move.png` | 1 1 | Cursor for attack-move (reserved) |
 | `action-capture.png` | `cursors/action-capture.png` | 1 1 | Cursor over a capturable province (reserved) |
 | `action-garrison.png` | `cursors/action-garrison.png` | 1 1 | Cursor over a garrisonable target (reserved) |
-| `cursor-rally.png` | `cursors/cursor-rally.png` | 5 31 | Cursor while placing a rally point (reserved) |
+| `cursor-rally.png` | `cursors/cursor-rally.png` | 5 31 | Cursor while placing a rally point |
 | `cursor-no.png` | `cursors/cursor-no.png` | 13 14 | Cursor over an invalid / disallowed target |
 
 ---

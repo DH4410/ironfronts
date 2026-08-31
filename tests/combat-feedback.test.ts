@@ -16,6 +16,14 @@ describe('attack-order feedback', () => {
     expect(fn).toContain('cursor-no.png');
   });
 
+  it('drives distinct world cursors for rally placement and ground-order aiming', () => {
+    const fn = main.slice(main.indexOf('const updateWorldCursor ='), main.indexOf('canvas.addEventListener(\'pointermove\''));
+    expect(fn).toContain('cursors/cursor-rally.png');
+    expect(fn).toMatch(/awaitingRallyTarget && selectedProvinceId !== null/);
+    // move / split / retreat aiming get a precision cursor, not the default arrow
+    expect(fn).toMatch(/targetingMode === 'move' \|\| targetingMode === 'split' \|\| targetingMode === 'retreat'/);
+  });
+
   it('acknowledges an attack on server-accept (after any war confirm), not optimistically', () => {
     const start = main.indexOf("targetingMode === 'attack' && selectedArmyId");
     const branch = main.slice(start, main.indexOf("targetingMode === 'retreat'", start));
