@@ -200,8 +200,16 @@ mountMenu({
     if (rendererStarted) return;
     rendererStarted = true;
     try {
+      loading.hidden = false;
+      loadingStage.textContent = lobby.assignedCountryId === null ? 'Joining operation' : 'Restoring operation';
+      loadingValue.textContent = '0%';
+      loadingBar.style.width = '0%';
       if (lobby.assignedCountryId === null) await joinGame(countryId);
-      await music.setState('opening');
+      // Audio is non-critical and media playback can remain pending while a
+      // browser restores a tab. It must never hold the renderer bootstrap.
+      void music.setState('opening').catch((error) => {
+        console.warn('Opening music could not be started.', error);
+      });
 
     // The lobby is deliberately lightweight. The world canvas, loading scene,
     // renderer module graph, WebGPU device and world assets are all deferred
@@ -582,6 +590,12 @@ async function bootstrapGameSession(
 
   // Player identity -> renderer flag/tint + HUD.
   const player = session.ownCountry;
+  // The world package contains scenario-start ownership. A continued session
+  // must apply its authoritative snapshot before the first rendered frame;
+  // capture events only cover changes that happen after this connection.
+  renderer.setProvinceOwners(Object.entries(session.state.provinceOwners).map(([provinceId, countryId]) => ({
+    provinceId: Number(provinceId), countryId,
+  })));
   renderer.setPlayerCountryByName(player.name);
   const { x, z, distance } = session.state.startCamera;
   renderer.focus(x, z, distance);
@@ -751,7 +765,7 @@ function syncArmyMarkers(
       cursor += 16;
       count += 1;
     }
-    if (army.id === selectedArmyId && army.status === 'engaged') {
+    if (army.id === selectedArmyId && army.status === 'engaged' && targetingMode === 'retreat') {
       for (const exit of army.legalRetreatExits ?? []) {
         if (count >= 1_024) break;
         armyMarkerScratch[cursor] = exit.x;
@@ -956,6 +970,7 @@ function handleMapClick(
       if (!result.ok) pushNotification('warning', 'Retreat', result.reason ?? 'No legal retreat.');
       targetingMode = null;
       refreshSelectedArmy(session);
+      syncArmyMarkers(session, renderer);
       return true;
     }
   }
@@ -1036,11 +1051,14 @@ function handleArmyCommand(command: ArmyPanelCommand): void {
       targetingMode = 'retreat';
       pushNotification('information', 'Choose retreat direction', 'Select one of the highlighted exit edges on the map.');
       refreshSelectedArmy(session);
+      if (activeRenderer) syncArmyMarkers(session, activeRenderer);
       return;
     }
     const result = session.orderRetreat(selectedArmyId, firstNodeId);
     if (!result.ok) pushNotification('warning', 'Retreat', result.reason ?? 'No legal retreat.');
+    targetingMode = null;
     refreshSelectedArmy(session);
+    if (activeRenderer) syncArmyMarkers(session, activeRenderer);
     return;
   }
   if (command === 'stop') {

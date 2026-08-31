@@ -15,8 +15,8 @@ describe('selected army panel containment', () => {
 
   it('renders one aggregate battle card instead of unbounded front and retreat lists', () => {
     expect(armyUi).toContain('summarizeBattleFronts');
-    expect(armyUi).toContain("appendSide('Your forces'");
-    expect(armyUi).toContain("appendSide('Enemy forces'");
+    expect(armyUi).toContain("'Selected forces'");
+    expect(armyUi).toContain("'Opposing forces'");
     expect(armyUi).not.toContain('Retreat exit ${index + 1}');
   });
 });

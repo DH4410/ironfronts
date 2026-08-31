@@ -249,8 +249,8 @@ export function renderSelectedArmyPanel(
       row.append(sideHeader, healthTrack, cooldown);
       battleSides.append(row);
     };
-    appendSide('Your forces', battle.friendly, 'friendly');
-    appendSide('Enemy forces', battle.enemy, 'enemy');
+    appendSide(army.own ? 'Your forces' : 'Selected forces', battle.friendly, army.own ? 'friendly' : 'enemy');
+    appendSide(army.own ? 'Enemy forces' : 'Opposing forces', battle.enemy, army.own ? 'enemy' : 'friendly');
 
     const battleMeta = node('div', 'ifg-battle__meta');
     battleMeta.append(

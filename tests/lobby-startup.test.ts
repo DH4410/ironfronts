@@ -18,6 +18,24 @@ describe('lightweight lobby startup', () => {
     expect(main).not.toMatch(/import\s+\{\s*WorldRenderer[,}]/);
   });
 
+  it('cannot let optional opening music block Continue or a new deployment', () => {
+    const main = readFileSync(path.join(root, 'src/main.ts'), 'utf8');
+    expect(main).toContain("loadingStage.textContent = lobby.assignedCountryId === null ? 'Joining operation' : 'Restoring operation'");
+    expect(main).toContain("void music.setState('opening').catch");
+    expect(main).not.toContain("await music.setState('opening')");
+  });
+
+  it('restores authoritative territorial ownership before the first continued frame', () => {
+    const main = readFileSync(path.join(root, 'src/main.ts'), 'utf8');
+    const bootstrap = main.slice(main.indexOf('async function bootstrapGameSession'));
+    expect(bootstrap).toContain('renderer.setProvinceOwners(Object.entries(session.state.provinceOwners)');
+  });
+
+  it('shows retreat-exit circles only while the player is choosing a route', () => {
+    const main = readFileSync(path.join(root, 'src/main.ts'), 'utf8');
+    expect(main).toContain("army.status === 'engaged' && targetingMode === 'retreat'");
+  });
+
   it('does not use a media-element preload for lobby music warming', () => {
     const audio = readFileSync(path.join(root, 'src/audio/audio-manager.ts'), 'utf8');
     const start = audio.indexOf('prepareMusic(url: string)');

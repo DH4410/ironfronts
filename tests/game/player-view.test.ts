@@ -81,6 +81,36 @@ describe('projectArmyView', () => {
     expect(v.composition!.unitCount).toBe(4);
   });
 
+  it('reveals the oriented combat overview for a fully identified foreign stack', () => {
+    const player = army('p', 1, 0, 0);
+    const foreign = army('e', 2, 70, 0);
+    player.status = 'engaged';
+    foreign.status = 'engaged';
+    player.battleFrontIds = ['front-1'];
+    foreign.battleFrontIds = ['front-1'];
+    const s = state(true, [player, foreign]);
+    s.battles['battle-1'] = { id: 'battle-1', frontIds: ['front-1'] };
+    s.battleFronts['front-1'] = {
+      id: 'front-1', battleId: 'battle-1', anchorNodeId: 0, kind: 'road', provinceId: null, x: 35, z: 0,
+      sideA: {
+        countryId: 1, directionNodeId: 0, role: 'defense', armyIds: ['p'],
+        entryMaxHpByArmy: { p: 400 }, nextVolleyTick: 500,
+      },
+      sideB: {
+        countryId: 2, directionNodeId: 0, role: 'attack', armyIds: ['e'],
+        entryMaxHpByArmy: { e: 400 }, nextVolleyTick: 600,
+      },
+    };
+
+    const v = projectArmyView(s, world, 1, 'e')!;
+    expect(v.own).toBe(false);
+    expect(v.battleFronts).toHaveLength(1);
+    expect(v.battleFronts![0]).toMatchObject({
+      role: 'attack', friendlyBaselineHp: 400, enemyBaselineHp: 400,
+      friendlyNextVolleyTick: 600, enemyNextVolleyTick: 500,
+    });
+  });
+
   it('does not project a hidden foreign stack at all', () => {
     const s = state(true, [army('p', 1, 0, 0), army('e', 2, 400, 0)]);
     expect(projectArmyView(s, world, 1, 'e')).toBeNull();
