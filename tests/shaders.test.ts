@@ -50,11 +50,23 @@ describe('WGSL programs', () => {
     expect(terrainShader).not.toContain('if (elevation < 12.0)');
   });
 
+  it('overlaps the terrain and water coast cuts so no fragment is discarded by both', () => {
+    // Terrain keeps its cut at landAt <= 0.5; water is pushed inland to < 0.62
+    // so the 0.50..0.62 band is drawn by both passes (opaque terrain covers
+    // it) rather than the two passes meeting on a zero-width contour where a
+    // sampling disagreement opens a hole. Regression guard for the Ultra
+    // blocky-black-rectangle coastline artefact.
+    const terrainCut = Number(/bankField\.r <= ([\d.]+)/.exec(terrainShader)?.[1]);
+    const waterCut = Number(/landAt\(input\.mapUv\) >= ([\d.]+)/.exec(waterShader)?.[1]);
+    expect(terrainCut).toBe(0.5);
+    expect(waterCut).toBeGreaterThan(terrainCut);
+    expect(waterShader).not.toMatch(/landAt\(input\.mapUv\) >= 0\.5\b/);
+  });
+
   it('clips only the guarded river core while explicit water covers the wider contour', () => {
     const terrainFragment = terrainShader.slice(terrainShader.indexOf('@fragment\nfn terrainFragment'));
     expect(terrainFragment).toContain('riverField.r > 0.60 || riverField.g > 0.60');
     expect(waterShader).toContain('riverField.r > 0.45 || riverField.g > 0.45');
-    expect(waterShader).toContain('if (landAt(input.mapUv) >= 0.5)');
     expect(terrainShader).toContain('bankField.g');
     expect(terrainShader).toContain('shoreline * 0.72');
     expect(waterShader).toContain('oceanSurfaceColor(input.worldPosition');
