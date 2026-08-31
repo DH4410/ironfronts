@@ -1838,6 +1838,18 @@ function updateDiagnostics(stats: FrameStats): void {
     activeRenderer
       ? `graphics  ${activeRenderer.graphicsQuality} @ ${activeRenderer.effectiveRenderScale.toFixed(2)}x  ${canvas.width}x${canvas.height}`
       : 'graphics  —',
+    activeRenderer
+      ? (() => {
+        const q = activeRenderer.qualityReadout;
+        return `preset    prop ${q.propDistanceScale.toFixed(2)}x  lod ${q.terrainLodScale.toFixed(2)}x  detail ${q.detailFactor.toFixed(2)}  furniture ${q.furniture ? 'on' : 'off'}`;
+      })()
+      : 'preset    —',
+    activeRenderer
+      ? (() => {
+        const q = activeRenderer.qualityReadout;
+        return `budgets   trees ${q.treeBudget.toLocaleString()}  bldg ${q.buildingBudget.toLocaleString()}  3D army <${q.armyModelRange}u (${q.armyModelCount} now)`;
+      })()
+      : 'budgets   —',
     `trees     ${stats.trees.toLocaleString()}`,
     `buildings ${stats.buildings.toLocaleString()}`,
     `roads     ${stats.emittedRoads.toLocaleString()} + ${stats.hiddenRoads} dotted`,

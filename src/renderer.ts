@@ -158,6 +158,8 @@ export class WorldRenderer {
   private static readonly ARMY_MARKER_CAPACITY = 1_024;
   private static readonly ARMY_MODEL_CAPACITY = 4_096;
   private static readonly ARMY_MODEL_VERTEX_COUNT = 6 * 36;
+  /** Base camera distance for the strategic-marker <-> 3D-model LOD swap. */
+  private static readonly ARMY_MODEL_RANGE_BASE = 1_900;
   /** The ONLY resource-deposit marker layer: fed the player-visible authoritative
    *  set (natural + scenario-guaranteed, fog-filtered) via `setGameResourceMarkers`.
    *  The static `mapMarkers` layer carries junctions/towns only. */
@@ -259,6 +261,38 @@ export class WorldRenderer {
   /** Backing-store scale actually in use (× CSS pixels). */
   get effectiveRenderScale(): number {
     return resolveRenderPixelRatio(this.quality);
+  }
+
+  /**
+   * Camera distance below which close 3D army models draw (above it, only the
+   * strategic markers). Scaled by the preset prop-distance knob so LOW drops to
+   * markers sooner and ULTRA holds the models further out. Floored so LOW still
+   * shows models when the camera is genuinely low.
+   */
+  private get armyModelDrawDistance(): number {
+    return Math.max(900, WorldRenderer.ARMY_MODEL_RANGE_BASE * this.qualityPreset.propDistanceScale);
+  }
+
+  /**
+   * Resolved preset knobs + the live counts they gate, for the graphics dev
+   * readout. Lets QA prove a preset switch actually changed the renderer.
+   */
+  get qualityReadout(): {
+    propDistanceScale: number; terrainLodScale: number; detailFactor: number;
+    treeBudget: number; buildingBudget: number; furniture: boolean;
+    armyModelRange: number; armyModelCount: number;
+  } {
+    const p = this.qualityPreset;
+    return {
+      propDistanceScale: p.propDistanceScale,
+      terrainLodScale: p.terrainLodScale,
+      detailFactor: p.detailFactor,
+      treeBudget: p.treeInstanceBudget,
+      buildingBudget: p.buildingInstanceBudget,
+      furniture: p.furniture,
+      armyModelRange: Math.round(this.armyModelDrawDistance),
+      armyModelCount: this.armyModels?.count ?? 0,
+    };
   }
 
   /** Deterministic visual resource-deposit layer (no economy wiring). */
@@ -1450,7 +1484,7 @@ export class WorldRenderer {
     // Army-stack markers: always on (they are gameplay, not an overlay), and
     // visible further out than the resource overlay. The shader fades the last
     // stretch before strategic altitude.
-    if (this.armyModels && this.armyModels.count > 0 && this.camera.distance < 1_900) {
+    if (this.armyModels && this.armyModels.count > 0 && this.camera.distance < this.armyModelDrawDistance) {
       const instances = this.armyModels.count * WORLD_COPY_INDICES.length;
       pass.setPipeline(this.armyModelPipeline);
       pass.setBindGroup(1, this.armyModels.bindGroup);

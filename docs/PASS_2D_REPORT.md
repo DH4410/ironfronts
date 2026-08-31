@@ -47,6 +47,49 @@ running verdict.
   on the common (already-at-war) path.
 - Tests: `tests/combat-feedback.test.ts` updated (+1).
 
+### 3. 0 A.D. rally cursor + ground-order cursor (`feat(input): …`) — §32
+
+- `cursors/cursor-rally.png` (0 A.D., CC BY-SA 3.0) now shows while a rally
+  point is armed on an owned province.
+- Move / split / retreat aiming gets a `crosshair` instead of the default
+  arrow (0 A.D. has no clean bare "move" cursor to vendor).
+- `action-capture` / `action-garrison` stay unwired — there is no capture or
+  garrison order in the game, and the prompt forbids fake affordances.
+- Actually-surfaced cursor count: attack, no-target, rally, ground-aim.
+
+### 4. Live-apply verification + graphics dev readout (`feat(graphics): …`) — §38–§42
+
+- **Live-apply already works** and is now proven: `renderer.setQuality()`
+  re-runs `resize()` (render scale), bumps the camera revision and clears the
+  terrain-visibility cache, and every other knob (`propDistanceScale`,
+  `treeInstanceBudget`, `buildingInstanceBudget`, `furniture`,
+  `terrainLodScale`, `detailFactor`, `rainScale`) is read from the live preset
+  each frame. No renderer restart, no fake settings.
+- **New:** the 3D-army ⇄ strategic-marker LOD swap distance is now
+  preset-scaled (`ARMY_MODEL_RANGE_BASE × propDistanceScale`, floored at 900u)
+  — LOW drops to markers at ~855u, ULTRA holds models to ~2375u.
+- **New:** `renderer.qualityReadout` getter + two diagnostics lines:
+  `preset  prop 1.00x  lod 1.00x  detail 0.75  furniture on`
+  `budgets trees 60,000  bldg 40,000  3D army <1900u (12 now)`
+  so a preset switch is objectively visible in the F-key diagnostics.
+- **Preset matrix** (each adjacent pair differs on ≥4 real knobs — test-guarded):
+
+  | knob | low | medium | high | ultra |
+  |---|---|---|---|---|
+  | renderScale (abs, ×CSS px) | 0.75 | 1.00 | 1.25 | 1.50 |
+  | propDistanceScale | 0.45 | 0.70 | 1.00 | 1.25 |
+  | treeInstanceBudget | 9,000 | 22,000 | 60,000 | 400,000 |
+  | buildingInstanceBudget | 6,000 | 14,000 | 40,000 | 400,000 |
+  | terrainLodScale | 0.85 | 0.82 | 1.00 | 1.18 |
+  | detailFactor (shader) | 0.12 | 0.40 | 0.75 | 1.00 |
+  | rainScale | 0.35 | 0.60 | 1.00 | 1.00 |
+  | road furniture | off | off | on | on |
+  | 3D-army LOD range | ~855u | ~1330u | 1900u | ~2375u |
+
+  Note: `terrainLodScale` low (0.85) sits just above medium (0.82) on purpose —
+  LOW is meant to be cheaper (render scale / budgets / shader detail), not
+  visibly flatter terrain.
+
 ---
 
 ## Running totals
