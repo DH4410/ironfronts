@@ -49,8 +49,18 @@ export function mountMenu(handlers: MenuHandlers): void {
     profile: handlers.profile,
     onLogout: handlers.onLogout,
   });
-  newCampaign.disabled = assignedCountry !== null;
-  newCampaign.classList.toggle('is-disabled', assignedCountry !== null);
+  // A second campaign slot is not implemented yet. Rather than lock New
+  // Campaign entirely once a campaign exists, keep it open as a clearly
+  // labelled *preview* of the nation-selection flow that can never deploy —
+  // so the existing save is untouchable from here.
+  const previewOnly = assignedCountry !== null;
+  newCampaign.disabled = false;
+  newCampaign.classList.remove('is-disabled');
+  newCampaign.classList.toggle('is-preview', previewOnly);
+  if (previewOnly) {
+    const sub = newCampaign.querySelector('small');
+    if (sub) sub.textContent = 'Preview the setup flow — one campaign at a time for now.';
+  }
   continueButton.disabled = assignedCountry === null;
   continueButton.classList.toggle('is-disabled', assignedCountry === null);
   requiredId<HTMLElement>('ifm-continue-detail').textContent = assignedCountry
@@ -226,15 +236,20 @@ export function mountMenu(handlers: MenuHandlers): void {
     const country = selectedCountryId === null
       ? null
       : selectableCountries(handlers.lobby).find((c) => c.id === selectedCountryId) ?? null;
-    if (confirmNation) confirmNation.disabled = country === null;
+    if (confirmNation) {
+      confirmNation.disabled = country === null;
+      confirmNation.textContent = previewOnly ? 'Preview only' : 'Confirm';
+    }
     if (nationSelected) {
       nationSelected.textContent = country ? `Assigned: ${country.name}` : 'No nation selected';
       nationSelected.classList.toggle('is-ready', country !== null);
     }
     if (countryHint) {
-      countryHint.textContent = country === null
-        ? 'Select the nation you will command.'
-        : `${country.name} — confirm to take command for the whole campaign.`;
+      countryHint.textContent = previewOnly
+        ? `Preview of the nation-selection flow. A second campaign slot isn't built yet, so this cannot deploy — your current campaign is safe.`
+        : country === null
+          ? 'Select the nation you will command.'
+          : `${country.name} — confirm to take command for the whole campaign.`;
     }
   }
 
@@ -404,6 +419,17 @@ export function mountMenu(handlers: MenuHandlers): void {
 
   async function deploy(countryId: number): Promise<void> {
     if (busy) return; // don't launch while a menu transition is still animating
+    if (previewOnly) {
+      // Every deploy path (Confirm button, roster Enter key) funnels here, so
+      // this one guard makes the whole New Campaign flow non-destructive while
+      // a real campaign is loaded.
+      if (countryHint) {
+        countryHint.textContent = `Preview only — a second campaign slot isn't built yet. `
+          + `Your campaign${assignedCountry ? ` as ${assignedCountry.name}` : ''} is untouched; use Continue to resume it.`;
+      }
+      playCue('select');
+      return;
+    }
     try {
       await launch(countryId);
     } catch (error) {
