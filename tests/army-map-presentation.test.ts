@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildArmyFormation, dominantVisualKind, visualKindForUnit } from '../src/army-map-presentation';
+import {
+  buildArmyCompositionRows, buildArmyFormation, dominantVisualKind, visualKindForUnit,
+} from '../src/army-map-presentation';
 
 describe('army map presentation LOD data', () => {
   it('maps rule-level troop types onto four distinct map models', () => {
@@ -41,5 +43,21 @@ describe('army map presentation LOD data', () => {
     ]);
     expect(mixed).toHaveLength(4);
     expect(new Set(mixed.map((slot) => slot.kind))).toEqual(new Set([0, 1, 2, 3]));
+  });
+
+  it('builds one close-marker row per visual kind with its combined amount', () => {
+    expect(buildArmyCompositionRows([
+      { typeId: 'infantry', count: 3, health: 1 },
+      { typeId: 'engineer', count: 2, health: 0.5 },
+      { typeId: 'armored-car', count: 4, health: 0.75 },
+      { typeId: 'light-tank', count: 1, health: 1 },
+      { typeId: 'medium-tank', count: 2, health: 0.25 },
+      { typeId: 'artillery', count: 6, health: 0.5 },
+    ])).toEqual([
+      { kind: 0, count: 5, health: 0.8 },
+      { kind: 1, count: 5, health: 0.8 },
+      { kind: 2, count: 2, health: 0.25 },
+      { kind: 3, count: 6, health: 0.5 },
+    ]);
   });
 });

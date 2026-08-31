@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateTroopStat, armyActivityLabel } from '../src/ui/army-presentation';
+import {
+  aggregateTroopStat, armyActivityLabel, formatBattleCooldown, summarizeBattleFronts,
+} from '../src/ui/army-presentation';
 
 describe('selected army presentation', () => {
   it('describes authoritative activities in player-facing language', () => {
@@ -33,5 +35,31 @@ describe('selected army presentation', () => {
       soft: 30, light: 18.6, heavy: 14.7,
     });
     expect(aggregateTroopStat(undefined, 'attack', (id) => catalog[id])).toBeUndefined();
+  });
+
+  it('condenses any number of fronts into two battle sides with health and cooldowns', () => {
+    const summary = summarizeBattleFronts([
+      {
+        role: 'attack', friendlyHp: 80, friendlyBaselineHp: 100, enemyHp: 30, enemyBaselineHp: 60,
+        friendlyNextVolleyTick: 1_200, enemyNextVolleyTick: 1_000, reinforcementCount: 1,
+      },
+      {
+        role: 'defense', friendlyHp: 40, friendlyBaselineHp: 50, enemyHp: 20, enemyBaselineHp: 40,
+        friendlyNextVolleyTick: 1_100, enemyNextVolleyTick: 900, reinforcementCount: 2,
+      },
+    ], 900);
+    expect(summary).toEqual({
+      role: 'mixed', frontCount: 2, reinforcementCount: 3,
+      friendly: {
+        hp: 120, baselineHp: 150, healthPercent: 80,
+        nextVolleyTick: 1_100, cooldown: '00:20', ready: false,
+      },
+      enemy: {
+        hp: 50, baselineHp: 100, healthPercent: 50,
+        nextVolleyTick: 900, cooldown: 'Ready', ready: true,
+      },
+    });
+    expect(formatBattleCooldown(18_900, 900)).toBe('30:00');
+    expect(summarizeBattleFronts([], 0)).toBeNull();
   });
 });

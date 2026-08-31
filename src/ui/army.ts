@@ -8,6 +8,7 @@
  */
 
 import { createIcon, iconMarkup } from './icons';
+import { summarizeBattleFronts } from './army-presentation';
 import type { ArmyStackView, CombatStatus } from './ui-state';
 
 export type { ArmyStackView, CombatStatus } from './ui-state';
@@ -207,25 +208,60 @@ export function renderSelectedArmyPanel(
     const seconds = Math.max(0, Math.ceil((tick - (army.simulationTick ?? 0)) / 10));
     return seconds === 0 ? 'Ready' : `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   };
-  if (army.combat === 'engaged' && army.battleFronts?.length) {
-    activity.append(node('small', 'ifg-army-panel__eyebrow', 'Combat overview'));
-    for (const front of army.battleFronts) {
-      const line = node('article', 'ifg-army-panel__front');
-      line.append(
-        node('strong', undefined, `${front.role === 'attack' ? 'Attack' : 'Defence'} · direction ${front.directionNodeId}`),
-        node('span', undefined, `Friendly ${Math.ceil(front.friendlyHp)} / ${Math.ceil(front.friendlyBaselineHp)} HP · ${remaining(front.friendlyNextVolleyTick)}`),
-        node('span', undefined, `Enemy ${Math.ceil(front.enemyHp)} / ${Math.ceil(front.enemyBaselineHp)} HP · ${remaining(front.enemyNextVolleyTick)}`),
-        node('small', undefined, front.reinforcementCount ? `${front.reinforcementCount} reinforcing army(s)` : 'No reinforcements'),
+  const battle = army.combat === 'engaged'
+    ? summarizeBattleFronts(army.battleFronts, army.simulationTick ?? 0) : null;
+  if (battle) {
+    activity.classList.add('ifg-army-panel__activity--combat');
+    const battleHeader = node('div', 'ifg-battle__header');
+    const battleTitle = node('span');
+    battleTitle.append(
+      node('small', 'ifg-army-panel__eyebrow', 'Combat overview'),
+      node('strong', undefined, battle.role === 'mixed'
+        ? 'Contested battle' : battle.role === 'attack' ? 'Offensive' : 'Defensive line'),
+    );
+    battleHeader.append(
+      battleTitle,
+      node('span', 'ifg-battle__front-count', `${battle.frontCount} ${battle.frontCount === 1 ? 'front' : 'fronts'}`),
+    );
+
+    const battleSides = node('div', 'ifg-battle__sides');
+    const appendSide = (
+      label: string, side: typeof battle.friendly, tone: 'friendly' | 'enemy',
+    ): void => {
+      const row = node('article', `ifg-battle-side ifg-battle-side--${tone}`);
+      const sideHeader = node('div', 'ifg-battle-side__header');
+      sideHeader.append(
+        node('strong', undefined, label),
+        node('b', undefined, `${Math.ceil(side.hp)} / ${Math.ceil(side.baselineHp)} HP`),
       );
-      activity.append(line);
-    }
-    if (army.legalRetreatExits && army.legalRetreatExits.length > 1) {
-      const exits = node('div', 'ifg-army-panel__retreat-exits');
-      for (const [index, exit] of army.legalRetreatExits.entries()) {
-        exits.append(command(`Retreat exit ${index + 1}`, `retreat:${exit.firstNodeId}`, true));
-      }
-      activity.append(exits);
-    }
+      const healthTrack = node('span', 'ifg-battle-side__health');
+      healthTrack.setAttribute('role', 'progressbar');
+      healthTrack.setAttribute('aria-label', `${label} health`);
+      healthTrack.setAttribute('aria-valuemin', '0');
+      healthTrack.setAttribute('aria-valuemax', '100');
+      healthTrack.setAttribute('aria-valuenow', String(side.healthPercent));
+      const healthFill = node('i');
+      healthFill.style.width = `${side.healthPercent}%`;
+      healthTrack.append(healthFill);
+      const cooldown = node('span', 'ifg-battle-side__cooldown');
+      cooldown.classList.toggle('is-ready', side.ready);
+      cooldown.append(node('small', undefined, 'Next volley'), node('b', undefined, side.cooldown));
+      row.append(sideHeader, healthTrack, cooldown);
+      battleSides.append(row);
+    };
+    appendSide('Your forces', battle.friendly, 'friendly');
+    appendSide('Enemy forces', battle.enemy, 'enemy');
+
+    const battleMeta = node('div', 'ifg-battle__meta');
+    battleMeta.append(
+      node('span', undefined, battle.reinforcementCount
+        ? `${battle.reinforcementCount} supporting ${battle.reinforcementCount === 1 ? 'army' : 'armies'}`
+        : 'No reinforcements'),
+      node('span', undefined, army.legalRetreatExits?.length
+        ? `${army.legalRetreatExits.length} retreat ${army.legalRetreatExits.length === 1 ? 'route' : 'routes'} available`
+        : 'No safe retreat'),
+    );
+    activity.append(battleHeader, battleSides, battleMeta);
   } else {
     activity.append(node('small', 'ifg-army-panel__eyebrow', 'Activity'));
     const activityValue = node('strong', 'ifg-army-panel__activity-value', army.activity);

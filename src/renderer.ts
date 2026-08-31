@@ -92,6 +92,7 @@ export class WorldRenderer {
   private linePipeline!: GPURenderPipeline;
   private mapMarkerPipeline!: GPURenderPipeline;
   private armyMarkerPipeline!: GPURenderPipeline;
+  private armyCompositionPipeline!: GPURenderPipeline;
   private armyModelPipeline!: GPURenderPipeline;
   private countryLabelPipeline!: GPURenderPipeline;
   private countryLabelBuffer?: GPUBuffer;
@@ -784,6 +785,7 @@ export class WorldRenderer {
     this.linePipeline = pipelines.lines;
     this.mapMarkerPipeline = pipelines.mapMarkers;
     this.armyMarkerPipeline = pipelines.armyMarkers;
+    this.armyCompositionPipeline = pipelines.armyComposition;
     this.armyModelPipeline = pipelines.armyModels;
     this.countryLabelPipeline = pipelines.countryLabels;
   }
@@ -892,10 +894,10 @@ export class WorldRenderer {
     );
   }
 
-  /** Allocate the fixed-capacity army-marker instance buffer (2×vec4f per
+  /** Allocate the fixed-capacity army-marker instance buffer (4 vec4f per
    *  stack). `setArmyMarkers` fills only the used prefix each update. */
   private createArmyMarkerLayer(): void {
-    const zero = new Float32Array(WorldRenderer.ARMY_MARKER_CAPACITY * 8);
+    const zero = new Float32Array(WorldRenderer.ARMY_MARKER_CAPACITY * 16);
     this.armyMarkers = this.createInstanceLayer(
       'army stack markers', zero.buffer as ArrayBuffer, 0, 0, this.lineLayout,
     );
@@ -927,7 +929,7 @@ export class WorldRenderer {
   }
 
   /**
-   * Replace the drawn army markers. `records` is 8 floats per stack — see
+   * Replace the drawn army markers. `records` is 16 floats per stack; see
    * `armyMarkerShader`. `count` stacks are drawn; the rest of the capacity is
    * ignored. Cheap: one buffer write, no pipeline or bind-group churn.
    */
@@ -941,7 +943,7 @@ export class WorldRenderer {
     if (capped > 0) {
       this.device.queue.writeBuffer(
         this.armyMarkers.buffer, 0,
-        records.buffer as ArrayBuffer, records.byteOffset, capped * 8 * 4,
+        records.buffer as ArrayBuffer, records.byteOffset, capped * 16 * 4,
       );
     }
     this.device.queue.writeBuffer(
@@ -1376,9 +1378,14 @@ export class WorldRenderer {
       this.recordTriangleDraw('roadFurniture', WorldRenderer.ARMY_MODEL_VERTEX_COUNT / 3 * instances, instances);
     }
     if (this.armyMarkers && this.armyMarkers.count > 0 && this.camera.distance < 5_000) {
-      pass.setPipeline(this.armyMarkerPipeline);
       pass.setBindGroup(1, this.armyMarkers.bindGroup);
       const instances = this.armyMarkers.count * WORLD_COPY_INDICES.length;
+      if (this.camera.distance < 1_900) {
+        pass.setPipeline(this.armyCompositionPipeline);
+        pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.armyMarkers.count);
+        this.recordTriangleDraw('debugLines', instances * 2, instances);
+      }
+      pass.setPipeline(this.armyMarkerPipeline);
       pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.armyMarkers.count);
       this.recordTriangleDraw('debugLines', instances * 2, instances);
     }

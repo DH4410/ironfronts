@@ -24,7 +24,7 @@ import { GameConnection } from './client/game-connection';
 import { RemoteGameSession } from './client/remote-session';
 import { configureWorldAssetBase } from './world-assets';
 import type { SessionResponse } from '@ironfronts/protocol';
-import { buildArmyFormation, dominantVisualKind } from './army-map-presentation';
+import { buildArmyCompositionRows, buildArmyFormation, dominantVisualKind } from './army-map-presentation';
 
 type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
 
@@ -664,7 +664,7 @@ async function bootstrapGameSession(
   );
 }
 
-const armyMarkerScratch = new Float32Array(8 * 1_024);
+const armyMarkerScratch = new Float32Array(16 * 1_024);
 const armyModelScratch = new Float32Array(12 * 4_096);
 const resourceMarkerScratch = new Float32Array(4 * 4_096);
 const RESOURCE_KIND_INDEX: Record<'stone' | 'metal' | 'oil', number> = { stone: 0, metal: 1, oil: 2 };
@@ -720,6 +720,7 @@ function syncArmyMarkers(
     if (count >= 1_024) break;
     const identified = army.contact === 'visible';
     const formation = identified ? buildArmyFormation(army.composition?.groups ?? []) : [];
+    const compositionRows = identified ? buildArmyCompositionRows(army.composition?.groups ?? []) : [];
     armyMarkerScratch[cursor] = army.x;
     armyMarkerScratch[cursor + 1] = army.z;
     armyMarkerScratch[cursor + 2] = packRgb(army.ownerColor);
@@ -729,7 +730,11 @@ function syncArmyMarkers(
     armyMarkerScratch[cursor + 5] = identified ? army.composition?.health ?? 0 : 0;
     armyMarkerScratch[cursor + 6] = army.id === selectedArmyId ? 1 : 0;
     armyMarkerScratch[cursor + 7] = identified ? dominantVisualKind(formation) : 4;
-    cursor += 8;
+    for (let row = 0; row < 4; row += 1) {
+      armyMarkerScratch[cursor + 8 + row] = compositionRows[row]?.count ?? 0;
+      armyMarkerScratch[cursor + 12 + row] = compositionRows[row]?.kind ?? 4;
+    }
+    cursor += 16;
     count += 1;
     armyPickScratch.push({ id: army.id, x: army.x, z: army.z });
 
@@ -742,7 +747,8 @@ function syncArmyMarkers(
       armyMarkerScratch[cursor + 5] = 0;
       armyMarkerScratch[cursor + 6] = 0;
       armyMarkerScratch[cursor + 7] = 0;
-      cursor += 8;
+      armyMarkerScratch.fill(0, cursor + 8, cursor + 16);
+      cursor += 16;
       count += 1;
     }
     if (army.id === selectedArmyId && army.status === 'engaged') {
@@ -756,7 +762,8 @@ function syncArmyMarkers(
         armyMarkerScratch[cursor + 5] = 0;
         armyMarkerScratch[cursor + 6] = 0;
         armyMarkerScratch[cursor + 7] = 0;
-        cursor += 8;
+        armyMarkerScratch.fill(0, cursor + 8, cursor + 16);
+        cursor += 16;
         count += 1;
       }
     }

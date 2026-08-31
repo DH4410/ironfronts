@@ -22,6 +22,7 @@ export interface RendererPipelines {
   lines: GPURenderPipeline;
   mapMarkers: GPURenderPipeline;
   armyMarkers: GPURenderPipeline;
+  armyComposition: GPURenderPipeline;
   armyModels: GPURenderPipeline;
   armyKindCounts: GPURenderPipeline;
   countryLabels: GPURenderPipeline;
@@ -207,6 +208,14 @@ export function createRendererPipelines(
     primitive: { topology: 'triangle-list', cullMode: 'none' },
     depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
   });
+  const armyComposition = device.createRenderPipeline({
+    label: 'close-range army composition marker pipeline',
+    layout: device.createPipelineLayout({ bindGroupLayouts: [layouts.common, layouts.lines] }),
+    vertex: { module: armyMarkerModule, entryPoint: 'armyCompositionVertex' },
+    fragment: { module: armyMarkerModule, entryPoint: 'armyCompositionFragment', targets: [{ format, blend: alphaBlend }] },
+    primitive: { topology: 'triangle-list', cullMode: 'none' },
+    depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'always' },
+  });
   const countryLabels = device.createRenderPipeline({
     label: 'country label pipeline',
     layout: device.createPipelineLayout({ bindGroupLayouts: [layouts.common, layouts.countryLabels] }),
@@ -217,7 +226,7 @@ export function createRendererPipelines(
   });
   return {
     terrain, polarCaps, water, waterways, infrastructure, props, cityLights, rain, lines, mapMarkers, armyMarkers,
-    armyModels, armyKindCounts,
+    armyComposition, armyModels, armyKindCounts,
     countryLabels,
   };
 }

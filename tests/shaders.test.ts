@@ -12,6 +12,8 @@ describe('WGSL programs', () => {
     expect(armyModelShader).toContain('fn armyKindCountVertex');
     expect(armyModelShader).toContain('mix(model.c.xy, model.a.xy, motion)');
     expect(armyMarkerShader).toContain('fn dominantIcon');
+    expect(armyMarkerShader).toContain('fn armyCompositionVertex');
+    expect(armyMarkerShader).toContain('fn armyCompositionFragment');
     expect(armyMarkerShader).toContain('smoothstep(4400.0, 5000.0, zoom)');
   });
 
@@ -178,7 +180,8 @@ describe('WGSL programs', () => {
     ['city lights', cityLightShader, ['cityLightVertex'], ['cityLightFragment']],
     ['rain', rainShader, ['rainVertex'], ['rainFragment']],
     ['lines', lineShader, ['lineVertex'], ['lineFragment']],
-    ['army markers', armyMarkerShader, ['armyMarkerVertex'], ['armyMarkerFragment']],
+    ['army markers', armyMarkerShader,
+      ['armyMarkerVertex', 'armyCompositionVertex'], ['armyCompositionFragment', 'armyMarkerFragment']],
     ['army models', armyModelShader, ['armyModelVertex', 'armyKindCountVertex'], ['armyModelFragment', 'armyKindCountFragment']],
     ['country labels', countryLabelShader, ['countryLabelVertex'], ['countryLabelFragment']],
   ])('parses the %s shader and exposes its render entry points', (_name, source, vertexNames, fragmentNames) => {
