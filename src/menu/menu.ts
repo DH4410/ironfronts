@@ -323,7 +323,7 @@ export function mountMenu(handlers: MenuHandlers): void {
     const entries = [...roster.querySelectorAll<HTMLButtonElement>('.ifm__country')];
     if (!entries.length) return;
     if (event.key === 'Enter' || event.key === ' ') {
-      if (selectedCountryId !== null && !confirmNation?.disabled) { event.preventDefault(); void deploy(selectedCountryId); }
+      if (selectedCountryId !== null && !confirmNation?.disabled) { event.preventDefault(); void deployFromPicker(selectedCountryId); }
       return;
     }
     const columns = rosterColumns(entries);
@@ -368,7 +368,7 @@ export function mountMenu(handlers: MenuHandlers): void {
   nationCancel?.addEventListener('click', () => closeNationPicker());
   confirmNation?.addEventListener('click', () => {
     if (selectedCountryId === null) return;
-    void deploy(selectedCountryId);
+    void deployFromPicker(selectedCountryId);
   });
 
   // Graphics quality selector. Reads/persists the choice locally and only
@@ -419,10 +419,21 @@ export function mountMenu(handlers: MenuHandlers): void {
 
   async function deploy(countryId: number): Promise<void> {
     if (busy) return; // don't launch while a menu transition is still animating
+    try {
+      await launch(countryId);
+    } catch (error) {
+      if (countryHint) countryHint.textContent = error instanceof Error ? error.message : 'Unable to deploy.';
+    }
+  }
+
+  /**
+   * New Campaign's nation-picker entry point (Confirm button + roster Enter).
+   * While a campaign is already loaded this is preview-only: it never launches,
+   * so the New Campaign flow can be inspected without risking data/game.json.
+   * Continue does NOT go through here — it calls `deploy` directly.
+   */
+  async function deployFromPicker(countryId: number): Promise<void> {
     if (previewOnly) {
-      // Every deploy path (Confirm button, roster Enter key) funnels here, so
-      // this one guard makes the whole New Campaign flow non-destructive while
-      // a real campaign is loaded.
       if (countryHint) {
         countryHint.textContent = `Preview only — a second campaign slot isn't built yet. `
           + `Your campaign${assignedCountry ? ` as ${assignedCountry.name}` : ''} is untouched; use Continue to resume it.`;
@@ -430,11 +441,7 @@ export function mountMenu(handlers: MenuHandlers): void {
       playCue('select');
       return;
     }
-    try {
-      await launch(countryId);
-    } catch (error) {
-      if (countryHint) countryHint.textContent = error instanceof Error ? error.message : 'Unable to deploy.';
-    }
+    await deploy(countryId);
   }
 
   document.getElementById('ifm-apply-settings')?.addEventListener('click', () => playCue('confirm'));

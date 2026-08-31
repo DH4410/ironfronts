@@ -68,7 +68,7 @@ const RESOURCE_CHIPS: ReadonlyArray<{ key: keyof ProvinceResourceTotals; label: 
 const PROVINCE_ACTIONS = ['Build', 'Produce', 'Rally', 'Inspect'] as const;
 
 /** Real, always-available province fields (populated per selection). */
-const PROVINCE_FIELDS = ['Allegiance', 'Terrain', 'Sea access', 'Deposits'] as const;
+const PROVINCE_FIELDS = ['Allegiance', 'Terrain', 'Deposits', 'Extraction'] as const;
 type ProvinceFieldKey = (typeof PROVINCE_FIELDS)[number];
 
 const FACILITY_CHIPS: ReadonlyArray<{
@@ -536,10 +536,12 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       pvFieldValue.get('Allegiance')!.textContent = province.isOwn === true ? 'Your command'
         : province.isOwn === false ? province.owner : '—';
       pvFieldValue.get('Terrain')!.textContent = province.terrain || '—';
-      pvFieldValue.get('Sea access')!.textContent = province.coastal ? 'Coastal' : 'Inland';
       pvFieldValue.get('Deposits')!.textContent = depositKinds.length
         ? depositKinds.map((k) => k[0].toUpperCase() + k.slice(1)).join(' · ')
         : province.isOwn === false ? 'Unknown' : 'None';
+      pvFieldValue.get('Extraction')!.textContent = !depositKinds.length ? '—'
+        : province.deposits?.extracting ? 'Under way'
+        : province.deposits?.controlled ? 'Controlled' : 'Uncontrolled';
 
       // Facilities row — own provinces only, shown when at least one stands.
       const b = province.buildings;

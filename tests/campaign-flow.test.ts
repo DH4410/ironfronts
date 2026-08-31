@@ -75,7 +75,21 @@ describe('campaign flow — dossier then nation overlay', () => {
     // No eager render at mount any more (lighter lobby).
     expect(menu).not.toContain('renderCountryGrid(null)');
     expect(menu).toMatch(/function openNationPicker\(\)[\s\S]{0,160}renderRoster\(/);
-    expect(menu).toMatch(/confirmNation\?\.addEventListener\('click',[\s\S]{0,120}deploy\(selectedCountryId\)/);
+    expect(menu).toMatch(/confirmNation\?\.addEventListener\('click',[\s\S]{0,120}deployFromPicker\(selectedCountryId\)/);
+  });
+
+  it('New Campaign is a safe preview once a campaign exists, but Continue still launches', () => {
+    // previewOnly === (a country is already assigned). The picker paths
+    // (Confirm + roster Enter) go through deployFromPicker, which no-ops in
+    // preview mode; Continue calls deploy() directly and is never gated.
+    expect(menu).toContain('const previewOnly = assignedCountry !== null');
+    expect(menu).toContain('async function deployFromPicker(');
+    const picker = menu.slice(menu.indexOf('async function deployFromPicker('), menu.indexOf('async function deployFromPicker(') + 500);
+    expect(picker).toMatch(/if \(previewOnly\)[\s\S]+return;[\s\S]+\}\s*\n\s*await deploy\(countryId\)/);
+    // Continue's listener calls the unguarded deploy, not deployFromPicker.
+    expect(menu).toContain("continueButton.addEventListener('click', () => void deploy(assignedCountry.id))");
+    // New Campaign card is no longer hard-disabled when assigned.
+    expect(menu).toContain('newCampaign.disabled = false');
   });
 
   it('supports grid keyboard navigation in the roster', () => {
