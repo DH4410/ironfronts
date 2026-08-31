@@ -80,6 +80,12 @@ export interface SelectedProvince {
   readonly isOwn?: boolean;
   /** Province has sea access (drives the water / naval marker). */
   readonly coastal?: boolean;
+  /** Production facilities standing in this province (own provinces only). */
+  readonly buildings?: {
+    readonly barracks: number;
+    readonly tankPlant: number;
+    readonly ordnance: number;
+  } | null;
   /** Deposit control/extraction state, own provinces only. */
   readonly deposits?: {
     readonly controlled: boolean;

@@ -66,7 +66,18 @@ const RESOURCE_CHIPS: ReadonlyArray<{ key: keyof ProvinceResourceTotals; label: 
 ];
 
 const PROVINCE_ACTIONS = ['Build', 'Produce', 'Rally', 'Inspect'] as const;
-const RESERVED_FIELDS = ['Morale', 'Population', 'Supply', 'Victory pts'] as const;
+
+/** Real, always-available province fields (populated per selection). */
+const PROVINCE_FIELDS = ['Allegiance', 'Terrain', 'Sea access', 'Deposits'] as const;
+type ProvinceFieldKey = (typeof PROVINCE_FIELDS)[number];
+
+const FACILITY_CHIPS: ReadonlyArray<{
+  key: 'barracks' | 'tankPlant' | 'ordnance'; label: string; icon: IconName;
+}> = [
+  { key: 'barracks', label: 'Barracks', icon: 'stat-troops' },
+  { key: 'tankPlant', label: 'Tank plant', icon: 'industry' },
+  { key: 'ordnance', label: 'Ordnance works', icon: 'stat-attack' },
+];
 
 const numberFormat = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
@@ -229,10 +240,29 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   pvHead.append(pvFlagHost, pvHeadText, pvFocusBtn, pvClose);
 
   const pvGrid = el('div', 'ifg-card__grid');
-  for (const label of RESERVED_FIELDS) {
-    pvGrid.append(el('span', 'ifg-field is-pending',
-      `<small>${label}</small><b>--</b>`));
+  const pvFieldValue = new Map<ProvinceFieldKey, HTMLElement>();
+  for (const label of PROVINCE_FIELDS) {
+    const cell = el('span', 'ifg-field');
+    const value = el('b', undefined, '--');
+    cell.append(el('small', undefined, label), value);
+    pvFieldValue.set(label, value);
+    pvGrid.append(cell);
   }
+
+  // FACILITIES — production structures standing in the province (own only).
+  const pvFacilities = el('div', 'ifg-card__facilities');
+  pvFacilities.hidden = true;
+  pvFacilities.append(el('small', 'ifg-card__restitle', 'Facilities'));
+  const pvFacChips = el('div', 'ifg-card__facchips');
+  const pvFacChipByKey = new Map<string, HTMLElement>();
+  for (const { key, label, icon } of FACILITY_CHIPS) {
+    const chip = el('span', 'ifg-rchip');
+    chip.title = label;
+    chip.append(createIcon(icon, 'ifg-rchip__icon'), el('b', 'ifg-rchip__value', label));
+    pvFacChipByKey.set(key, chip);
+    pvFacChips.append(chip);
+  }
+  pvFacilities.append(pvFacChips);
 
   // RESOURCES — deposit abundance in the province (not production/day). Hidden
   // when the province holds no known deposits, or (under fog) for foreign land.
@@ -299,7 +329,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     b.title = `${label} — not available yet`;
     pvActions.append(b);
   }
-  provinceCard.append(pvHead, pvGrid, pvResources, pvProduce, pvBuild, pvActions);
+  provinceCard.append(pvHead, pvGrid, pvFacilities, pvResources, pvProduce, pvBuild, pvActions);
 
   // ---------------- centered selected-army command overlay ----------------
   const armyCard = el('section', 'ifg-army-panel');
@@ -495,6 +525,30 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       if (nextPvFlagKey !== pvFlagKey) {
         pvFlagKey = nextPvFlagKey;
         pvFlagHost.replaceChildren(createFlag(province.owner, province.ownerColor, 'inline'));
+      }
+      // Owner colour drives the panel's left edge, matching the army panel.
+      provinceCard.style.setProperty('--pv-country', province.ownerColor || 'var(--ifg-brass)');
+
+      // Real, always-present fields (replaces the old --/pending placeholders).
+      const depositKinds = province.resources
+        ? (['stone', 'metal', 'oil'] as const).filter((k) => province.resources![k] > 0)
+        : [];
+      pvFieldValue.get('Allegiance')!.textContent = province.isOwn === true ? 'Your command'
+        : province.isOwn === false ? province.owner : '—';
+      pvFieldValue.get('Terrain')!.textContent = province.terrain || '—';
+      pvFieldValue.get('Sea access')!.textContent = province.coastal ? 'Coastal' : 'Inland';
+      pvFieldValue.get('Deposits')!.textContent = depositKinds.length
+        ? depositKinds.map((k) => k[0].toUpperCase() + k.slice(1)).join(' · ')
+        : province.isOwn === false ? 'Unknown' : 'None';
+
+      // Facilities row — own provinces only, shown when at least one stands.
+      const b = province.buildings;
+      const anyFacility = Boolean(b && (b.barracks > 0 || b.tankPlant > 0 || b.ordnance > 0));
+      pvFacilities.hidden = !anyFacility;
+      if (b) {
+        for (const { key } of FACILITY_CHIPS) {
+          pvFacChipByKey.get(key)!.hidden = (b[key] ?? 0) <= 0;
+        }
       }
       const res = province.resources;
       const dep = province.deposits ?? null;

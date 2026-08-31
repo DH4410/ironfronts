@@ -333,31 +333,32 @@
 /* ================= compact selected-province card ================= */
 .ifg-card {
   position: absolute;
-  left: 16px;
-  bottom: 16px;
-  width: clamp(320px, 24vw, 430px);
-  padding: 12px 14px 13px;
+  left: 50%;
+  bottom: 18px;
+  width: min(720px, calc(100vw - 80px));
+  padding: 13px 18px 15px 20px;
   background-color: #171911;
   background-image: var(--ifg-panel);
   border: 1px solid var(--ifg-rule);
   border-top: 2px solid var(--ifg-brass);
-  border-radius: 2px;
-  box-shadow: var(--ifg-lift);
-  transform: translateY(10px);
+  border-radius: 3px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.58), inset 0 0 0 1px rgba(255, 255, 255, 0.025);
   opacity: 0;
-  transition: transform 0.16s var(--ifg-ease), opacity 0.14s ease;
+  transform: translate(-50%, 14px);
+  transition: transform 0.18s var(--ifg-ease), opacity 0.14s ease;
 }
-.ifg-card:not([hidden]) { transform: translateY(0); opacity: 1; }
-/* two asymmetric corner ticks — a printed-document cue, not four boxes */
-.ifg-card::before, .ifg-card::after {
+.ifg-card:not([hidden]) { transform: translate(-50%, 0); opacity: 1; }
+/* Owner-colour left edge, exactly like the selected-army panel. */
+.ifg-card::before {
   content: "";
   position: absolute;
-  width: 8px; height: 8px;
-  border: 1px solid var(--ifg-brass);
-  opacity: 0.7;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--pv-country, var(--ifg-brass));
+  opacity: 0.9;
+  border: 0;
 }
-.ifg-card::before { top: 5px; left: 5px; border-right: 0; border-bottom: 0; }
-.ifg-card::after { bottom: 5px; right: 5px; border-left: 0; border-top: 0; }
+.ifg-card::after { content: none; }
 
 .ifg-card__head { display: flex; align-items: flex-start; gap: 9px; }
 .ifg-card__flag { flex: none; margin-top: 3px; }
@@ -381,14 +382,22 @@
 
 .ifg-card__grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 18px;
-  margin: 11px 0 12px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px 16px;
+  margin: 10px 0 10px;
+  padding: 9px 0;
+  border-top: 1px solid var(--ifg-rule-soft);
+  border-bottom: 1px solid var(--ifg-rule-soft);
 }
-.ifg-field { display: flex; flex-direction: column; gap: 1px; line-height: 1.25; }
+@media (max-width: 720px) { .ifg-card__grid { grid-template-columns: 1fr 1fr; } }
+.ifg-field { display: flex; flex-direction: column; gap: 2px; line-height: 1.2; min-width: 0; }
 .ifg-field small { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ifg-dim); }
-.ifg-field b { font-size: 12.5px; font-weight: 700; }
+.ifg-field b { font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ifg-field.is-pending b { color: var(--ifg-dim); font-weight: 500; }
+
+.ifg-card__facilities { margin-bottom: 10px; }
+.ifg-card__facchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.ifg-card__facchips .ifg-rchip__value { text-transform: none; letter-spacing: 0.02em; }
 
 .ifg-card__actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .ifg-card__act {
@@ -969,7 +978,7 @@
   .ifg-dock { top: 50px; }
   .ifg-topbar__country-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ifg-res__value { font-size: 12px; }
-  .ifg-card { width: clamp(300px, 30vw, 380px); }
+  .ifg-card { width: min(640px, calc(100vw - 48px)); }
   .ifg-army-panel { width: min(930px, calc(100vw - 48px)); }
   .ifg-army-panel__body { grid-template-columns: 155px minmax(320px, 1fr) 235px; }
   .ifg-army-panel__health,
