@@ -22,40 +22,55 @@ const log = (...a) => console.log('[combat-check]', ...a);
 const BASE = process.argv[2] ?? 'http://127.0.0.1:5173/';
 
 try {
-  // Isolated QA account (Playwright profile is already isolated). No country
-  // assignment, so this drives the real New Campaign flow and never touches
-  // the user's Greece save.
-  const auth = await fetch('http://127.0.0.1:3001/v1/auth/register', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1:5173' },
-    body: JSON.stringify({ username: `qa-combat-${Date.now()}`, password: `qa-${Date.now()}-pw` }),
-  }).then((r) => (r.ok ? r : fetch('http://127.0.0.1:3001/v1/auth/login', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', origin: 'http://127.0.0.1:5173' },
-    body: JSON.stringify({ username: 'qa-combat', password: 'qa-combat-pw-9137' }),
-  })));
+  // ONE fixed, reused QA account with ONE permanent seat. The first ever run
+  // registers it and joins a single country; every later run logs in and hits
+  // Continue. This deliberately avoids grabbing a fresh curated nation per run
+  // (four earlier runs each burned one, which had to be reverted). The single
+  // qa-combat seat is acknowledged permanent QA debris in the live game.json.
+  const QA_USER = 'qa-combat';
+  const QA_PASS = 'qa-combat-pw-9137';
+  const authHeaders = { 'content-type': 'application/json', origin: 'http://127.0.0.1:5173' };
+  await fetch('http://127.0.0.1:3001/v1/auth/register', {
+    method: 'POST', headers: authHeaders,
+    body: JSON.stringify({ username: QA_USER, password: QA_PASS }),
+  }).catch(() => {}); // already exists after the first run — fine
+  const auth = await fetch('http://127.0.0.1:3001/v1/auth/login', {
+    method: 'POST', headers: authHeaders,
+    body: JSON.stringify({ username: QA_USER, password: QA_PASS }),
+  });
   const cookie = (auth.headers.get('set-cookie') || '').split(';')[0];
   const [name, value] = cookie.split('=');
   await page.context().addCookies([
     { name, value, domain: '127.0.0.1', path: '/', httpOnly: true, sameSite: 'Lax' },
   ]);
-  log('authed as QA account; cookie set');
+  log('authed as fixed QA account; cookie set');
 
   await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2_000);
   await page.screenshot(shot('cc-00-menu.png'));
 
-  // New Campaign -> dossier -> Begin Operation -> pick first nation -> Confirm.
-  await page.evaluate(() => document.getElementById('ifm-new-campaign')?.click());
-  await page.waitForTimeout(1_200);
-  await page.evaluate(() => document.getElementById('ifm-begin-operation')?.click());
-  await page.waitForTimeout(900);
-  await page.screenshot(shot('cc-00b-nation-picker.png'));
-  await page.evaluate(() => {
-    document.querySelector('#ifm-country-grid .ifm__country:not(.is-unavailable)')?.click();
+  // If this QA account already holds its seat, Continue is enabled -> resume it.
+  // Otherwise (first run only) drive New Campaign once to create the single seat.
+  const hasSeat = await page.evaluate(() => {
+    const c = document.getElementById('ifm-continue');
+    return !!c && !c.disabled && !c.classList.contains('is-disabled');
   });
-  await page.waitForTimeout(400);
-  await page.evaluate(() => document.getElementById('ifm-confirm-nation')?.click());
+  if (hasSeat) {
+    log('QA account already seated -> Continue');
+    await page.evaluate(() => document.getElementById('ifm-continue')?.click());
+  } else {
+    log('first run -> New Campaign (creates the one permanent QA seat)');
+    await page.evaluate(() => document.getElementById('ifm-new-campaign')?.click());
+    await page.waitForTimeout(1_200);
+    await page.evaluate(() => document.getElementById('ifm-begin-operation')?.click());
+    await page.waitForTimeout(900);
+    await page.screenshot(shot('cc-00b-nation-picker.png'));
+    await page.evaluate(() => {
+      document.querySelector('#ifm-country-grid .ifm__country:not(.is-unavailable)')?.click();
+    });
+    await page.waitForTimeout(400);
+    await page.evaluate(() => document.getElementById('ifm-confirm-nation')?.click());
+  }
 
   await page.waitForFunction(
     () => !!window.__ironfrontsSession && document.getElementById('loading')?.hasAttribute('hidden'),
@@ -138,16 +153,50 @@ try {
     log('cursor over VISIBLE enemy:', cur);
     await page.screenshot(shot('cc-04-attack-cursor-visible.png'));
 
+    // Immediately after the click: the optimistic ack (toast + reticle) is what
+    // this pass added and can verify. The 90ms sample catches the optimistic
+    // mutation before any server round-trip.
     await page.mouse.click(vp.width / 2, vp.height / 2);
     await page.waitForTimeout(90);
+    const ack = await page.evaluate((id) => {
+      const a = window.__ironfrontsSession.state.armies[id];
+      return {
+        status: a?.status, moveIntent: a?.moveIntent,
+        reticle: !!document.querySelector('.ifg-attack-flash.is-firing'),
+        toasts: [...document.querySelectorAll('.ifg-notify__item')].map((n) => n.textContent?.trim()),
+      };
+    }, picked.id);
+    log('optimistic ack (t+90ms):', JSON.stringify(ack));
     await page.screenshot(shot('cc-05-attack-issued.png'));
+    // Attacking a country you are not yet at war with round-trips a "Declare
+    // war?" modal; the optimistic order is reverted until it is confirmed. Click
+    // through it so the end-to-end path can actually be measured.
+    await page.waitForTimeout(500);
+    const warPrompt = await page.evaluate(() => {
+      const dlg = document.querySelector('dialog.ifg-command-dialog');
+      if (!dlg) return null;
+      const title = dlg.querySelector('h2')?.textContent ?? '';
+      dlg.querySelector('button.is-primary')?.click();
+      return title;
+    });
+    if (warPrompt) log('war-confirmation modal shown & confirmed:', JSON.stringify(warPrompt));
+    // ~1.2s later: did the SERVER accept the order (army moving with a move
+    // order) or reject it. Reported separately from the optimistic ack.
     await page.waitForTimeout(1_100);
     const post = await page.evaluate((id) => {
       const a = window.__ironfrontsSession.state.armies[id];
-      const toast = [...document.querySelectorAll('.ifg-notify__item')].map((n) => n.textContent);
-      return { status: a?.status, moveIntent: a?.moveIntent, toasts: toast };
+      return {
+        status: a?.status, moveIntent: a?.moveIntent,
+        hasMoveOrder: !!a?.moveOrder,
+        moveOrderTarget: a?.moveOrder?.attackTargetId ?? a?.moveOrder?.targetProvinceId ?? null,
+        pathLen: a?.moveOrder?.path?.length ?? 0,
+        toasts: [...document.querySelectorAll('.ifg-notify__item')].map((n) => n.textContent?.trim()),
+      };
     }, picked.id);
-    log('after attack issued:', JSON.stringify(post));
+    log('server outcome (t+1.2s):', JSON.stringify(post));
+    if (post.status === 'moving' && post.hasMoveOrder) log('OK: server accepted the attack order end-to-end');
+    else if (warPrompt) log('NOTE: order still not moving after confirming war (may need another sim tick)');
+    else log('NOTE: server did not confirm an attack order (no war prompt seen either)');
     await page.screenshot(shot('cc-06-after-attack.png'));
   }
   if (enemy.contact) {
@@ -161,14 +210,22 @@ try {
     await page.waitForTimeout(300);
     await page.keyboard.press('a');
     await page.waitForTimeout(200);
-    await page.evaluate(({ x, z }) => window.__ironfrontsRenderer.focus(x, z, 420), enemy.contact);
+    // Zoom in tight so the contact-only blip is the ONLY army near screen-centre,
+    // then confirm the centre pick really is that contact army before judging
+    // the cursor — otherwise a nearby *visible* enemy under the pixel makes the
+    // attack cursor legitimate and the check meaningless.
+    await page.evaluate(({ x, z }) => window.__ironfrontsRenderer.focus(x, z, 240), enemy.contact);
     await page.waitForTimeout(900);
     await page.mouse.move(vp.width / 2, vp.height / 2);
+    await page.waitForTimeout(80);
+    await page.mouse.move(vp.width / 2 + 1, vp.height / 2); // nudge to force a fresh pointermove -> updateWorldCursor
     await page.waitForTimeout(200);
     const probe = await page.evaluate(() => {
       const r = window.__ironfrontsRenderer;
       const s = window.__ironfrontsSession;
-      const id = r.pickArmyAt(window.innerWidth / 2, window.innerHeight / 2);
+      const cx = Math.round(window.innerWidth / 2) + 1;
+      const cy = Math.round(window.innerHeight / 2);
+      const id = r.pickArmyAt(cx, cy);
       const a = id ? s.state.armies[id] : null;
       return {
         cursor: document.getElementById('world')?.style.cursor ?? '',
@@ -177,13 +234,17 @@ try {
         pickedOwn: a ? a.own : null,
       };
     });
-    // Correct outcome: either the pick under the cursor is a contact-only enemy
-    // AND the cursor is not the attack cursor, or the pick is a *visible* enemy
-    // (the attack cursor is then legitimate).
     log('contact-only probe:', JSON.stringify(probe));
-    const leak = probe.pickedContact === 'contact' && probe.cursor.includes('action-attack');
-    log(leak ? 'FAIL: attack cursor over a contact-only target (fog leak)' : 'OK: no attack affordance for contact-only');
-    if (leak) errors.push('fog: attack cursor shown for a contact-only target');
+    if (probe.pickedContact !== 'contact') {
+      log('SKIP: could not isolate a contact-only army under the cursor (picked', probe.pickedContact + ')');
+    } else {
+      // The pick under the cursor is definitively a contact-only enemy. The
+      // attack cursor here would be a fog leak.
+      const leak = probe.cursor.includes('action-attack');
+      log(leak ? 'FAIL: attack cursor over a confirmed contact-only target (fog leak)'
+        : 'OK: no attack affordance for a confirmed contact-only target (cursor: ' + (probe.cursor || 'default') + ')');
+      if (leak) errors.push('fog: attack cursor shown for a confirmed contact-only target');
+    }
     await page.screenshot(shot('cc-07-cursor-contact-only.png'));
   }
 
