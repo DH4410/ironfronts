@@ -16,16 +16,30 @@ describe('icon-first army command strip', () => {
     }
   });
 
-  it('builds each command as an icon + short caption with the full label on aria-label/title', () => {
+  it('builds each command as an icon + short caption with the full label on aria-label + rich tooltip', () => {
     const start = army.indexOf('const command = (');
-    const body = army.slice(start, army.indexOf('};', start));
+    const body = army.slice(start, army.indexOf('  if (army.own) {', start));
     expect(body).toContain("createIcon(icon, 'ifg-army-panel__command-icon')");
     expect(body).toContain("node('span', 'ifg-army-panel__command-label', caption)");
     expect(body).toContain("button.setAttribute('aria-label', label)");
-    expect(body).toContain('button.title =');
+    // The shared rich tooltip carries the explanation, shortcut and (when
+    // blocked) the disabled reason — no bare title="" string.
+    expect(body).toContain('bindTooltip(button, () => ({');
+    expect(body).toContain('shortcut: tip.shortcut');
+    expect(body).toContain('disabledReason: enabled ? undefined');
   });
 
-  it('gives the disabled Retreat button a tooltip that explains the rule', () => {
+  it('gives every command a shortcut and a concrete disabled reason', () => {
+    for (const [key, reason] of [
+      ["shortcut: 'A'", 'No visible hostile target in range.'],
+      ["shortcut: 'M'", 'This formation is currently locked in combat.'],
+      ["shortcut: 'X'", 'This force is too small to divide.'],
+      ["shortcut: 'E'", 'No extractable resource deposit at this position.'],
+    ] as const) {
+      expect(army, key).toContain(key);
+      expect(army, reason).toContain(reason);
+    }
+    // Retreat still explains the encirclement / close-combat rule.
     expect(army).toContain('Retreat opens once the stack is locked in close combat.');
     expect(army).toContain('No open line of retreat — the stack is encircled.');
   });

@@ -9,6 +9,7 @@
 
 import { createIcon, iconMarkup, type IconName } from './icons';
 import { summarizeBattleFronts } from './army-presentation';
+import { bindTooltip } from './tooltip';
 import type { ArmyStackView, CombatStatus } from './ui-state';
 
 export type { ArmyStackView, CombatStatus } from './ui-state';
@@ -148,18 +149,24 @@ export function renderSelectedArmyPanel(
 
   const commands = node('div', 'ifg-army-panel__commands ifg-army-panel__commands--primary');
   // Icon-first: the glyph carries the meaning, a short caption sits under it, and
-  // the full label + explanation live on aria-label / title for a11y and hover.
+  // the full label + explanation live on aria-label + the shared rich tooltip.
+  interface CommandTip { description?: string; shortcut?: string; disabledReason?: string; }
   const command = (
     label: string, caption: string, icon: IconName, key: ArmyPanelCommand,
-    enabled: boolean, active = false, title?: string,
+    enabled: boolean, active = false, tip: CommandTip = {},
   ): HTMLButtonElement => {
     const button = node('button', 'ifg-army-panel__command');
     button.type = 'button';
     button.disabled = !enabled;
     button.classList.toggle('is-active', active);
     button.setAttribute('aria-label', label);
-    button.title = title ? `${label} — ${title}` : label;
     button.append(createIcon(icon, 'ifg-army-panel__command-icon'), node('span', 'ifg-army-panel__command-label', caption));
+    bindTooltip(button, () => ({
+      title: label,
+      description: tip.description,
+      shortcut: tip.shortcut,
+      disabledReason: enabled ? undefined : (tip.disabledReason ?? `${label} is unavailable right now.`),
+    }));
     if (enabled) button.addEventListener('click', () => onCommand(key));
     return button;
   };
@@ -177,15 +184,36 @@ export function renderSelectedArmyPanel(
     const retreatActive = army.targetingMode === 'retreat';
     const splitActive = army.targetingMode === 'split';
     commands.append(
-      command('Move', moveActive ? 'Pick spot' : 'Move', 'cmd-move', 'move', army.canMove === true, moveActive,
-        'Right-click a destination in your territory or a discovered area.'),
-      command('Attack', attackActive ? 'Pick target' : 'Attack', 'cmd-attack', 'attack', army.canAttack === true, attackActive,
-        'Advance to contact against an enemy force or province.'),
-      command('Retreat', retreatActive ? 'Pick exit' : 'Retreat', 'cmd-retreat', 'retreat', army.canRetreat === true, retreatActive, retreatHint),
-      command('Split', splitActive ? 'Pick spot' : 'Split', 'cmd-split', 'split', army.canSplit === true, splitActive,
-        'Detach part of the stack into a new force.'),
-      command('Stop', 'Stop', 'cmd-stop', 'stop', army.canStop === true, false, 'Cancel the current order and hold.'),
-      command('Extract', 'Extract', 'cmd-extract', 'extract', army.canExtract === true, false, 'Work the resource deposit under this stack.'),
+      command('Move', moveActive ? 'Pick spot' : 'Move', 'cmd-move', 'move', army.canMove === true, moveActive, {
+        description: 'Move this army to a chosen destination in your territory or discovered ground.',
+        shortcut: 'M',
+        disabledReason: 'This formation is currently locked in combat.',
+      }),
+      command('Attack', attackActive ? 'Pick target' : 'Attack', 'cmd-attack', 'attack', army.canAttack === true, attackActive, {
+        description: 'Advance to contact against a visible hostile force or province.',
+        shortcut: 'A',
+        disabledReason: 'No visible hostile target in range.',
+      }),
+      command('Retreat', retreatActive ? 'Pick exit' : 'Retreat', 'cmd-retreat', 'retreat', army.canRetreat === true, retreatActive, {
+        description: 'Withdraw along a legal retreat route.',
+        shortcut: 'R',
+        disabledReason: retreatHint,
+      }),
+      command('Split', splitActive ? 'Pick spot' : 'Split', 'cmd-split', 'split', army.canSplit === true, splitActive, {
+        description: 'Divide this force into two separate formations.',
+        shortcut: 'X',
+        disabledReason: 'This force is too small to divide.',
+      }),
+      command('Stop', 'Stop', 'cmd-stop', 'stop', army.canStop === true, false, {
+        description: 'Cancel the current movement or order and hold position.',
+        shortcut: 'S',
+        disabledReason: 'No active order to cancel.',
+      }),
+      command('Extract', 'Extract', 'cmd-extract', 'extract', army.canExtract === true, false, {
+        description: 'Begin resource extraction at the deposit under this stack.',
+        shortcut: 'E',
+        disabledReason: 'No extractable resource deposit at this position.',
+      }),
     );
   }
 

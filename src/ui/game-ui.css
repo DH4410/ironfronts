@@ -832,7 +832,8 @@
 .ifg-army-panel__command:not(:disabled):hover .ifg-army-panel__command-label,
 .ifg-army-panel__command.is-active .ifg-army-panel__command-label { color: var(--ifg-brass-lit); }
 .ifg-army-panel__command.is-active { background: rgba(201, 164, 99, 0.18); }
-.ifg-army-panel__command:disabled { opacity: 0.32; }
+/* Dimmed, but still hoverable so the tooltip can explain why it is blocked. */
+.ifg-army-panel__command:disabled { opacity: 0.32; cursor: help; pointer-events: auto; }
 
 /* stat rows: small key icon + label on the left, value on the right */
 .ifg-army-stat__key { display: flex; align-items: center; gap: 5px; min-width: 0; }
@@ -1051,4 +1052,51 @@
   .ifg-attack-flash.is-firing { animation-duration: 300ms; }
   .ifg-attack-flash.is-firing { animation-name: ifg-attack-flash-fade; }
   @keyframes ifg-attack-flash-fade { 0% { opacity: 1; } 100% { opacity: 0; } }
+}
+
+/* ================= shared rich tooltip (see src/ui/tooltip.ts) ================= */
+.ifg-tip {
+  position: fixed;
+  z-index: 60;
+  max-width: 248px;
+  padding: 8px 10px 9px;
+  border: 1px solid rgba(241, 226, 190, 0.34);
+  border-left: 3px solid rgba(241, 226, 190, 0.5);
+  border-radius: 3px;
+  background: rgba(16, 24, 24, 0.94);
+  box-shadow: 0 10px 34px rgba(4, 12, 12, 0.4);
+  backdrop-filter: blur(9px);
+  color: #d9d2be;
+  pointer-events: none;
+  animation: ifg-tip-in 90ms var(--ifg-ease, ease-out);
+}
+.ifg-tip.is-blocked { border-left-color: #c66; }
+@keyframes ifg-tip-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .ifg-tip { animation: none; } }
+.ifg-tip__title {
+  display: block;
+  color: #f3ead3;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+.ifg-tip__detail { display: block; margin-top: 3px; font-size: 11px; line-height: 1.35; color: #b9c4ba; }
+.ifg-tip__detail.is-blocked { color: #e6a99c; }
+.ifg-tip__metas { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 5px; }
+.ifg-tip__meta { display: inline-flex; align-items: baseline; gap: 5px; font-size: 11px; font-weight: 700; color: #e6ddc4; }
+.ifg-tip__meta i { font-style: normal; font-size: 8.5px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: #8a978c; }
+.ifg-tip__key { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding-top: 5px; border-top: 1px solid rgba(241, 226, 190, 0.14); }
+.ifg-tip__key i { font-style: normal; font-size: 8.5px; font-weight: 700; letter-spacing: 0.13em; text-transform: uppercase; color: #8a978c; }
+.ifg-tip__key kbd {
+  min-width: 15px;
+  padding: 1px 5px;
+  border: 1px solid rgba(241, 226, 190, 0.3);
+  border-radius: 3px;
+  background: rgba(241, 226, 190, 0.08);
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  color: #f1e2be;
+  text-align: center;
 }

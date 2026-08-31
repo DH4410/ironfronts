@@ -862,6 +862,8 @@ async function bootstrapGameSession(
     } else if (event.key === 's' || event.key === 'S') {
       session.orderStop(selectedArmyId); targetingMode = null; awaitingMoveTarget = false; refreshSelectedArmy(session);
     }
+    else if (event.key === 'r' || event.key === 'R') { handleArmyCommand('retreat'); }
+    else if (event.key === 'x' || event.key === 'X') { handleArmyCommand('split'); }
     else if (event.key === 'e' || event.key === 'E') { handleArmyCommand('extract'); }
     else if (event.key === 'Escape') { deselectArmy(); }
   };
