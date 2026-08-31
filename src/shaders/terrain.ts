@@ -92,9 +92,8 @@ fn surfaceTransitionAt(mapUv: vec2f, center: vec4u) -> f32 {
 @fragment
 fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let bankField = bankFieldAt(input.mapUv);
-  // Paired with the water pass, which now draws inland to landAt < 0.62: the
-  // 0.50..0.62 band is intentional terrain/water overlap so a coastal
-  // fragment is never discarded by both passes at once (see water.ts).
+  // Water discards where landAt > 0.5, so the landAt == 0.5 contour is drawn
+  // by the water pass, not double-discarded (see water.ts).
   if (bankField.r <= 0.5) { discard; }
   let navigation = navigationAt(input.mapUv);
   let riverField = navigation.ba;

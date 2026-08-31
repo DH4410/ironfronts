@@ -39,17 +39,17 @@ fn waterVertex(input: WaterVertexInput, @builtin(instance_index) instanceIndex: 
 fn waterFragment(input: WaterVertexOutput) -> @location(0) vec4f {
   let riverField = waterwayFieldAt(input.mapUv);
   if (riverField.r > 0.45 || riverField.g > 0.45) { discard; }
-  // Terrain discards where landAt <= 0.5, so the naive complement here is
-  // >= 0.5 — but that leaves the two passes meeting on a razor-thin contour
-  // with no overlap. Wherever the land field is sampled even slightly
-  // differently between the two passes (a chunk-LOD seam, linear filtering,
-  // Ultra's higher render scale resolving a thinner sliver) a coastal
-  // fragment can land in the gap and be discarded by *both* passes, showing
-  // the clear colour through as blocky chunk-edge holes. Draw water a short
-  // way further inland instead: the 0.50..0.62 band is covered by opaque
-  // terrain (which sits at/above the water plane) so it is never visible,
-  // and no sampling disagreement of that size can reopen a hole.
-  if (landAt(input.mapUv) >= 0.62) { discard; }
+  // Terrain discards where landAt <= 0.5; water must cover exactly the
+  // complement. Using >= 0.5 here made both passes discard the interpolated
+  // landAt == 0.5 contour, opening a hairline of clear colour along the
+  // coast. Strict greater-than hands that contour to the water pass so
+  // every fragment is drawn by exactly one of the two. NOTE: this does not
+  // close the wider blocky-rectangle holes where a chunk-LOD seam makes the
+  // two passes sample landAt on opposite sides of 0.5 - the robust fix is a
+  // real overlap band, but ~40% of the shoreline transition zone is terrain
+  // below the 0.35 water plane, so widening the water cut floods those
+  // beaches with shallow water and needs a foreground look first.
+  if (landAt(input.mapUv) > 0.5) { discard; }
   let visualRiver = 0.0;
   let debugMode = u32(uniforms.map.w + 0.5);
   if (debugMode == 6u) {

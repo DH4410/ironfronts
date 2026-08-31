@@ -50,17 +50,14 @@ describe('WGSL programs', () => {
     expect(terrainShader).not.toContain('if (elevation < 12.0)');
   });
 
-  it('overlaps the terrain and water coast cuts so no fragment is discarded by both', () => {
-    // Terrain keeps its cut at landAt <= 0.5; water is pushed inland to < 0.62
-    // so the 0.50..0.62 band is drawn by both passes (opaque terrain covers
-    // it) rather than the two passes meeting on a zero-width contour where a
-    // sampling disagreement opens a hole. Regression guard for the Ultra
-    // blocky-black-rectangle coastline artefact.
-    const terrainCut = Number(/bankField\.r <= ([\d.]+)/.exec(terrainShader)?.[1]);
-    const waterCut = Number(/landAt\(input\.mapUv\) >= ([\d.]+)/.exec(waterShader)?.[1]);
-    expect(terrainCut).toBe(0.5);
-    expect(waterCut).toBeGreaterThan(terrainCut);
-    expect(waterShader).not.toMatch(/landAt\(input\.mapUv\) >= 0\.5\b/);
+  it('hands the landAt == 0.5 coast contour to exactly one of the terrain / water passes', () => {
+    // Terrain discards at landAt <= 0.5; water must discard strictly above
+    // 0.5 (not >=) so the interpolated 0.5 contour is drawn by the water
+    // pass instead of being discarded by both — the hairline-gap half of the
+    // Ultra blocky-black-coast artefact.
+    expect(terrainShader).toContain('bankField.r <= 0.5');
+    expect(waterShader).toContain('if (landAt(input.mapUv) > 0.5)');
+    expect(waterShader).not.toMatch(/landAt\(input\.mapUv\) >= 0\.5/);
   });
 
   it('clips only the guarded river core while explicit water covers the wider contour', () => {
