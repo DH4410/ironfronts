@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { WgslReflect } from 'wgsl_reflect/wgsl_reflect.module.js';
 import { create, globals } from 'webgpu';
 import {
-  armyMarkerShader, armyModelShader, cityLightShader, countryLabelShader, infrastructureShader, lineShader, mapMarkerShader, polarCapShader, propShader,
+  armyMarkerShader, armyModelShader, cityLightShader, combatEffectShader, countryLabelShader, infrastructureShader, lineShader, mapMarkerShader, polarCapShader, propShader,
   rainShader, terrainShader, waterShader, waterwayShader,
 } from '../src/shaders';
 
@@ -218,6 +218,7 @@ describe('WGSL programs', () => {
     ['army markers', armyMarkerShader,
       ['armyMarkerVertex', 'armyCompositionVertex'], ['armyCompositionFragment', 'armyMarkerFragment']],
     ['army models', armyModelShader, ['armyModelVertex', 'armyKindCountVertex'], ['armyModelFragment', 'armyKindCountFragment']],
+    ['combat effects', combatEffectShader, ['combatEffectVertex'], ['combatEffectFragment']],
     ['country labels', countryLabelShader, ['countryLabelVertex'], ['countryLabelFragment']],
   ])('parses the %s shader and exposes its render entry points', (_name, source, vertexNames, fragmentNames) => {
     const reflection = new WgslReflect(source);
@@ -239,7 +240,7 @@ describe('WGSL programs', () => {
     const device = await adapter.requestDevice();
     const modules = new Map<string, GPUShaderModule>();
     for (const [label, source] of [
-      ['terrain', terrainShader], ['polar caps', polarCapShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['city lights', cityLightShader], ['rain', rainShader], ['lines', lineShader], ['map markers', mapMarkerShader], ['army markers', armyMarkerShader], ['army models', armyModelShader], ['country labels', countryLabelShader],
+      ['terrain', terrainShader], ['polar caps', polarCapShader], ['water', waterShader], ['waterways', waterwayShader], ['infrastructure', infrastructureShader], ['props', propShader], ['city lights', cityLightShader], ['rain', rainShader], ['lines', lineShader], ['map markers', mapMarkerShader], ['army markers', armyMarkerShader], ['army models', armyModelShader], ['combat effects', combatEffectShader], ['country labels', countryLabelShader],
     ] as const) {
       const module = device.createShaderModule({ label, code: source });
       modules.set(label, module);
@@ -351,6 +352,13 @@ describe('WGSL programs', () => {
       layout: device.createPipelineLayout({ bindGroupLayouts: [common, layer] }),
       vertex: { module: modules.get('map markers')!, entryPoint: 'mapMarkerVertex' },
       fragment: { module: modules.get('map markers')!, entryPoint: 'mapMarkerFragment', targets: [{ format: 'bgra8unorm' }] },
+      primitive: { topology: 'triangle-list' },
+      depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'always' },
+    })).resolves.toBeDefined();
+    await expect(device.createRenderPipelineAsync({
+      layout: device.createPipelineLayout({ bindGroupLayouts: [common, layer] }),
+      vertex: { module: modules.get('combat effects')!, entryPoint: 'combatEffectVertex' },
+      fragment: { module: modules.get('combat effects')!, entryPoint: 'combatEffectFragment', targets: [{ format: 'bgra8unorm' }] },
       primitive: { topology: 'triangle-list' },
       depthStencil: { ...depthStencil, depthWriteEnabled: false, depthCompare: 'always' },
     })).resolves.toBeDefined();

@@ -100,6 +100,7 @@ export class WorldRenderer {
   private armyMarkerPipeline!: GPURenderPipeline;
   private armyCompositionPipeline!: GPURenderPipeline;
   private armyModelPipeline!: GPURenderPipeline;
+  private combatEffectPipeline!: GPURenderPipeline;
   private countryLabelPipeline!: GPURenderPipeline;
   private countryLabelBuffer?: GPUBuffer;
   private countryLabelParamsBuffer?: GPUBuffer;
@@ -165,6 +166,10 @@ export class WorldRenderer {
    *  The static `mapMarkers` layer carries junctions/towns only. */
   private gameResourceMarkers?: InstanceLayer;
   private static readonly RESOURCE_MARKER_CAPACITY = 4_096;
+  /** Pooled world-space combat effects (see CombatEffectPool). 8 floats each. */
+  private combatEffects?: InstanceLayer;
+  private static readonly COMBAT_EFFECT_CAPACITY = 384;
+  private static readonly COMBAT_EFFECT_MAX_DISTANCE = 5_000;
   /** Own-army movement/attack routes (line mode 3), one LineRecord per segment. */
   private routeLines?: InstanceLayer;
   private static readonly ROUTE_SEGMENT_CAPACITY = 4_096;
@@ -844,6 +849,7 @@ export class WorldRenderer {
     this.armyMarkerPipeline = pipelines.armyMarkers;
     this.armyCompositionPipeline = pipelines.armyComposition;
     this.armyModelPipeline = pipelines.armyModels;
+    this.combatEffectPipeline = pipelines.combatEffects;
     this.countryLabelPipeline = pipelines.countryLabels;
   }
 
@@ -970,6 +976,34 @@ export class WorldRenderer {
     this.routeLines = this.createInstanceLayer(
       'order routes', zeroRoutes.buffer as ArrayBuffer, 0, 3, this.lineLayout,
     );
+    const zeroEffects = new Float32Array(WorldRenderer.COMBAT_EFFECT_CAPACITY * 8);
+    this.combatEffects = this.createInstanceLayer(
+      'combat effects', zeroEffects.buffer as ArrayBuffer, 0, 0, this.lineLayout,
+    );
+  }
+
+  /**
+   * Replace the drawn combat effects. `records` is 8 floats per instance
+   * (see combatEffectShader); `count` is the used prefix. One buffer write.
+   */
+  setCombatEffects(records: Float32Array, count: number): void {
+    if (!this.combatEffects) return;
+    const capped = Math.min(count, WorldRenderer.COMBAT_EFFECT_CAPACITY);
+    if (capped > 0) {
+      this.device.queue.writeBuffer(
+        this.combatEffects.buffer, 0,
+        records.buffer as ArrayBuffer, records.byteOffset, capped * 8 * 4,
+      );
+    }
+    this.device.queue.writeBuffer(
+      this.combatEffects.params, 0, new Uint32Array([Math.max(1, capped), 0, 1, 0]),
+    );
+    this.combatEffects.count = capped;
+  }
+
+  /** Camera distance past which combat effects stop drawing (markers only). */
+  get combatEffectMaxDistance(): number {
+    return WorldRenderer.COMBAT_EFFECT_MAX_DISTANCE;
   }
 
   /**
@@ -1480,6 +1514,17 @@ export class WorldRenderer {
         pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.gameResourceMarkers.count);
         this.recordTriangleDraw('debugLines', instances * 2, instances);
       }
+    }
+    // World-space combat effects (muzzle / tracer / impact / smoke / explosion /
+    // battle markers). Drawn under the army markers so smoke never hides a
+    // stack; the CPU pool already distance-culled the transients.
+    if (this.combatEffects && this.combatEffects.count > 0
+      && this.camera.distance < WorldRenderer.COMBAT_EFFECT_MAX_DISTANCE && this.debugView === 0) {
+      const instances = this.combatEffects.count * WORLD_COPY_INDICES.length;
+      pass.setPipeline(this.combatEffectPipeline);
+      pass.setBindGroup(1, this.combatEffects.bindGroup);
+      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.combatEffects.count);
+      this.recordTriangleDraw('debugLines', instances * 2, instances);
     }
     // Army-stack markers: always on (they are gameplay, not an overlay), and
     // visible further out than the resource overlay. The shader fades the last

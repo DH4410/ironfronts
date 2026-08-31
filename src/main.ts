@@ -24,6 +24,7 @@ import { getGame, getSession, joinGame, logout } from './client/auth-api';
 import { GameConnection } from './client/game-connection';
 import { RemoteGameSession } from './client/remote-session';
 import { configureWorldAssetBase } from './world-assets';
+import { CombatEffectPool, EFFECT_KIND, effectDensityForDistance } from './combat-effects';
 import type { SessionResponse } from '@ironfronts/protocol';
 import { buildArmyCompositionRows, buildArmyFormation, dominantVisualKind } from './army-map-presentation';
 
@@ -204,6 +205,9 @@ let rendererStarted = false;
 let activeRenderer: WorldRenderer | undefined;
 let activeSession: RemoteGameSession | undefined;
 let activeConnection: GameConnection | undefined;
+/** Pooled world-space combat visuals; fed by drainSessionEvents, drawn from onStats. */
+const combatEffects = new CombatEffectPool(320);
+let lastCombatCameraDistance = 3_000;
 // Launch lifecycle: a monotonically increasing token invalidates a superseded
 // attempt (Retry / Return to Command), a disposer list tears an aborted attempt
 // down cleanly, and `launchOutcome` bridges to the menu's `onLaunch` promise so
@@ -458,7 +462,12 @@ async function startGame(token: number): Promise<void> {
   if (import.meta.env.DEV || debugEnabled) {
     // Invisible automation handle (QA capture / perf scripts). Not a player-
     // facing affordance.
-    (window as Window & { __ironfrontsRenderer?: WorldRenderer }).__ironfrontsRenderer = renderer;
+    (window as Window & {
+      __ironfrontsRenderer?: WorldRenderer;
+      __ironfrontsCombatEffects?: CombatEffectPool;
+    }).__ironfrontsRenderer = renderer;
+    (window as Window & { __ironfrontsCombatEffects?: CombatEffectPool })
+      .__ironfrontsCombatEffects = combatEffects;
   }
   // Hover deposits come from the fog-aware GameSession projection once it
   // exists; before that (and for water) show no deposit chips. The renderer's
@@ -558,6 +567,16 @@ async function startGame(token: number): Promise<void> {
       oceanAudible = shouldHearOcean;
       void audio.setOceanEnabled(oceanAudible);
     }
+    // Repack the pooled combat effects for this frame (cheap: <=320*8 floats,
+    // reused buffer). Transients past the LOD range are dropped CPU-side; the
+    // renderer stops drawing everything past its own max distance.
+    lastCombatCameraDistance = stats.distance;
+    const packed = combatEffects.collect(
+      Date.now(),
+      { x: stats.camera[0], z: stats.camera[1] },
+      renderer.combatEffectMaxDistance,
+    );
+    renderer.setCombatEffects(packed.floats, packed.count);
     if (!diagnostics.hidden) updateDiagnostics(stats);
   };
   renderer.onDiplomacyChange = (state) => {
@@ -860,6 +879,7 @@ async function bootstrapGameSession(
     uiStore.patch({ resources: playerResourceLines(session) });
     syncArmyMarkers(session, renderer);
     syncResourceMarkers(session, renderer);
+    syncCombatMarkers(session);
     refreshSelectedArmy(session);
     refreshSelectedProvince(session); // keep production / construction % live
     drainSessionEvents(session);
@@ -884,6 +904,7 @@ async function bootstrapGameSession(
     window.clearInterval(civilClockTimer);
     window.removeEventListener('keydown', onKey);
     clearAllNotificationTimers();
+    combatEffects.clear();
     if (activeSession === session) activeSession = undefined;
   };
   const teardownSessionOnPagehide = (event: PageTransitionEvent): void => {
@@ -1606,6 +1627,29 @@ function maybePlayCombatAlert(): void {
   void audio.playCombatAlert();
 }
 
+/**
+ * Reconcile one persistent battle marker per engaged cluster (armies grouped to
+ * a ~70u grid so two stacks trading fire share a marker). The marker's compass
+ * direction points at the nearest engaged enemy stack.
+ */
+function syncCombatMarkers(session: RemoteGameSession): void {
+  const engaged = Object.values(session.state.armies).filter((a) => a.status === 'engaged');
+  const seen = new Map<string, { id: string; x: number; z: number; intensity: number; dir: number }>();
+  for (const a of engaged) {
+    const key = `${Math.round(a.x / 70)}:${Math.round(a.z / 70)}`;
+    if (seen.has(key)) continue;
+    let dir = Number.NaN;
+    let best = Number.POSITIVE_INFINITY;
+    for (const other of engaged) {
+      if (other === a || other.ownerCountryId === a.ownerCountryId) continue;
+      const d = (other.x - a.x) ** 2 + (other.z - a.z) ** 2;
+      if (d < best) { best = d; dir = Math.atan2(other.z - a.z, other.x - a.x); }
+    }
+    seen.set(key, { id: key, x: a.x, z: a.z, intensity: 1, dir });
+  }
+  combatEffects.syncBattles([...seen.values()]);
+}
+
 function drainSessionEvents(session: RemoteGameSession): void {
   const player = session.playerCountryId;
   for (const done of session.pendingCompletions.splice(0)) {
@@ -1620,11 +1664,50 @@ function drainSessionEvents(session: RemoteGameSession): void {
       'The site is operational.');
     if (selectedProvinceId === done.provinceId) refreshSelectedProvince(session);
   }
+  // A world spot for a fight between two countries: the first engaged stack we
+  // can see that belongs to either side. null when neither is visible.
+  const battleSpotFor = (a: number, b: number): { x: number; z: number } | null => {
+    for (const army of Object.values(session.state.armies)) {
+      if (army.status !== 'engaged') continue;
+      if (army.ownerCountryId === a || army.ownerCountryId === b) return { x: army.x, z: army.z };
+    }
+    return null;
+  };
+  const fxDensity = effectDensityForDistance(lastCombatCameraDistance);
   for (const ev of session.pendingCombat.splice(0)) {
     // Only fights the player is in are player news. 'engaged' is gated to the
     // moment contact is made, so it fires once per battle, not every tick.
     if (ev.attacker !== player && ev.defender !== player) continue;
     const mine = ev.defender === player;
+    // World-space visuals for the same event, near-camera only (LOD gated).
+    if (fxDensity > 0) {
+      const atkSpot = battleSpotFor(ev.attacker, ev.attacker);
+      const defSpot = battleSpotFor(ev.defender, ev.defender) ?? battleSpotFor(ev.attacker, ev.defender);
+      const spot = defSpot ?? atkSpot;
+      const dir = atkSpot && defSpot
+        ? Math.atan2(defSpot.z - atkSpot.z, defSpot.x - atkSpot.x)
+        : Number.NaN;
+      if (spot) {
+        if (ev.kind === 'engaged') {
+          combatEffects.spawnVolley('generic', spot.x, spot.z, Number.isFinite(dir) ? dir : 0);
+          if (mine) combatEffects.spawn(EFFECT_KIND.targetFlash, spot.x, spot.z, { scale: 1.1 });
+        } else if (ev.kind === 'volley') {
+          combatEffects.spawnVolley('infantry', spot.x, spot.z, Number.isFinite(dir) ? dir : 0);
+        } else if (ev.kind === 'bombardment') {
+          if (atkSpot) {
+            combatEffects.spawnVolley('artillery', atkSpot.x, atkSpot.z, Number.isFinite(dir) ? dir : 0);
+          }
+          const impactAt = defSpot ?? spot;
+          window.setTimeout(() => {
+            combatEffects.spawn(EFFECT_KIND.explosion, impactAt.x, impactAt.z, { scale: 1.3 });
+            combatEffects.spawn(EFFECT_KIND.smoke, impactAt.x, impactAt.z, { scale: 1.2, lifetimeMs: 2_400 });
+          }, 520);
+        } else if (ev.kind === 'destroyed') {
+          combatEffects.spawn(EFFECT_KIND.explosion, spot.x, spot.z, { scale: 1.5 });
+          combatEffects.spawn(EFFECT_KIND.smoke, spot.x, spot.z, { scale: 1.6, lifetimeMs: 2_800 });
+        }
+      }
+    }
     if (ev.kind === 'engaged') {
       // Locate the fight on one of the player's engaged stacks so the toast can
       // jump the camera there. 'engaged' fires once per battle server-side, so

@@ -54,10 +54,23 @@ describe('attack-order feedback', () => {
   });
 
   it('locates an "under attack" toast on a friendly engaged stack for click-to-focus', () => {
-    const block = main.slice(main.indexOf("if (ev.kind === 'engaged')"));
+    const block = main.slice(main.indexOf("// Locate the fight on one of the player's engaged stacks"));
     expect(block.slice(0, 700)).toMatch(/a\.own && a\.status === 'engaged'/);
     expect(block.slice(0, 700)).toMatch(/focus: \{ x: spot\.x, z: spot\.z \}/);
     expect(block.slice(0, 700)).toContain('maybePlayCombatAlert()');
+  });
+
+  it('spawns pooled world-space effects from the same combat events (LOD-gated)', () => {
+    const block = main.slice(main.indexOf('const fxDensity = effectDensityForDistance'),
+      main.indexOf('for (const cap of session.pendingCaptures'));
+    expect(block).toContain("combatEffects.spawnVolley('generic'");
+    expect(block).toContain('EFFECT_KIND.explosion');
+    expect(block).toContain("ev.kind === 'bombardment'");
+    // markers reconcile off engaged armies, not per event
+    expect(main).toContain('combatEffects.syncBattles([...seen.values()])');
+    // per-frame repack + upload lives in onStats
+    expect(main).toContain('combatEffects.collect(');
+    expect(main).toContain('renderer.setCombatEffects(packed.floats, packed.count)');
   });
 });
 
