@@ -19,7 +19,9 @@
  */
 
 import type { ContactLevel } from './visibility';
-import { computeArmyVisibility, friendlyVisionSources, pointContactLevel } from './visibility';
+import {
+  computeArmyVisibility, friendlyVisionSources, ownsGroundAt, pointContactLevel,
+} from './visibility';
 import type { GameState, ResourceNodeState } from './game-state';
 import type { WorldData } from './world-data';
 import type { ArmyStack, ArmyStatus } from './units/army';
@@ -202,6 +204,7 @@ export function visibleResourceNodes(
   const sources = friendlyVisionSources(state, world, viewerCountryId);
   return nodes.filter((node) => {
     if (node.controllerCountryId === viewerCountryId) return true;
+    if (ownsGroundAt(state, world, viewerCountryId, node.x, node.z)) return true;
     return pointContactLevel(sources, node.x, node.z, world.width) !== 'hidden';
   });
 }
