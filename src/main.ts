@@ -25,7 +25,7 @@ import { GameConnection } from './client/game-connection';
 import { RemoteGameSession } from './client/remote-session';
 import { configureWorldAssetBase } from './world-assets';
 import type { SessionResponse } from '@ironfronts/protocol';
-import { buildArmyFormation, dominantVisualKind } from './army-map-presentation';
+import { buildArmyCompositionRows, buildArmyFormation, dominantVisualKind } from './army-map-presentation';
 
 type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
 
@@ -757,6 +757,12 @@ async function bootstrapGameSession(
 
   // Player identity -> renderer flag/tint + HUD.
   const player = session.ownCountry;
+  // The world package contains scenario-start ownership. A continued session
+  // must apply its authoritative snapshot before the first rendered frame;
+  // capture events only cover changes that happen after this connection.
+  renderer.setProvinceOwners(Object.entries(session.state.provinceOwners).map(([provinceId, countryId]) => ({
+    provinceId: Number(provinceId), countryId,
+  })));
   renderer.setPlayerCountryByName(player.name);
   const { x, z, distance } = session.state.startCamera;
   // Deterministic near-top-down view centred on the player's homeland; no prior
@@ -850,7 +856,7 @@ async function bootstrapGameSession(
   );
 }
 
-const armyMarkerScratch = new Float32Array(8 * 1_024);
+const armyMarkerScratch = new Float32Array(16 * 1_024);
 const armyModelScratch = new Float32Array(12 * 4_096);
 const resourceMarkerScratch = new Float32Array(4 * 4_096);
 /** LineRecord (8 f32) per own-army route segment — see renderer.setOrderRoutes. */
@@ -943,6 +949,7 @@ function syncArmyMarkers(
     }
 
     const formation = identified ? buildArmyFormation(army.composition?.groups ?? []) : [];
+    const compositionRows = identified ? buildArmyCompositionRows(army.composition?.groups ?? []) : [];
     armyMarkerScratch[cursor] = army.x;
     armyMarkerScratch[cursor + 1] = army.z;
     armyMarkerScratch[cursor + 2] = packRgb(army.ownerColor);
@@ -952,7 +959,11 @@ function syncArmyMarkers(
     armyMarkerScratch[cursor + 5] = identified ? army.composition?.health ?? 0 : 0;
     armyMarkerScratch[cursor + 6] = army.id === selectedArmyId ? 1 : 0;
     armyMarkerScratch[cursor + 7] = identified ? dominantVisualKind(formation) : 4;
-    cursor += 8;
+    for (let row = 0; row < 4; row += 1) {
+      armyMarkerScratch[cursor + 8 + row] = compositionRows[row]?.count ?? 0;
+      armyMarkerScratch[cursor + 12 + row] = compositionRows[row]?.kind ?? 4;
+    }
+    cursor += 16;
     count += 1;
     armyPickScratch.push({ id: army.id, x: army.x, z: army.z });
 
@@ -965,10 +976,11 @@ function syncArmyMarkers(
       armyMarkerScratch[cursor + 5] = 0;
       armyMarkerScratch[cursor + 6] = 0;
       armyMarkerScratch[cursor + 7] = 0;
-      cursor += 8;
+      armyMarkerScratch.fill(0, cursor + 8, cursor + 16);
+      cursor += 16;
       count += 1;
     }
-    if (army.id === selectedArmyId && army.status === 'engaged') {
+    if (army.id === selectedArmyId && army.status === 'engaged' && targetingMode === 'retreat') {
       for (const exit of army.legalRetreatExits ?? []) {
         if (count >= 1_024) break;
         armyMarkerScratch[cursor] = exit.x;
@@ -979,7 +991,8 @@ function syncArmyMarkers(
         armyMarkerScratch[cursor + 5] = 0;
         armyMarkerScratch[cursor + 6] = 0;
         armyMarkerScratch[cursor + 7] = 0;
-        cursor += 8;
+        armyMarkerScratch.fill(0, cursor + 8, cursor + 16);
+        cursor += 16;
         count += 1;
       }
     }
@@ -1221,6 +1234,7 @@ function handleMapClick(
       if (!result.ok) pushNotification('warning', 'Retreat', result.reason ?? 'No legal retreat.');
       targetingMode = null;
       refreshSelectedArmy(session);
+      syncArmyMarkers(session, renderer);
       return true;
     }
   }
@@ -1372,11 +1386,14 @@ function handleArmyCommand(command: ArmyPanelCommand): void {
       targetingMode = 'retreat';
       pushNotification('information', 'Choose retreat direction', 'Select one of the highlighted exit edges on the map.');
       refreshSelectedArmy(session);
+      if (activeRenderer) syncArmyMarkers(session, activeRenderer);
       return;
     }
     const result = session.orderRetreat(selectedArmyId, firstNodeId);
     if (!result.ok) pushNotification('warning', 'Retreat', result.reason ?? 'No legal retreat.');
+    targetingMode = null;
     refreshSelectedArmy(session);
+    if (activeRenderer) syncArmyMarkers(session, activeRenderer);
     return;
   }
   if (command === 'stop') {

@@ -8,6 +8,7 @@
  */
 
 import { createIcon, iconMarkup, type IconName } from './icons';
+import { summarizeBattleFronts } from './army-presentation';
 import type { ArmyStackView, CombatStatus } from './ui-state';
 
 export type { ArmyStackView, CombatStatus } from './ui-state';
@@ -96,20 +97,6 @@ function createUnitGlyph(typeId: string, label: string): SVGSVGElement {
   svg.setAttribute('aria-label', label);
   svg.innerHTML = UNIT_GLYPHS[typeId] ?? '<path d="M8 34h32V14H8zM14 20h20M14 27h20"/>';
   return svg;
-}
-
-/** A labelled proportion bar for the combat overview (ours vs enemy strength). */
-function strengthBar(label: string, current: number, baseline: number, modifier: string): HTMLElement {
-  const pct = baseline > 0 ? Math.max(0, Math.min(100, Math.round((current / baseline) * 100))) : 0;
-  const row = node('div', `ifg-army-panel__front-bar ${modifier}`);
-  row.append(node('span', 'ifg-army-panel__front-bar-label', label));
-  const track = node('span', 'ifg-army-panel__front-bar-track');
-  const fill = node('i');
-  fill.style.width = `${pct}%`;
-  track.append(fill);
-  row.append(track, node('b', undefined, `${pct}%`));
-  row.title = `${label}: ${Math.ceil(current)} / ${Math.ceil(baseline)} HP`;
-  return row;
 }
 
 function appendStat(host: HTMLElement, label: string, value: string, icon?: IconName): void {
@@ -250,26 +237,64 @@ export function renderSelectedArmyPanel(
     const seconds = Math.max(0, Math.ceil((tick - (army.simulationTick ?? 0)) / 10));
     return seconds === 0 ? 'Ready' : `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
   };
-  if (army.combat === 'engaged' && army.battleFronts?.length) {
-    activity.append(node('small', 'ifg-army-panel__eyebrow', 'Combat overview'));
-    for (const front of army.battleFronts) {
-      const line = node('article', 'ifg-army-panel__front');
-      const head = node('div', 'ifg-army-panel__front-head');
-      head.append(
-        node('strong', undefined, front.role === 'attack' ? 'Attacking' : 'Defending'),
-        node('span', 'ifg-army-panel__front-volley', `Next volley ${remaining(front.friendlyNextVolleyTick)}`),
+  const battle = army.combat === 'engaged'
+    ? summarizeBattleFronts(army.battleFronts, army.simulationTick ?? 0) : null;
+  if (battle) {
+    activity.classList.add('ifg-army-panel__activity--combat');
+    const battleHeader = node('div', 'ifg-battle__header');
+    const battleTitle = node('span');
+    battleTitle.append(
+      node('small', 'ifg-army-panel__eyebrow', 'Combat overview'),
+      node('strong', undefined, battle.role === 'mixed'
+        ? 'Contested battle' : battle.role === 'attack' ? 'Offensive' : 'Defensive line'),
+    );
+    battleHeader.append(
+      battleTitle,
+      node('span', 'ifg-battle__front-count', `${battle.frontCount} ${battle.frontCount === 1 ? 'front' : 'fronts'}`),
+    );
+
+    const battleSides = node('div', 'ifg-battle__sides');
+    const appendSide = (
+      label: string, side: typeof battle.friendly, tone: 'friendly' | 'enemy',
+    ): void => {
+      const row = node('article', `ifg-battle-side ifg-battle-side--${tone}`);
+      const sideHeader = node('div', 'ifg-battle-side__header');
+      sideHeader.append(
+        node('strong', undefined, label),
+        node('b', undefined, `${Math.ceil(side.hp)} / ${Math.ceil(side.baselineHp)} HP`),
       );
-      line.append(head);
-      line.append(strengthBar('Ours', front.friendlyHp, front.friendlyBaselineHp, 'is-friendly'));
-      line.append(strengthBar('Enemy', front.enemyHp, front.enemyBaselineHp, 'is-enemy'));
-      if (front.reinforcementCount) {
-        line.append(node('small', 'ifg-army-panel__front-note', `+${front.reinforcementCount} reinforcing`));
-      }
-      activity.append(line);
-    }
-    // One chip per *distinct* escape direction (the server already collapses the
-    // raw per-province routes and tags each with a compass bearing), not one per
-    // graph node — that used to spill 25 look-alike buttons into the panel.
+      const healthTrack = node('span', 'ifg-battle-side__health');
+      healthTrack.setAttribute('role', 'progressbar');
+      healthTrack.setAttribute('aria-label', `${label} health`);
+      healthTrack.setAttribute('aria-valuemin', '0');
+      healthTrack.setAttribute('aria-valuemax', '100');
+      healthTrack.setAttribute('aria-valuenow', String(side.healthPercent));
+      const healthFill = node('i');
+      healthFill.style.width = `${side.healthPercent}%`;
+      healthTrack.append(healthFill);
+      const cooldown = node('span', 'ifg-battle-side__cooldown');
+      cooldown.classList.toggle('is-ready', side.ready);
+      cooldown.append(node('small', undefined, 'Next volley'), node('b', undefined, side.cooldown));
+      row.append(sideHeader, healthTrack, cooldown);
+      battleSides.append(row);
+    };
+    appendSide(army.own ? 'Your forces' : 'Selected forces', battle.friendly, army.own ? 'friendly' : 'enemy');
+    appendSide(army.own ? 'Enemy forces' : 'Opposing forces', battle.enemy, army.own ? 'enemy' : 'friendly');
+
+    const battleMeta = node('div', 'ifg-battle__meta');
+    battleMeta.append(
+      node('span', undefined, battle.reinforcementCount
+        ? `${battle.reinforcementCount} supporting ${battle.reinforcementCount === 1 ? 'army' : 'armies'}`
+        : 'No reinforcements'),
+      node('span', undefined, army.legalRetreatExits?.length
+        ? `${army.legalRetreatExits.length} retreat ${army.legalRetreatExits.length === 1 ? 'route' : 'routes'} available`
+        : 'No safe retreat'),
+    );
+    activity.append(battleHeader, battleSides, battleMeta);
+    // One actionable chip per *distinct* escape direction (the server already
+    // collapses the raw per-province routes and tags each with a compass
+    // bearing), not one per graph node — that used to spill 25 look-alike
+    // buttons into the panel.
     if (army.legalRetreatExits && army.legalRetreatExits.length > 1) {
       const box = node('div', 'ifg-army-panel__retreat');
       box.append(node('small', 'ifg-army-panel__eyebrow', `Retreat routes · ${army.legalRetreatExits.length} open`));

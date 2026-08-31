@@ -19,8 +19,8 @@ export function visualKindForUnit(typeId: string): ArmyVisualKind {
   return 0;
 }
 
-/** Collapse rule-level unit types into the few silhouettes useful on the map. */
-export function buildArmyFormation(groups: readonly ProjectedTroopGroup[]): ArmyFormationGroup[] {
+/** Collapse rule-level unit types into the four categories readable on the map. */
+export function buildArmyCompositionRows(groups: readonly ProjectedTroopGroup[]): ArmyFormationGroup[] {
   const buckets = new Map<ArmyVisualKind, { count: number; weightedHealth: number }>();
   for (const group of groups) {
     if (group.count <= 0) continue;
@@ -30,11 +30,16 @@ export function buildArmyFormation(groups: readonly ProjectedTroopGroup[]): Army
     bucket.weightedHealth += group.health * group.count;
     buckets.set(kind, bucket);
   }
-  const categories = [...buckets.entries()]
-    .map(([kind, bucket]) => ({
-      kind, count: bucket.count, health: bucket.weightedHealth / bucket.count, slots: 1, remainder: 0,
-    }))
-    .sort((a, b) => a.kind - b.kind);
+  return [...buckets.entries()]
+    .map(([kind, bucket]) => ({ kind, count: bucket.count, health: bucket.weightedHealth / bucket.count }))
+    .sort((a, b) => a.kind - b.kind)
+    .slice(0, 4);
+}
+
+/** Spread the composition categories over at most four close-range models. */
+export function buildArmyFormation(groups: readonly ProjectedTroopGroup[]): ArmyFormationGroup[] {
+  const categories = buildArmyCompositionRows(groups)
+    .map((group) => ({ ...group, slots: 1, remainder: 0 }));
   const totalUnits = categories.reduce((sum, category) => sum + category.count, 0);
   const slotLimit = Math.min(4, totalUnits);
   const remaining = Math.max(0, slotLimit - categories.length);

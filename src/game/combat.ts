@@ -232,7 +232,16 @@ export function legalRetreatPaths(session: SimContext, armyId: string): RetreatP
   const army = session.state.armies[armyId];
   if (!army || army.status !== 'engaged') return [];
   const front = army.battleFrontIds?.map((id) => session.state.battleFronts[id]).find(Boolean);
-  return front ? retreatPaths(session, army, legalFirstNodes(session, army, front)) : [];
+  if (!front) return [];
+  // Retreat selection is directional: commands and map highlights are keyed by
+  // firstNodeId. `retreatPaths` can find the same exit once for every reachable
+  // friendly province, so retain only its shortest (first, due to sorting)
+  // route instead of flooding the projection with duplicate exit choices.
+  const uniqueExits = new Map<number, RetreatPath>();
+  for (const route of retreatPaths(session, army, legalFirstNodes(session, army, front))) {
+    if (!uniqueExits.has(route.firstNodeId)) uniqueExits.set(route.firstNodeId, route);
+  }
+  return [...uniqueExits.values()];
 }
 
 export function issueManualRetreat(

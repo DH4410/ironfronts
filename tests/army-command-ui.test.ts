@@ -32,8 +32,10 @@ describe('icon-first army command strip', () => {
 
   it('shows the combat front as strength bars, not a raw graph-node id', () => {
     expect(army).not.toContain('direction ${front.directionNodeId}');
-    expect(army).toContain('function strengthBar(');
-    expect(army).toContain("strengthBar('Ours'");
-    expect(army).toContain("strengthBar('Enemy'");
+    // The aggregated battle overview (summarizeBattleFronts) renders per-side
+    // health bars, never a bare front/graph-node identifier.
+    expect(army).toContain('summarizeBattleFronts(');
+    expect(army).toContain("node('span', 'ifg-battle-side__health')");
+    expect(army).toContain('healthFill.style.width');
   });
 });

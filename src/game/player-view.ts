@@ -129,7 +129,9 @@ export function projectArmyView(
 
   const owner = state.countries[army.ownerCountryId];
   const fullyVisible = own || level === 'visible';
-  const fronts = own ? (army.battleFrontIds ?? []).flatMap((frontId) => {
+  // A fully identified foreign army exposes the same battle-level readout as
+  // an owned army. Contact-only stacks still reveal no combat composition.
+  const fronts = fullyVisible ? (army.battleFrontIds ?? []).flatMap((frontId) => {
     const front = state.battleFronts?.[frontId];
     if (!front) return [];
     const friendly = front.sideA.countryId === army.ownerCountryId ? front.sideA : front.sideB;

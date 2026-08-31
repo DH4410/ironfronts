@@ -75,6 +75,7 @@ describe('single authoritative game runtime', () => {
     try {
       const runtime = new GameRuntime(tinyWorld());
       expect(runtime.join('account-a', 1)).toMatchObject({ ok: true });
+      runtime.session.state.provinceOwners[5] = 1;
       runtime.tick(2);
       await persistence.save({
         formatVersion: 2,
@@ -90,6 +91,7 @@ describe('single authoritative game runtime', () => {
       expect(restored.seat('account-a')).toBe(1);
       expect(restored.session.gameTimeHours).toBeCloseTo(2, 5);
       expect(restored.session.state.countries[1].controller).toBe('player');
+      expect(restored.session.state.provinceOwners[5]).toBe(1);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
