@@ -6,8 +6,12 @@ export const propShader = commonWgsl + /* wgsl */ `
 // strategic-map scale. Footprint is trimmed harder than height so a town still
 // has a silhouette. Nothing gameplay reads these (no picking, no road/army
 // height) — terrain height stays the shared authoritative path.
-const BUILDING_FOOTPRINT_SCALE = 0.6;
-const BUILDING_HEIGHT_SCALE = 0.72;
+// Trimmed again (0.60 -> 0.42 footprint, 0.72 -> 0.52 height): at strategic
+// zoom a town should read as a small dense cluster, not a handful of
+// road-width-wide blocks. The landmark archetype (4) still mixes back toward
+// full size below so a capital keeps its presence.
+const BUILDING_FOOTPRINT_SCALE = 0.42;
+const BUILDING_HEIGHT_SCALE = 0.52;
 const TREE_MAP_SCALE = 0.66;
 
 struct InstanceRecord { a: vec4f, b: vec4f };

@@ -27,7 +27,7 @@ describe('WGSL programs', () => {
     const footprint = Number(/BUILDING_FOOTPRINT_SCALE = ([\d.]+)/.exec(propShader)?.[1]);
     const tree = Number(/TREE_MAP_SCALE = ([\d.]+)/.exec(propShader)?.[1]);
     expect(footprint).toBeGreaterThan(0);
-    expect(footprint).toBeLessThanOrEqual(0.7);
+    expect(footprint).toBeLessThanOrEqual(0.45);
     expect(tree).toBeLessThanOrEqual(0.75);
     // landmark buildings keep more of their bulk so a capital still reads
     expect(propShader).toContain('archetype == 4u');
