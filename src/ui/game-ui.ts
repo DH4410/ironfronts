@@ -74,9 +74,9 @@ type ProvinceFieldKey = (typeof PROVINCE_FIELDS)[number];
 const FACILITY_CHIPS: ReadonlyArray<{
   key: 'barracks' | 'tankPlant' | 'ordnance'; label: string; icon: IconName;
 }> = [
-  { key: 'barracks', label: 'Barracks', icon: 'stat-troops' },
-  { key: 'tankPlant', label: 'Tank plant', icon: 'industry' },
-  { key: 'ordnance', label: 'Ordnance works', icon: 'stat-attack' },
+  { key: 'barracks', label: 'Barracks', icon: 'structure-barracks' },
+  { key: 'tankPlant', label: 'Tank plant', icon: 'structure-plant' },
+  { key: 'ordnance', label: 'Ordnance works', icon: 'structure-ordnance' },
 ];
 
 const numberFormat = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });

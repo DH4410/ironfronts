@@ -36,7 +36,8 @@ export type IconName =
   | 'note-warning' | 'note-combat' | 'note-completed' | 'note-diplomacy' | 'note-information'
   | 'node-stone' | 'node-metal' | 'node-oil' | 'resource-water'
   | 'cmd-move' | 'cmd-attack' | 'cmd-retreat' | 'cmd-split' | 'cmd-stop' | 'cmd-extract'
-  | 'stat-health' | 'stat-attack' | 'stat-defence' | 'stat-speed' | 'stat-troops';
+  | 'stat-health' | 'stat-attack' | 'stat-defence' | 'stat-speed' | 'stat-troops'
+  | 'structure-barracks' | 'structure-plant' | 'structure-ordnance';
 
 interface IconDef { readonly kind: 'img' | 'svg'; readonly value: string; }
 
@@ -84,6 +85,9 @@ const ICONS: Record<IconName, IconDef> = {
   'stat-defence': { kind: 'svg', value: svg('shield') },
   'stat-speed': { kind: 'svg', value: svg('speed') },
   'stat-troops': { kind: 'svg', value: svg('troops') },
+  'structure-barracks': { kind: 'img', value: png('training') },
+  'structure-plant': { kind: 'img', value: png('production') },
+  'structure-ordnance': { kind: 'img', value: png('construction') },
 };
 
 export function createIcon(name: IconName, className = ''): HTMLElement {

@@ -15,7 +15,9 @@ specific files we actually use are vendored.
 
 Vendored under `src/ui/assets/icons/0ad/` (bundled by Vite). Each file is
 copied unmodified from `0ad/0ad` at ref `master`, from
-`binaries/data/mods/public/art/textures/ui/session/icons/`:
+`binaries/data/mods/public/art/textures/ui/session/icons/`. The
+`binaries/data/mods/*/art` tree is CC BY-SA 3.0 per that repo's
+`binaries/data/mods/public/art/LICENSE.txt` and top-level `LICENSE.txt`.
 
 | Vendored file | Upstream source path | Used in Ironfronts for |
 |---|---|---|
@@ -25,7 +27,9 @@ copied unmodified from `0ad/0ad` at ref `master`, from
 | `wood.png` | `resources/wood.png` | (reserved — forestry) |
 | `population.png` | `resources/population.png` | Manpower resource |
 | `economics.png` | `economics.png` | Funds resource · Economy dock button |
-| `production.png` | `production.png` | Industry resource |
+| `production.png` | `production.png` | Industry resource · Tank-plant facility chip |
+| `training.png` | `training.png` | Barracks facility chip (city panel) |
+| `construction.png` | `construction.png` | Ordnance-works facility chip (city panel) |
 | `diplomacy.png` | `diplomacy.png` | Diplomacy map mode · Diplomacy dock button |
 | `objectives.png` | `objectives.png` | Objectives dock button |
 | `attack-request.png` | `attack-request.png` | (reserved — army/combat UI) |
