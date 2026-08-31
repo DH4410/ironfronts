@@ -857,6 +857,8 @@ async function bootstrapGameSession(
     if (event.repeat || !selectedArmyId) return;
     if (event.key === 'm' || event.key === 'M') {
       targetingMode = 'move'; awaitingMoveTarget = true; refreshSelectedArmy(session);
+    } else if (event.key === 'a' || event.key === 'A') {
+      handleArmyCommand('attack');
     } else if (event.key === 's' || event.key === 'S') {
       session.orderStop(selectedArmyId); targetingMode = null; awaitingMoveTarget = false; refreshSelectedArmy(session);
     }
