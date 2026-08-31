@@ -320,6 +320,23 @@
 }
 .ifg-notify__item[data-kind="warning"] { border-left-color: #d9a441; }
 .ifg-notify__item[data-kind="combat"] { border-left-color: #c9603f; }
+/* A located combat alert reads louder and invites a click to jump there. */
+.ifg-notify__item.is-locatable {
+  cursor: pointer;
+  border-color: rgba(201, 96, 63, 0.5);
+  box-shadow: var(--ifg-lift), 0 0 0 1px rgba(201, 96, 63, 0.35), 0 0 18px rgba(201, 96, 63, 0.22);
+}
+.ifg-notify__item.is-locatable:hover { border-color: #c9603f; }
+.ifg-notify__item.is-locatable strong { color: #f0b49c; }
+.ifg-notify__item.is-locatable::after {
+  content: "Jump →";
+  grid-column: 2 / 3;
+  margin-top: 2px;
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #c9603f;
+}
 .ifg-notify__item[data-kind="completed"] { border-left-color: #7f9e5a; }
 .ifg-notify__item[data-kind="diplomacy"] { border-left-color: #6f8fae; }
 .ifg-notify__icon { width: 18px; height: 18px; margin-top: 1px; color: var(--ifg-brass-lit); }
@@ -1002,3 +1019,36 @@
 
 .ifg-card__prodlist { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .ifg-card__prodlist .ifg-card__act { flex: 0 0 auto; }
+
+/* ============ attack-order target reticle (one-shot, DOM) ============ */
+.ifg-attack-flash {
+  position: fixed;
+  z-index: 40;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  border: 2px solid #e5533a;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 0 14px 2px rgba(229, 83, 58, 0.55);
+}
+.ifg-attack-flash::before,
+.ifg-attack-flash::after {
+  content: "";
+  position: absolute;
+  background: #e5533a;
+}
+.ifg-attack-flash::before { left: 50%; top: -7px; bottom: -7px; width: 2px; margin-left: -1px; }
+.ifg-attack-flash::after { top: 50%; left: -7px; right: -7px; height: 2px; margin-top: -1px; }
+.ifg-attack-flash.is-firing { animation: ifg-attack-flash 620ms var(--ifg-ease, ease-out) forwards; }
+@keyframes ifg-attack-flash {
+  0%   { opacity: 0; transform: scale(1.9) rotate(-18deg); }
+  22%  { opacity: 1; }
+  100% { opacity: 0; transform: scale(0.72) rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ifg-attack-flash.is-firing { animation-duration: 300ms; }
+  .ifg-attack-flash.is-firing { animation-name: ifg-attack-flash-fade; }
+  @keyframes ifg-attack-flash-fade { 0% { opacity: 1; } 100% { opacity: 0; } }
+}

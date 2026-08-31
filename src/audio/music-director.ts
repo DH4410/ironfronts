@@ -17,6 +17,10 @@ export interface MusicDirectorOptions {
   random?: () => number;
   setTimer?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   clearTimer?: (timer: ReturnType<typeof setTimeout>) => void;
+  /** Fired only when a track *actually* starts playing (post `playMusic`
+   *  success), and with `null` when music stops. Never fired for a blocked
+   *  autoplay attempt — so a "Now Playing" readout can't show a phantom title. */
+  onTrackChange?: (track: MusicTrack | null) => void;
 }
 
 const RECENT_HISTORY = 4;
@@ -25,6 +29,8 @@ export class MusicDirector {
   private readonly random: () => number;
   private readonly setTimer: NonNullable<MusicDirectorOptions['setTimer']>;
   private readonly clearTimer: NonNullable<MusicDirectorOptions['clearTimer']>;
+  private readonly onTrackChange: NonNullable<MusicDirectorOptions['onTrackChange']>;
+  private currentTrackId: string | null = null;
   private state: MusicState | null = null;
   private generation = 0;
   private timer?: ReturnType<typeof setTimeout>;
@@ -39,10 +45,16 @@ export class MusicDirector {
     this.random = options.random ?? Math.random;
     this.setTimer = options.setTimer ?? ((callback, delayMs) => globalThis.setTimeout(callback, delayMs));
     this.clearTimer = options.clearTimer ?? ((timer) => globalThis.clearTimeout(timer));
+    this.onTrackChange = options.onTrackChange ?? (() => undefined);
   }
 
   getState(): MusicState | null {
     return this.state;
+  }
+
+  /** The track currently playing, or null when music is stopped / blocked. */
+  getCurrentTrack(): MusicTrack | null {
+    return this.currentTrackId ? TRACK_BY_ID.get(this.currentTrackId) ?? null : null;
   }
 
   /**
@@ -103,6 +115,10 @@ export class MusicDirector {
     this.state = null;
     this.cancelTimer();
     this.player.stopMusic(fadeSeconds);
+    if (this.currentTrackId !== null) {
+      this.currentTrackId = null;
+      this.onTrackChange(null);
+    }
   }
 
   private async playNextFromPool(
@@ -156,6 +172,10 @@ export class MusicDirector {
       if (played) {
         this.remember(candidate.id);
         this.rememberForState(state, candidate.id);
+        if (this.currentTrackId !== candidate.id) {
+          this.currentTrackId = candidate.id;
+          this.onTrackChange(candidate);
+        }
         return true;
       }
     }

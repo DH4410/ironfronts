@@ -132,11 +132,17 @@ export class RemoteGameSession extends EventTarget {
   }
   orderAttackProvince(armyId: string, provinceId: number) {
     if (!this.ownsArmy(armyId)) return { ok: false, reason: 'Not your army.' } as const;
-    return this.send({ type: 'attackArmy', armyId, target: { kind: 'province', provinceId } }, () => undefined);
+    return this.send({ type: 'attackArmy', armyId, target: { kind: 'province', provinceId } }, (state) => {
+      const army = state.armies[armyId];
+      if (army) { army.status = 'moving'; army.moveIntent = 'attack'; }
+    });
   }
   orderAttackArmy(armyId: string, targetArmyId: string) {
     if (!this.ownsArmy(armyId)) return { ok: false, reason: 'Not your army.' } as const;
-    return this.send({ type: 'attackArmy', armyId, target: { kind: 'army', armyId: targetArmyId } }, () => undefined);
+    return this.send({ type: 'attackArmy', armyId, target: { kind: 'army', armyId: targetArmyId } }, (state) => {
+      const army = state.armies[armyId];
+      if (army) { army.status = 'moving'; army.moveIntent = 'attack'; }
+    });
   }
   orderRetreat(armyId: string, firstNodeId: number) {
     if (!this.ownsArmy(armyId)) return { ok: false, reason: 'Not your army.' } as const;

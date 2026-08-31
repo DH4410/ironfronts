@@ -131,6 +131,9 @@ export interface GameNotification {
   readonly at: number;
   /** When true the toast stays until dismissed (action-required); else it auto-expires. */
   readonly sticky?: boolean;
+  /** World point this event happened at. When present the toast is clickable
+   *  and re-centres the camera there (e.g. "force under attack"). */
+  readonly focus?: { readonly x: number; readonly z: number };
 }
 
 export type CombatStatus = 'idle' | 'moving' | 'engaged' | 'retreating';

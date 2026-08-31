@@ -289,6 +289,24 @@ export class AudioManager {
     );
   }
 
+  /**
+   * "One of your forces is under attack" cue. Routed through the `effects`
+   * bus, so it obeys master + SFX volume but never the music volume, and can
+   * never gate gameplay (a rejected AudioContext op is swallowed). The caller
+   * owns dedupe / cooldown — this just plays the sample once.
+   */
+  async playCombatAlert(volume = 0.6): Promise<boolean> {
+    try {
+      if (!await this.unlock()) return false;
+      const effectsGain = this.gains?.effects;
+      if (!effectsGain) return false;
+      return await this.playSample('/audio/sfx/alarmattackunit_1.ogg', effectsGain, volume);
+    } catch (error) {
+      console.warn('Combat alert cue failed and was ignored.', error);
+      return false;
+    }
+  }
+
   async playMusic(url: string, options: MusicPlaybackOptions = {}): Promise<boolean> {
     if (!url || !await this.unlock()) return false;
     const request = ++this.musicRequest;

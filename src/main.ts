@@ -149,7 +149,9 @@ const debugEnabled = urlParams.has('debug') || urlParams.has('benchmark');
 const uiStore = createUiStore(createInitialState({ quality: loadQuality(), debugEnabled }));
 
 const audio = new AudioManager(safeLocalStorage());
-const music = new MusicDirector(audio);
+const music = new MusicDirector(audio, {
+  onTrackChange: (track) => updateNowPlaying(track ? track.title : null),
+});
 const firstMenuTrack = TRACK_BY_ID.get('honor-bound');
 audio.prime(firstMenuTrack ? trackSources(firstMenuTrack).slice(0, 1) : []);
 audio.installLifecycle();
@@ -466,6 +468,33 @@ async function startGame(token: number): Promise<void> {
       ? activeSession.describeProvince(info.id).resources
       : null);
 
+  // Attack-order cursor feedback. With an own army selected, the world cursor
+  // becomes the 0 A.D. attack cursor over a *fully identified* enemy stack, and
+  // the "no" cursor while aiming an attack at anything that can't be struck.
+  // Gating on `contact === 'visible'` keeps the cursor honest with the server's
+  // "a strike needs an identified target" rule — a contact-only blip gets no
+  // attack affordance, so hovering never confirms an unseen force is there.
+  const updateWorldCursor = (clientX: number, clientY: number): void => {
+    const session = activeSession;
+    if (!session || !selectedArmyId || !session.ownsArmy(selectedArmyId)) {
+      canvas.style.cursor = '';
+      return;
+    }
+    const hoveredId = renderer.pickArmyAt(clientX, clientY);
+    const hovered = hoveredId && hoveredId !== selectedArmyId ? session.army(hoveredId) : null;
+    const strikable = Boolean(hovered && !hovered.own && hovered.contact === 'visible');
+    if (strikable) {
+      canvas.style.cursor = 'url(/cursors/action-attack.png) 1 1, crosshair';
+    } else if (targetingMode === 'attack') {
+      canvas.style.cursor = 'url(/cursors/cursor-no.png) 13 14, not-allowed';
+    } else {
+      canvas.style.cursor = '';
+    }
+  };
+  canvas.addEventListener('pointermove', (event) => {
+    updateWorldCursor(event.clientX, event.clientY);
+  }, attemptListener);
+
   // ---- Player HUD: typed state in, typed actions out -----------------
   const setMapModeUnified = (mode: MapMode): void => {
     const input = mapModeInputs.find((candidate) => candidate.value === mode);
@@ -492,6 +521,7 @@ async function startGame(token: number): Promise<void> {
     openDebugInspector: () => {
       if (debugEnabled) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3', key: 'F3' }));
     },
+    focusWorld: (x, z) => renderer.focus(x, z, 900),
     armyCommand: (command) => handleArmyCommand(command),
     produceUnit: (provinceId, unitTypeId) => handleProduce(provinceId, unitTypeId),
     buildStructure: (provinceId, buildingId) => handleBuild(provinceId, buildingId),
@@ -1174,6 +1204,24 @@ function chooseSplitGroups(session: RemoteGameSession, armyId: string): Promise<
 
 // ---- army selection + orders --------------------------
 
+/** A one-shot red reticle that snaps onto the click point and fades. Pure DOM,
+ *  no renderer pipeline — the immediate "acknowledged" cue for an attack order. */
+let attackFlashEl: HTMLDivElement | null = null;
+function flashAttackTarget(clientX: number, clientY: number): void {
+  if (!attackFlashEl) {
+    attackFlashEl = document.createElement('div');
+    attackFlashEl.className = 'ifg-attack-flash';
+    attackFlashEl.setAttribute('aria-hidden', 'true');
+    document.body.append(attackFlashEl);
+  }
+  const el = attackFlashEl;
+  el.style.left = `${clientX}px`;
+  el.style.top = `${clientY}px`;
+  el.classList.remove('is-firing');
+  void el.offsetWidth; // restart the animation
+  el.classList.add('is-firing');
+}
+
 function handleMapClick(
   renderer: WorldRenderer, session: RemoteGameSession, clientX: number, clientY: number,
 ): boolean {
@@ -1218,8 +1266,17 @@ function handleMapClick(
     if (!result.ok) {
       const { title, body } = describeOrderFailure(result.reason ?? 'Invalid target.');
       pushNotification('warning', title, body);
+    } else {
+      // Acknowledge the click immediately — do not wait for the server to open
+      // combat. Reticle on the target, a short order cue, and a toast; the
+      // optimistic mutation flips the panel to "advancing to engage".
+      flashAttackTarget(clientX, clientY);
+      void audio.playUiCue('confirm');
+      pushNotification('information', 'Attack order issued',
+        'Your force is advancing to engage.');
     }
     targetingMode = null;
+    syncArmyMarkers(session, renderer);
     refreshSelectedArmy(session);
     return true;
   }
@@ -1520,6 +1577,17 @@ function refreshSelectedProvince(session: RemoteGameSession): void {
   uiStore.patch({ selectedProvince: projectSelectedProvince(session, selectedProvinceId) });
 }
 
+/** Global spacing so several battles opening at once cannot stack the alert
+ *  cue into a wall of noise (the server already fires 'engaged' once per
+ *  battle, so this is the only extra guard needed). */
+let lastCombatAlertAt = 0;
+function maybePlayCombatAlert(): void {
+  const now = Date.now();
+  if (now - lastCombatAlertAt < 3_000) return;
+  lastCombatAlertAt = now;
+  void audio.playCombatAlert();
+}
+
 function drainSessionEvents(session: RemoteGameSession): void {
   const player = session.playerCountryId;
   for (const done of session.pendingCompletions.splice(0)) {
@@ -1540,8 +1608,16 @@ function drainSessionEvents(session: RemoteGameSession): void {
     if (ev.attacker !== player && ev.defender !== player) continue;
     const mine = ev.defender === player;
     if (ev.kind === 'engaged') {
-      pushNotification('combat', mine ? 'Under attack' : 'Contact',
-        mine ? 'Enemy forces have engaged your line.' : 'Your forces have made contact.');
+      // Locate the fight on one of the player's engaged stacks so the toast can
+      // jump the camera there. 'engaged' fires once per battle server-side, so
+      // the only client-side guard needed is a global alert-sound cooldown.
+      const spot = mine
+        ? Object.values(session.state.armies).find((a) => a.own && a.status === 'engaged')
+        : undefined;
+      pushNotification('combat', mine ? 'Force under attack' : 'Contact',
+        mine ? 'Enemy forces have engaged your line.' : 'Your forces have made contact.',
+        spot ? { focus: { x: spot.x, z: spot.z } } : {});
+      if (mine) maybePlayCombatAlert();
     } else if (ev.kind === 'retreat') {
       pushNotification('combat', mine ? 'Forces withdrawing' : 'Enemy in retreat',
         mine ? 'A battered stack is pulling back to friendly ground.'
@@ -1579,6 +1655,21 @@ function drainSessionEvents(session: RemoteGameSession): void {
   }
 }
 
+/** "Now Playing" chip. Driven only by MusicDirector.onTrackChange, which fires
+ *  after playback actually succeeds — so a blocked autoplay never shows a title. */
+const nowPlayingEl = document.getElementById('now-playing');
+const nowPlayingTitleEl = document.getElementById('now-playing-title');
+let nowPlayingHideTimer: number | undefined;
+function updateNowPlaying(title: string | null): void {
+  if (!nowPlayingEl || !nowPlayingTitleEl) return;
+  if (nowPlayingHideTimer !== undefined) { window.clearTimeout(nowPlayingHideTimer); nowPlayingHideTimer = undefined; }
+  if (!title) { nowPlayingEl.hidden = true; return; }
+  nowPlayingTitleEl.textContent = title;
+  nowPlayingEl.hidden = false;
+  nowPlayingEl.classList.add('is-changing');
+  window.setTimeout(() => nowPlayingEl.classList.remove('is-changing'), 2_600);
+}
+
 /** id -> auto-dismiss timer handle. Cleared on manual dismiss and on teardown. */
 const notificationTimers = new Map<string, number>();
 
@@ -1601,12 +1692,12 @@ function clearAllNotificationTimers(): void {
 
 function pushNotification(
   kind: GameNotification['kind'], title: string, body?: string,
-  options: { sticky?: boolean } = {},
+  options: { sticky?: boolean; focus?: { x: number; z: number } } = {},
 ): void {
   const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const sticky = isSticky(kind, options.sticky);
   const previous = uiStore.get().notifications;
-  const notifications = [...previous, { id, kind, title, body, at: Date.now(), sticky }].slice(-4);
+  const notifications = [...previous, { id, kind, title, body, at: Date.now(), sticky, focus: options.focus }].slice(-4);
   // Anything the last-4 cap just dropped no longer needs its auto-dismiss timer.
   const kept = new Set(notifications.map((entry) => entry.id));
   for (const entry of previous) if (!kept.has(entry.id)) clearNotificationTimer(entry.id);

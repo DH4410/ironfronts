@@ -31,6 +31,8 @@ export interface GameUiActions {
   returnToMenu(): void;
   openDebugInspector(): void;
   focusSelected?: () => void;
+  /** Re-centre the camera on a world point (locatable notifications). */
+  focusWorld?: (x: number, z: number) => void;
   /** Selected-army orders. 'deselect' clears the selection. */
   armyCommand(command: ArmyPanelCommand): void;
   /** Queue a unit in the selected (own) province. */
@@ -660,7 +662,8 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     // Notifications.
     const nextNotifyKey = state.notifications.map((n) => n.id).join(',');
     if (nextNotifyKey !== notifyKey) {
-      notifyStack.replaceChildren(...state.notifications.map((n) => buildNotification(n, actions.dismissNotification)));
+      notifyStack.replaceChildren(...state.notifications.map(
+        (n) => buildNotification(n, actions.dismissNotification, actions.focusWorld)));
       notifyKey = nextNotifyKey;
     }
 

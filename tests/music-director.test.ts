@@ -34,6 +34,30 @@ describe('music director', () => {
   });
 
 
+  it('fires onTrackChange only after playback actually succeeds, and with null on stop', async () => {
+    const player = new FakeMusicPlayer();
+    player.failedFragments.add('Honor_Bound.ogg');
+    player.failedFragments.add('Honor_Bound.mp3');
+    const changes: Array<string | null> = [];
+    const director = new MusicDirector(player, {
+      random: () => 0,
+      onTrackChange: (track) => changes.push(track ? track.title : null),
+    });
+
+    await director.setState('menu'); // blocked autoplay — no title must appear
+    expect(changes).toEqual([]);
+    expect(director.getCurrentTrack()).toBeNull();
+
+    player.failedFragments.clear();
+    await director.setState('menu', { force: true });
+    expect(changes).toEqual(['Honor Bound']);
+    expect(director.getCurrentTrack()?.title).toBe('Honor Bound');
+
+    director.stop();
+    expect(changes).toEqual(['Honor Bound', null]);
+    expect(director.getCurrentTrack()).toBeNull();
+  });
+
   it('retries the same first menu track when autoplay was blocked', async () => {
     const player = new FakeMusicPlayer();
     player.failedFragments.add('Honor_Bound.ogg');
