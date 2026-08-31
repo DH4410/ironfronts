@@ -29,6 +29,7 @@ export class MusicDirector {
   private generation = 0;
   private timer?: ReturnType<typeof setTimeout>;
   private recentIds: string[] = [];
+  private readonly playedIdsByState = new Map<MusicState, Set<string>>();
   private menuPlayed = false;
 
   constructor(
@@ -53,14 +54,12 @@ export class MusicDirector {
     this.cancelTimer();
 
     if (next === 'victory') {
-      this.recentIds = [];
       const victory = TRACK_BY_ID.get('victorious');
       if (victory) await this.playTrack(victory, next, generation, 0.45);
       return;
     }
 
     if (next === 'opening') {
-      this.recentIds = [];
       const opening = TRACK_BY_ID.get('first-sighting');
       if (opening && await this.playTrack(opening, next, generation, 0.85)) return;
 
@@ -73,16 +72,19 @@ export class MusicDirector {
     }
 
     if (next === 'menu') {
-      this.recentIds = [];
-      const firstMenuTrack = TRACK_BY_ID.get(this.menuPlayed ? 'calm-before-the-storm' : 'honor-bound');
-      if (firstMenuTrack) {
-        const played = await this.playTrack(firstMenuTrack, next, generation, 0.35);
-        if (played) this.menuPlayed = true;
+      if (!this.menuPlayed) {
+        const firstMenuTrack = TRACK_BY_ID.get('honor-bound');
+        if (firstMenuTrack) {
+          const played = await this.playTrack(firstMenuTrack, next, generation, 0.35);
+          if (played) this.menuPlayed = true;
+        }
+        return;
       }
+
+      await this.playNextFromPool(next, generation);
       return;
     }
 
-    this.recentIds = [];
     await this.playNextFromPool(next, generation);
   }
 
@@ -101,7 +103,19 @@ export class MusicDirector {
     if (!this.isCurrent(state, generation)) return;
     const pool = tracksForState(state);
     const remaining = pool.filter((candidate) => !attemptedIds.has(candidate.id));
-    const candidate = chooseTrack(remaining, this.recentIds, this.random);
+    const playedThisCycle = this.playedIdsByState.get(state) ?? new Set<string>();
+    const unplayed = remaining.filter((candidate) => !playedThisCycle.has(candidate.id));
+
+    // Prefer every track in the current state once before beginning another
+    // cycle. This matters most for the small menu/war pools, where a short
+    // recent-history window could otherwise repeat songs too often.
+    if (!unplayed.length && remaining.length) {
+      playedThisCycle.clear();
+    }
+    this.playedIdsByState.set(state, playedThisCycle);
+
+    const cyclePool = unplayed.length ? unplayed : remaining;
+    const candidate = chooseTrack(cyclePool, this.recentIds, this.random);
     if (!candidate) {
       // Do not recurse forever when every source is temporarily unavailable.
       this.scheduleRetry(state, generation);
@@ -131,6 +145,7 @@ export class MusicDirector {
       });
       if (played) {
         this.remember(candidate.id);
+        this.rememberForState(state, candidate.id);
         return true;
       }
     }
@@ -170,6 +185,12 @@ export class MusicDirector {
 
   private remember(id: string): void {
     this.recentIds = [id, ...this.recentIds.filter((candidate) => candidate !== id)].slice(0, RECENT_HISTORY);
+  }
+
+  private rememberForState(state: MusicState, id: string): void {
+    const played = this.playedIdsByState.get(state) ?? new Set<string>();
+    played.add(id);
+    this.playedIdsByState.set(state, played);
   }
 
   private cancelTimer(): void {

@@ -42,4 +42,10 @@ describe('music catalog', () => {
     const selected = chooseTrack(pool, ['honor-bound'], () => 0);
     expect(selected?.id).toBe('calm-before-the-storm');
   });
+
+  it('never immediately repeats the last track when a small pool starts a new cycle', () => {
+    const pool = tracksForState('menu');
+    const selected = chooseTrack(pool, ['honor-bound', 'calm-before-the-storm'], () => 0);
+    expect(selected?.id).toBe('calm-before-the-storm');
+  });
 });
