@@ -87,11 +87,16 @@ export class RemoteGameSession extends EventTarget {
     this.dispatchEvent(new Event('change'));
   }
 
-  private send(command: CommandPayload, mutation: OptimisticMutation): { ok: true } {
+  private send(
+    command: CommandPayload, mutation: OptimisticMutation, onAccepted?: () => void,
+  ): { ok: true } {
     let id = '';
     id = this.connection.command(command, (ok, reason, requiredWarCountryIds) => {
       if (ok) {
         this.acknowledged.add(id);
+        // Server has accepted the order (after any war confirmation) but combat
+        // has not started — the right moment to acknowledge the click.
+        onAccepted?.();
       } else if (requiredWarCountryIds?.length) {
         this.optimistic.delete(id);
         this.rebuild();
@@ -103,7 +108,7 @@ export class RemoteGameSession extends EventTarget {
           const confirmedCommand = {
             ...command, confirmedWarCountryIds: [...requiredWarCountryIds],
           } as CommandPayload;
-          this.send(confirmedCommand, mutation);
+          this.send(confirmedCommand, mutation, onAccepted);
         };
         this.dispatchEvent(new CustomEvent('war-confirmation', {
           detail: { countryIds: [...requiredWarCountryIds], respond },
@@ -130,19 +135,19 @@ export class RemoteGameSession extends EventTarget {
       if (army) { army.moveOrder = { x, z }; army.status = 'moving'; }
     });
   }
-  orderAttackProvince(armyId: string, provinceId: number) {
+  orderAttackProvince(armyId: string, provinceId: number, onAccepted?: () => void) {
     if (!this.ownsArmy(armyId)) return { ok: false, reason: 'Not your army.' } as const;
     return this.send({ type: 'attackArmy', armyId, target: { kind: 'province', provinceId } }, (state) => {
       const army = state.armies[armyId];
       if (army) { army.status = 'moving'; army.moveIntent = 'attack'; }
-    });
+    }, onAccepted);
   }
-  orderAttackArmy(armyId: string, targetArmyId: string) {
+  orderAttackArmy(armyId: string, targetArmyId: string, onAccepted?: () => void) {
     if (!this.ownsArmy(armyId)) return { ok: false, reason: 'Not your army.' } as const;
     return this.send({ type: 'attackArmy', armyId, target: { kind: 'army', armyId: targetArmyId } }, (state) => {
       const army = state.armies[armyId];
       if (army) { army.status = 'moving'; army.moveIntent = 'attack'; }
-    });
+    }, onAccepted);
   }
   orderRetreat(armyId: string, firstNodeId: number) {
     if (!this.ownsArmy(armyId)) return { ok: false, reason: 'Not your army.' } as const;

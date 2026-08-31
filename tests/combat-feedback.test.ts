@@ -16,12 +16,27 @@ describe('attack-order feedback', () => {
     expect(fn).toContain('cursor-no.png');
   });
 
-  it('acknowledges an accepted attack click immediately, without waiting for combat', () => {
+  it('acknowledges an attack on server-accept (after any war confirm), not optimistically', () => {
     const start = main.indexOf("targetingMode === 'attack' && selectedArmyId");
     const branch = main.slice(start, main.indexOf("targetingMode === 'retreat'", start));
+    // The reticle / cue / toast live in one closure...
+    expect(branch).toContain('const acknowledgeAttack = ()');
     expect(branch).toContain('flashAttackTarget(clientX, clientY)');
     expect(branch).toMatch(/pushNotification\('information', 'Attack order issued'/);
     expect(branch).toContain("audio.playUiCue('confirm')");
+    // ...that is handed to the order as its onAccepted callback, never called
+    // from the synchronous (optimistic) path.
+    expect(branch).toContain('session.orderAttackArmy(selectedArmyId, targetArmyId, acknowledgeAttack)');
+    expect(branch).toContain('session.orderAttackProvince(selectedArmyId!, provinceId, acknowledgeAttack)');
+    expect(branch).not.toMatch(/}\s*else\s*{\s*\n\s*flashAttackTarget/);
+  });
+
+  it('threads onAccepted through the war-confirmation re-send', () => {
+    const remote = readFileSync(path.join(root, 'src/client/remote-session.ts'), 'utf8');
+    expect(remote).toContain('onAccepted?: () => void');
+    expect(remote).toContain('onAccepted?.();');
+    // re-send after respond(true) keeps the same callback
+    expect(remote).toContain('this.send(confirmedCommand, mutation, onAccepted);');
   });
 
   it('rate-limits the under-attack alert so simultaneous battles cannot stack it', () => {

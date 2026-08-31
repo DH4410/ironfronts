@@ -32,6 +32,21 @@ running verdict.
   reason is reachable on hover.
 - Tests: `tests/tooltip.test.ts` (4), `tests/army-command-ui.test.ts` updated.
 
+### 2. War-confirm ordering fix (`fix(combat): …`) — §33
+
+- The attack acknowledgement (target reticle + order cue + "Attack order
+  issued" toast) no longer fires optimistically. It is now a single
+  `acknowledgeAttack` closure passed as `onAccepted` to
+  `orderAttackArmy` / `orderAttackProvince`.
+- `RemoteGameSession.send()` gained an `onAccepted?` callback fired in the
+  server-`ok` branch — reached on the plain path *and* after the
+  "Declare war?" confirmation re-sends the command. Cancelling the war
+  declaration now leaves no misleading "attack issued" toast.
+- The optimistic `status:'moving' / moveIntent:'attack'` mutation still
+  applies instantly, so the panel + red route read "advancing" with no delay
+  on the common (already-at-war) path.
+- Tests: `tests/combat-feedback.test.ts` updated (+1).
+
 ---
 
 ## Running totals

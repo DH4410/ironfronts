@@ -1259,25 +1259,28 @@ function handleMapClick(
       refreshSelectedArmy(session);
       return true;
     }
+    // Fired once the server accepts the order — which is *after* any "Declare
+    // war?" confirmation but still before combat opens. Do not run it
+    // optimistically: a cancelled war declaration must not leave the player
+    // told their attack was "issued". Reticle on the target, an order cue and
+    // a toast; the optimistic status mutation already reads "advancing".
+    const acknowledgeAttack = (): void => {
+      flashAttackTarget(clientX, clientY);
+      void audio.playUiCue('confirm');
+      pushNotification('information', 'Attack order issued',
+        'Your force is advancing to engage.');
+    };
     const result = targetArmyId && targetArmyId !== selectedArmyId && pickedTarget?.contact === 'visible'
-      ? session.orderAttackArmy(selectedArmyId, targetArmyId)
+      ? session.orderAttackArmy(selectedArmyId, targetArmyId, acknowledgeAttack)
       : (() => {
         const provinceId = renderer.provinceIdAt(clientX, clientY);
         return provinceId >= 0
-          ? session.orderAttackProvince(selectedArmyId!, provinceId)
+          ? session.orderAttackProvince(selectedArmyId!, provinceId, acknowledgeAttack)
           : { ok: false as const, reason: 'Aim at an enemy army or a province centre to attack.' };
       })();
     if (!result.ok) {
       const { title, body } = describeOrderFailure(result.reason ?? 'Invalid target.');
       pushNotification('warning', title, body);
-    } else {
-      // Acknowledge the click immediately — do not wait for the server to open
-      // combat. Reticle on the target, a short order cue, and a toast; the
-      // optimistic mutation flips the panel to "advancing to engage".
-      flashAttackTarget(clientX, clientY);
-      void audio.playUiCue('confirm');
-      pushNotification('information', 'Attack order issued',
-        'Your force is advancing to engage.');
     }
     targetingMode = null;
     syncArmyMarkers(session, renderer);
