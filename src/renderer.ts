@@ -208,7 +208,7 @@ export class WorldRenderer {
   private showWaterwayNetwork = false;
   private showBorders = true;
   private showCountryOverlay = true;
-  private mapMode: MapMode = 'balanced';
+  private mapMode: MapMode = 'political';
   private showProps = true;
   private showRoads = true;
   private showHiddenConnections = true;
