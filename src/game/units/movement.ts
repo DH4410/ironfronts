@@ -215,7 +215,15 @@ function revalidateOrder(session: SimContext, army: ArmyStack, order: MoveOrder)
     ? targetArmy.graphNodeId
     : nearestNode(session.graph, targetX, targetZ, 600, session.graph.component[army.graphNodeId]);
   const edgeAllowed = movementEdgeAllowed(session, army.ownerCountryId);
-  const nextInvalid = order.path.length > 0 && !edgeAllowed(army.graphNodeId, order.path[0]);
+  // A path loaded from a save (or laid before a world rebuild) can contain an
+  // edge the audited graph no longer links — e.g. a land connection whose
+  // corridor was found to cross water. Treat a missing leading edge exactly
+  // like an ownership-blocked one: re-path around it, or stop if nothing legal
+  // remains. Without this a stale order lerps a land army straight over water.
+  const nextMissing = order.path.length > 0
+    && !session.graph.adjacency[army.graphNodeId]?.includes(order.path[0]);
+  const nextInvalid = order.path.length > 0
+    && (nextMissing || !edgeAllowed(army.graphNodeId, order.path[0]));
   const pursuitChanged = order.target?.kind === 'army'
     && targetNode >= 0 && order.path[order.path.length - 1] !== targetNode;
   if (!nextInvalid && !pursuitChanged) return;
