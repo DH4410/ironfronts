@@ -32,13 +32,68 @@ copied unmodified from `0ad/0ad` at ref `master`, from
 | `construction.png` | `construction.png` | Ordnance-works facility chip (city panel) |
 | `diplomacy.png` | `diplomacy.png` | Diplomacy map mode · Diplomacy dock button |
 | `objectives.png` | `objectives.png` | Objectives dock button |
-| `attack-request.png` | `attack-request.png` | (reserved — army/combat UI) |
-| `repair.png` | `repair.png` | (reserved — build/repair actions) |
-| `stop.png` | `stop.png` | (reserved — army stop order) |
+| `attack-request.png` | `attack-request.png` | Attack-order request marker |
+| `repair.png` | `repair.png` | Build / repair actions |
+| `stop.png` | `stop.png` | Army stop order (command grid) |
+| `kill.png` | `kill.png` | Attack command (command grid) |
+| `patrol.png` | `patrol.png` | Patrol command (reserved) |
+| `garrison.png` | `garrison.png` | Garrison command (reserved) |
+| `heal.png` | `heal.png` | Health / medical stat |
+| `promote.png` | `promote.png` | Veterancy / promotion (reserved) |
+| `upgrade.png` | `upgrade.png` | Upgrade action (reserved) |
+| `cancel.png` | `cancel.png` | Cancel / abort action (reserved) |
+| `groups.png` | `groups.png` | Control-group / army-group UI (reserved) |
+| `call-to-arms.png` | `call-to-arms.png` | Mobilise / call-to-arms (reserved) |
+| `focus-attacked.png` | `focus-attacked.png` | "Force under attack" notification + click-to-focus |
+| `focus-rally.png` | `focus-rally.png` | Rally-point focus (reserved) |
+| `stances/aggressive.png` | `stances/aggressive.png` | Army stance: aggressive (reserved) |
+| `stances/defensive.png` | `stances/defensive.png` | Army stance: defensive (reserved) |
+| `stances/passive.png` | `stances/passive.png` | Army stance: passive (reserved) |
+| `stances/standground.png` | `stances/standground.png` | Army stance: hold ground (reserved) |
+| `ranks/Basic.png` | `ranks/Basic.png` | Army experience tier: green |
+| `ranks/Advanced.png` | `ranks/Advanced.png` | Army experience tier: seasoned |
+| `ranks/Elite.png` | `ranks/Elite.png` | Army experience tier: elite |
+| `formations/column_open.png` | `formations/column_open.png` | Formation: march column (reserved) |
+| `formations/line_closed.png` | `formations/line_closed.png` | Formation: firing line (reserved) |
+| `formations/wedge.png` | `formations/wedge.png` | Formation: wedge / spearhead (reserved) |
+| `formations/flank.png` | `formations/flank.png` | Formation: flanking (reserved) |
+| `formations/box.png` | `formations/box.png` | Formation: defensive box (reserved) |
+| `formations/scatter.png` | `formations/scatter.png` | Formation: dispersed (reserved) |
 
 CC BY-SA 3.0 is share-alike: these icons remain under CC BY-SA 3.0 as
 distributed here. If Ironfronts ships a formal credits screen, these must be
 listed there too.
+
+---
+
+## 0 A.D. — session cursors
+
+Vendored under `public/cursors/` (served as-is), copied unmodified from
+`0ad/0ad` at `master`, `binaries/data/mods/public/art/textures/cursors/`.
+Same CC BY-SA 3.0 art licence. Hotspot (x y, from the upstream `.txt`
+sidecar) noted for the CSS `cursor: url(...) x y` fallback.
+
+| Vendored file | Upstream source path | Hotspot | Used in Ironfronts for |
+|---|---|---|---|
+| `action-attack.png` | `cursors/action-attack.png` | 1 1 | Cursor over a valid attack target |
+| `action-attack-move.png` | `cursors/action-attack-move.png` | 1 1 | Cursor for attack-move (reserved) |
+| `action-capture.png` | `cursors/action-capture.png` | 1 1 | Cursor over a capturable province (reserved) |
+| `action-garrison.png` | `cursors/action-garrison.png` | 1 1 | Cursor over a garrisonable target (reserved) |
+| `cursor-rally.png` | `cursors/cursor-rally.png` | 5 31 | Cursor while placing a rally point (reserved) |
+| `cursor-no.png` | `cursors/cursor-no.png` | 13 14 | Cursor over an invalid / disallowed target |
+
+---
+
+## 0 A.D. — interface audio
+
+Vendored under `public/audio/sfx/`, copied unmodified from `0ad/0ad` at
+`master`, `binaries/data/mods/public/audio/interface/alarm/`. The
+`binaries/data/mods/*/audio` tree is CC BY-SA 3.0 per that repo's
+`binaries/data/mods/public/audio/LICENSE.txt` and top-level `LICENSE.txt`.
+
+| Vendored file | Upstream source path | Used in Ironfronts for |
+|---|---|---|
+| `alarmattackunit_1.ogg` | `audio/interface/alarm/alarmattackunit_1.ogg` | "One of your forces is under attack" alert cue |
 
 ---
 
