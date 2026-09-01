@@ -651,7 +651,19 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     // Army card — shown whenever a stack is selected (province takes priority).
     const showArmy = Boolean(army) && !province;
     armyCard.hidden = !showArmy;
-    const nextArmyKey = showArmy && army ? JSON.stringify(army) : '';
+    // Narrow re-render key: only the fields the panel actually paints. The clock
+    // patches the store every in-game minute; a full JSON.stringify(army) here
+    // rebuilt the whole panel (portraits included) on every one of those.
+    const nextArmyKey = showArmy && army ? [
+      army.id, army.identified, army.combat, army.targetingMode ?? '', army.activity,
+      Math.round((army.health ?? 0) * 100), Math.round((army.strength ?? 0) * 100),
+      army.unitCount, army.canMove, army.canAttack, army.canRetreat,
+      army.canSplit, army.canStop, army.canExtract,
+      army.legalRetreatExits?.length ?? 0,
+      army.artillery?.targetArmyId ?? '', army.artillery?.nextVolleyTick ?? 0,
+      (army.groups ?? []).map((g) => `${g.typeId}:${g.count}:${Math.round(g.health * 100)}`).join(','),
+      (army.battleFronts ?? []).length,
+    ].join('|') : '';
     if (nextArmyKey !== armyKey) {
       armyKey = nextArmyKey;
       if (showArmy && army) {

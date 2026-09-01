@@ -10,6 +10,7 @@
 import { createIcon, iconMarkup, type IconName } from './icons';
 import { summarizeBattleFronts } from './army-presentation';
 import { bindTooltip } from './tooltip';
+import { createUnitPortrait, UNIT_ROLE_NOTE } from './unit-portraits';
 import type { ArmyStackView, CombatStatus } from './ui-state';
 
 export type { ArmyStackView, CombatStatus } from './ui-state';
@@ -72,15 +73,6 @@ export type ArmyPanelCommand =
   | 'move' | 'attack' | 'retreat' | 'split' | 'stop' | 'extract' | 'deselect'
   | `retreat:${number}`;
 
-const UNIT_GLYPHS: Readonly<Record<string, string>> = {
-  infantry: '<circle cx="24" cy="10" r="5"/><path d="M17 42l2-17 5-7 5 7 2 17M12 25l12 5 13-12M29 26l9 16"/>',
-  engineer: '<path d="M14 16h20l-2-7H16zM12 19h24M24 19v22M16 41h16M14 28h20"/><path d="M31 23l8 8m0-8-8 8"/>',
-  'armored-car': '<path d="M7 31h34l-3-12H18l-7 6zM15 19l5-7h13l5 7M13 31v5h24v-5"/><circle cx="16" cy="37" r="4"/><circle cx="34" cy="37" r="4"/>',
-  'light-tank': '<path d="M7 31h35l-4-13H16l-6 6zM17 18l4-7h15v7M28 11V7h11"/><path d="M10 35h30M13 39h24"/><circle cx="17" cy="35" r="3"/><circle cx="33" cy="35" r="3"/>',
-  'medium-tank': '<path d="M5 31h39l-4-15H15l-7 8zM16 16l5-8h16v8M29 8V5h15"/><path d="M8 35h34M12 40h26"/><circle cx="15" cy="35" r="3"/><circle cx="25" cy="35" r="3"/><circle cx="35" cy="35" r="3"/>',
-  artillery: '<path d="M8 35h27M17 35l8-13 17-9M24 22l9 8M37 10l5 3-3 5"/><circle cx="17" cy="36" r="6"/><circle cx="34" cy="36" r="4"/>',
-};
-
 function node<K extends keyof HTMLElementTagNameMap>(
   tag: K, className?: string, text?: string,
 ): HTMLElementTagNameMap[K] {
@@ -88,16 +80,6 @@ function node<K extends keyof HTMLElementTagNameMap>(
   if (className) element.className = className;
   if (text !== undefined) element.textContent = text;
   return element;
-}
-
-function createUnitGlyph(typeId: string, label: string): SVGSVGElement {
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('class', 'ifg-army-unit__glyph');
-  svg.setAttribute('viewBox', '0 0 48 48');
-  svg.setAttribute('role', 'img');
-  svg.setAttribute('aria-label', label);
-  svg.innerHTML = UNIT_GLYPHS[typeId] ?? '<path d="M8 34h32V14H8zM14 20h20M14 27h20"/>';
-  return svg;
 }
 
 function appendStat(host: HTMLElement, label: string, value: string, icon?: IconName): void {
@@ -223,19 +205,30 @@ export function renderSelectedArmyPanel(
   if (army.identified === false || !army.groups?.length) {
     unitRow.append(node('span', 'ifg-army-panel__intel', 'Composition unavailable'));
   } else {
+    // Portrait-card strip — the drawing carries the identity, the name is
+    // secondary, and the numbers / role move onto the hover tooltip. Tightens
+    // to a denser grid once the stack fields more than four unit families.
+    unitRow.classList.toggle('is-dense', army.groups.length > 4);
     for (const group of army.groups) {
+      const health = Math.round(group.health * 100);
       const unit = node('article', 'ifg-army-unit');
       unit.dataset.unitType = group.typeId;
-      unit.title = `${group.label}: ${group.count} troops, ${Math.round(group.health * 100)}% health`;
       const visual = node('span', 'ifg-army-unit__visual');
-      visual.append(createUnitGlyph(group.typeId, group.label));
+      visual.append(createUnitPortrait(group.typeId, group.label));
+      visual.append(node('b', 'ifg-army-unit__count', `×${group.count}`));
       const details = node('span', 'ifg-army-unit__details');
-      details.append(node('strong', undefined, group.label), node('b', undefined, `×${group.count}`));
+      details.append(node('strong', undefined, group.label));
       const condition = node('span', 'ifg-army-unit__condition');
+      condition.dataset.state = health >= 66 ? 'ok' : health >= 33 ? 'worn' : 'spent';
       const conditionFill = node('i');
-      conditionFill.style.width = `${Math.round(group.health * 100)}%`;
+      conditionFill.style.width = `${health}%`;
       condition.append(conditionFill);
       unit.append(visual, details, condition);
+      bindTooltip(unit, () => ({
+        title: group.label,
+        description: UNIT_ROLE_NOTE[group.typeId],
+        status: `${group.count} strong · ${health}% condition`,
+      }));
       unitRow.append(unit);
     }
   }

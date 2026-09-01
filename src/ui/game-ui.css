@@ -601,25 +601,29 @@
   background: radial-gradient(circle at 50% 28%, rgba(201, 164, 99, 0.12), transparent 58%);
   pointer-events: none;
 }
-.ifg-army-unit__visual { display: grid; place-items: center; min-height: 63px; color: #cbc5b2; }
-.ifg-army-unit__glyph {
-  width: 50px;
-  height: 50px;
-  overflow: visible;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.65));
+.ifg-army-unit__visual { position: relative; display: block; overflow: hidden; line-height: 0; min-height: 68px; }
+/* Portrait fills the tile top — the drawing is the identity, not a line glyph. */
+.ifg-army-unit__portrait { display: block; width: 100%; height: 100%; }
+.ifg-army-unit__portrait svg { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ifg-army-unit__count {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 1px 5px;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ifg-brass-lit);
+  background: rgba(9, 11, 8, 0.82);
+  border: 1px solid var(--ifg-rule-soft);
+  border-radius: 2px;
 }
 .ifg-army-unit__details {
   min-width: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 5px;
-  padding: 5px 7px;
+  justify-content: center;
+  padding: 4px 6px;
   background: rgba(9, 11, 8, 0.62);
   border-top: 1px solid var(--ifg-rule-soft);
 }
@@ -628,13 +632,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 9px;
-  letter-spacing: 0.05em;
+  font-size: 8.5px;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
+  color: #d8d2c0;
 }
-.ifg-army-unit__details b { color: var(--ifg-brass-lit); font-size: 11px; }
 .ifg-army-unit__condition { display: block; height: 4px; background: #090b08; }
-.ifg-army-unit__condition i { display: block; height: 100%; background: #819c58; }
+.ifg-army-unit__condition i { display: block; height: 100%; background: #819c58; transition: width 0.2s ease; }
+.ifg-army-unit__condition[data-state="worn"] i { background: #c9a044; }
+.ifg-army-unit__condition[data-state="spent"] i { background: #c05a3c; }
+.ifg-army-unit:hover { border-color: var(--ifg-brass); }
+/* Denser layout once the stack fields >4 unit families. */
+.ifg-army-panel__units.is-dense { grid-template-columns: repeat(auto-fit, minmax(74px, 1fr)); }
+.ifg-army-panel__units.is-dense .ifg-army-unit { min-height: 92px; }
 .ifg-army-panel__report { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; }
 .ifg-army-panel__stats > .ifg-army-panel__eyebrow,
 .ifg-army-panel__activity > .ifg-army-panel__eyebrow { margin-bottom: 6px; }
