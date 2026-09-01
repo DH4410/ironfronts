@@ -147,12 +147,22 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
   // discard. 1.0 means "full close-up city"; lower values thin the cluster.
   var buildingLod = 1.0;
 
+  // Forest clumping (no world rebuild). A low-frequency value-noise field over
+  // world XZ keeps dense stands at full density and fades the thin scattered
+  // outliers, so forests read as grouped woods instead of an even sprinkle
+  // across every province. Tunable: raise CLUSTER_SCALE for bigger stands,
+  // widen the smoothstep band to thin more gently.
+  var treeCluster = 1.0;
+
   if (instanceParams.kind == 0u) {
     let variant = min(u32(record.a.w + 0.5), 4u);
     let part = u32(input.materialPart + 0.5);
     let partScale = treePartScale(variant, part);
     local = (local * partScale + treePartCenter(variant, part)) * record.a.z * TREE_MAP_SCALE;
     angle = record.b.x;
+    let clusterNoise = valueNoise(record.a.xy / 520.0)
+      + (noiseHash(record.a.xy * 0.13) - 0.5) * 0.14;
+    treeCluster = smoothstep(0.32, 0.55, clusterNoise);
     transformedNormal = rotateY(normalize(input.normal / max(partScale, vec3f(0.001))), angle);
     opacity = select(0.0, 1.0, treePartVisible(variant, part));
     color = vec3f(record.b.y);
@@ -223,7 +233,7 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
   local = rotateY(local, angle);
   let worldPosition = vec3f(record.a.x + copyOffset + local.x, ground + local.y, record.a.y + local.z);
   let maximumDistance = select(select(1900.0, 2600.0, instanceParams.kind == 1u), 3200.0, instanceParams.kind == 0u);
-  let visibility = (1.0 - smoothstep(maximumDistance * 0.75, maximumDistance, distance(uniforms.camera.xyz, worldPosition))) * buildingLod;
+  let visibility = (1.0 - smoothstep(maximumDistance * 0.75, maximumDistance, distance(uniforms.camera.xyz, worldPosition))) * buildingLod * treeCluster;
   var output: PropVertexOutput;
   output.position = uniforms.viewProjection * vec4f(worldPosition, 1.0);
   output.worldPosition = worldPosition;
@@ -273,9 +283,20 @@ fn propFragment(input: PropVertexOutput) -> @location(0) vec4f {
   if (input.treeMaterialLayer < -0.5) { wetSheen = wetSurfaceSheen(normal, input.worldPosition); }
   // Floor the lighting term for buildings (treeMaterialLayer < -0.5) so faces
   // turned away from the sun keep fill light. Dark roof palettes on a shaded
-  // side were rendering whole cities as flat black. Trees keep full shading.
+  // side were rendering whole cities as flat black.
   let litShade = surfaceLight(normal);
-  let shade = select(litShade, max(litShade, vec3f(0.46)), input.treeMaterialLayer < -0.5);
+  var shade = litShade;
+  if (input.treeMaterialLayer < -0.5) {
+    shade = max(litShade, vec3f(0.46));
+  } else {
+    // Trees at night were crushing to near-black scattered dots: the canopy
+    // albedo is already dark and surfaceLight's night term sits near 0.27.
+    // Floor the shaded side with a cool ambient that fades in only as daylight
+    // drops, so the daytime canopy is untouched but a night forest still
+    // reads as a soft mass rather than a field of black specks.
+    let nightAmount = 1.0 - uniforms.lighting.x;
+    shade = max(litShade, mix(vec3f(0.0), vec3f(0.34, 0.40, 0.47), nightAmount));
+  }
   let color = mix(mix(albedo * shade + emission + wetSheen, distanceFogColor(), fog * 0.39), worldFogColor(), worldFog);
   return vec4f(color, input.visibility * input.opacity * (1.0 - worldFog));
 }

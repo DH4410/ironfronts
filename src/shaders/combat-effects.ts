@@ -170,27 +170,56 @@ fn combatEffectFragment(input: EffectOut) -> @location(0) vec4f {
   } else if (kind == 3) {                 // impact — expanding ring + spark
     a = clamp(ring(uv, 0.7, 0.06) + softDisc(uv * 3.0, 0.0) * 0.7, 0.0, 1.0);
     rgb = vec3f(0.95, 0.93, 0.86);
-  } else if (kind == 4) {                 // dust — soft brown puff
-    let n = valueNoise(uv * 3.0 + input.seed * 40.0);
-    a = softDisc(uv, 0.1) * (0.4 + 0.5 * n) * 0.7;
-    rgb = mix(vec3f(0.55, 0.46, 0.34), vec3f(0.68, 0.6, 0.48), n);
-  } else if (kind == 5) {                 // smoke — dark grey puff
-    let n = valueNoise(uv * 2.4 + input.seed * 27.0 + vec2f(input.age * 1.5, 0.0));
-    a = softDisc(uv, 0.05) * (0.35 + 0.5 * n) * 0.62;
-    rgb = mix(vec3f(0.14, 0.14, 0.15), vec3f(0.3, 0.29, 0.28), n);
-  } else if (kind == 6) {                 // explosion — hot flash that billows into smoke
-    let t = input.age;
-    let turb = turbulence(uv * 2.6 + input.seed * 40.0 + vec2f(0.0, -t * 1.6));
-    // Dissolve the silhouette with turbulence so it never reads as a clean disc.
-    let body = smoothstep(1.0, 0.12, length(uv) + (turb - 0.5) * 0.95);
-    let flash = 1.0 - smoothstep(0.0, 0.30, t);      // brief fireball
-    let cooling = smoothstep(0.08, 0.85, t);         // smoke takes over
-    let heat = body * flash * (0.55 + 0.7 * turb);
-    let smoke = body * cooling * (0.35 + 0.55 * turb);
-    let fireCol = mix(vec3f(1.0, 0.32, 0.07), vec3f(1.0, 0.88, 0.52), clamp(heat, 0.0, 1.0));
-    let smokeCol = mix(vec3f(0.08, 0.07, 0.07), vec3f(0.30, 0.28, 0.27), turb);
-    rgb = mix(smokeCol, fireCol, clamp(heat * 1.4, 0.0, 1.0));
-    a = clamp(heat * 1.5 + smoke * 0.85, 0.0, 1.0);
+  } else if (kind == 4) {                 // dust — soft brown puff, billowing
+    let n = valueNoise(uv * 3.0 + input.seed * 40.0) * 0.7
+          + valueNoise(uv * 6.5 - input.seed * 12.0) * 0.3;
+    a = softDisc(uv, 0.1) * (0.35 + 0.55 * n) * 0.72;
+    rgb = mix(vec3f(0.52, 0.43, 0.31), vec3f(0.70, 0.62, 0.50), n);
+  } else if (kind == 5) {                 // smoke — dark grey puff, curling up
+    let n = valueNoise(uv * 2.4 + input.seed * 27.0 + vec2f(input.age * 1.5, -input.age * 2.0)) * 0.7
+          + valueNoise(uv * 5.0 + input.seed * 9.0 - vec2f(0.0, input.age * 3.0)) * 0.3;
+    a = softDisc(uv, 0.05) * (0.30 + 0.55 * n) * 0.64;
+    rgb = mix(vec3f(0.12, 0.12, 0.13), vec3f(0.32, 0.31, 0.29), n);
+  } else if (kind == 6) {
+    // Explosion, composited bottom-up: ground dust skirt -> rolling smoke that
+    // lifts and greys as it ages -> orange fireball with a white-hot core that
+    // is spent by ~60% life -> a scatter of bright embers fading to red. Reads
+    // as a battlefield burst rather than an expanding coloured disc.
+    let rise = vec2f(0.0, -input.age * 0.55);
+    let turb = valueNoise(uv * 2.3 + rise * 3.0 + input.seed * 51.0)
+             + valueNoise(uv * 5.1 - rise * 2.0 + input.seed * 17.0) * 0.5;
+    let billow = clamp(turb / 1.5, 0.0, 1.0);
+    let rr = length(uv * vec2f(1.0, 1.12) - rise);
+
+    let fireLife = 1.0 - smoothstep(0.0, 0.55, input.age);
+    let fireBody = (1.0 - smoothstep(0.12, 0.78 + billow * 0.25, rr)) * fireLife;
+    let hotCore = (1.0 - smoothstep(0.0, 0.30, rr)) * fireLife;
+    let fireCol = mix(vec3f(1.0, 0.45, 0.12), vec3f(1.0, 0.93, 0.66), hotCore);
+
+    let smokeLife = smoothstep(0.06, 0.5, input.age) * (1.0 - smoothstep(0.72, 1.0, input.age));
+    let smokeBody = (1.0 - smoothstep(0.15, 0.95, rr)) * (0.35 + 0.65 * billow) * smokeLife;
+    let smokeCol = mix(vec3f(0.16, 0.15, 0.15), vec3f(0.40, 0.35, 0.30), billow);
+
+    let dustLife = 1.0 - smoothstep(0.0, 0.4, input.age);
+    let ground = uv.y + 0.35;
+    let dust = (1.0 - smoothstep(0.2, 1.0, length(vec2f(uv.x * 0.7, ground * 2.4))))
+             * step(ground, 0.35) * dustLife * (0.4 + 0.5 * billow);
+
+    let emberField = valueNoise(uv * 9.0 + input.seed * 120.0);
+    let ember = smoothstep(0.86, 0.98, emberField)
+              * (1.0 - smoothstep(0.2, 0.95, input.age)) * step(0.25, rr);
+    let emberCol = mix(vec3f(1.0, 0.8, 0.3), vec3f(0.9, 0.25, 0.1), input.age);
+
+    var col = vec3f(0.52, 0.44, 0.34);
+    var cov = dust;
+    col = mix(col, smokeCol, smokeBody);
+    cov = max(cov, smokeBody);
+    col = mix(col, fireCol, fireBody);
+    cov = max(cov, fireBody * 1.1);
+    col += emberCol * ember * 1.3;
+    cov = clamp(max(cov, ember), 0.0, 1.0);
+    rgb = clamp(col, vec3f(0.0), vec3f(1.0));
+    a = cov;
   } else if (kind == 7) {                 // target flash — red reticle
     let cross = max(
       step(abs(uv.x), 0.06) * step(abs(uv.y), 0.85),
