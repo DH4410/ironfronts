@@ -71,7 +71,9 @@ export function mountMenu(handlers: MenuHandlers): void {
     const flagUrl = resolveFlagUrl(assignedCountry.name);
     if (flagUrl) {
       const icon = continueButton.querySelector<HTMLElement>('.ifm__icon');
-      if (icon) icon.style.setProperty('--flag', `url(${flagUrl})`);
+      // Quote the URL: resolveFlagUrl can return a data: URI whose commas /
+      // parens would break an unquoted url().
+      if (icon) icon.style.setProperty('--flag', `url("${flagUrl}")`);
       else continueButton.classList.remove('is-assigned');
     } else {
       continueButton.classList.remove('is-assigned');
