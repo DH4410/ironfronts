@@ -27,7 +27,7 @@ const ROAD_BONUS = 1.35;
  * terrain ordering (plain > hill > mountain) and the road bonus are unchanged.
  * Does NOT touch the simulation tick.
  */
-const STRATEGIC_MOVEMENT_SCALE = 0.42;
+const STRATEGIC_MOVEMENT_SCALE = 0.30;
 const EDGE_SAMPLE_DISTANCE = 18;
 const edgeProvinceCache = new WeakMap<object, Map<string, number[]>>();
 
