@@ -5,3 +5,6 @@ artifacts/
 data/
 *.log
 .DS_Store
+
+# local save/state backups — never publish
+ironfronts-backups/

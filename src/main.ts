@@ -1306,9 +1306,13 @@ function handleMapClick(
       ? session.orderAttackArmy(selectedArmyId, targetArmyId, acknowledgeAttack)
       : (() => {
         const provinceId = renderer.provinceIdAt(clientX, clientY);
-        return provinceId >= 0
-          ? session.orderAttackProvince(selectedArmyId!, provinceId, acknowledgeAttack)
-          : { ok: false as const, reason: 'Aim at an enemy army or a province centre to attack.' };
+        if (provinceId < 0) {
+          return { ok: false as const, reason: 'Aim at an enemy army or a province centre to attack.' };
+        }
+        if (session.ownsProvince(provinceId)) {
+          return { ok: false as const, reason: "That is your own territory — you can't attack it." };
+        }
+        return session.orderAttackProvince(selectedArmyId!, provinceId, acknowledgeAttack);
       })();
     if (!result.ok) {
       const { title, body } = describeOrderFailure(result.reason ?? 'Invalid target.');
@@ -1364,6 +1368,9 @@ function describeOrderFailure(reason: string): { title: string; body?: string } 
   const r = reason.toLowerCase();
   if (r.includes('not your army')) return { title: 'Not your army', body: 'You can only order armies you command.' };
   if (r.includes('not your province')) return { title: 'Not your province', body: reason };
+  if (r.includes('own force') || r.includes('own territory') || r.includes('already hold that province')) {
+    return { title: 'Invalid target', body: 'You cannot attack your own forces or territory.' };
+  }
   if (r.includes('close combat') || r.includes('is engaged')) return { title: 'Army is fighting', body: 'It cannot take new orders until the battle ends.' };
   if (r.includes('retreating')) return { title: 'Army is retreating', body: 'Wait for it to disengage before giving new orders.' };
   if (r.includes('war declaration')) return { title: 'War not declared', body: 'That route crosses a country you are not at war with.' };

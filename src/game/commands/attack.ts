@@ -21,6 +21,12 @@ export function issueAttack(ctx: SimContext, command: AttackCommand): CommandRes
     const provinceId = command.target.provinceId;
     const province = ctx.world.provinces.find((item) => item.id === provinceId);
     if (!province) return { ok: false, reason: 'No such province.' };
+    // You cannot order a strike on ground you already hold. The client normally
+    // routes a right-click on own territory to a plain move; this is the
+    // server-side backstop for a modified or out-of-sync client.
+    if ((ctx.state.provinceOwners[province.id] ?? 0) === army.ownerCountryId) {
+      return { ok: false, reason: 'You already hold that province — move there instead.' };
+    }
     return issueMoveOrder(
       ctx, army.id, province.center[0], province.center[1], 'attack',
       { kind: 'province', provinceId: province.id }, command.confirmedWarCountryIds,
@@ -30,6 +36,11 @@ export function issueAttack(ctx: SimContext, command: AttackCommand): CommandRes
 
   const target = ctx.state.armies[command.target.armyId];
   if (!target) return { ok: false, reason: 'No such target army.' };
+  // No alliance system yet, so "friendly" is exactly "same country". A strike on
+  // your own force is always rejected here regardless of what the client sent.
+  if (target.ownerCountryId === army.ownerCountryId) {
+    return { ok: false, reason: 'That is one of your own forces.' };
+  }
   const contact = computeArmyVisibility(ctx.state, ctx.world, army.ownerCountryId).get(target.id);
   // Only a fully identified force can be attacked by name. A distant "contact"
   // exposes no exact position, so ordering a strike on one would leak it.
