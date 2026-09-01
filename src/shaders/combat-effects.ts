@@ -43,7 +43,7 @@ fn effectPixelSize(kind: i32) -> f32 {
     case 5: { return 44.0; }   // smoke
     case 6: { return 52.0; }   // explosion
     case 7: { return 30.0; }   // target flash
-    default: { return 40.0; }  // battle marker
+    default: { return 32.0; }  // battle marker
   }
 }
 
@@ -120,12 +120,6 @@ fn ring(uv: vec2f, radius: f32, width: f32) -> f32 {
   return 1.0 - smoothstep(width, width * 2.4, abs(length(uv) - radius));
 }
 
-fn segDist(p: vec2f, a: vec2f, b: vec2f) -> f32 {
-  let pa = p - a; let ba = b - a;
-  let h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-  return length(pa - ba * h);
-}
-
 @fragment
 fn combatEffectFragment(input: EffectOut) -> @location(0) vec4f {
   if (input.alpha < 0.01) { discard; }
@@ -174,13 +168,16 @@ fn combatEffectFragment(input: EffectOut) -> @location(0) vec4f {
     );
     a = clamp(ring(uv, 0.78, 0.05) + cross, 0.0, 1.0);
     rgb = vec3f(0.95, 0.28, 0.20);
-  } else {                                // battle marker — crossed sabres + pulse
-    let s1 = 1.0 - smoothstep(0.05, 0.12, segDist(uv, vec2f(-0.62, -0.62), vec2f(0.62, 0.62)));
-    let s2 = 1.0 - smoothstep(0.05, 0.12, segDist(uv, vec2f(-0.62, 0.62), vec2f(0.62, -0.62)));
-    let pulse = ring(uv, 0.60 + 0.34 * input.age, 0.04) * (1.0 - input.age);
-    let blades = clamp(s1 + s2, 0.0, 1.0);
-    rgb = mix(vec3f(0.98, 0.86, 0.5), vec3f(0.95, 0.32, 0.22), blades * 0.4 + pulse);
-    a = clamp(blades + pulse * 0.9, 0.0, 1.0);
+  } else {                                // battle marker — pulsing spark burst, not a cross/X
+    // A giant crossed-blades "X" read as a cartoon cancel icon at a glance;
+    // a compact radiating burst plus a breathing ring reads as "fighting
+    // here" without borrowing another symbol's meaning.
+    let core = softDisc(uv * 2.6, 0.0);
+    let spikes = pow(max(0.0, 1.0 - abs(uv.x) * 2.2), 3.0) + pow(max(0.0, 1.0 - abs(uv.y) * 2.2), 3.0);
+    let burst = clamp(core * 0.9 + spikes * 0.35, 0.0, 1.0);
+    let pulse = ring(uv, 0.58 + 0.3 * input.age, 0.045) * (1.0 - input.age * 0.6);
+    rgb = mix(vec3f(1.0, 0.8, 0.4), vec3f(0.93, 0.34, 0.2), clamp(burst * 0.5 + pulse * 0.6, 0.0, 1.0));
+    a = clamp(burst * 0.8 + pulse * 0.75, 0.0, 1.0);
   }
 
   let out = clamp(a * input.alpha * (0.7 + 0.3 * input.intensity), 0.0, 1.0);
