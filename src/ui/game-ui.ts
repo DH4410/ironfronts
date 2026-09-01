@@ -120,11 +120,16 @@ const FACILITY_NOTE: Record<string, string> = {
 
 const numberFormat = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
-/** "1:02" / "0:45" — capped so a very long build never prints minutes > 99. */
+/**
+ * "7s" / "7m 12s" / "1h 03m" — unit-labelled so a short build can't be misread
+ * as minutes. Seconds are dropped once we're into hours (nobody counts them
+ * there) and the minutes are zero-padded so the width stays stable.
+ */
 function formatEta(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
-  const m = Math.min(99, Math.floor(s / 60));
-  return `${m}:${String(s % 60).padStart(2, '0')}`;
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+  return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`;
 }
 
 /**

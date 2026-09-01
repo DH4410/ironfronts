@@ -1275,8 +1275,8 @@
   transition: border-color 0.1s ease, color 0.1s ease, box-shadow 0.1s ease;
 }
 .ifg-buildbtn__thumb {
-  width: 52px;
-  height: 52px;
+  width: 60px;
+  height: 60px;
   flex: none;
   border: 1px solid var(--ifg-rule-soft);
   border-radius: 2px;
