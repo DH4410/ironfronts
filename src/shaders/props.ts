@@ -162,7 +162,9 @@ fn propVertex(input: PropVertexInput, @builtin(instance_index) instanceIndex: u3
     angle = record.b.x;
     let clusterNoise = valueNoise(record.a.xy / 520.0)
       + (noiseHash(record.a.xy * 0.13) - 0.5) * 0.14;
-    treeCluster = smoothstep(0.32, 0.55, clusterNoise);
+    // Tightened so well over half the scattered trees drop out — forests keep
+    // their cores, open ground reads as open. Raise the low bound to thin more.
+    treeCluster = smoothstep(0.50, 0.76, clusterNoise);
     transformedNormal = rotateY(normalize(input.normal / max(partScale, vec3f(0.001))), angle);
     opacity = select(0.0, 1.0, treePartVisible(variant, part));
     color = vec3f(record.b.y);
