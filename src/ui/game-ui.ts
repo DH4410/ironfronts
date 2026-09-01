@@ -16,6 +16,8 @@ import { renderSelectedArmyPanel, type ArmyPanelCommand } from './army';
 import { createFlag } from './flags';
 import { createIcon, type IconName } from './icons';
 import { buildNotification } from './notifications';
+import { bindTooltip } from './tooltip';
+import { createUnitPortrait, UNIT_ROLE_NOTE } from './unit-portraits';
 import type {
   MapMode, NavId, ProvinceResourceTotals, StrategicUiState, UiStore,
 } from './ui-state';
@@ -80,6 +82,20 @@ const FACILITY_CHIPS: ReadonlyArray<{
   { key: 'tankPlant', label: 'Tank plant', icon: 'structure-plant' },
   { key: 'ordnance', label: 'Ordnance works', icon: 'structure-ordnance' },
 ];
+
+/** Building id → 0 A.D. facility icon, for the graphical Build row. */
+const FACILITY_ICON: Record<string, IconName> = {
+  barracks: 'structure-barracks',
+  tankPlant: 'structure-plant',
+  ordnance: 'structure-ordnance',
+};
+
+/** Building id → one-line note for the Build tooltip. */
+const FACILITY_NOTE: Record<string, string> = {
+  barracks: 'Trains infantry and engineers.',
+  tankPlant: 'Builds armoured cars and tanks.',
+  ordnance: 'Builds artillery and heavy ordnance.',
+};
 
 const numberFormat = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
@@ -589,10 +605,19 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         pvProduce.hidden = !(province.isOwn && prod.length > 0);
         if (province.isOwn && prod.length > 0) {
           pvProduceList.replaceChildren(...prod.map((u) => {
-            const b = el('button', 'ifg-card__act');
+            // Portrait-thumb button, RTS build-panel style: the drawing reads
+            // first, the cost + role sit on the hover tooltip.
+            const b = el('button', 'ifg-buildbtn');
             b.type = 'button';
-            b.textContent = u.name;
-            b.title = u.costLabel;
+            const thumb = createUnitPortrait(u.id, u.name);
+            thumb.classList.add('ifg-buildbtn__thumb');
+            b.append(thumb, el('span', 'ifg-buildbtn__label', u.name));
+            b.setAttribute('aria-label', `${u.name} — ${u.costLabel}`);
+            bindTooltip(b, () => ({
+              title: u.name,
+              description: UNIT_ROLE_NOTE[u.id],
+              cost: u.costLabel,
+            }));
             b.addEventListener('click', () => actions.produceUnit(province.id, u.id));
             return b;
           }));
@@ -619,13 +644,22 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         pvBuild.hidden = !province.isOwn || (buildable.length === 0 && construction.length === 0);
         if (!pvBuild.hidden) {
           pvBuildList.replaceChildren(...buildable.map((b) => {
-            const btn = el('button', 'ifg-card__act');
+            // Facility icon (0 A.D. art) + short label. Unaffordable buildings
+            // stay on the list, disabled, with the cost on the tooltip so the
+            // player knows what to save for.
+            const btn = el('button', 'ifg-buildbtn');
             btn.type = 'button';
-            btn.title = b.costLabel;
-            // Unaffordable buildings stay on the list, disabled, with the cost
-            // spelled out so the player knows what to save for.
-            btn.textContent = b.affordable ? b.name : `${b.name} (${b.costLabel})`;
+            const icon = FACILITY_ICON[b.id];
+            if (icon) btn.append(createIcon(icon, 'ifg-buildbtn__thumb'));
+            btn.append(el('span', 'ifg-buildbtn__label', b.name));
             btn.disabled = !b.affordable;
+            btn.setAttribute('aria-label', `${b.name} — ${b.costLabel}`);
+            bindTooltip(btn, () => ({
+              title: b.name,
+              description: FACILITY_NOTE[b.id],
+              cost: b.costLabel,
+              disabledReason: b.affordable ? undefined : `Not enough resources — needs ${b.costLabel}.`,
+            }));
             if (b.affordable) {
               btn.addEventListener('click', () => actions.buildStructure(province.id, b.id));
             }
