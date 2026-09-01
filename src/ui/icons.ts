@@ -39,7 +39,8 @@ export type IconName =
   | 'cmd-move' | 'cmd-attack' | 'cmd-retreat' | 'cmd-split' | 'cmd-stop' | 'cmd-extract'
   | 'cmd-patrol' | 'cmd-garrison'
   | 'stat-health' | 'stat-attack' | 'stat-defence' | 'stat-speed' | 'stat-troops'
-  | 'structure-barracks' | 'structure-plant' | 'structure-ordnance'
+  | 'structure-barracks' | 'structure-plant' | 'structure-ordnance' | 'structure-fortress'
+  | 'stance-attack-defend' | 'stance-defend' | 'stance-retreat'
   | 'note-attacked' | 'rank-basic' | 'rank-advanced' | 'rank-elite';
 
 interface IconDef { readonly kind: 'img' | 'svg'; readonly value: string; }
@@ -93,9 +94,15 @@ const ICONS: Record<IconName, IconDef> = {
   'stat-defence': { kind: 'svg', value: svg('shield') },
   'stat-speed': { kind: 'svg', value: svg('speed') },
   'stat-troops': { kind: 'svg', value: svg('troops') },
-  'structure-barracks': { kind: 'img', value: png('training') },
-  'structure-plant': { kind: 'img', value: png('production') },
+  'structure-barracks': { kind: 'img', value: ironfrontsPng('barracks') },
+  'structure-plant': { kind: 'img', value: ironfrontsPng('tank-plant') },
   'structure-ordnance': { kind: 'img', value: png('construction') },
+  // Reserved — committed painterly art (project owner, see ASSET_CREDITS.md)
+  // with no wired mechanic yet: no fortress building, no army-stance system.
+  'structure-fortress': { kind: 'img', value: ironfrontsPng('fortress') },
+  'stance-attack-defend': { kind: 'img', value: ironfrontsPng('stance-attack-defend') },
+  'stance-defend': { kind: 'img', value: ironfrontsPng('stance-defend') },
+  'stance-retreat': { kind: 'img', value: ironfrontsPng('stance-retreat') },
   'rank-basic': { kind: 'img', value: png('ranks/Basic') },
   'rank-advanced': { kind: 'img', value: png('ranks/Advanced') },
   'rank-elite': { kind: 'img', value: png('ranks/Elite') },

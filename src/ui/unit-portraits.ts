@@ -28,6 +28,16 @@ const raw = import.meta.glob('./assets/units/*.svg', {
 
 const portrait = (stem: string): string => raw[`./assets/units/${stem}.svg`];
 
+// Committed painterly raster portraits (hand-provided by the project owner,
+// downscaled — see docs/ASSET_CREDITS.md). These are real shipped art, so the
+// glob deliberately DOES pull them into the bundle; when one exists for a unit
+// id it replaces the inline SVG in every build. Ids with no raster keep the SVG.
+const rasterUrls = import.meta.glob('./assets/units/*.png', {
+  eager: true, query: '?url', import: 'default',
+}) as Record<string, string>;
+
+const rasterPortrait = (stem: string): string | undefined => rasterUrls[`./assets/units/${stem}.png`];
+
 // Deliberately NOT import.meta.glob (eager or lazy): Vite's glob transform
 // statically enumerates matching files and wires them into Rollup's module
 // graph at parse time, before any import.meta.env.DEV dead-code elimination
@@ -79,11 +89,18 @@ export function createUnitPortrait(typeId: string, label: string): HTMLElement {
   frame.setAttribute('role', 'img');
   frame.setAttribute('aria-label', label);
   frame.innerHTML = unitPortraitMarkup(typeId);
-  const url = prototypeUrl(typeId);
+  // Prefer the committed raster portrait; fall back to the dev-only Call of War
+  // reference image when there's no raster for this id. The SVG stays as the
+  // instant placeholder and the final fallback if neither image loads.
+  const raster = rasterPortrait(typeId);
+  const url = raster ?? prototypeUrl(typeId);
   if (url) {
     const img = document.createElement('img');
-    img.onload = () => { frame.dataset.prototype = 'true'; frame.replaceChildren(img); };
-    img.onerror = () => { /* no local reference file on disk; SVG stays as-is */ };
+    img.onload = () => {
+      frame.dataset[raster ? 'raster' : 'prototype'] = 'true';
+      frame.replaceChildren(img);
+    };
+    img.onerror = () => { /* image missing; the inline SVG stays as-is */ };
     img.src = url;
   }
   return frame;
