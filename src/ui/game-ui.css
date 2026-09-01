@@ -624,6 +624,14 @@
   display: block; width: 100%; height: 100%; object-fit: cover;
   filter: brightness(1.16) contrast(1.12) saturate(1.06);
 }
+.ifg-army-unit__portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* Dev-only Call of War reference art (see dev-assets/callofwar-reference) —
+   flagged unmistakably so it is never confused for shipped Ironfronts art. */
+.ifg-army-unit__portrait[data-prototype="true"]::after {
+  content: "REF"; position: absolute; top: 2px; right: 2px; z-index: 2;
+  padding: 1px 4px; font: 700 7px/1.4 var(--ifg-sans, sans-serif); letter-spacing: 0.08em;
+  color: #1a1a14; background: rgba(232, 201, 136, 0.88); border-radius: 2px;
+}
 /* soft top spotlight so the figure separates from the panel */
 .ifg-army-unit__visual::after {
   content: "";
