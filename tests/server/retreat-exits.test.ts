@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { buildLandGraph } from '../../src/game/movement/graph';
 import {
-  bearingLabel, homelandCamera, orderRouteForClient, retreatExitsForClient,
+  bearingLabel, homelandCamera, orderRouteForClient, rallyRouteForClient, retreatExitsForClient,
 } from '../../apps/game-server/src/projection';
 
 describe('bearingLabel', () => {
@@ -67,6 +68,29 @@ describe('orderRouteForClient', () => {
 
   it('returns null for an order whose path has been consumed', () => {
     expect(orderRouteForClient({ path: [] }, graph, 0, 0)).toBeNull();
+  });
+});
+
+describe('rallyRouteForClient', () => {
+  // (0,0) - (200,0) - (400,0)
+  const graph = buildLandGraph(new Float32Array([
+    0, 0, 200, 0, 1, 0, 0, 0,
+    200, 0, 400, 0, 1, 0, 0, 0,
+  ]), 10_000, 5_000);
+  const world = {
+    width: 10_000, height: 5_000,
+    provinces: [{ id: 7, center: [0, 0], terrainId: 4, population: 1, coastal: false, urban: true }],
+  } as never;
+
+  it('returns the road polyline from the province node to the rally node', () => {
+    const route = rallyRouteForClient(world, graph, 7, { x: 395, z: 5 });
+    expect(route && route.length).toBeGreaterThanOrEqual(2);
+    expect(route![0]).toEqual({ x: 0, z: 0 });
+    expect(route![route!.length - 1]).toEqual({ x: 400, z: 0 });
+  });
+
+  it('is null for an unknown province', () => {
+    expect(rallyRouteForClient(world, graph, 999, { x: 0, z: 0 })).toBeNull();
   });
 });
 

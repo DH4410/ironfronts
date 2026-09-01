@@ -101,16 +101,14 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
     widthPixels = 2.1 + nearFactor * 0.75;
     color = select(vec4f(0.05, 0.91, 1.0, 0.94), vec4f(0.98, 0.71, 0.12, 0.96), line.b.z > 0.5);
   } else if (lineParams.mode == 3u) {
-    // Order route. b.x: 0 move (cream) / 1 attack (muted red); b.z > 0.5 retreat
-    // (amber, overrides); b.y > 0.5 = a non-selected army's route, drawn faint.
+    // Order route. b.x: 0 move (cream) / 1 attack (muted red) / 2 rally (blue);
+    // b.z > 0.5 retreat (amber, overrides); b.w > 0.5 = destination chevron.
     widthPixels = 1.9 + nearFactor * 1.0;
-    var routeColor = select(
-      vec4f(0.94, 0.89, 0.74, 0.92),
-      vec4f(0.82, 0.30, 0.24, 0.94),
-      line.b.x > 0.5,
-    );
+    var routeColor = vec4f(0.94, 0.89, 0.74, 0.92);
+    if (line.b.x > 1.5) { routeColor = vec4f(0.42, 0.66, 0.95, 0.88); }
+    else if (line.b.x > 0.5) { routeColor = vec4f(0.82, 0.30, 0.24, 0.94); }
     if (line.b.z > 0.5) { routeColor = vec4f(0.92, 0.62, 0.24, 0.94); }
-    if (line.b.y > 0.5) { routeColor.a *= 0.4; widthPixels -= 0.5; }
+    if (line.b.w > 0.5) { widthPixels += 1.4; routeColor.a = min(1.0, routeColor.a + 0.06); }
     color = routeColor;
     innerColor = routeColor;
   }

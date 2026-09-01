@@ -1,6 +1,6 @@
 import {
   computeArmyVisibility, projectArmyView, visibleResourceNodes,
-  legalRetreatPaths, stackExtractionRate,
+  legalRetreatPaths, stackExtractionRate, nearestNode, findPath,
   type GameState, type LandGraph, type WorldData,
 } from '@ironfronts/game-core';
 import type { PlayerProjection, ProjectionDelta, PublicCountry } from '@ironfronts/protocol';
@@ -77,7 +77,11 @@ export function projectFor(
     provinceBuildings: privateMap(state.provinceBuildings),
     productionQueues: privateMap(state.productionQueues),
     constructionQueues: privateMap(state.constructionQueues),
-    rallyPoints: privateMap(state.rallyPoints),
+    rallyPoints: graph
+      ? Object.fromEntries(Object.entries(privateMap(state.rallyPoints)).map(([id, point]) => [
+        id, { ...point, route: rallyRouteForClient(world, graph, Number(id), point) ?? undefined },
+      ]))
+      : privateMap(state.rallyPoints),
     armies,
     resourceNodes,
     ownCountry: own ? {
@@ -173,6 +177,27 @@ export function orderRouteForClient(
     { x: armyX, z: armyZ },
     ...Array.from(order.path, (nodeId) => ({ x: graph.nodeX[nodeId], z: graph.nodeZ[nodeId] })),
   ];
+}
+
+/**
+ * Road polyline from a province's own movement node to its rally point, using
+ * the same planner a freshly produced unit walks. First point is the province
+ * node so the client can draw it without knowing province centres. Null when the
+ * province, its node, or a path can't be resolved.
+ */
+export function rallyRouteForClient(
+  world: WorldData, graph: LandGraph,
+  provinceId: number, rally: { x: number; z: number },
+): Array<{ x: number; z: number }> | null {
+  const province = world.provinces.find((p) => p.id === provinceId);
+  if (!province) return null;
+  const from = nearestNode(graph, province.center[0], province.center[1], 600);
+  if (from < 0) return null;
+  const to = nearestNode(graph, rally.x, rally.z, 600, graph.component[from]);
+  if (to < 0) return null;
+  const path = findPath(graph, from, to);
+  if (!path || path.length < 2) return null;
+  return path.map((nodeId) => ({ x: graph.nodeX[nodeId], z: graph.nodeZ[nodeId] }));
 }
 
 export function retreatExitsForClient(

@@ -1043,26 +1043,48 @@ function syncArmyMarkers(
     if (count >= 1_024) break;
     const identified = army.contact === 'visible';
 
-    // Own-army authoritative route polyline (move = cream, attack = red,
-    // retreating = amber; the selected army's route is bright, others faint).
-    if (army.own && army.moveRoute && army.moveRoute.length >= 2) {
+    // Authoritative route polyline for the SELECTED own army only (move = cream,
+    // attack = red, retreating = amber). Other armies' routes stay hidden so the
+    // map isn't a web of lines; a deselect clears this on the next sync.
+    if (army.own && army.id === selectedArmyId && army.moveRoute && army.moveRoute.length >= 2) {
       const colorFlag = army.moveIntent === 'attack' ? 1 : 0;
-      const dim = army.id === selectedArmyId ? 0 : 1;
       const retreatFlag = army.status === 'retreating' ? 1 : 0;
-      for (let i = 0; i + 1 < army.moveRoute.length && routeCount < 4_096; i += 1) {
-        const a = army.moveRoute[i];
-        const b = army.moveRoute[i + 1];
-        routeScratch[routeCursor] = a.x;
-        routeScratch[routeCursor + 1] = a.z;
-        routeScratch[routeCursor + 2] = b.x;
-        routeScratch[routeCursor + 3] = b.z;
+      const emitSegment = (ax: number, az: number, bx: number, bz: number, arrow: number): void => {
+        if (routeCount >= 4_096) return;
+        routeScratch[routeCursor] = ax;
+        routeScratch[routeCursor + 1] = az;
+        routeScratch[routeCursor + 2] = bx;
+        routeScratch[routeCursor + 3] = bz;
         routeScratch[routeCursor + 4] = colorFlag;
-        routeScratch[routeCursor + 5] = dim;
+        routeScratch[routeCursor + 5] = 0;
         routeScratch[routeCursor + 6] = retreatFlag;
-        routeScratch[routeCursor + 7] = 0;
+        routeScratch[routeCursor + 7] = arrow;
         routeCursor += 8;
         routeCount += 1;
+      };
+      const route = army.moveRoute;
+      for (let i = 0; i + 1 < route.length; i += 1) {
+        emitSegment(route[i].x, route[i].z, route[i + 1].x, route[i + 1].z, 0);
       }
+      // Chevron at the destination, oriented by the final leg tangent, in the
+      // route's own colour. Kept small so it never buries the end point.
+      const tip = route[route.length - 1];
+      const prev = route[route.length - 2];
+      const worldW = renderer.manifest?.world.width ?? 0;
+      let tx = tip.x - prev.x;
+      if (worldW) {
+        if (tx > worldW / 2) tx -= worldW;
+        else if (tx < -worldW / 2) tx += worldW;
+      }
+      const tz = tip.z - prev.z;
+      const tlen = Math.hypot(tx, tz) || 1;
+      const ux = tx / tlen;
+      const uz = tz / tlen;
+      const WING = 34;
+      const COS = Math.cos(2.5); // ~143deg: wings sweep back from the tip
+      const SIN = Math.sin(2.5);
+      emitSegment(tip.x + WING * (ux * COS - uz * SIN), tip.z + WING * (ux * SIN + uz * COS), tip.x, tip.z, 1);
+      emitSegment(tip.x + WING * (ux * COS + uz * SIN), tip.z + WING * (-ux * SIN + uz * COS), tip.x, tip.z, 1);
     }
 
     const formation = identified ? buildArmyFormation(army.composition?.groups ?? []) : [];
@@ -1197,6 +1219,48 @@ function syncArmyMarkers(
   for (const key of activeModelKeys) activeArmyIds.add(key.slice(0, key.lastIndexOf(':')));
   for (const id of previousArmyHeading.keys()) {
     if (!activeArmyIds.has(id)) previousArmyHeading.delete(id);
+  }
+  // Rally route for the selected production city only: city node -> rally point
+  // along the real road network (server-derived), plus a chevron at the rally
+  // end. Hidden the moment the city is deselected.
+  if (selectedProvinceId !== null && session.ownsProvince(selectedProvinceId)) {
+    const rally = session.rallyPoint(selectedProvinceId);
+    const rroute = rally?.route;
+    if (rroute && rroute.length >= 2) {
+      const worldW = renderer.manifest?.world.width ?? 0;
+      const emitRally = (ax: number, az: number, bx: number, bz: number, arrow: number): void => {
+        if (routeCount >= 4_096) return;
+        routeScratch[routeCursor] = ax;
+        routeScratch[routeCursor + 1] = az;
+        routeScratch[routeCursor + 2] = bx;
+        routeScratch[routeCursor + 3] = bz;
+        routeScratch[routeCursor + 4] = 2; // rally colour flag
+        routeScratch[routeCursor + 5] = 0;
+        routeScratch[routeCursor + 6] = 0;
+        routeScratch[routeCursor + 7] = arrow;
+        routeCursor += 8;
+        routeCount += 1;
+      };
+      for (let i = 0; i + 1 < rroute.length; i += 1) {
+        emitRally(rroute[i].x, rroute[i].z, rroute[i + 1].x, rroute[i + 1].z, 0);
+      }
+      const tip = rroute[rroute.length - 1];
+      const prev = rroute[rroute.length - 2];
+      let tdx = tip.x - prev.x;
+      if (worldW) {
+        if (tdx > worldW / 2) tdx -= worldW;
+        else if (tdx < -worldW / 2) tdx += worldW;
+      }
+      const tdz = tip.z - prev.z;
+      const tl = Math.hypot(tdx, tdz) || 1;
+      const rx = tdx / tl;
+      const rz = tdz / tl;
+      const W = 30;
+      const C = Math.cos(2.5);
+      const S = Math.sin(2.5);
+      emitRally(tip.x + W * (rx * C - rz * S), tip.z + W * (rx * S + rz * C), tip.x, tip.z, 1);
+      emitRally(tip.x + W * (rx * C + rz * S), tip.z + W * (-rx * S + rz * C), tip.x, tip.z, 1);
+    }
   }
   renderer.setArmyMarkers(armyMarkerScratch, count, armyPickScratch, armyModelScratch, modelCount);
   renderer.setOrderRoutes(routeScratch, routeCount);

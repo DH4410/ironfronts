@@ -33,14 +33,16 @@ describe('WGSL programs', () => {
     expect(propShader).toContain('archetype == 4u');
   });
 
-  it('draws order routes as a terrain-draped line mode with move / attack / retreat colours', () => {
+  it('draws order routes as a terrain-draped line mode with move / attack / rally / retreat colours and an end chevron', () => {
     expect(lineShader).toContain('lineParams.mode == 3u');
     // draped along terrain, not floating at a fixed height
     expect(lineShader).toMatch(/mode == 3u\)?\s*\{[\s\S]*heightAt\(uv0\) \+ 2\.1/);
-    // move vs attack select + a retreat override branch
+    // move (default) vs attack vs rally, plus a retreat override branch
+    expect(lineShader).toContain('if (line.b.x > 1.5)');
     expect(lineShader).toMatch(/line\.b\.x > 0\.5/);
     expect(lineShader).toContain('if (line.b.z > 0.5)');
-    expect(lineShader).toContain('if (line.b.y > 0.5)');
+    // destination chevron segments are drawn bolder
+    expect(lineShader).toContain('if (line.b.w > 0.5)');
   });
 
   it('limits beach material to the actual shoreline mask', () => {

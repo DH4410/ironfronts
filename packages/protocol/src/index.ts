@@ -100,7 +100,10 @@ export interface PlayerProjection {
   provinceBuildings: Record<number, { barracks: number; tankPlant: number; ordnance: number }>;
   productionQueues: Record<number, unknown[]>;
   constructionQueues: Record<number, unknown[]>;
-  rallyPoints: Record<number, { x: number; z: number }>;
+  // `route` is the server-derived road polyline from the province's node to the
+  // rally point — the same planner a produced unit will actually walk. Derived
+  // per projection, not persisted; absent until the graph resolves one.
+  rallyPoints: Record<number, { x: number; z: number; route?: Array<{ x: number; z: number }> }>;
   armies: Record<string, ProjectedArmy>;
   resourceNodes: Record<number, unknown>;
   ownCountry: null | Record<string, unknown>;

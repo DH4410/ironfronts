@@ -199,7 +199,9 @@ export class RemoteGameSession extends EventTarget {
   clearRally(provinceId: number) {
     return this.send({ type: 'setRally', provinceId, target: null }, (state) => { delete state.rallyPoints[provinceId]; });
   }
-  rallyPoint(provinceId: number): { x: number; z: number } | null { return this.state.rallyPoints[provinceId] ?? null; }
+  rallyPoint(provinceId: number): { x: number; z: number; route?: Array<{ x: number; z: number }> } | null {
+    return this.state.rallyPoints[provinceId] ?? null;
+  }
 
   private deduct(state: PlayerProjection, cost: unknown): void {
     if (!state.ownCountry || !cost || typeof cost !== 'object') return;

@@ -5,6 +5,8 @@ export { buildWorldData } from '../../../src/game/world-data-loader';
 export { projectArmyView, visibleResourceNodes } from '../../../src/game/player-view';
 export { computeArmyVisibility } from '../../../src/game/visibility';
 export { legalRetreatPaths } from '../../../src/game/combat';
+export { nearestNode } from '../../../src/game/movement/graph';
+export { findPath } from '../../../src/game/movement/pathfind';
 export { UNIT_TYPES, unitType } from '../../../src/game/units/unit-catalog';
 export { stackExtractionRate } from '../../../src/game/units/army';
 export { BUILDINGS } from '../../../src/game/construction';
