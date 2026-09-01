@@ -550,7 +550,16 @@ export class WorldRenderer {
     this.terrainMeshes = [this.manifest.terrain.gridResolution, 33, 17, 9]
       .map((resolution) => createTerrainMesh(this.device, resolution, true));
     this.polarCapMesh = createTerrainMesh(this.device, 65);
-    this.waterMeshes = [33, 25, 17, 9].map((resolution) => createTerrainMesh(this.device, resolution));
+    // Water MUST tessellate identically to terrain at every LOD. Both passes
+    // key off the same per-chunk `draw.lod` and decide coast coverage from
+    // landAt(interpolated mapUv); when the water grid was coarser (was
+    // [33,25,17,9] vs terrain's [49,33,17,9]) the 0.5 coast contour landed on a
+    // different polyline in each pass, so at a fine LOD (Ultra) a shoreline
+    // fragment could be discarded by BOTH — the black rectangles. Matching the
+    // resolutions makes landAt(mapUv) per-pixel identical, so the
+    // terrain `<= 0.5` / water `> 0.5` split covers every fragment exactly once.
+    this.waterMeshes = [this.manifest.terrain.gridResolution, 33, 17, 9]
+      .map((resolution) => createTerrainMesh(this.device, resolution));
     this.roadMesh = uploadIndexedMesh(this.device, 'terrain roads', roadVertexBuffer, roadIndexBuffer, this.manifest.buffers.roadIndices.count);
     this.hiddenConnectionMesh = uploadIndexedMesh(this.device, 'floating hidden connections', hiddenConnectionVertexBuffer,
       hiddenConnectionIndexBuffer, this.manifest.buffers.hiddenConnectionIndices.count);

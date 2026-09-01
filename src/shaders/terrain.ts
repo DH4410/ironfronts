@@ -92,15 +92,14 @@ fn surfaceTransitionAt(mapUv: vec2f, center: vec4u) -> f32 {
 @fragment
 fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let bankField = bankFieldAt(input.mapUv);
-  // Water discards where landAt > 0.5, so the 0.5 contour itself is drawn by
-  // the water pass. Terrain is then allowed to draw a thin band PAST that
-  // contour (down to 0.5 - COAST_OVERLAP) so that where a chunk-LOD seam makes
-  // the two passes sample landAt on opposite sides of 0.5, terrain still fills
-  // the fragment instead of leaving a clear-colour (black at night) rectangle.
-  // The band is under the y=0.35 water plane and the water surface is ~opaque,
-  // so the only visible effect is a hair of wet shoreline — it never floods the
-  // beach the way widening the *water* cut would (see water.ts:44).
-  let COAST_OVERLAP = 0.045;
+  // Coast split: water discards where landAt > 0.5, terrain where landAt <= 0.5,
+  // so the two passes tile the shoreline exactly once. This is only watertight
+  // because water and terrain now tessellate identically at every LOD (see
+  // renderer.ts waterMeshes) — landAt(input.mapUv) is per-pixel identical in
+  // both passes. COAST_OVERLAP keeps a hair of terrain drawn past the contour
+  // as float-precision insurance; it sits under the y=0.35 water plane so it
+  // reads only as a wet edge, never a flooded beach.
+  let COAST_OVERLAP = 0.03;
   if (bankField.r <= 0.5 - COAST_OVERLAP) { discard; }
   let navigation = navigationAt(input.mapUv);
   let riverField = navigation.ba;
