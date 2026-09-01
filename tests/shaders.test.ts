@@ -23,6 +23,31 @@ describe('WGSL programs', () => {
     expect(scale).toBeLessThanOrEqual(2.1);
   });
 
+  it('faces vehicles and infantry down their line of travel and adds a marching gait', () => {
+    // tank hull long axis is Z (travel / gun direction), not X
+    expect(armyModelShader).toContain('halfSize = vec3f(1.12, 0.46, 1.68)');
+    expect(armyModelShader).toContain('halfSize = vec3f(1.28, 0.52, 1.95)');
+    // infantry rifle points forward (-Z), not out the side (+X)
+    expect(armyModelShader).toContain('center = vec3f(0.06, 1.72, -0.78)');
+    // gait only animates while the unit is actually moving between syncs
+    expect(armyModelShader).toContain('let moveAmt = clamp(distance(model.a.xy, model.c.xy) / 3.0, 0.0, 1.0)');
+  });
+
+  it('holds marker plaques and count badges at a constant CSS size across graphics presets', () => {
+    expect(armyMarkerShader).toContain('* uniforms.viewport.z');
+    expect(armyModelShader).toContain('* 2.0 * uniforms.viewport.z / uniforms.viewport.xy');
+    // digits and vehicle icons are anti-aliased, not hard step() blocks
+    expect(armyMarkerShader).toContain('fn iconBox');
+    expect(armyMarkerShader).toContain('acc += glyphBit(glyph, col, row)');
+  });
+
+  it('renders the explosion as layered fire, embers, smoke and ground dust', () => {
+    expect(combatEffectShader).toContain('let fireLife = 1.0 - smoothstep(0.0, 0.55, input.age)');
+    expect(combatEffectShader).toContain('let smokeLife = smoothstep(0.06, 0.5, input.age)');
+    expect(combatEffectShader).toContain('let emberField = valueNoise(uv * 9.0 + input.seed * 120.0)');
+    expect(combatEffectShader).toContain('* uniforms.viewport.z');
+  });
+
   it('pulls towns and forests down to a strategic map scale', () => {
     const footprint = Number(/BUILDING_FOOTPRINT_SCALE = ([\d.]+)/.exec(propShader)?.[1]);
     const tree = Number(/TREE_MAP_SCALE = ([\d.]+)/.exec(propShader)?.[1]);
@@ -128,7 +153,18 @@ describe('WGSL programs', () => {
     expect(propShader).toContain('local.y *= mix(1.0, 0.5, regionalLod)');
     expect(propShader).toContain('let lodHash = noiseHash(vec2f(f32(visibleInstance % count), 7.31))');
     expect(propShader).toContain('buildingLod = 1.0 - smoothstep(lodStart, lodStart + 0.25, regionalLod) * 0.6');
-    expect(propShader).toContain(') * buildingLod;');
+    expect(propShader).toContain(') * buildingLod * treeCluster;');
+  });
+
+  it('clumps forests via a low-frequency noise field without a world rebuild', () => {
+    expect(propShader).toContain('var treeCluster = 1.0;');
+    expect(propShader).toContain('let clusterNoise = valueNoise(record.a.xy / 520.0)');
+    expect(propShader).toContain('treeCluster = smoothstep(0.32, 0.55, clusterNoise);');
+  });
+
+  it('floors the night canopy shade so forests do not crush to black specks', () => {
+    expect(propShader).toContain('let nightAmount = 1.0 - uniforms.lighting.x;');
+    expect(propShader).toContain('shade = max(litShade, mix(vec3f(0.0), vec3f(0.34, 0.40, 0.47), nightAmount));');
   });
 
   it('uses precomputed terrain normals, faithful mipmapped albedo, prop AO, and packed navigation', () => {

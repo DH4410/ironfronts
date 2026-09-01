@@ -108,7 +108,7 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
     if (line.b.x > 1.5) { routeColor = vec4f(0.42, 0.66, 0.95, 0.88); }
     else if (line.b.x > 0.5) { routeColor = vec4f(0.82, 0.30, 0.24, 0.94); }
     if (line.b.z > 0.5) { routeColor = vec4f(0.92, 0.62, 0.24, 0.94); }
-    if (line.b.w > 0.5) { widthPixels += 1.4; routeColor.a = min(1.0, routeColor.a + 0.06); }
+    if (line.b.w > 0.5) { widthPixels += 0.5; routeColor.a = min(1.0, routeColor.a + 0.04); }
     color = routeColor;
     innerColor = routeColor;
   }

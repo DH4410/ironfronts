@@ -82,8 +82,10 @@ fn armyMarkerVertex(
   let closeFade = select(smoothstep(1400.0, 1800.0, zoom), 1.0, contact);
   let rangeFade = closeFade * (1.0 - smoothstep(4400.0, 5000.0, zoom));
   let zoomScale = mix(0.8, 1.25, smoothstep(4600.0, 900.0, zoom));
-  // Plaque is a touch wider than tall.
-  let half = vec2f(26.0, 15.0) * zoomScale;
+  // Plaque is a touch wider than tall. viewport.z (backing-store scale) keeps
+  // the plaque a constant CSS size — without it a lower graphics preset renders
+  // fewer framebuffer pixels and the plaque balloons on screen.
+  let half = vec2f(26.0, 15.0) * zoomScale * uniforms.viewport.z;
 
   var output: ArmyOut;
   output.uv = corner;
@@ -127,17 +129,35 @@ fn glyphBit(glyph: i32, col: i32, row: i32) -> f32 {
 }
 
 // Coverage of one glyph rendered into the box spanning [-w,w] x [-h,h] in uv.
+// 3x3 supersampled: the 3x5 bitmap font otherwise reads as hard aliased blocks
+// at small on-screen sizes (the "2 / 1" that looked pixelated). Averaging a few
+// taps gives the digits a soft edge for the cost of nine table lookups.
 fn glyphCoverage(glyph: i32, p: vec2f, boxW: f32, boxH: f32, offsetX: f32) -> f32 {
   let local = vec2f((p.x - offsetX) / boxW, p.y / boxH); // -1..1
-  if (abs(local.x) > 1.0 || abs(local.y) > 1.0) { return 0.0; }
-  let col = i32(floor((local.x * 0.5 + 0.5) * 3.0));
-  let row = i32(floor((0.5 - local.y * 0.5) * 5.0));
-  return glyphBit(glyph, col, row);
+  if (abs(local.x) > 1.2 || abs(local.y) > 1.2) { return 0.0; }
+  var acc = 0.0;
+  for (var sy = -1; sy <= 1; sy += 1) {
+    for (var sx = -1; sx <= 1; sx += 1) {
+      let s = local + vec2f(f32(sx) * 0.10, f32(sy) * 0.06);
+      let col = i32(floor((s.x * 0.5 + 0.5) * 3.0));
+      let row = i32(floor((0.5 - s.y * 0.5) * 5.0));
+      acc += glyphBit(glyph, col, row);
+    }
+  }
+  return acc / 9.0;
 }
 
 fn roundedBox(p: vec2f, b: vec2f, r: f32) -> f32 {
   let q = abs(p) - b + vec2f(r);
   return length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0) - r;
+}
+
+// Anti-aliased filled box in icon space, used by the vehicle unit-kind icons
+// so their hull/turret/tracks stop reading as jagged step() rectangles.
+fn iconBox(q: vec2f, he: vec2f) -> f32 {
+  let d = abs(q) - he;
+  let sd = length(max(d, vec2f(0.0))) + min(max(d.x, d.y), 0.0);
+  return 1.0 - smoothstep(0.0, 0.06, sd);
 }
 
 fn markerSegmentDistance(p: vec2f, a: vec2f, b: vec2f) -> f32 {
@@ -158,16 +178,16 @@ fn unitKindIcon(kind: i32, q: vec2f) -> f32 {
     return max(head, max(body, limbs));
   }
   if (kind == 1) {
-    let hull = step(abs(q.x), 0.78) * step(abs(q.y + 0.18), 0.30);
-    let turret = step(abs(q.x), 0.42) * step(abs(q.y - 0.30), 0.26);
-    let barrel = step(abs(q.x), 0.10) * step(q.y, 0.95) * step(0.48, q.y);
+    let hull = iconBox(q - vec2f(0.0, -0.18), vec2f(0.78, 0.30));
+    let turret = iconBox(q - vec2f(0.0, 0.30), vec2f(0.42, 0.26));
+    let barrel = iconBox(q - vec2f(0.0, 0.72), vec2f(0.09, 0.26));
     return max(hull, max(turret, barrel));
   }
   if (kind == 2) {
-    let hull = step(abs(q.x), 0.90) * step(abs(q.y + 0.20), 0.38);
-    let turret = step(abs(q.x), 0.50) * step(abs(q.y - 0.30), 0.28);
-    let barrel = step(abs(q.x), 0.11) * step(q.y, 1.0) * step(0.48, q.y);
-    let tracks = step(abs(q.x), 0.98) * step(abs(q.y + 0.58), 0.10);
+    let hull = iconBox(q - vec2f(0.0, -0.20), vec2f(0.88, 0.36));
+    let turret = iconBox(q - vec2f(0.0, 0.30), vec2f(0.50, 0.28));
+    let barrel = iconBox(q - vec2f(0.0, 0.74), vec2f(0.10, 0.28));
+    let tracks = iconBox(q - vec2f(0.0, -0.58), vec2f(0.98, 0.10));
     return max(max(hull, tracks), max(turret, barrel));
   }
   let cannon = 1.0 - smoothstep(0.09, 0.15, markerSegmentDistance(q, vec2f(-0.52, -0.55), vec2f(0.55, 0.62)));
@@ -212,8 +232,8 @@ fn armyCompositionVertex(
   let worldPos = vec3f(worldXZ.x, heightAt(vec2f(marker.a.x, marker.a.y) / uniforms.map.xy) + 17.0, worldXZ.y);
   let clip = uniforms.viewProjection * vec4f(worldPos, 1.0);
   let rows = compositionRowCount(marker.c);
-  let half = vec2f(29.0, 6.0 + rows * 7.5);
-  let pixelCenter = vec2f(38.0, 2.0);
+  let half = vec2f(29.0, 6.0 + rows * 7.5) * uniforms.viewport.z;
+  let pixelCenter = vec2f(38.0, 2.0) * uniforms.viewport.z;
 
   var output: CompositionOut;
   output.uv = corner;

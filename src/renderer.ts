@@ -1367,7 +1367,15 @@ export class WorldRenderer {
       inverseViewProjection: this.camera.inverseViewProjection,
       camera: [this.camera.position[0], this.camera.position[1], this.camera.position[2], this.camera.target[0]],
       sunTime: [...lighting.sunDirection, this.elapsed],
-      viewport: [this.canvas.width, this.canvas.height, 1 / this.canvas.width, 1 / this.canvas.height],
+      // .z = backing-store scale (framebuffer px per CSS px) so screen-space
+      // billboards can hold a constant CSS size across graphics presets instead
+      // of ballooning when the render scale drops. .w stays 1/height.
+      viewport: [
+        this.canvas.width,
+        this.canvas.height,
+        this.canvas.clientWidth > 0 ? this.canvas.width / this.canvas.clientWidth : 1,
+        1 / this.canvas.height,
+      ],
       map: [this.manifest.world.width, this.manifest.world.height, this.manifest.terrain.maxHeight, this.debugView],
       interaction: [this.hoveredId, this.camera.distance, tintMode, countryBordersEnabled],
       terrainInfo: [this.manifest.terrain.chunksX, this.manifest.terrain.chunksY, this.manifest.terrain.gridResolution, this.showWireframe ? 1 : 0],
