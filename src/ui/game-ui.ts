@@ -99,6 +99,46 @@ const FACILITY_NOTE: Record<string, string> = {
 
 const numberFormat = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
+/** "1:02" / "0:45" — capped so a very long build never prints minutes > 99. */
+function formatEta(seconds: number): string {
+  const s = Math.max(0, Math.round(seconds));
+  const m = Math.min(99, Math.floor(s / 60));
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
+}
+
+/**
+ * A 0 A.D.-style production/construction queue: the active order gets a
+ * thumbnail, a fill bar, and a countdown; anything queued behind it is a
+ * smaller inert thumbnail. Rebuilt whenever the caller's cache key changes
+ * (see the pvResourceKey gate) rather than diffed in place — a queue is at
+ * most a handful of items.
+ */
+function renderQueue(
+  container: HTMLElement, items: readonly import('./ui-state').QueueItem[],
+  thumbFor: (id: string, label: string) => HTMLElement,
+): void {
+  container.replaceChildren(...items.map((item) => {
+    const row = el('div', 'ifg-queue__item');
+    row.classList.toggle('is-active', item.active);
+    row.append(thumbFor(item.id, item.label));
+    if (item.active) {
+      const bar = el('div', 'ifg-queue__bar');
+      const fill = el('i');
+      fill.style.width = `${Math.round(item.progress * 100)}%`;
+      bar.append(fill);
+      const eta = el('span', 'ifg-queue__eta', formatEta(item.etaSeconds));
+      const meta = el('div', 'ifg-queue__meta');
+      meta.append(bar, eta);
+      row.append(meta);
+    }
+    bindTooltip(row, () => ({
+      title: item.label,
+      status: item.active ? `${Math.round(item.progress * 100)}% — ${formatEta(item.etaSeconds)} left` : 'Queued',
+    }));
+    return row;
+  }));
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K, className?: string, html?: string,
 ): HTMLElementTagNameMap[K] {
@@ -314,7 +354,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   pvProduce.append(el('small', 'ifg-card__restitle', 'Produce'));
   const pvProduceList = el('div', 'ifg-card__prodlist');
   pvProduce.append(pvProduceList);
-  const pvQueue = el('small', 'ifg-card__resstatus');
+  const pvQueue = el('div', 'ifg-queue');
   pvQueue.hidden = true;
   pvProduce.append(pvQueue);
   const pvRally = el('div', 'ifg-card__actions');
@@ -333,7 +373,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   pvBuild.append(el('small', 'ifg-card__restitle', 'Build'));
   const pvBuildList = el('div', 'ifg-card__prodlist');
   pvBuild.append(pvBuildList);
-  const pvConstruction = el('small', 'ifg-card__resstatus');
+  const pvConstruction = el('div', 'ifg-queue');
   pvConstruction.hidden = true;
   pvBuild.append(pvConstruction);
 
@@ -578,9 +618,9 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         dep ? `${dep.controlled ? 'C' : ''}${dep.extracting ? 'E' : ''}` : '',
         province.isOwn,
         (province.producible ?? []).map((u) => u.id).join(','),
-        (province.queue ?? []).join(','),
+        (province.queue ?? []).map((q) => `${q.id}:${Math.round(q.progress * 100)}:${Math.round(q.etaSeconds)}`).join(','),
         (province.buildable ?? []).map((b) => `${b.id}${b.affordable ? '+' : '-'}`).join(','),
-        (province.construction ?? []).join(','),
+        (province.construction ?? []).map((q) => `${q.id}:${Math.round(q.progress * 100)}:${Math.round(q.etaSeconds)}`).join(','),
         province.rally ? `${Math.round(province.rally.x)},${Math.round(province.rally.z)}` : '-',
         province.awaitingRallyTarget ? 'arm' : '',
       ].join('|');
@@ -623,7 +663,13 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
           }));
           const q = province.queue ?? [];
           pvQueue.hidden = q.length === 0;
-          pvQueue.textContent = q.length ? `Queue: ${q.join(', ')}` : '';
+          if (q.length) {
+            renderQueue(pvQueue, q, (id, label) => {
+              const thumb = createUnitPortrait(id, label);
+              thumb.classList.add('ifg-queue__thumb');
+              return thumb;
+            });
+          }
 
           // Rally point: where finished units march. Placed by a map click.
           pvRally.hidden = false;
@@ -666,8 +712,14 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
             return btn;
           }));
           pvConstruction.hidden = construction.length === 0;
-          pvConstruction.textContent = construction.length
-            ? `Under construction: ${construction.join(', ')}` : '';
+          if (construction.length) {
+            renderQueue(pvConstruction, construction, (id, label) => {
+              const icon = FACILITY_ICON[id];
+              const thumb = icon ? createIcon(icon, 'ifg-queue__thumb ifg-icon') : el('span', 'ifg-queue__thumb');
+              if (!icon) thumb.textContent = label.slice(0, 1);
+              return thumb;
+            });
+          }
         }
 
         if (dep && hasDeposits) {

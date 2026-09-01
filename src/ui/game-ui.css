@@ -944,6 +944,41 @@
 }
 .ifg-buildbtn:disabled { opacity: 0.42; cursor: help; pointer-events: auto; }
 
+/* 0 A.D.-style production/construction queue: active order gets a thumb +
+   fill bar + countdown; anything queued behind it is a smaller inert icon. */
+.ifg-queue { display: flex; align-items: flex-end; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.ifg-queue__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+}
+.ifg-queue__item:not(.is-active) { opacity: 0.55; }
+.ifg-queue__item.is-active {
+  border-color: var(--ifg-rule-soft);
+  background: linear-gradient(180deg, rgba(52, 56, 48, 0.7), rgba(26, 29, 24, 0.75));
+}
+.ifg-queue__thumb {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 1px solid var(--ifg-rule-soft);
+  border-radius: 2px;
+  overflow: hidden;
+  background: #12140f;
+}
+.ifg-queue__thumb.ifg-icon { display: grid; place-items: center; }
+.ifg-queue__thumb.ifg-icon img,
+.ifg-queue__thumb.ifg-icon svg { width: 20px; height: 20px; }
+.ifg-queue__thumb svg,
+.ifg-queue__thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ifg-queue__meta { display: flex; flex-direction: column; gap: 3px; min-width: 52px; }
+.ifg-queue__bar { width: 100%; height: 4px; background: #090b08; border-radius: 2px; overflow: hidden; }
+.ifg-queue__bar i { display: block; height: 100%; background: var(--ifg-brass-lit, #c9a044); transition: width 0.2s linear; }
+.ifg-queue__eta { font-size: 9.5px; letter-spacing: 0.03em; color: var(--ifg-dim); font-variant-numeric: tabular-nums; }
+
 /* stat rows: small key icon + label on the left, value on the right */
 .ifg-army-stat__key { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .ifg-army-stat__icon { width: 12px; height: 12px; color: var(--ifg-dim); flex: none; }

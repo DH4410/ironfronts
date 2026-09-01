@@ -39,6 +39,12 @@ const buildingCostLabel = (id: BuildingId): string => Object.entries((activeSess
   .map(([k, v]) => `${v} ${k}`).join(' · ');
 const orderPercent = (o: { progressHours: number; totalHours: number }): number =>
   o.totalHours > 0 ? Math.min(99, Math.floor((o.progressHours / o.totalHours) * 100)) : 0;
+/** Simulation runs at a fixed 0.05 game-hour / 100ms tick — 0.5 game-hours
+ *  per real second at normal (1x, production) speed. Dev-only sim speed-ups
+ *  are server-side and invisible here, so this is a normal-play estimate. */
+const GAME_HOURS_PER_REAL_SECOND = 0.5;
+const orderEtaSeconds = (o: { progressHours: number; totalHours: number }): number =>
+  Math.max(0, (o.totalHours - o.progressHours) / GAME_HOURS_PER_REAL_SECOND);
 
 /** Player queues a unit from the selected-province PRODUCE panel. */
 function handleProduce(provinceId: number, unitTypeId: string): void {
@@ -1716,11 +1722,12 @@ function projectSelectedProvince(
           id, name: gameUnitLabel(id), costLabel: unitCostLabel(id),
         }))
       : [],
-    // Only the head order is being worked; tag it with its % so the player can
-    // see how close the next unit / building is.
+    // Only the head order is being worked; it carries live progress/eta.
     queue: summary.isOwn
-      ? (session.state.productionQueues[provinceId] as Array<{ unitTypeId: string; progressHours: number; totalHours: number }> ?? []).map((o, i) =>
-          i === 0 ? `${gameUnitLabel(o.unitTypeId)} · ${orderPercent(o)}%` : gameUnitLabel(o.unitTypeId))
+      ? (session.state.productionQueues[provinceId] as Array<{ unitTypeId: string; progressHours: number; totalHours: number }> ?? []).map((o, i) => ({
+          id: o.unitTypeId, label: gameUnitLabel(o.unitTypeId), active: i === 0,
+          progress: i === 0 ? orderPercent(o) / 100 : 0, etaSeconds: i === 0 ? orderEtaSeconds(o) : 0,
+        }))
       : [],
     buildable: summary.isOwn
       ? session.buildable(provinceId).map(({ id, affordable }) => ({
@@ -1728,8 +1735,10 @@ function projectSelectedProvince(
         }))
       : [],
     construction: summary.isOwn
-      ? (session.state.constructionQueues[provinceId] as Array<{ buildingId: BuildingId; progressHours: number; totalHours: number }> ?? []).map((o, i) =>
-          i === 0 ? `${buildingLabel(o.buildingId)} · ${orderPercent(o)}%` : buildingLabel(o.buildingId))
+      ? (session.state.constructionQueues[provinceId] as Array<{ buildingId: BuildingId; progressHours: number; totalHours: number }> ?? []).map((o, i) => ({
+          id: o.buildingId, label: buildingLabel(o.buildingId), active: i === 0,
+          progress: i === 0 ? orderPercent(o) / 100 : 0, etaSeconds: i === 0 ? orderEtaSeconds(o) : 0,
+        }))
       : [],
     rally: summary.isOwn ? session.rallyPoint(provinceId) : null,
     awaitingRallyTarget: summary.isOwn && awaitingRallyTarget && selectedProvinceId === provinceId,
