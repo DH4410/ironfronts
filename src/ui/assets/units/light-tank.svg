@@ -1,9 +1,9 @@
 <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Light Tank">
   <defs>
     <linearGradient id="u-lt-bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2b3226"/>
-      <stop offset="0.62" stop-color="#1b1f18"/>
-      <stop offset="1" stop-color="#12140f"/>
+      <stop offset="0" stop-color="#20261b"/>
+      <stop offset="0.62" stop-color="#12150e"/>
+      <stop offset="1" stop-color="#0b0d08"/>
     </linearGradient>
     <linearGradient id="u-lt-hull" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#7d8163"/>
