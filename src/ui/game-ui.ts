@@ -99,11 +99,16 @@ const FACILITY_NOTE: Record<string, string> = {
 
 const numberFormat = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
-/** "1:02" / "0:45" — capped so a very long build never prints minutes > 99. */
+/**
+ * "7s" / "7m 12s" / "1h 03m" — unit-labelled so a short build can't be misread
+ * as minutes. Seconds are dropped once we're into hours (nobody counts them
+ * there) and the minutes are zero-padded so the width stays stable.
+ */
 function formatEta(seconds: number): string {
   const s = Math.max(0, Math.round(seconds));
-  const m = Math.min(99, Math.floor(s / 60));
-  return `${m}:${String(s % 60).padStart(2, '0')}`;
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+  return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`;
 }
 
 /**
@@ -117,10 +122,19 @@ function renderQueue(
   container: HTMLElement, items: readonly import('./ui-state').QueueItem[],
   thumbFor: (id: string, label: string) => HTMLElement,
 ): void {
-  container.replaceChildren(...items.map((item) => {
+  // Collapse a run of identical queued (inactive) orders into one row with a
+  // "×N" badge, so five of the same unit reads as one tile, not five.
+  const groups: Array<{ item: import('./ui-state').QueueItem; count: number }> = [];
+  for (const item of items) {
+    const last = groups[groups.length - 1];
+    if (last && !item.active && !last.item.active && last.item.id === item.id) last.count += 1;
+    else groups.push({ item, count: 1 });
+  }
+  container.replaceChildren(...groups.map(({ item, count }) => {
     const row = el('div', 'ifg-queue__item');
     row.classList.toggle('is-active', item.active);
     row.append(thumbFor(item.id, item.label));
+    if (count > 1) row.append(el('span', 'ifg-queue__count', `×${count}`));
     if (item.active) {
       const bar = el('div', 'ifg-queue__bar');
       const fill = el('i');
@@ -132,8 +146,10 @@ function renderQueue(
       row.append(meta);
     }
     bindTooltip(row, () => ({
-      title: item.label,
-      status: item.active ? `${Math.round(item.progress * 100)}% — ${formatEta(item.etaSeconds)} left` : 'Queued',
+      title: count > 1 ? `${item.label} ×${count}` : item.label,
+      status: item.active
+        ? `${Math.round(item.progress * 100)}% — ${formatEta(item.etaSeconds)} left`
+        : count > 1 ? `Queued — ${count}` : 'Queued',
     }));
     return row;
   }));
