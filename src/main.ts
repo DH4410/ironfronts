@@ -976,6 +976,57 @@ function hashUnit(key: string): number {
  */
 const armyPickScratch: Array<{ id: string; x: number; z: number }> = [];
 const previousArmyModelPositions = new Map<string, { x: number; z: number }>();
+/** Last rendered facing per army, so the column turns a road corner over a
+ *  second or so instead of snapping when the server shifts the leading node. */
+const previousArmyHeading = new Map<string, number>();
+
+/** Shortest-arc step from `from` toward `to` (radians), covering `frac` of the gap. */
+function dampAngle(from: number, to: number, frac: number): number {
+  let delta = to - from;
+  delta -= Math.PI * 2 * Math.round(delta / (Math.PI * 2));
+  return from + delta * frac;
+}
+
+/**
+ * Facing for a marching column: a point a short way ahead along the actual road
+ * polyline (not the far destination), so the heading already eases toward the
+ * next leg before the army reaches a bend. Falls back to the straight-line
+ * bearing to the order target. `worldW` handles the x-seam.
+ */
+function routeLookaheadHeading(
+  route: ReadonlyArray<{ x: number; z: number }> | undefined,
+  order: { x: number; z: number } | null | undefined,
+  fromX: number, fromZ: number, worldW: number,
+): number | null {
+  const unwrap = (dx: number): number => {
+    if (!worldW) return dx;
+    if (dx > worldW / 2) return dx - worldW;
+    if (dx < -worldW / 2) return dx + worldW;
+    return dx;
+  };
+  if (route && route.length >= 2) {
+    const LOOKAHEAD = 16;
+    let travelled = 0;
+    let px = route[0].x;
+    let pz = route[0].z;
+    for (let i = 1; i < route.length; i += 1) {
+      const dx = unwrap(route[i].x - px);
+      const dz = route[i].z - pz;
+      const segLen = Math.hypot(dx, dz) || 1;
+      if (travelled + segLen >= LOOKAHEAD || i === route.length - 1) {
+        const need = Math.min(1, (LOOKAHEAD - travelled) / segLen);
+        const aimX = px + dx * need;
+        const aimZ = pz + dz * need;
+        return Math.atan2(unwrap(aimX - fromX), -(aimZ - fromZ));
+      }
+      travelled += segLen;
+      px += dx;
+      pz += dz;
+    }
+  }
+  if (order) return Math.atan2(unwrap(order.x - fromX), -(order.z - fromZ));
+  return null;
+}
 
 function syncArmyMarkers(
   session: RemoteGameSession, renderer: WorldRenderer,
@@ -1071,17 +1122,15 @@ function syncArmyMarkers(
       // fall back to a straight line at the destination.
       const route = army.moveRoute;
       const worldW = renderer.manifest?.world.width ?? 0;
-      let heading = 0;
-      if (route && route.length >= 2) {
-        let legDx = route[1].x - route[0].x;
-        if (worldW) {
-          if (legDx > worldW / 2) legDx -= worldW;
-          else if (legDx < -worldW / 2) legDx += worldW;
-        }
-        heading = Math.atan2(legDx, -(route[1].z - route[0].z));
-      } else if (target) {
-        heading = Math.atan2(target.x - army.x, -(target.z - army.z));
-      }
+      const previousHeading = previousArmyHeading.get(army.id);
+      // A stopped army keeps its last facing; a marching one aims a little way
+      // along the road and eases toward it, so corners are a turn, not a snap.
+      const desiredHeading = routeLookaheadHeading(route, target, army.x, army.z, worldW)
+        ?? previousHeading ?? 0;
+      const heading = previousHeading === undefined
+        ? desiredHeading
+        : dampAngle(previousHeading, desiredHeading, marching ? 0.4 : 0.25);
+      previousArmyHeading.set(army.id, heading);
       const forwardX = Math.sin(heading);
       const forwardZ = -Math.cos(heading);
       const rightX = Math.cos(heading);
@@ -1131,7 +1180,10 @@ function syncArmyMarkers(
         armyModelScratch[modelCursor + 8] = previousX;
         armyModelScratch[modelCursor + 9] = previous.z;
         armyModelScratch[modelCursor + 10] = 0;
-        armyModelScratch[modelCursor + 11] = 0;
+        // Facing before this update — the shader eases from it to slot +7 over
+        // the same window it uses to slide the model, so the turn is smooth
+        // between the 2.5 Hz marker syncs.
+        armyModelScratch[modelCursor + 11] = previousHeading ?? heading;
         previousArmyModelPositions.set(modelKey, { x, z });
         modelCursor += 12;
         modelCount += 1;
@@ -1140,6 +1192,11 @@ function syncArmyMarkers(
   }
   for (const key of previousArmyModelPositions.keys()) {
     if (!activeModelKeys.has(key)) previousArmyModelPositions.delete(key);
+  }
+  const activeArmyIds = new Set<string>();
+  for (const key of activeModelKeys) activeArmyIds.add(key.slice(0, key.lastIndexOf(':')));
+  for (const id of previousArmyHeading.keys()) {
+    if (!activeArmyIds.has(id)) previousArmyHeading.delete(id);
   }
   renderer.setArmyMarkers(armyMarkerScratch, count, armyPickScratch, armyModelScratch, modelCount);
   renderer.setOrderRoutes(routeScratch, routeCount);

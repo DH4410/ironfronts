@@ -98,7 +98,13 @@ fn armyModelVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_in
   let partIndex = vertexIndex / 36u;
   let cube = cubePoint(vertexIndex % 36u);
   let part = modelPart(kind, partIndex);
-  let heading = model.b.w;
+  // Same 0.42s window used to slide the model between marker syncs also eases
+  // the facing, along the shortest arc, from the pre-sync heading (c.w) to the
+  // new one (b.w) — a road corner reads as a turn, not a snap.
+  let motion = smoothstep(0.0, 1.0, (uniforms.sunTime.w - model.c.z) / 0.42);
+  var headingDelta = model.b.w - model.c.w;
+  headingDelta = headingDelta - 6.2831853 * round(headingDelta / 6.2831853);
+  let heading = model.c.w + headingDelta * motion;
   let cosine = cos(heading);
   let sine = sin(heading);
   // Map-scale strategic units: kept deliberately small so roads, towns and the
@@ -108,7 +114,6 @@ fn armyModelVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_in
   let scale = 1.7;
   let local = (part.center + cube.position * part.halfSize) * scale;
   let rotated = vec3f(local.x * cosine - local.z * sine, local.y, local.x * sine + local.z * cosine);
-  let motion = smoothstep(0.0, 1.0, (uniforms.sunTime.w - model.c.z) / 0.42);
   let centerXZ = mix(model.c.xy, model.a.xy, motion) + vec2f(copyOffset, 0.0);
   let ground = heightAt(centerXZ / uniforms.map.xy);
   // Ground lift tracks model scale so shrinking the unit doesn't leave it hovering.
