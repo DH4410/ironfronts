@@ -174,12 +174,18 @@ Lanczos-downscaled with Pillow — portraits to 384 px, icons to 256 px
 | Runtime file | Slot | Wired? |
 |---|---|---|
 | `src/ui/assets/units/infantry.png` | Infantry composition portrait | yes (raster beats the SVG) |
+| `src/ui/assets/units/engineer.png` | Engineer / pioneer portrait | yes |
 | `src/ui/assets/units/armored-car.png` | Armoured-car portrait | yes |
+| `src/ui/assets/units/light-tank.png` | Light-tank portrait | yes |
 | `src/ui/assets/units/medium-tank.png` | Medium-tank portrait | yes |
 | `src/ui/assets/units/artillery.png` | Artillery portrait | yes |
 | `src/ui/assets/icons/ironfronts/barracks.png` | `structure-barracks` — Build row | yes (replaces 0 A.D. `training.png`) |
 | `src/ui/assets/icons/ironfronts/tank-plant.png` | `structure-plant` — Build row | yes (replaces 0 A.D. `production.png`) |
+| `src/ui/assets/icons/ironfronts/ordnance.png` | `structure-ordnance` — Build row | yes (replaces 0 A.D. `construction.png`) |
 | `src/ui/assets/icons/ironfronts/fortress.png` | `structure-fortress` | reserved — no fortress building exists yet |
-| `src/ui/assets/icons/ironfronts/stance-attack-defend.png` | `stance-attack-defend` (crossed swords + shield) | reserved — no army-stance system |
-| `src/ui/assets/icons/ironfronts/stance-defend.png` | `stance-defend` (shield + planted spears) | reserved — no army-stance system |
-| `src/ui/assets/icons/ironfronts/stance-retreat.png` | `stance-retreat` (soldier + fall-back arrow) | reserved — no army-stance system |
+| `src/ui/assets/icons/ironfronts/settlement.png` | `structure-city` (walled town) | reserved — no city/settlement icon slot yet |
+| `src/ui/assets/icons/ironfronts/stance-attack.png` | `stance-attack` (three swords) | reserved — no army-stance system |
+| `src/ui/assets/icons/ironfronts/stance-attack-defend.png` | `stance-attack-defend` (crossed swords + shield) | reserved |
+| `src/ui/assets/icons/ironfronts/stance-defend.png` | `stance-defend` (shield + planted spears) | reserved |
+| `src/ui/assets/icons/ironfronts/stance-retreat.png` | `stance-retreat` (soldier + fall-back arrow) | reserved |
+| `src/ui/assets/icons/ironfronts/stance-defend-retreat.png` | `stance-defend-retreat` (double shield + fall-back arrow) | reserved |

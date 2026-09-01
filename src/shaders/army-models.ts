@@ -189,10 +189,10 @@ fn armyKindCountVertex(
   output.color = unpackModelRgb(model.a.z);
   output.count = model.b.x;
   output.alpha = (1.0 - smoothstep(1500.0, 1900.0, uniforms.interaction.y)) * (1.0 - horizontalWorldFog(worldPosition.x));
-  let pixelCenter = vec2f(28.0, 1.0);
+  let pixelCenter = vec2f(23.0, 1.0);
   // viewport.z (backing-store scale) holds the count badge at a constant CSS
   // size so it doesn't grow when the graphics preset lowers the render scale.
-  let pixelOffset = (pixelCenter + corner * vec2f(13.0, 10.0)) * 2.0 * uniforms.viewport.z / uniforms.viewport.xy;
+  let pixelOffset = (pixelCenter + corner * vec2f(10.5, 8.0)) * 2.0 * uniforms.viewport.z / uniforms.viewport.xy;
   output.position = clip + vec4f(pixelOffset * clip.w, -0.0002 * clip.w, 0.0);
   return output;
 }

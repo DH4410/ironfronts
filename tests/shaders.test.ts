@@ -159,7 +159,7 @@ describe('WGSL programs', () => {
   it('clumps forests via a low-frequency noise field without a world rebuild', () => {
     expect(propShader).toContain('var treeCluster = 1.0;');
     expect(propShader).toContain('let clusterNoise = valueNoise(record.a.xy / 520.0)');
-    expect(propShader).toContain('treeCluster = smoothstep(0.32, 0.55, clusterNoise);');
+    expect(propShader).toContain('treeCluster = smoothstep(0.50, 0.76, clusterNoise);');
   });
 
   it('floors the night canopy shade so forests do not crush to black specks', () => {

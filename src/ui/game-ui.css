@@ -584,10 +584,10 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 132px));
+  grid-template-columns: repeat(auto-fill, minmax(68px, 88px));
   align-content: start;
   justify-content: start;
-  gap: 8px;
+  gap: 7px;
   overflow: auto;
   overscroll-behavior: contain;
 }
@@ -604,7 +604,7 @@
 .ifg-army-unit {
   position: relative;
   display: grid;
-  grid-template-rows: 96px auto 4px;
+  grid-template-rows: 66px auto 4px;
   overflow: hidden;
   background: linear-gradient(155deg, rgba(56, 60, 51, 0.72), rgba(24, 27, 23, 0.92));
   border: 1px solid var(--ifg-rule-soft);
@@ -617,7 +617,7 @@
   background: radial-gradient(circle at 50% 28%, rgba(201, 164, 99, 0.12), transparent 58%);
   pointer-events: none;
 }
-.ifg-army-unit__visual { position: relative; display: block; overflow: hidden; line-height: 0; height: 96px; }
+.ifg-army-unit__visual { position: relative; display: block; overflow: hidden; line-height: 0; height: 66px; }
 /* Portrait fills the tile top — the drawing is the identity, not a line glyph. */
 .ifg-army-unit__portrait { display: block; width: 100%; height: 100%; }
 .ifg-army-unit__portrait svg {
@@ -625,13 +625,6 @@
   filter: brightness(1.16) contrast(1.12) saturate(1.06);
 }
 .ifg-army-unit__portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
-/* Dev-only Call of War reference art (see dev-assets/callofwar-reference) —
-   flagged unmistakably so it is never confused for shipped Ironfronts art. */
-.ifg-army-unit__portrait[data-prototype="true"]::after {
-  content: "REF"; position: absolute; top: 2px; right: 2px; z-index: 2;
-  padding: 1px 4px; font: 700 7px/1.4 var(--ifg-sans, sans-serif); letter-spacing: 0.08em;
-  color: #1a1a14; background: rgba(232, 201, 136, 0.88); border-radius: 2px;
-}
 /* soft top spotlight so the figure separates from the panel */
 .ifg-army-unit__visual::after {
   content: "";
@@ -679,9 +672,9 @@
 .ifg-army-unit__condition[data-state="spent"] i { background: #c05a3c; }
 .ifg-army-unit:hover { border-color: var(--ifg-brass); }
 /* Denser layout once the stack fields >4 unit families. */
-.ifg-army-panel__units.is-dense { grid-template-columns: repeat(auto-fill, minmax(78px, 104px)); }
-.ifg-army-panel__units.is-dense .ifg-army-unit { grid-template-rows: 74px auto 4px; }
-.ifg-army-panel__units.is-dense .ifg-army-unit__visual { height: 74px; }
+.ifg-army-panel__units.is-dense { grid-template-columns: repeat(auto-fill, minmax(58px, 78px)); }
+.ifg-army-panel__units.is-dense .ifg-army-unit { grid-template-rows: 52px auto 4px; }
+.ifg-army-panel__units.is-dense .ifg-army-unit__visual { height: 52px; }
 .ifg-army-panel__report { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 10px; }
 .ifg-army-panel__stats > .ifg-army-panel__eyebrow,
 .ifg-army-panel__activity > .ifg-army-panel__eyebrow { margin-bottom: 6px; }
@@ -1164,7 +1157,7 @@
   .ifg-topbar__resources { gap: 7px; }
   .ifg-army-panel { width: calc(100vw - 24px); bottom: 12px; }
   .ifg-army-panel__body { grid-template-columns: 130px minmax(270px, 1fr) 200px; }
-  .ifg-army-panel__units { grid-template-columns: repeat(auto-fit, minmax(82px, 1fr)); }
+  .ifg-army-panel__units { grid-template-columns: repeat(auto-fit, minmax(62px, 1fr)); }
   .ifg-army-panel__identity small { display: none; }
 }
 @media (min-width: 2400px) {

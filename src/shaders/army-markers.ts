@@ -85,7 +85,7 @@ fn armyMarkerVertex(
   // Plaque is a touch wider than tall. viewport.z (backing-store scale) keeps
   // the plaque a constant CSS size — without it a lower graphics preset renders
   // fewer framebuffer pixels and the plaque balloons on screen.
-  let half = vec2f(26.0, 15.0) * zoomScale * uniforms.viewport.z;
+  let half = vec2f(20.0, 11.5) * zoomScale * uniforms.viewport.z;
 
   var output: ArmyOut;
   output.uv = corner;
@@ -232,8 +232,8 @@ fn armyCompositionVertex(
   let worldPos = vec3f(worldXZ.x, heightAt(vec2f(marker.a.x, marker.a.y) / uniforms.map.xy) + 17.0, worldXZ.y);
   let clip = uniforms.viewProjection * vec4f(worldPos, 1.0);
   let rows = compositionRowCount(marker.c);
-  let half = vec2f(29.0, 6.0 + rows * 7.5) * uniforms.viewport.z;
-  let pixelCenter = vec2f(38.0, 2.0) * uniforms.viewport.z;
+  let half = vec2f(23.0, 5.0 + rows * 6.0) * uniforms.viewport.z;
+  let pixelCenter = vec2f(30.0, 2.0) * uniforms.viewport.z;
 
   var output: CompositionOut;
   output.uv = corner;
