@@ -85,16 +85,17 @@
 .ifm__eyebrow span:last-child { background: linear-gradient(270deg, transparent, var(--hud-line-bright)); }
 .ifm__eyebrow b { font: 700 .68em/1 var(--ifm-sans); letter-spacing: .38em; text-transform: uppercase; }
 
-.ifm__grid { display: flex; gap: clamp(16px, 1.6vw, 26px); }
+.ifm__grid { display: flex; gap: clamp(18px, 2vw, 32px); }
 
 .ifm__card {
-  position: relative; width: clamp(158px, 10.6vw, 208px); height: clamp(196px, 23vh, 258px);
+  position: relative; width: clamp(200px, 15.5vw, 268px); height: clamp(216px, 25vh, 276px);
   border: 0; padding: 0; cursor: pointer; text-align: center; color: inherit; overflow: hidden;
   display: flex; flex-direction: column; align-items: center;
   background:
+    linear-gradient(180deg, rgba(255,255,255,.05), transparent 30%),
     linear-gradient(180deg, var(--hud-panel), var(--hud-panel-strong)),
     url('/menu/paper.jpg') center/cover;
-  background-blend-mode: multiply;
+  background-blend-mode: normal, multiply, multiply;
   border: 1px solid var(--hud-line);
   box-shadow: 0 1.4vh 2.6vh rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.02);
   transition: transform .35s var(--ifm-ease), border-color .35s ease, box-shadow .35s ease;
@@ -105,6 +106,16 @@
   box-shadow: 0 1.8vh 3.4vh rgba(0,0,0,.55), 0 0 0 1px rgba(232,201,136,.25), 0 0 28px rgba(201,164,99,.18);
 }
 .ifm__card:focus-visible { outline: none; }
+
+/* Small pill badge for a card that cannot fully act yet (e.g. New Campaign
+   while a save exists) — replaces a long inline caveat sentence. Hidden unless
+   the card is flagged .is-preview. */
+.ifm__card-badge { display: none; }
+.ifm__card.is-preview .ifm__card-badge {
+  display: block; position: absolute; top: 10px; right: 10px; padding: .3em .62em;
+  font: 700 .56em/1 var(--ifm-sans); letter-spacing: .12em; color: var(--hud-bg);
+  background: var(--hud-gold-bright); border-radius: 999px; opacity: .92;
+}
 
 /* No save system yet — Continue is a visible-but-inert slot, not a live control. */
 .ifm__card.is-disabled { cursor: default; opacity: .5; filter: saturate(.6); }
@@ -119,22 +130,36 @@
 .ifm__corner--br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
 
 .ifm__icon {
-  flex: 0 0 auto; margin-top: 14%; width: 22%; aspect-ratio: 1; border-radius: 50%;
+  flex: 0 0 auto; margin-top: 13%; width: 30%; aspect-ratio: 1; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  background: radial-gradient(circle at 34% 28%, rgba(201,164,99,.16), rgba(0,0,0,0) 70%);
+  background: radial-gradient(circle at 34% 28%, rgba(201,164,99,.2), rgba(0,0,0,0) 70%);
   border: 1px solid var(--hud-line);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.03), inset 0 6px 12px rgba(0,0,0,.35);
+  transition: box-shadow .35s ease, border-color .35s ease;
 }
+.ifm__card:hover .ifm__icon { border-color: var(--hud-line-bright); box-shadow: inset 0 0 0 1px rgba(255,255,255,.05), inset 0 6px 12px rgba(0,0,0,.3), 0 0 16px rgba(201,164,99,.2); }
 .ifm__icon::after {
-  content: ""; width: 52%; height: 52%; background-color: var(--hud-gold-bright);
+  content: ""; width: 54%; height: 54%; background-color: var(--hud-gold-bright);
   -webkit-mask: var(--icon) center/contain no-repeat;
   mask: var(--icon) center/contain no-repeat;
 }
-.ifm__card strong { margin-top: 12%; font: 500 1.35em/1.1 var(--ifm-serif); color: var(--hud-text); letter-spacing: .01em; }
-.ifm__card small { margin-top: .6em; padding: 0 8%; font: 400 .82em/1.35 var(--ifm-sans); color: var(--hud-text-dim); }
+/* Continue with an assigned country shows its flag in full colour instead of
+   the generic archive glyph — real visual identity, not a placeholder icon. */
+.ifm__card.is-assigned .ifm__icon { border-radius: 4px; overflow: hidden; }
+.ifm__card.is-assigned .ifm__icon::after {
+  width: 100%; height: 100%; background-color: transparent;
+  -webkit-mask: none; mask: none;
+  background: var(--flag) center/cover no-repeat;
+}
+.ifm__card strong { margin-top: 10%; font: 500 1.4em/1.1 var(--ifm-serif); color: var(--hud-text); letter-spacing: .01em; }
+.ifm__card small {
+  margin-top: .55em; padding: 0 12px; font: 400 .8em/1.32 var(--ifm-sans); color: var(--hud-text-dim);
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; min-height: 2.7em;
+}
 .ifm__card-foot {
-  margin-top: auto; width: 100%; padding: .8em 1em; display: flex; align-items: center; justify-content: space-between;
+  margin-top: auto; width: 100%; padding: .7em .9em; display: flex; align-items: center; justify-content: space-between;
   border-top: 1px solid rgba(201,164,99,.16);
-  font: 700 .62em/1 var(--ifm-sans); letter-spacing: .16em; color: var(--hud-text-dim);
+  font: 700 .58em/1 var(--ifm-sans); letter-spacing: .12em; color: var(--hud-text-dim);
 }
 .ifm__card-foot i { font-style: normal; color: var(--hud-gold); }
 
@@ -537,8 +562,8 @@
   .ifm__card { width: 100%; height: clamp(128px, 18.5svh, 168px); }
   .ifm__icon { width: 25%; margin-top: 9%; }
   .ifm__card strong { margin-top: 8%; font-size: 1.16em; }
-  .ifm__card small { margin-top: .35em; font-size: .72em; }
-  .ifm__card-foot { padding: .62em .75em; }
+  .ifm__card small { margin-top: .35em; font-size: .72em; min-height: 2.2em; }
+  .ifm__card-foot { padding: .55em .7em; }
 
   .ifm__footer {
     min-height: 52px;
@@ -592,7 +617,7 @@
   .ifm__screen { justify-content: flex-start; gap: 8px; padding-top: 8px; }
   .ifm__logo img { width: min(34vw, 250px); }
   .ifm__eyebrow { display: none; }
-  .ifm__grid { display: grid; grid-template-columns: repeat(4, minmax(132px, 1fr)); width: min(94vw, 760px); gap: 8px; }
+  .ifm__grid { display: grid; grid-template-columns: repeat(3, minmax(132px, 1fr)); width: min(94vw, 620px); gap: 8px; }
   .ifm__card { width: 100%; height: 142px; }
   .ifm__card small { display: none; }
   .ifm__footer { min-height: 44px; }

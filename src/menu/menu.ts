@@ -59,13 +59,24 @@ export function mountMenu(handlers: MenuHandlers): void {
   newCampaign.classList.toggle('is-preview', previewOnly);
   if (previewOnly) {
     const sub = newCampaign.querySelector('small');
-    if (sub) sub.textContent = 'Preview the setup flow — one campaign at a time for now.';
+    if (sub) sub.textContent = "Inspect the setup flow — your campaign stays untouched.";
   }
   continueButton.disabled = assignedCountry === null;
   continueButton.classList.toggle('is-disabled', assignedCountry === null);
+  continueButton.classList.toggle('is-assigned', assignedCountry !== null);
   requiredId<HTMLElement>('ifm-continue-detail').textContent = assignedCountry
-    ? `Continue as ${assignedCountry.name}.` : 'No field assignment.';
-  if (assignedCountry) continueButton.addEventListener('click', () => void deploy(assignedCountry.id));
+    ? `${assignedCountry.name} — resume where you left off.` : 'No field assignment.';
+  if (assignedCountry) {
+    continueButton.addEventListener('click', () => void deploy(assignedCountry.id));
+    const flagUrl = resolveFlagUrl(assignedCountry.name);
+    if (flagUrl) {
+      const icon = continueButton.querySelector<HTMLElement>('.ifm__icon');
+      if (icon) icon.style.setProperty('--flag', `url(${flagUrl})`);
+      else continueButton.classList.remove('is-assigned');
+    } else {
+      continueButton.classList.remove('is-assigned');
+    }
+  }
 
   let busy = false;
   let openScreen: string | null = null;
