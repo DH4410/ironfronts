@@ -103,8 +103,9 @@ fn armyModelVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_in
   let sine = sin(heading);
   // Map-scale strategic units: kept deliberately small so roads, towns and the
   // movement path still read at strategic zoom. Selection/pick hitbox is on the
-  // flat marker, not the model, so this does not hurt selectability.
-  let scale = 1.95;
+  // flat marker, not the model, so this does not hurt selectability. Trimmed
+  // again this pass (1.95 -> 1.7) to sit closer to the road ribbon width.
+  let scale = 1.7;
   let local = (part.center + cube.position * part.halfSize) * scale;
   let rotated = vec3f(local.x * cosine - local.z * sine, local.y, local.x * sine + local.z * cosine);
   let motion = smoothstep(0.0, 1.0, (uniforms.sunTime.w - model.c.z) / 0.42);
