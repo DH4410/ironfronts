@@ -74,6 +74,11 @@ export class RemoteGameSession extends EventTarget {
   get ownCountry(): OwnCountry { return this.state.ownCountry as unknown as OwnCountry; }
   readClock(): GameClockReading { return this.connection.readClock(); }
 
+  /** Dev/test only. See GameConnection.setDevSimSpeed. */
+  get devSimSpeed(): number { return this.connection.devSimSpeed; }
+  get devSimSpeedEnabled(): boolean { return this.connection.devSimSpeedEnabled; }
+  setDevSimSpeed(multiplier: number): void { this.connection.setDevSimSpeed(multiplier); }
+
   unit(typeId: string): Record<string, unknown> | undefined {
     return this.catalogs.units.find((unit) => unit.id === typeId);
   }

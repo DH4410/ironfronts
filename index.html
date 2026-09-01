@@ -233,6 +233,18 @@
           </label>
           <small>Sun, sky and shadows only &mdash; the game clock, movement, combat and economy are unaffected. 1.0× = a full day in 10 min; 0.0× freezes the light.</small>
         </div>
+        <div class="diagnostics__group sim-speed-controls">
+          <div class="time-controls__heading"><strong>SIMULATION SPEED &mdash; DEV ONLY</strong><output id="debug-sim-speed-state">1&times;</output></div>
+          <div class="sim-speed-controls__buttons" role="group" aria-label="Simulation speed">
+            <button type="button" data-sim-speed="0">Pause</button>
+            <button type="button" data-sim-speed="1" aria-pressed="true">1&times;</button>
+            <button type="button" data-sim-speed="2">2&times;</button>
+            <button type="button" data-sim-speed="4">4&times;</button>
+            <button type="button" data-sim-speed="8">8&times;</button>
+            <button type="button" data-sim-speed="16">16&times;</button>
+          </div>
+          <small>Server-authoritative: movement, production, construction, combat and game time all scale together for every player on this server. Not available against a production server. Separate from the lighting clock above, which is visual only.</small>
+        </div>
         <div class="diagnostics__group weather-controls">
           <strong>WEATHER</strong>
           <label><input id="debug-rain" type="checkbox" /> Rain</label>

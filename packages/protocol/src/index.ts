@@ -31,6 +31,11 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('authenticate'), protocolVersion: z.literal(PROTOCOL_VERSION), ticket: z.string().min(1) }),
   z.object({ type: z.literal('command'), commandId: z.string().min(1).max(100), command: commandPayloadSchema }),
   z.object({ type: z.literal('resync'), afterRevision: z.number().int().nonnegative().optional() }),
+  // Dev/test only — the server ignores this in production regardless of who
+  // sends it (see gameplay-gateway.ts). Not a gameplay command: it changes
+  // the whole server's simulation pace for every connected player, so it is
+  // never wrapped in the commandId-acked command envelope above.
+  z.object({ type: z.literal('devSetSimSpeed'), multiplier: z.number().finite().min(0).max(32) }),
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 
@@ -146,7 +151,12 @@ export type ServerMessage =
   | { type: 'clockSync'; clock: GameClockSync }
   | { type: 'commandAck'; commandId: string; ok: boolean; reason?: string; requiredWarCountryIds?: readonly number[] }
   | { type: 'event'; event: FilteredEvent }
-  | { type: 'error'; code: string; message: string; retryable?: boolean };
+  | { type: 'error'; code: string; message: string; retryable?: boolean }
+  // Sent right after `baseline` and again whenever the multiplier changes.
+  // `devControlsEnabled: false` in production — the server ignores
+  // devSetSimSpeed there regardless, but the client uses this to hide the
+  // control entirely rather than offer a lever that silently does nothing.
+  | { type: 'devSimSpeed'; multiplier: number; devControlsEnabled: boolean };
 
 export const serverMessageSchema = z.discriminatedUnion('type', [
   z.object({
@@ -175,6 +185,10 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('commandAck'), commandId: z.string(), ok: z.boolean(), reason: z.string().optional(), requiredWarCountryIds: z.array(z.number().int().positive()).optional() }),
   z.object({ type: z.literal('event'), event: z.custom<FilteredEvent>((value) => Boolean(value && typeof value === 'object')) }),
   z.object({ type: z.literal('error'), code: z.string(), message: z.string(), retryable: z.boolean().optional() }),
+  z.object({
+    type: z.literal('devSimSpeed'), multiplier: z.number().finite().min(0).max(32),
+    devControlsEnabled: z.boolean(),
+  }),
 ]);
 
 export interface FilteredEvent { id: string; kind: string; message?: string; [key: string]: unknown }

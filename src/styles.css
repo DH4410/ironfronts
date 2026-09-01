@@ -287,6 +287,11 @@ body { user-select: none; }
 .time-controls small { display: block; margin-top: 9px; color: #71847e; font-size: 8px; line-height: 1.45; }
 .weather-controls button { margin: 7px 0 0 23px; padding: 5px 8px; border: 1px solid rgba(220,196,139,.24); border-radius: 3px; color: #c9d1ca; background: rgba(255,255,255,.035); font: 700 8px/1 inherit; letter-spacing: .07em; text-transform: uppercase; cursor: pointer; }
 .weather-controls button:hover { color: #f0dfb5; border-color: rgba(220,196,139,.42); background: rgba(201,180,119,.12); }
+
+.sim-speed-controls__buttons { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin: 8px 0 10px; }
+.sim-speed-controls__buttons button { min-height: 25px; padding: 4px 2px; border: 1px solid rgba(220,196,139,.2); border-radius: 3px; color: #c9d1ca; background: rgba(255,255,255,.035); font: 700 8px/1 inherit; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
+.sim-speed-controls__buttons button:hover { color: #f0dfb5; border-color: rgba(220,196,139,.42); background: rgba(201,180,119,.12); }
+.sim-speed-controls__buttons button[aria-pressed="true"] { color: #12140f; background: #e8c988; border-color: #e8c988; }
 .weather-controls small { display: block; margin: 6px 0 0 23px; color: #71847e; font-size: 8px; line-height: 1.4; }
 
 .country-flag { display: flex; align-items: center; gap: 11px; margin-top: 14px; padding: 11px; border: 1px solid rgba(255,255,255,.09); border-radius: 5px; background: rgba(255,255,255,.035); }

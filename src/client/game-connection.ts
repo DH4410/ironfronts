@@ -16,6 +16,10 @@ export class GameConnection extends EventTarget {
   catalogs!: PresentationCatalogs;
   world!: WorldDescriptor;
   revision = 0;
+  /** Current server-wide sim-speed multiplier and whether the dev control is
+   *  even usable (always false against a production server). */
+  devSimSpeed = 1;
+  devSimSpeedEnabled = false;
   private readonly gameClock = new InterpolatedGameClock();
   private socket: WebSocket | null = null;
   private closed = false;
@@ -120,6 +124,10 @@ export class GameConnection extends EventTarget {
         } else if (message.type === 'clockSync') {
           this.gameClock.synchronize(message.clock);
           this.dispatchEvent(new Event('clock-sync'));
+        } else if (message.type === 'devSimSpeed') {
+          this.devSimSpeed = message.multiplier;
+          this.devSimSpeedEnabled = message.devControlsEnabled;
+          this.dispatchEvent(new Event('dev-sim-speed'));
         } else if (message.type === 'error') {
           if (!ready) {
             settleError(new Error(message.message), 1008, 'Server rejected connection');
@@ -174,6 +182,12 @@ export class GameConnection extends EventTarget {
   }
 
   readClock(): GameClockReading { return this.gameClock.read(); }
+
+  /** Dev/test only — server ignores this against a production server. */
+  setDevSimSpeed(multiplier: number): void {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    this.socket.send(JSON.stringify({ type: 'devSetSimSpeed', multiplier }));
+  }
 
   close(): void { this.closed = true; this.socket?.close(1000, 'Client closed'); }
 }

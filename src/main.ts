@@ -115,6 +115,8 @@ const debugTimeMultiplier = required<HTMLInputElement>('debug-time-multiplier');
 const debugTimePresets = [...document.querySelectorAll<HTMLButtonElement>('[data-debug-time]')];
 const debugRain = required<HTMLInputElement>('debug-rain');
 const debugThunder = required<HTMLButtonElement>('debug-thunder');
+const debugSimSpeedState = required<HTMLOutputElement>('debug-sim-speed-state');
+const debugSimSpeedButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-sim-speed]')];
 const debugView = required<HTMLSelectElement>('debug-view');
 const debugConnections = required<HTMLInputElement>('debug-connections');
 const debugRivers = required<HTMLInputElement>('debug-rivers');
@@ -804,6 +806,31 @@ function updateTimeControls(state: TimeOfDayState): void {
   if (document.activeElement !== debugTimeMultiplier) debugTimeMultiplier.value = state.multiplier.toFixed(1);
 }
 
+const simSpeedGroup = debugSimSpeedButtons[0]?.closest<HTMLElement>('.sim-speed-controls');
+/**
+ * Dev-only simulation-speed control: server-authoritative, shared by every
+ * connected player. Hidden (not just disabled) against a production server so
+ * it never offers a lever that would silently do nothing. Uses `activeSession`
+ * rather than a closed-over session so it can be polled from bootstrapGameSession's
+ * HUD timer, which runs in a different function scope than these buttons.
+ */
+function syncSimSpeedUi(): void {
+  const session = activeSession;
+  if (simSpeedGroup) simSpeedGroup.hidden = !session || !session.devSimSpeedEnabled;
+  if (!session) return;
+  debugSimSpeedState.textContent = session.devSimSpeed === 0 ? 'Paused' : `${session.devSimSpeed}×`;
+  for (const button of debugSimSpeedButtons) {
+    button.setAttribute('aria-pressed', String(Number(button.dataset.simSpeed) === session.devSimSpeed));
+  }
+}
+for (const button of debugSimSpeedButtons) {
+  // Module-level, one-time wiring (unlike the per-launch listeners above,
+  // these static buttons and activeSession outlive any single game attempt).
+  button.addEventListener('click', () => {
+    activeSession?.setDevSimSpeed(Number(button.dataset.simSpeed));
+  });
+}
+
 async function bootstrapGameSession(
   renderer: WorldRenderer, session: RemoteGameSession,
 ): Promise<void> {
@@ -889,6 +916,7 @@ async function bootstrapGameSession(
     refreshSelectedArmy(session);
     refreshSelectedProvince(session); // keep production / construction % live
     drainSessionEvents(session);
+    syncSimSpeedUi();
   }, 400);
   const onKey = (event: KeyboardEvent): void => {
     if (event.repeat || !selectedArmyId) return;
