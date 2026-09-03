@@ -113,73 +113,8 @@ const ICONS: Record<IconName, IconDef> = {
   'rank-elite': { kind: 'img', value: png('ranks/Elite') },
 };
 
-export type FacilityIconSlot = 'barracks' | 'tankPlant' | 'ordnance';
-
-const FACILITY_ICON_NAMES: Readonly<Record<FacilityIconSlot, IconName>> = {
-  barracks: 'structure-barracks',
-  tankPlant: 'structure-plant',
-  ordnance: 'structure-ordnance',
-};
-const DEV_ICON_MAPPING_KEY = 'ironfronts:dev-icon-mapping';
-
-export interface ZeroAdIconEntry {
-  readonly path: string;
-  readonly filename: string;
-  readonly url: string;
-}
-
-/** The committed 0 A.D. catalog, used by the development icon mapper. */
-export function listZeroAdIcons(): ZeroAdIconEntry[] {
-  return Object.entries(pngUrls)
-    .map(([path, url]) => ({
-      path,
-      filename: path.slice(path.lastIndexOf('/') + 1),
-      url,
-    }))
-    .sort((a, b) => a.path.localeCompare(b.path));
-}
-
-function readDevIconMapping(): Partial<Record<FacilityIconSlot, string>> {
-  if (!import.meta.env.DEV) return {};
-  try {
-    const raw = window.localStorage.getItem(DEV_ICON_MAPPING_KEY);
-    const parsed: unknown = raw ? JSON.parse(raw) : {};
-    if (!parsed || typeof parsed !== 'object') return {};
-    return parsed as Partial<Record<FacilityIconSlot, string>>;
-  } catch {
-    return {};
-  }
-}
-
-export function getDevIconMapping(): Partial<Record<FacilityIconSlot, string>> {
-  return readDevIconMapping();
-}
-
-export function setDevIconMapping(mapping: Partial<Record<FacilityIconSlot, string>>): void {
-  if (!import.meta.env.DEV) return;
-  window.localStorage.setItem(DEV_ICON_MAPPING_KEY, JSON.stringify(mapping));
-}
-
-/** Resolve a mapper selection to a bundled URL, never an arbitrary URL. */
-function mappedFacilityUrl(slot: FacilityIconSlot): string | undefined {
-  const selected = readDevIconMapping()[slot];
-  return selected ? pngUrls[selected] : undefined;
-}
-
-export function getFacilityIconPath(slot: FacilityIconSlot): string {
-  const mapped = readDevIconMapping()[slot];
-  return mapped && pngUrls[mapped] ? mapped : ICONS[FACILITY_ICON_NAMES[slot]].value;
-}
-
-function iconDefinition(name: IconName): IconDef {
-  const slot = (Object.keys(FACILITY_ICON_NAMES) as FacilityIconSlot[])
-    .find((candidate) => FACILITY_ICON_NAMES[candidate] === name);
-  const override = slot ? mappedFacilityUrl(slot) : undefined;
-  return override ? { kind: 'img', value: override } : ICONS[name];
-}
-
 export function createIcon(name: IconName, className = ''): HTMLElement {
-  const def = iconDefinition(name);
+  const def = ICONS[name];
   const wrap = document.createElement('span');
   wrap.className = `ifg-icon${className ? ` ${className}` : ''}`;
   wrap.dataset.kind = def.kind;
@@ -197,7 +132,7 @@ export function createIcon(name: IconName, className = ''): HTMLElement {
 }
 
 export function iconMarkup(name: IconName, className = ''): string {
-  const def = iconDefinition(name);
+  const def = ICONS[name];
   const cls = `ifg-icon${className ? ` ${className}` : ''}`;
   return def.kind === 'img'
     ? `<span class="${cls}" data-kind="img" aria-hidden="true"><img src="${def.value}" alt="" draggable="false"></span>`
