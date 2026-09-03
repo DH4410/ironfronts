@@ -214,6 +214,7 @@
         <button type="button" data-debug-tab="world" aria-selected="true">World</button>
         <button type="button" data-debug-tab="diplomacy" aria-selected="false">Diplomacy</button>
         <button type="button" data-debug-tab="renderer" aria-selected="false">Renderer</button>
+        <button type="button" data-debug-tab="icons" aria-selected="false">Icons</button>
       </nav>
 
       <div class="diagnostics__panel" data-debug-panel="world">
@@ -319,6 +320,8 @@
         </div>
         <p class="diagnostics__hint"><kbd>[</kbd> <kbd>]</kbd> cycle views</p>
       </div>
+
+      <div class="diagnostics__panel" data-debug-panel="icons" hidden id="debug-icon-mapper"></div>
     </aside>
 
     <fieldset id="map-modes" class="map-modes" aria-label="Map overlay" hidden>

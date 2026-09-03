@@ -15,6 +15,7 @@ import { autoDismissDelay, isSticky } from './ui/notification-lifecycle';
 import { DEMO_ARMY, type ArmyPanelCommand } from './ui/army';
 import { aggregateTroopStat, armyActivityLabel } from './ui/army-presentation';
 import { iconMarkup } from './ui/icons';
+import { mountIconMapper } from './ui/icon-mapper';
 import type { ProvinceResources } from './resource-nodes';
 import type { WorldRenderer, MapMode, TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
@@ -143,6 +144,7 @@ const debugWarList = required<HTMLElement>('debug-war-list');
 const debugAlliedList = required<HTMLElement>('debug-allied-list');
 const debugDiplomacyStatus = required<HTMLElement>('debug-diplomacy-status');
 const debugCountryNames = required<HTMLDataListElement>('debug-country-names');
+const debugIconMapper = required<HTMLElement>('debug-icon-mapper');
 const mapModes = required<HTMLFieldSetElement>('map-modes');
 const mapModeInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="map-mode"]')];
 const unsupported = required<HTMLElement>('unsupported');
@@ -153,6 +155,11 @@ const urlParams = new URLSearchParams(window.location.search);
 // ?benchmark automation hook). They are NOT auto-enabled by the dev server, so
 // `npm run dev` shows the real player experience by default.
 const debugEnabled = urlParams.has('debug') || urlParams.has('benchmark');
+
+if (import.meta.env.DEV) mountIconMapper(debugIconMapper);
+else {
+  document.querySelector<HTMLButtonElement>('[data-debug-tab="icons"]')?.setAttribute('hidden', '');
+}
 
 // The single typed channel between renderer/game systems and the player HUD.
 const uiStore = createUiStore(createInitialState({ quality: loadQuality(), debugEnabled }));
