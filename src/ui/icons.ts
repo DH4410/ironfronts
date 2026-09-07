@@ -40,6 +40,9 @@ export type IconName =
   | 'cmd-patrol' | 'cmd-garrison'
   | 'stat-health' | 'stat-attack' | 'stat-defence' | 'stat-speed' | 'stat-troops'
   | 'structure-barracks' | 'structure-plant' | 'structure-ordnance'
+  | 'structure-fortress' | 'structure-city'
+  | 'stance-attack' | 'stance-attack-defend' | 'stance-defend'
+  | 'stance-retreat' | 'stance-defend-retreat'
   | 'note-attacked' | 'rank-basic' | 'rank-advanced' | 'rank-elite';
 
 interface IconDef { readonly kind: 'img' | 'svg'; readonly value: string; }
@@ -93,9 +96,18 @@ const ICONS: Record<IconName, IconDef> = {
   'stat-defence': { kind: 'svg', value: svg('shield') },
   'stat-speed': { kind: 'svg', value: svg('speed') },
   'stat-troops': { kind: 'svg', value: svg('troops') },
-  'structure-barracks': { kind: 'img', value: png('training') },
-  'structure-plant': { kind: 'img', value: png('production') },
-  'structure-ordnance': { kind: 'img', value: png('construction') },
+  'structure-barracks': { kind: 'img', value: ironfrontsPng('barracks') },
+  'structure-plant': { kind: 'img', value: ironfrontsPng('tank-plant') },
+  'structure-ordnance': { kind: 'img', value: ironfrontsPng('ordnance') },
+  // Reserved — committed painterly art (project owner, see ASSET_CREDITS.md)
+  // with no wired mechanic yet: no fortress / city building, no army-stance system.
+  'structure-fortress': { kind: 'img', value: ironfrontsPng('fortress') },
+  'structure-city': { kind: 'img', value: ironfrontsPng('settlement') },
+  'stance-attack': { kind: 'img', value: ironfrontsPng('stance-attack') },
+  'stance-attack-defend': { kind: 'img', value: ironfrontsPng('stance-attack-defend') },
+  'stance-defend': { kind: 'img', value: ironfrontsPng('stance-defend') },
+  'stance-retreat': { kind: 'img', value: ironfrontsPng('stance-retreat') },
+  'stance-defend-retreat': { kind: 'img', value: ironfrontsPng('stance-defend-retreat') },
   'rank-basic': { kind: 'img', value: png('ranks/Basic') },
   'rank-advanced': { kind: 'img', value: png('ranks/Advanced') },
   'rank-elite': { kind: 'img', value: png('ranks/Elite') },
