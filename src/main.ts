@@ -511,7 +511,17 @@ async function startGame(token: number): Promise<void> {
     const hoveredId = renderer.pickArmyAt(clientX, clientY);
     const hovered = hoveredId && hoveredId !== selectedArmyId ? session.army(hoveredId) : null;
     const strikable = Boolean(hovered && !hovered.own);
-    if (strikable) {
+    // In attack mode a click also lands on enemy/neutral *territory* (an
+    // orderAttackProvince fallback), so the cursor must accept a province the
+    // same way the click does — otherwise it reads "not allowed" over ground
+    // the order will happily take.
+    const groundStrikable = targetingMode === 'attack' && !strikable && (() => {
+      const ground = renderer.groundPointAt(clientX, clientY);
+      if (!ground) return false;
+      const provinceId = renderer.provinceIdAt(clientX, clientY);
+      return provinceId >= 0 && !session.ownsProvince(provinceId);
+    })();
+    if (strikable || groundStrikable) {
       canvas.style.cursor = 'url(/cursors/action-attack.png) 1 1, crosshair';
     } else if (targetingMode === 'attack') {
       canvas.style.cursor = 'url(/cursors/cursor-no.png) 13 14, not-allowed';
