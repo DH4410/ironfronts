@@ -1122,7 +1122,7 @@ function syncArmyMarkers(
       const tlen = Math.hypot(tx, tz) || 1;
       const ux = tx / tlen;
       const uz = tz / tlen;
-      const WING = 34;
+      const WING = 16;
       const COS = Math.cos(2.5); // ~143deg: wings sweep back from the tip
       const SIN = Math.sin(2.5);
       emitSegment(tip.x + WING * (ux * COS - uz * SIN), tip.z + WING * (ux * SIN + uz * COS), tip.x, tip.z, 1);

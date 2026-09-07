@@ -60,13 +60,13 @@ export function mountMenu(handlers: MenuHandlers): void {
   newCampaign.classList.toggle('is-preview', previewOnly);
   if (previewOnly) {
     const sub = newCampaign.querySelector('small');
-    if (sub) sub.textContent = "Inspect the setup flow — your campaign stays untouched.";
+    if (sub) sub.textContent = "Inspect the setup flow. Your campaign stays untouched.";
   }
   continueButton.disabled = assignedCountry === null;
   continueButton.classList.toggle('is-disabled', assignedCountry === null);
   continueButton.classList.toggle('is-assigned', assignedCountry !== null);
   requiredId<HTMLElement>('ifm-continue-detail').textContent = assignedCountry
-    ? `${assignedCountry.name} — resume where you left off.` : 'No field assignment.';
+    ? `${assignedCountry.name}. Resume where you left off.` : 'No field assignment.';
   if (assignedCountry) {
     continueButton.addEventListener('click', () => void deploy(assignedCountry.id));
     const flagUrl = resolveFlagUrl(assignedCountry.name);
@@ -262,10 +262,10 @@ export function mountMenu(handlers: MenuHandlers): void {
     }
     if (countryHint) {
       countryHint.textContent = previewOnly
-        ? `Preview of the nation-selection flow. A second campaign slot isn't built yet, so this cannot deploy — your current campaign is safe.`
+        ? `Preview of the nation-selection flow. A second campaign slot isn't built yet, so this cannot deploy. Your current campaign is safe.`
         : country === null
           ? 'Select a beige country. Grey countries cannot be claimed.'
-          : `${country.name} is selected — join to take command for the whole campaign.`;
+          : `${country.name} is selected. Join to take command for the whole campaign.`;
     }
   }
 
@@ -384,8 +384,8 @@ export function mountMenu(handlers: MenuHandlers): void {
   async function deployFromPicker(countryId: number): Promise<void> {
     if (previewOnly) {
       if (countryHint) {
-        countryHint.textContent = `Preview only — a second campaign slot isn't built yet. `
-          + `Your campaign${assignedCountry ? ` as ${assignedCountry.name}` : ''} is untouched; use Continue to resume it.`;
+        countryHint.textContent = `Preview only. A second campaign slot isn't built yet. `
+          + `Your campaign${assignedCountry ? ` as ${assignedCountry.name}` : ''} is untouched. Use Continue to resume it.`;
       }
       playCue('select');
       return;

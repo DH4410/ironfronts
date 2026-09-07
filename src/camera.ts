@@ -101,8 +101,8 @@ export class StrategyCamera {
 
   update(deltaSeconds: number): void {
     vec3.set(this.move, 0, 0, 0);
-    if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) this.move[2] -= 1;
-    if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) this.move[2] += 1;
+    if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) this.move[2] += 1;
+    if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) this.move[2] -= 1;
     if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) this.move[0] -= 1;
     if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) this.move[0] += 1;
     if (vec3.squaredLength(this.move) > 0) {
