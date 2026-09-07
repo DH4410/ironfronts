@@ -48,6 +48,11 @@ describe('game-state serialization', () => {
     const state = minimalState();
     const restored = deserializeGameState(serializeGameState(state));
     expect(restored).toEqual(state);
+    // These records were added without a version bump; an older v2 save that
+    // omits them remains a valid v2 state and is initialized lazily on use.
+    expect(restored.diplomacyMessages).toBeUndefined();
+    expect(restored.diplomacyProposals).toBeUndefined();
+    expect(restored.nextDiplomacyId).toBeUndefined();
   });
 
   it('cloneGameState is a deep, independent copy', () => {
@@ -87,6 +92,8 @@ describe('game-state serialization', () => {
     setRelation(state, 41, 24, 'war');
     expect(relationOf(state, 24, 41)).toBe('war');
     expect(state.relations['24:41']).toBe('war');
+    setRelation(state, 24, 41, 'allied');
+    expect(relationOf(state, 41, 24)).toBe('allied');
     setRelation(state, 24, 41, 'peace');
     expect(relationOf(state, 24, 41)).toBe('peace');
     expect(Object.keys(state.relations)).toHaveLength(0);

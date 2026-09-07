@@ -72,9 +72,44 @@ export interface RallyCommand {
   readonly target: { readonly x: number; readonly z: number } | null;
 }
 
+export interface SendDiplomaticMessageCommand {
+  readonly type: 'sendDiplomaticMessage';
+  readonly countryId: number;
+  readonly targetCountryId: number;
+  readonly body: string;
+}
+
+export interface ProposeDiplomacyCommand {
+  readonly type: 'proposeDiplomacy';
+  readonly countryId: number;
+  readonly targetCountryId: number;
+  readonly proposal: 'alliance' | 'peace';
+}
+
+export interface RespondDiplomacyCommand {
+  readonly type: 'respondDiplomacy';
+  readonly countryId: number;
+  readonly proposalId: string;
+  readonly accept: boolean;
+}
+
+export interface DeclareWarCommand {
+  readonly type: 'declareWar';
+  readonly countryId: number;
+  readonly targetCountryId: number;
+}
+
+export interface EndAllianceCommand {
+  readonly type: 'endAlliance';
+  readonly countryId: number;
+  readonly targetCountryId: number;
+}
+
 export type GameCommand =
   | MoveArmyCommand | AttackCommand | RetreatArmyCommand | SplitArmyCommand
-  | StopArmyCommand | ExtractCommand | ProduceCommand | BuildCommand | RallyCommand;
+  | StopArmyCommand | ExtractCommand | ProduceCommand | BuildCommand | RallyCommand
+  | SendDiplomaticMessageCommand | ProposeDiplomacyCommand | RespondDiplomacyCommand
+  | DeclareWarCommand | EndAllianceCommand;
 
 export type GameCommandType = GameCommand['type'];
 

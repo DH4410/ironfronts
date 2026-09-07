@@ -135,6 +135,54 @@ export type NavId =
   | 'armies' | 'provinces' | 'production' | 'research'
   | 'diplomacy' | 'economy' | 'intelligence' | 'events';
 
+export type SidePanelId = 'diplomacy';
+
+export type DiplomacyRelation = 'neutral' | 'allied' | 'war';
+
+export interface DiplomacyCountryView {
+  readonly id: number;
+  readonly name: string;
+  readonly color: string;
+  readonly controller: 'player' | 'ai' | 'neutral';
+  readonly alive: boolean;
+  readonly relation: DiplomacyRelation;
+  /** Messages received since this cable was last opened. */
+  readonly unreadCount?: number;
+  /** Pending proposals from this country that require the player's answer. */
+  readonly incomingProposalCount?: number;
+}
+
+export interface DiplomacyMessageView {
+  readonly id: string;
+  readonly fromCountryId: number;
+  readonly toCountryId: number;
+  readonly body: string;
+  readonly sentAtTick: number;
+}
+
+export interface DiplomacyProposalView {
+  readonly id: string;
+  readonly fromCountryId: number;
+  readonly toCountryId: number;
+  readonly kind: 'alliance' | 'peace';
+  readonly status: 'pending' | 'accepted' | 'declined' | 'withdrawn';
+  readonly createdAtTick: number;
+  readonly resolvedAtTick?: number;
+}
+
+export type DiplomacyBusyAction =
+  | 'message' | 'alliance' | 'peace' | 'declare-war' | 'end-alliance' | 'proposal-response';
+
+export interface DiplomacyView {
+  readonly viewerCountryId: number | null;
+  readonly countries: readonly DiplomacyCountryView[];
+  readonly selectedCountryId: number | null;
+  readonly messages: readonly DiplomacyMessageView[];
+  readonly proposals: readonly DiplomacyProposalView[];
+  readonly busy: DiplomacyBusyAction | null;
+  readonly feedback: string | null;
+}
+
 export type NotificationKind =
   | 'warning' | 'combat' | 'completed' | 'diplomacy' | 'information';
 
@@ -227,6 +275,9 @@ export interface StrategicUiState {
   readonly selectedProvince: SelectedProvince | null;
   readonly selectedArmy: ArmyStackView | null;
   readonly notifications: readonly GameNotification[];
+  /** One non-modal command drawer at a time; the map remains visible behind it. */
+  readonly activeSidePanel: SidePanelId | null;
+  readonly diplomacy: DiplomacyView;
   readonly quality: QualityLevel;
   /** Backing-store scale actually in use (diagnostics / verification). */
   readonly effectiveRenderScale: number;
@@ -258,6 +309,16 @@ export function createInitialState(overrides: Partial<StrategicUiState> = {}): S
     selectedProvince: null,
     selectedArmy: null,
     notifications: [],
+    activeSidePanel: null,
+    diplomacy: {
+      viewerCountryId: null,
+      countries: [],
+      selectedCountryId: null,
+      messages: [],
+      proposals: [],
+      busy: null,
+      feedback: null,
+    },
     quality: 'high',
     effectiveRenderScale: 1,
     paused: false,

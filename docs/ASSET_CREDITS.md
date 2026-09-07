@@ -201,6 +201,14 @@ centered on 256x256 transparent RGBA canvases for runtime use.
 | `src/ui/assets/icons/ironfronts/command-stop.png` | Stop command |
 | `src/ui/assets/icons/ironfronts/command-extract.png` | Extract command |
 
+### `public/ui/diplomatic-cable-watermark.png`
+
+Original Ironfronts project artwork generated with OpenAI's built-in image
+generation tool on 2026-09-07. The prompt requested a transparent, distressed
+two-colour 1939 field-envelope and radio-arc watermark in the HUD's brass and
+cream palette. Used decoratively in the diplomacy drawer header; no control or
+game state depends on the image.
+
 ### `water.png`
 
 **Source: User-provided Ironfronts asset.** A painterly water-drop-in-a-bowl

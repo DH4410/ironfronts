@@ -37,6 +37,30 @@ describe('game tickets and command wire schema', () => {
     }).type).toBe('splitArmy');
   });
 
+  it('validates diplomacy commands and strips forged sender ids', () => {
+    expect(commandPayloadSchema.parse({
+      type: 'sendDiplomaticMessage', targetCountryId: 2, body: 'Hello', countryId: 999,
+    })).toEqual({ type: 'sendDiplomaticMessage', targetCountryId: 2, body: 'Hello' });
+    expect(commandPayloadSchema.parse({
+      type: 'proposeDiplomacy', targetCountryId: 2, proposal: 'alliance', countryId: 999,
+    })).toEqual({ type: 'proposeDiplomacy', targetCountryId: 2, proposal: 'alliance' });
+    expect(commandPayloadSchema.parse({
+      type: 'respondDiplomacy', proposalId: 'proposal-1', accept: true, countryId: 999,
+    })).toEqual({ type: 'respondDiplomacy', proposalId: 'proposal-1', accept: true });
+    expect(commandPayloadSchema.parse({
+      type: 'declareWar', targetCountryId: 2, countryId: 999,
+    })).toEqual({ type: 'declareWar', targetCountryId: 2 });
+    expect(commandPayloadSchema.parse({
+      type: 'endAlliance', targetCountryId: 2, countryId: 999,
+    })).toEqual({ type: 'endAlliance', targetCountryId: 2 });
+    expect(() => commandPayloadSchema.parse({
+      type: 'sendDiplomaticMessage', targetCountryId: 2, body: 'x'.repeat(501),
+    })).toThrow();
+    expect(() => commandPayloadSchema.parse({
+      type: 'proposeDiplomacy', targetCountryId: 2, proposal: 'surrender',
+    })).toThrow();
+  });
+
   it('accepts a ticket nonce once and rejects replay', () => {
     const nonces = new TicketNonceStore();
     expect(nonces.consume('one-time', Date.now() + 10_000)).toBe(true);

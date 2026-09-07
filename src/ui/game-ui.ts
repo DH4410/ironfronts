@@ -15,6 +15,7 @@ import { QUALITY_LEVELS, QUALITY_PRESETS, type QualityLevel } from '../graphics/
 import { renderSelectedArmyPanel, type ArmyPanelCommand } from './army';
 import { createFlag } from './flags';
 import { createIcon, type IconName } from './icons';
+import { createDiplomacyPanel } from './diplomacy-panel';
 import { buildNotification } from './notifications';
 import { groupQueueItems, type QueueGroup } from './queue-presentation';
 import { bindTooltip } from './tooltip';
@@ -28,6 +29,13 @@ export interface GameUiActions {
   clearSelection(): void;
   setQuality(level: QualityLevel): void;
   navSelect(id: NavId): void;
+  selectDiplomacyCountry(countryId: number): void;
+  sendDiplomaticMessage(countryId: number, body: string): void;
+  proposeAlliance(countryId: number): void;
+  offerPeace(countryId: number): void;
+  declareWar(countryId: number): void;
+  endAlliance(countryId: number): void;
+  respondDiplomacy(proposalId: string, accept: boolean): void;
   dismissNotification(id: string): void;
   togglePause(open: boolean): void;
   returnToMenu(): void;
@@ -306,15 +314,24 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
 
   const dockMore = el('div', 'ifg-dock__more');
   dockMore.hidden = true;
+  const dockButtons = new Map<NavId, HTMLButtonElement>();
   for (const section of DOCK_SECTIONS) {
     const b = el('button', 'ifg-dock__btn');
     b.type = 'button';
-    b.disabled = true;
+    const available = section.id === 'diplomacy';
+    b.disabled = !available;
     b.dataset.nav = section.id;
     b.title = `${section.label} — not available yet`;
     b.setAttribute('aria-label', `${section.label} (not available yet)`);
+    if (available) {
+      b.title = section.label;
+      b.setAttribute('aria-label', section.label);
+      b.setAttribute('aria-controls', 'ifg-diplomacy-panel');
+      b.setAttribute('aria-expanded', 'false');
+    }
     b.append(createIcon(section.icon), el('span', 'ifg-dock__tip', section.label));
     b.addEventListener('click', () => actions.navSelect(section.id));
+    dockButtons.set(section.id, b);
     dockMore.append(b);
   }
   expandBtn.addEventListener('click', () => {
@@ -324,6 +341,17 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     expandBtn.classList.toggle('is-open', open);
   });
   dock.append(dockMore, expandBtn);
+
+  const diplomacyPanel = createDiplomacyPanel({
+    close: () => actions.navSelect('diplomacy'),
+    selectCountry: actions.selectDiplomacyCountry,
+    sendMessage: actions.sendDiplomaticMessage,
+    proposeAlliance: actions.proposeAlliance,
+    offerPeace: actions.offerPeace,
+    declareWar: actions.declareWar,
+    endAlliance: actions.endAlliance,
+    respondProposal: actions.respondDiplomacy,
+  });
 
   // ---------------- map-mode cluster (top-right) ----------------
   const modeCluster = el('div', 'ifg-modes');
@@ -537,11 +565,18 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     if (event.target === overlay) actions.togglePause(false);
   });
 
-  root.append(topbar, dock, modeCluster, notifyStack, provinceCard, armyCard, overlay);
+  root.append(topbar, dock, diplomacyPanel.element, modeCluster, notifyStack, provinceCard, armyCard, overlay);
   document.body.append(root);
 
   const onKey = (event: KeyboardEvent): void => {
     if (event.key === 'Escape' && store.get().phase === 'in-game') {
+      if (store.get().activeSidePanel) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const panel = store.get().activeSidePanel;
+        if (panel) actions.navSelect(panel);
+        return;
+      }
       actions.togglePause(!store.get().paused);
     }
   };
@@ -557,11 +592,25 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   let weatherKey = '';
   let pvFlagKey = '';
   let pvResourceKey = '';
+  let renderedSidePanel: StrategicUiState['activeSidePanel'] = null;
 
   const render = (state: StrategicUiState): void => {
     root.hidden = state.phase !== 'in-game';
     root.dataset.phase = state.phase;
     inspectorButton.hidden = !state.debugEnabled;
+
+    const diplomacyOpen = state.activeSidePanel === 'diplomacy';
+    const diplomacyDockButton = dockButtons.get('diplomacy');
+    if (diplomacyDockButton) {
+      diplomacyDockButton.classList.toggle('is-on', diplomacyOpen);
+      diplomacyDockButton.setAttribute('aria-expanded', String(diplomacyOpen));
+      diplomacyDockButton.setAttribute('aria-pressed', String(diplomacyOpen));
+    }
+    diplomacyPanel.render(diplomacyOpen, state.diplomacy);
+    if (renderedSidePanel === 'diplomacy' && state.activeSidePanel === null) {
+      diplomacyDockButton?.focus({ preventScroll: true });
+    }
+    renderedSidePanel = state.activeSidePanel;
 
     // `.brand { display:flex }` beats [hidden]; override inline, re-asserted so
     // it outlasts the menu launch transition.

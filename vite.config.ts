@@ -14,6 +14,7 @@ export default defineConfig({
     { src: 'public/menu', dest: '.' },
     { src: 'public/models', dest: '.' },
     { src: 'public/textures', dest: '.' },
+    { src: 'public/ui', dest: '.' },
     { src: 'public/world', dest: '.' },
   ] })],
   build: {

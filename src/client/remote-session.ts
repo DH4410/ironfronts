@@ -129,6 +129,50 @@ export class RemoteGameSession extends EventTarget {
     return { ok: true };
   }
 
+  /**
+   * Diplomacy is authoritative and never painted optimistically: another
+   * player may answer or change the relation at the same time. The optional
+   * callback only releases local UI busy state; rejected commands still flow
+   * through the session's shared commandFailed notification path.
+   */
+  private sendDiplomacyCommand(
+    command: CommandPayload, onResult?: (ok: boolean) => void,
+  ): { ok: true } {
+    this.connection.command(command, (ok, reason) => {
+      if (!ok) this.commandFailed(reason ?? 'Diplomacy command failed.');
+      onResult?.(ok);
+    });
+    return { ok: true };
+  }
+
+  sendDiplomaticMessage(targetCountryId: number, body: string, onResult?: (ok: boolean) => void) {
+    return this.sendDiplomacyCommand({
+      type: 'sendDiplomaticMessage', targetCountryId, body,
+    }, onResult);
+  }
+
+  proposeDiplomacy(
+    targetCountryId: number, proposal: 'alliance' | 'peace', onResult?: (ok: boolean) => void,
+  ) {
+    return this.sendDiplomacyCommand({
+      type: 'proposeDiplomacy', targetCountryId, proposal,
+    }, onResult);
+  }
+
+  respondDiplomacy(proposalId: string, accept: boolean, onResult?: (ok: boolean) => void) {
+    return this.sendDiplomacyCommand({
+      type: 'respondDiplomacy', proposalId, accept,
+    }, onResult);
+  }
+
+  declareWar(targetCountryId: number, onResult?: (ok: boolean) => void) {
+    return this.sendDiplomacyCommand({ type: 'declareWar', targetCountryId }, onResult);
+  }
+
+  endAlliance(targetCountryId: number, onResult?: (ok: boolean) => void) {
+    return this.sendDiplomacyCommand({ type: 'endAlliance', targetCountryId }, onResult);
+  }
+
   ownsArmy(armyId: string): boolean { return this.state.armies[armyId]?.own ?? false; }
   ownsProvince(provinceId: number): boolean { return this.state.provinceOwners[provinceId] === this.playerCountryId; }
 

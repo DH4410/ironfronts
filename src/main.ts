@@ -10,6 +10,8 @@ import { mountMenu } from './menu/menu';
 import { mountGameUi, type GameUiActions } from './ui/game-ui';
 import {
   createInitialState, createUiStore, type GameNotification, type ResourceLine,
+  type DiplomacyBusyAction, type DiplomacyCountryView, type DiplomacyMessageView,
+  type DiplomacyProposalView, type DiplomacyView,
 } from './ui/ui-state';
 import { autoDismissDelay, isSticky } from './ui/notification-lifecycle';
 import { DEMO_ARMY, type ArmyPanelCommand } from './ui/army';
@@ -218,6 +220,10 @@ let rendererStarted = false;
 let activeRenderer: WorldRenderer | undefined;
 let activeSession: RemoteGameSession | undefined;
 let activeConnection: GameConnection | undefined;
+const readDiplomacyMessages = new Set<string>();
+const announcedDiplomacyItems = new Set<string>();
+const diplomacyProposalStatuses = new Map<string, string>();
+let diplomacyBootstrapped = false;
 /** Pooled world-space combat visuals; fed by drainSessionEvents, drawn from onStats. */
 const combatEffects = new CombatEffectPool(320);
 let lastCombatCameraDistance = 3_000;
@@ -552,7 +558,52 @@ async function startGame(token: number): Promise<void> {
       saveQuality(level);
       uiStore.patch({ quality: level, effectiveRenderScale: renderer.effectiveRenderScale });
     },
-    navSelect: () => { /* No player-facing system is implemented yet. */ },
+    navSelect: (id) => {
+      if (id !== 'diplomacy') return;
+      const open = uiStore.get().activeSidePanel === 'diplomacy';
+      uiStore.patch({ activeSidePanel: open ? null : 'diplomacy' });
+      if (!open) {
+        const selected = uiStore.get().diplomacy.selectedCountryId
+          ?? Object.values(session.state.countries)
+            .filter((country) => country.id !== session.playerCountryId)
+            .sort((a, b) => a.name.localeCompare(b.name))[0]?.id
+          ?? null;
+        if (selected !== null) markDiplomacyRead(session, selected);
+        syncDiplomacyView(session, selected ?? undefined);
+      }
+    },
+    selectDiplomacyCountry: (countryId) => {
+      for (const message of session.state.diplomacy?.messages ?? []) {
+        if (message.fromCountryId === countryId || message.toCountryId === countryId) {
+          readDiplomacyMessages.add(message.id);
+        }
+      }
+      uiStore.patch({ activeSidePanel: 'diplomacy' });
+      syncDiplomacyView(session, countryId);
+    },
+    sendDiplomaticMessage: (countryId, body) => {
+      diplomacyCommand(session, 'message', (done) => session.sendDiplomaticMessage(countryId, body, done));
+    },
+    proposeAlliance: (countryId) => {
+      void showGameConfirmation('Propose alliance?', 'Send an alliance proposal to this country?')
+        .then((yes) => { if (yes) diplomacyCommand(session, 'alliance', (done) => session.proposeDiplomacy(countryId, 'alliance', done)); });
+    },
+    offerPeace: (countryId) => {
+      void showGameConfirmation('Offer peace?', 'Send a peace proposal to end this war?')
+        .then((yes) => { if (yes) diplomacyCommand(session, 'peace', (done) => session.proposeDiplomacy(countryId, 'peace', done)); });
+    },
+    declareWar: (countryId) => {
+      const name = session.state.countries[countryId]?.name ?? 'this country';
+      void showGameConfirmation('Declare war?', `Open hostilities with ${name}?`)
+        .then((yes) => { if (yes) diplomacyCommand(session, 'declare-war', (done) => session.declareWar(countryId, done)); });
+    },
+    endAlliance: (countryId) => {
+      void showGameConfirmation('End alliance?', 'End the current alliance with this country?')
+        .then((yes) => { if (yes) diplomacyCommand(session, 'end-alliance', (done) => session.endAlliance(countryId, done)); });
+    },
+    respondDiplomacy: (proposalId, accept) => {
+      diplomacyCommand(session, 'proposal-response', (done) => session.respondDiplomacy(proposalId, accept, done));
+    },
     dismissNotification: (id) => removeNotification(id),
     togglePause: (open) => uiStore.patch({ paused: open }),
     returnToMenu: () => { /* Disabled in the UI until a safe menu-return path exists. */ },
@@ -872,6 +923,10 @@ for (const button of debugSimSpeedButtons) {
 async function bootstrapGameSession(
   renderer: WorldRenderer, session: RemoteGameSession,
 ): Promise<void> {
+  readDiplomacyMessages.clear();
+  announcedDiplomacyItems.clear();
+  diplomacyProposalStatuses.clear();
+  diplomacyBootstrapped = false;
   selectedArmyId = null;
   awaitingMoveTarget = false;
   targetingMode = null;
@@ -920,6 +975,10 @@ async function bootstrapGameSession(
     renderer.setDiplomaticRelations(session.state.relations);
   };
   session.addEventListener('change', syncDiplomaticRelations);
+  const onDiplomacySessionChange = (): void => syncDiplomacyView(session);
+  session.addEventListener('change', onDiplomacySessionChange);
+  launchDisposers.push(() => session.removeEventListener('change', onDiplomacySessionChange));
+  syncDiplomacyView(session);
 
   uiStore.patch({
     playerCountry: { name: player.name, color: player.color },
@@ -967,9 +1026,9 @@ async function bootstrapGameSession(
     window.clearInterval(hudTimer);
     window.clearInterval(civilClockTimer);
     armyMotionInterpolator.clear();
+    clearAllNotificationTimers();
     window.removeEventListener('keydown', onKey);
     session.removeEventListener('change', syncDiplomaticRelations);
-    clearAllNotificationTimers();
     combatEffects.clear();
     if (activeSession === session) activeSession = undefined;
   };
@@ -1981,6 +2040,133 @@ function pushNotification(
   if (delay !== null) {
     notificationTimers.set(id, window.setTimeout(() => removeNotification(id), delay));
   }
+}
+
+function diplomacyRelation(session: RemoteGameSession, countryId: number): 'neutral' | 'allied' | 'war' {
+  const a = Math.min(session.playerCountryId, countryId);
+  const b = Math.max(session.playerCountryId, countryId);
+  const relation = session.state.relations[`${a}:${b}`] ?? 'peace';
+  return relation === 'allied' || relation === 'war' ? relation : 'neutral';
+}
+
+function sameDiplomacyView(previous: DiplomacyView, next: DiplomacyView): boolean {
+  const sameCountries = previous.countries.length === next.countries.length
+    && previous.countries.every((country: DiplomacyCountryView, index) => {
+      const candidate = next.countries[index];
+      return country.id === candidate.id && country.name === candidate.name
+        && country.color === candidate.color && country.controller === candidate.controller
+        && country.alive === candidate.alive && country.relation === candidate.relation
+        && country.unreadCount === candidate.unreadCount
+        && country.incomingProposalCount === candidate.incomingProposalCount;
+    });
+  const sameMessages = previous.messages.length === next.messages.length
+    && previous.messages.every((message: DiplomacyMessageView, index) => {
+      const candidate = next.messages[index];
+      return message.id === candidate.id && message.fromCountryId === candidate.fromCountryId
+        && message.toCountryId === candidate.toCountryId && message.body === candidate.body
+        && message.sentAtTick === candidate.sentAtTick;
+    });
+  const sameProposals = previous.proposals.length === next.proposals.length
+    && previous.proposals.every((proposal: DiplomacyProposalView, index) => {
+      const candidate = next.proposals[index];
+      return proposal.id === candidate.id && proposal.fromCountryId === candidate.fromCountryId
+        && proposal.toCountryId === candidate.toCountryId && proposal.kind === candidate.kind
+        && proposal.status === candidate.status && proposal.createdAtTick === candidate.createdAtTick
+        && proposal.resolvedAtTick === candidate.resolvedAtTick;
+    });
+  return previous.viewerCountryId === next.viewerCountryId
+    && previous.selectedCountryId === next.selectedCountryId
+    && previous.busy === next.busy && previous.feedback === next.feedback
+    && sameCountries && sameMessages && sameProposals;
+}
+
+function syncDiplomacyView(session: RemoteGameSession, selectedCountryId?: number): void {
+  const projection = session.state;
+  const diplomacy = projection.diplomacy ?? { messages: [], proposals: [] };
+  if (!diplomacyBootstrapped) {
+    for (const message of diplomacy.messages) announcedDiplomacyItems.add(`message:${message.id}`);
+    for (const proposal of diplomacy.proposals) announcedDiplomacyItems.add(`proposal:${proposal.id}`);
+    diplomacyBootstrapped = true;
+  }
+  for (const message of diplomacy.messages) {
+    const key = `message:${message.id}`;
+    if (!announcedDiplomacyItems.has(key) && message.toCountryId === projection.viewerCountryId) {
+      pushNotification('diplomacy', 'Incoming diplomatic cable',
+        `${projection.countries[message.fromCountryId]?.name ?? 'Foreign office'} sent a message.`);
+      announcedDiplomacyItems.add(key);
+    }
+  }
+  for (const proposal of diplomacy.proposals) {
+    const key = `proposal:${proposal.id}`;
+    const previousStatus = diplomacyProposalStatuses.get(proposal.id);
+    if (previousStatus && previousStatus !== proposal.status && proposal.fromCountryId === projection.viewerCountryId) {
+      const other = projection.countries[proposal.toCountryId]?.name ?? 'Foreign office';
+      pushNotification('diplomacy', 'Diplomatic proposal resolved', `${other} ${proposal.status} your ${proposal.kind} proposal.`);
+    }
+    diplomacyProposalStatuses.set(proposal.id, proposal.status);
+    if (!announcedDiplomacyItems.has(key) && proposal.toCountryId === projection.viewerCountryId
+      && proposal.status === 'pending') {
+      pushNotification('diplomacy', 'Diplomatic proposal received',
+        `${projection.countries[proposal.fromCountryId]?.name ?? 'Foreign office'} sent a ${proposal.kind} proposal.`);
+      announcedDiplomacyItems.add(key);
+    }
+  }
+  const current = uiStore.get().diplomacy;
+  const target = selectedCountryId ?? current.selectedCountryId;
+  const countries = Object.values(projection.countries)
+    .filter((country) => country.id !== projection.viewerCountryId)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((country) => {
+      const messages = diplomacy.messages.filter((message) =>
+        (message.fromCountryId === projection.viewerCountryId && message.toCountryId === country.id)
+        || (message.toCountryId === projection.viewerCountryId && message.fromCountryId === country.id));
+      const incoming = diplomacy.proposals.filter((proposal) =>
+        proposal.status === 'pending' && proposal.toCountryId === projection.viewerCountryId
+        && proposal.fromCountryId === country.id).length;
+      return {
+        id: country.id, name: country.name, color: country.color, controller: country.controller,
+        alive: country.alive, relation: diplomacyRelation(session, country.id),
+        unreadCount: messages.filter((message) => message.toCountryId === projection.viewerCountryId
+          && !readDiplomacyMessages.has(message.id)).length,
+        incomingProposalCount: incoming,
+      };
+    });
+  const selected = countries.some((country) => country.id === target) ? target : (countries[0]?.id ?? null);
+  const selectedMessages = selected === null ? [] : diplomacy.messages.filter((message) =>
+    (message.fromCountryId === projection.viewerCountryId && message.toCountryId === selected)
+    || (message.toCountryId === projection.viewerCountryId && message.fromCountryId === selected));
+  const selectedProposals = selected === null ? [] : diplomacy.proposals.filter((proposal) =>
+    proposal.fromCountryId === selected || proposal.toCountryId === selected);
+  const next: DiplomacyView = {
+    viewerCountryId: projection.viewerCountryId,
+    countries,
+    selectedCountryId: selected,
+    messages: selectedMessages,
+    proposals: selectedProposals,
+    busy: current.busy,
+    feedback: current.feedback,
+  };
+  if (!sameDiplomacyView(current, next)) uiStore.patch({ diplomacy: next });
+}
+
+function markDiplomacyRead(session: RemoteGameSession, countryId: number): void {
+  for (const message of session.state.diplomacy?.messages ?? []) {
+    if (message.fromCountryId === countryId || message.toCountryId === countryId) readDiplomacyMessages.add(message.id);
+  }
+}
+
+function diplomacyCommand(
+  session: RemoteGameSession, action: DiplomacyBusyAction, send: (done: (ok: boolean) => void) => { ok: true },
+): void {
+  uiStore.patch({ diplomacy: { ...uiStore.get().diplomacy, busy: action, feedback: null } });
+  send((ok) => {
+    const labels: Record<DiplomacyBusyAction, string> = {
+      message: 'Cable sent.', alliance: 'Alliance proposal sent.', peace: 'Peace offer sent.',
+      'declare-war': 'War declared.', 'end-alliance': 'Alliance ended.', 'proposal-response': 'Proposal response sent.',
+    };
+    uiStore.patch({ diplomacy: { ...uiStore.get().diplomacy, busy: null, feedback: ok ? labels[action] : 'Command rejected.' } });
+    syncDiplomacyView(session);
+  });
 }
 
 /**

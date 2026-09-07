@@ -8,12 +8,17 @@ import { queueUnit } from './production';
 import { queueBuilding } from './construction';
 import { issueAttack } from './commands/attack';
 import { issueSplit } from './commands/split';
+import {
+  declareWar, endAlliance, proposeDiplomacy, respondDiplomacy, sendDiplomaticMessage,
+} from './diplomacy';
 import type { CommandResult, GameCommand } from './commands/types';
 
 export type {
   AttackCommand, AttackTarget, BuildCommand, CommandResult, ExtractCommand,
   GameCommand, GameCommandType, MoveArmyCommand, ProduceCommand, RallyCommand,
-  RetreatArmyCommand, SplitArmyCommand, StopArmyCommand,
+  RetreatArmyCommand, SplitArmyCommand, StopArmyCommand, DeclareWarCommand,
+  EndAllianceCommand, ProposeDiplomacyCommand, RespondDiplomacyCommand,
+  SendDiplomaticMessageCommand,
 } from './commands/types';
 
 function controlsArmy(ctx: SimContext, countryId: number, armyId: string): boolean {
@@ -59,5 +64,15 @@ export function applyCommand(ctx: SimContext, command: GameCommand): CommandResu
       if (command.target) ctx.state.rallyPoints[command.provinceId] = { ...command.target };
       else delete ctx.state.rallyPoints[command.provinceId];
       return { ok: true };
+    case 'sendDiplomaticMessage':
+      return sendDiplomaticMessage(ctx.state, command.countryId, command.targetCountryId, command.body);
+    case 'proposeDiplomacy':
+      return proposeDiplomacy(ctx.state, command.countryId, command.targetCountryId, command.proposal);
+    case 'respondDiplomacy':
+      return respondDiplomacy(ctx.state, command.countryId, command.proposalId, command.accept);
+    case 'declareWar':
+      return declareWar(ctx.state, command.countryId, command.targetCountryId);
+    case 'endAlliance':
+      return endAlliance(ctx.state, command.countryId, command.targetCountryId);
   }
 }

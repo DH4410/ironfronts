@@ -83,6 +83,9 @@ describe('Spain "World at War" initialisation', () => {
 
     // all peace at start
     expect(Object.keys(state.relations)).toHaveLength(0);
+    expect(state.diplomacyMessages).toEqual({});
+    expect(state.diplomacyProposals).toEqual({});
+    expect(state.nextDiplomacyId).toBe(1);
   });
 
   it('is deterministic for the same inputs', () => {

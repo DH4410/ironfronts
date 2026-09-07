@@ -101,7 +101,25 @@ export interface ResourceNodeState {
   readonly provenance: ResourceProvenance;
 }
 
-export type Relation = 'peace' | 'war';
+export type Relation = 'peace' | 'allied' | 'war';
+
+export interface DiplomacyMessage {
+  readonly id: string;
+  readonly fromCountryId: number;
+  readonly toCountryId: number;
+  readonly body: string;
+  readonly sentAtTick: number;
+}
+
+export interface DiplomacyProposal {
+  readonly id: string;
+  readonly fromCountryId: number;
+  readonly toCountryId: number;
+  readonly kind: 'alliance' | 'peace';
+  status: 'pending' | 'accepted' | 'declined' | 'withdrawn';
+  readonly createdAtTick: number;
+  resolvedAtTick?: number;
+}
 
 export type BattleRole = 'attack' | 'defense';
 
@@ -167,8 +185,15 @@ export interface GameState {
   battleFronts: Record<string, BattleFrontState>;
   resourceNodes: Record<number, ResourceNodeState>;
 
-  /** Directed-pair relation key "a:b" with a < b -> 'war' (absent = peace). */
+  /** Undirected-pair relation key "a:b" with a < b (absent = peace). */
   relations: Record<string, Relation>;
+
+  /** Optional for compatibility with v2 snapshots created before diplomacy. */
+  diplomacyMessages?: Record<string, DiplomacyMessage>;
+  /** Optional for compatibility with v2 snapshots created before diplomacy. */
+  diplomacyProposals?: Record<string, DiplomacyProposal>;
+  /** Shared monotonic id source for diplomacy records. */
+  nextDiplomacyId?: number;
 
   nextArmyId: number;
   nextBattleId: number;
@@ -194,6 +219,14 @@ export function setRelation(state: GameState, a: number, b: number, relation: Re
   const key = relationKey(a, b);
   if (relation === 'peace') delete state.relations[key];
   else state.relations[key] = relation;
+  if (relation === 'war') {
+    for (const proposal of Object.values(state.diplomacyProposals ?? {})) {
+      if (proposal.status !== 'pending'
+        || relationKey(proposal.fromCountryId, proposal.toCountryId) !== key) continue;
+      proposal.status = 'withdrawn';
+      proposal.resolvedAtTick = state.simulationTick;
+    }
+  }
 }
 
 /**
