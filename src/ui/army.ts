@@ -24,9 +24,11 @@ const COMBAT_LABEL: Record<CombatStatus, string> = {
 
 function formatDamageRate(value: number): string {
   if (!Number.isFinite(value)) return '--';
-  const magnitude = Math.abs(value);
-  const digits = magnitude >= 100 ? 0 : magnitude >= 10 ? 1 : magnitude >= 1 ? 2 : 4;
-  return value.toFixed(digits).replace(/\.?0+$/, '');
+  // Stored as a fraction of a target stack removed per game hour; a bare
+  // "0.0077" is unreadable at a glance, so show it as a rounded percentage.
+  const pct = value * 100;
+  if (pct <= 0) return '0';
+  return pct < 10 ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
 }
 
 /**

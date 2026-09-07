@@ -299,27 +299,32 @@
 /* ================= notifications ================= */
 .ifg-notify {
   position: absolute;
-  top: 58px;
-  right: 12px;
-  width: 288px;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(620px, 84vw);
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
 }
 .ifg-notify__item {
+  pointer-events: auto;
   display: grid;
-  grid-template-columns: 26px 1fr 16px;
-  align-items: start;
-  gap: 10px;
-  padding: 11px 12px;
+  grid-template-columns: 30px 1fr 18px;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 20px;
   background: var(--ifg-panel);
   border: 1px solid var(--ifg-rule-soft);
-  border-left: 3px solid var(--ifg-brass);
+  border-left: 4px solid var(--ifg-brass);
   border-radius: 2px;
-  box-shadow: var(--ifg-lift);
+  box-shadow: var(--ifg-lift), 0 10px 30px rgba(0, 0, 0, 0.5);
   animation: ifg-notify-in 0.22s var(--ifg-ease);
 }
-@keyframes ifg-notify-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: none; } }
+@keyframes ifg-notify-in { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
 .ifg-notify__item[data-kind="warning"] { border-left-color: #d9a441; }
 .ifg-notify__item[data-kind="combat"] {
   border-left-width: 4px;
@@ -351,11 +356,15 @@
 }
 .ifg-notify__item[data-kind="completed"] { border-left-color: #7f9e5a; }
 .ifg-notify__item[data-kind="diplomacy"] { border-left-color: #6f8fae; }
-.ifg-notify__icon { width: 22px; height: 22px; margin-top: 1px; color: var(--ifg-brass-lit); }
+.ifg-notify__icon { width: 26px; height: 26px; margin-top: 1px; color: var(--ifg-brass-lit); }
 .ifg-notify__item[data-kind="combat"] .ifg-notify__icon { color: #e88a6c; }
 .ifg-notify__body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.ifg-notify__body strong { font-size: 13px; font-weight: 700; line-height: 1.25; }
-.ifg-notify__body span { font-size: 11.5px; line-height: 1.35; color: #b7bdb2; }
+.ifg-notify__body strong {
+  font-family: var(--ifg-serif, "Special Elite"), serif;
+  font-size: 18px; font-weight: 700; line-height: 1.2; letter-spacing: 0.01em;
+  color: #f2e7cd; text-transform: uppercase;
+}
+.ifg-notify__body span { font-size: 12.5px; line-height: 1.35; color: #c3c8bd; }
 @media (prefers-reduced-motion: reduce) {
   .ifg-notify__item, .ifg-notify__item[data-kind="combat"] { animation: none; }
 }
@@ -632,7 +641,15 @@
   display: block; width: 100%; height: 100%; object-fit: cover;
   filter: brightness(1.16) contrast(1.12) saturate(1.06);
 }
-.ifg-army-unit__portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* Raster portraits are near-square full figures: contain (not cover) so the
+   head is never cropped into the card border. The small letterbox sits on a
+   dark wash that reads as intentional framing. */
+.ifg-army-unit__portrait img {
+  display: block; width: 100%; height: 100%;
+  object-fit: contain; object-position: center bottom;
+  padding: 2px 3px 0;
+  background: linear-gradient(180deg, rgba(18, 21, 16, 0.55), rgba(10, 12, 8, 0.28));
+}
 /* Dev-only Call of War reference art (see dev-assets/callofwar-reference) —
    flagged unmistakably so it is never confused for shipped Ironfronts art. */
 .ifg-army-unit__portrait[data-prototype="true"]::after {
@@ -703,18 +720,18 @@
   font-variant-numeric: tabular-nums;
 }
 .ifg-army-panel__stat-table th,
-.ifg-army-panel__stat-table td { padding: 3px 4px; border: 1px solid var(--ifg-rule-soft); text-align: center; }
+.ifg-army-panel__stat-table td { padding: 4px 5px; border: 1px solid var(--ifg-rule-soft); text-align: center; }
 .ifg-army-panel__stat-table th:first-child { width: 43%; text-align: left; }
 .ifg-army-panel__stat-table thead th {
   color: var(--ifg-dim);
-  font-size: 7px;
+  font-size: 9px;
   font-weight: 600;
   letter-spacing: .1em;
   text-transform: uppercase;
 }
-.ifg-army-panel__stat-table tbody th { color: #c8c1ae; font-size: 8px; font-weight: 600; }
-.ifg-army-panel__stat-table tbody td { color: #eee5d0; font-size: 9px; font-weight: 700; }
-.ifg-army-stat__icon { width: 10px; height: 10px; margin-right: 4px; vertical-align: -2px; color: var(--ifg-brass); }
+.ifg-army-panel__stat-table tbody th { color: #c8c1ae; font-size: 10px; font-weight: 600; }
+.ifg-army-panel__stat-table tbody td { color: #eee5d0; font-size: 12px; font-weight: 700; }
+.ifg-army-stat__icon { width: 12px; height: 12px; margin-right: 4px; vertical-align: -2px; color: var(--ifg-brass); }
 .ifg-army-panel__stat-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 6px; }
 .ifg-army-panel__stat-meta > span {
   display: grid;
@@ -725,8 +742,8 @@
   background: rgba(201, 164, 99, .055);
   border: 1px solid var(--ifg-rule-soft);
 }
-.ifg-army-panel__stat-meta small { color: var(--ifg-dim); font-size: 7px; letter-spacing: .07em; text-transform: uppercase; }
-.ifg-army-panel__stat-meta b { font-size: 9px; font-variant-numeric: tabular-nums; }
+.ifg-army-panel__stat-meta small { color: var(--ifg-dim); font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
+.ifg-army-panel__stat-meta b { font-size: 12px; font-variant-numeric: tabular-nums; }
 .ifg-army-panel__activity {
   height: 100%;
   box-sizing: border-box;
@@ -883,15 +900,16 @@
   transition: border-color 0.1s ease, background 0.1s ease, transform 0.06s ease;
 }
 .ifg-army-panel__commands--primary .ifg-army-panel__command {
-  width: 50px;
-  height: 50px;
-  min-width: 50px;
-  flex: 0 0 50px;
-  padding: 5px 3px 4px;
+  width: 62px;
+  height: 62px;
+  min-width: 62px;
+  flex: 0 0 62px;
+  padding: 7px 3px 5px;
 }
+.ifg-army-panel__commands--primary .ifg-army-panel__command-icon { width: 28px; height: 28px; }
 .ifg-army-panel__command-icon { width: 22px; height: 22px; color: inherit; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6)); }
 .ifg-army-panel__command-label {
-  font-size: 8px;
+  font-size: 9px;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--ifg-dim);
@@ -1151,7 +1169,7 @@
 
 /* ================= responsive ================= */
 @media (max-width: 1440px) {
-  .ifg-notify { width: 216px; }
+  .ifg-notify { max-width: min(480px, 84vw); }
   .ifg-topbar__resources { gap: 13px; }
 }
 @media (max-width: 1366px) {

@@ -101,14 +101,16 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
     widthPixels = 2.1 + nearFactor * 0.75;
     color = select(vec4f(0.05, 0.91, 1.0, 0.94), vec4f(0.98, 0.71, 0.12, 0.96), line.b.z > 0.5);
   } else if (lineParams.mode == 3u) {
-    // Order route. b.x: 0 move (cream) / 1 attack (muted red) / 2 rally (blue);
-    // b.z > 0.5 retreat (amber, overrides); b.w > 0.5 = destination chevron.
-    widthPixels = 1.9 + nearFactor * 1.0;
-    var routeColor = vec4f(0.94, 0.89, 0.74, 0.92);
-    if (line.b.x > 1.5) { routeColor = vec4f(0.42, 0.66, 0.95, 0.88); }
-    else if (line.b.x > 0.5) { routeColor = vec4f(0.82, 0.30, 0.24, 0.94); }
-    if (line.b.z > 0.5) { routeColor = vec4f(0.92, 0.62, 0.24, 0.94); }
-    if (line.b.w > 0.5) { widthPixels += 1.4; routeColor.a = min(1.0, routeColor.a + 0.06); }
+    // Order route. b.x: 0 move (cream) / 1 attack (muted rose) / 2 rally (blue);
+    // b.z > 0.5 retreat (dusty amber, overrides); b.w > 0.5 = destination chevron.
+    // Kept wide, low-alpha and desaturated so the route reads as a ghosted
+    // intent laid over the map, not a hard painted line.
+    widthPixels = 2.6 + nearFactor * 1.3;
+    var routeColor = vec4f(0.90, 0.86, 0.74, 0.58);
+    if (line.b.x > 1.5) { routeColor = vec4f(0.52, 0.66, 0.86, 0.56); }
+    else if (line.b.x > 0.5) { routeColor = vec4f(0.70, 0.46, 0.44, 0.50); }
+    if (line.b.z > 0.5) { routeColor = vec4f(0.78, 0.60, 0.44, 0.52); }
+    if (line.b.w > 0.5) { widthPixels += 0.3; }
     color = routeColor;
     innerColor = routeColor;
   }

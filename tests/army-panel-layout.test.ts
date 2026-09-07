@@ -25,7 +25,7 @@ describe('selected army panel containment', () => {
     expect(armyUi).toContain('body.append(summary, center, report)');
     expect(armyUi).toContain("node('table', 'ifg-army-panel__stat-table')");
     expect(css).toMatch(/\.ifg-army-panel__commands--primary\s*\{[^}]*bottom: calc\(100% \+ 9px\)/s);
-    expect(css).toMatch(/\.ifg-army-panel__commands--primary \.ifg-army-panel__command\s*\{[^}]*width: 50px;[^}]*height: 50px;/s);
+    expect(css).toMatch(/\.ifg-army-panel__commands--primary \.ifg-army-panel__command\s*\{[^}]*width: 62px;[^}]*height: 62px;/s);
     expect(css).toMatch(/\.ifg-army-panel__summary\s*\{[^}]*grid-template-rows: 92px minmax\(0, 1fr\)/s);
     expect(armyUi).toContain('report.append(activity)');
   });
