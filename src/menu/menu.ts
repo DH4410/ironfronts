@@ -61,6 +61,14 @@ export function mountMenu(handlers: MenuHandlers): void {
   if (previewOnly) {
     const sub = newCampaign.querySelector('small');
     if (sub) sub.textContent = "Inspect the setup flow. Your campaign stays untouched.";
+    const previewBanner = document.getElementById('ifm-registry-preview');
+    if (previewBanner) {
+      previewBanner.textContent = assignedCountry
+        ? `Preview only. Your campaign as ${assignedCountry.name} is already in progress. `
+          + `Go back and choose Continue to resume it. Picking a country here will not start a new game.`
+        : `Preview only. Picking a country here will not start a new game.`;
+      previewBanner.hidden = false;
+    }
   }
   continueButton.disabled = assignedCountry === null;
   continueButton.classList.toggle('is-disabled', assignedCountry === null);

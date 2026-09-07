@@ -406,11 +406,14 @@
 .ifm__briefing-grid b.is-risk-low { color: #9ec79a; }
 
 /* ---------- operation dossier (full-viewport briefing, no country list) ---------- */
-.ifm__subpage--dossier { padding: 2vh 2vw; overflow: hidden; }
+/* Reserve a clear gap top and bottom so the panel never sits flush against the
+   window edge, and let the whole subpage scroll as a last resort on a very
+   short screen instead of clipping the footer. */
+.ifm__subpage--dossier { padding: 3vh 2vw; overflow: auto; }
 .ifm__file--dossier {
   width: min(1520px, 96vw);
-  height: min(880px, calc(100dvh - max(40px, env(safe-area-inset-top) + env(safe-area-inset-bottom))));
-  max-height: calc(100dvh - max(40px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+  height: min(860px, calc(100dvh - max(120px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 96px)));
+  max-height: calc(100dvh - max(120px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 96px));
   box-sizing: border-box;
   margin: auto;
 }
@@ -455,13 +458,13 @@
 /* ---------- nation-selection overlay (Mobilization Registry) ---------- */
 .ifm__overlay {
   position: fixed; inset: 0; z-index: 20; display: grid; place-items: center;
-  padding: 4vh 4vw; background: rgba(5, 7, 6, .82);
+  padding: 4vh 4vw; background: rgba(5, 7, 6, .82); overflow: auto;
 }
 .ifm__overlay[hidden] { display: none; }
 .ifm__registry {
   display: flex; flex-direction: column; width: min(1180px, 94vw);
-  height: min(820px, calc(100dvh - max(48px, env(safe-area-inset-top) + env(safe-area-inset-bottom))));
-  max-height: calc(100dvh - max(48px, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+  height: min(800px, calc(100dvh - max(120px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 96px)));
+  max-height: calc(100dvh - max(120px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 96px));
   box-sizing: border-box;
   background:
     linear-gradient(var(--hud-panel-strong), var(--hud-panel-strong)),
@@ -482,6 +485,16 @@
   flex: 0 0 auto; margin: 0; padding: .9em 1.8em; border-bottom: 1px solid var(--hud-line);
   font: 400 .86em/1.3 var(--ifm-sans); color: var(--hud-text-dim);
 }
+/* Permanent preview-mode warning: never depends on hover / selection state. */
+.ifm__registry-preview {
+  flex: 0 0 auto; margin: 0; padding: 1em 1.8em;
+  border-bottom: 1px solid var(--hud-line);
+  border-left: 4px solid var(--hud-gold-bright);
+  background: rgba(217, 164, 65, .12);
+  color: var(--hud-gold-bright);
+  font: 700 .9em/1.4 var(--ifm-sans); letter-spacing: .02em;
+}
+.ifm__registry-preview[hidden] { display: none; }
 .ifm__campaign-map-shell {
   flex: 1 1 auto;
   min-height: 0;

@@ -44,7 +44,7 @@ describe('campaign flow — dossier then nation overlay', () => {
   it('keeps the dossier footer and join controls inside the dynamic viewport', () => {
     expect(css).toMatch(/\.ifm__file--dossier\s*\{[^}]*height:\s*min\([^}]*100dvh/s);
     expect(css).toMatch(/\.ifm__file--dossier\s*\{[^}]*max-height:\s*calc\(100dvh/s);
-    expect(css).toMatch(/\.ifm__subpage--dossier\s*\{[^}]*overflow:\s*hidden/);
+    expect(css).toMatch(/\.ifm__subpage--dossier\s*\{[^}]*overflow:\s*(auto|hidden)/);
     expect(css).toMatch(/\.ifm__registry\s*\{[^}]*height:\s*min\([^}]*100dvh/s);
     expect(css).toMatch(/\.ifm__file-actions\s*\{[^}]*flex:\s*0 0 auto/);
     expect(css).toMatch(/\.ifm__registry-actions\s*\{[^}]*flex:\s*0 0 auto/);
