@@ -1926,7 +1926,7 @@ function drainSessionEvents(session: RemoteGameSession): void {
     const from = session.state.countries[cap.fromCountryId]?.name ?? '?';
     pushNotification('combat',
       cap.toCountryId === player ? 'Province captured' : 'Province lost',
-      `${to} took a province from ${from}.`);
+      cap.toCountryId === player ? `Taken from ${from}` : `${to} took it from you`);
   }
 }
 
