@@ -25,4 +25,18 @@ describe('campaign map pointer coordinates', () => {
     expect(campaignMapCoordinates(rect.left + inset + 10, rect.top + 100, rect)).toEqual([10, 100]);
     expect(campaignMapCoordinates(rect.left + 10, rect.top + 100, rect)).toBeNull();
   });
+
+  it('folds a zoom + pan window into the resolved raster pixel', () => {
+    const rect = { left: 0, top: 0, width: CAMPAIGN_MAP_WIDTH, height: CAMPAIGN_MAP_HEIGHT };
+    // Whole-map view is unchanged from the 3-arg form.
+    expect(campaignMapCoordinates(200, 100, rect, { zoom: 1, originX: 0, originY: 0 }))
+      .toEqual([200, 100]);
+    // 2x zoom, panned to (100, 50): the display centre lands half a window in.
+    expect(campaignMapCoordinates(CAMPAIGN_MAP_WIDTH / 2, CAMPAIGN_MAP_HEIGHT / 2, rect,
+      { zoom: 2, originX: 100, originY: 50 }))
+      .toEqual([100 + CAMPAIGN_MAP_WIDTH / 4, 50 + Math.floor(CAMPAIGN_MAP_HEIGHT / 4)]);
+    // Top-left of the display box is exactly the window origin.
+    expect(campaignMapCoordinates(0, 0, rect, { zoom: 3, originX: 300, originY: 120 }))
+      .toEqual([300, 120]);
+  });
 });
