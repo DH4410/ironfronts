@@ -252,11 +252,14 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
       if (hasRelationship) {
         overlayStrength = ${POLITICAL_MAP_TINT_STRENGTH.toFixed(2)};
       }
-      // Neutral foreign land: a light grey wash in strategic mode so ownership
-      // reads at gameplay zoom without drowning the terrain. (War / allied land
-      // is already forced to the full tint above; the player's own is below.)
+      // Neutral foreign land: a firm grey wash in strategic mode so it is
+      // unmistakably "not yours" at gameplay zoom, and desaturated further so
+      // it reads as grey rather than a muted biome. (War / allied land is
+      // already forced to the full tint above; the player's own is below.)
       if (!isPlayer && !hasRelationship && strategicMode) {
-        overlayStrength = max(overlayStrength, 0.20);
+        overlayStrength = max(overlayStrength, 0.44);
+        let grey = dot(coloredSurface, vec3f(0.32, 0.5, 0.18));
+        coloredSurface = mix(coloredSurface, vec3f(grey * 0.92, grey, grey * 0.96), 0.55);
       }
       baseColor = mix(baseColor, coloredSurface, overlayStrength);
       // Political and diplomacy modes are ownership-first at every zoom.
