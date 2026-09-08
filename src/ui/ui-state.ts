@@ -21,7 +21,7 @@ export interface PlayerCountry {
   readonly color: string;
 }
 
-export type ResourceId = 'money' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil';
+export type ResourceId = 'money' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil' | 'warheads';
 
 export interface ResourceLine {
   readonly id: ResourceId;

@@ -93,6 +93,9 @@ function makeCountryState(
     stockpile,
     income: emptyStockpile(),
     industryCapacity: selectable ? 10 : 6,
+    // Selectable powers open with one warhead ready so the strategic strike is
+    // usable from turn one; minors start dry and must build an Ordnance Workshop.
+    warheads: selectable && !sandbox ? 1 : 0,
   };
 }
 

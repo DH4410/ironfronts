@@ -113,6 +113,7 @@ export function projectFor(
       id: own.id, name: own.name, color: own.color, controller: own.controller,
       stockpile: { ...own.stockpile }, income: { ...own.income }, industryCapacity: own.industryCapacity,
       extraction,
+      warheads: Math.floor(own.warheads ?? 0),
     } : null,
     relations: { ...state.relations },
     diplomacy,

@@ -44,6 +44,10 @@ export const commandPayloadSchema = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('declareWar'), targetCountryId: z.number().int().positive() }),
   z.object({ type: z.literal('endAlliance'), targetCountryId: z.number().int().positive() }),
+  z.object({
+    type: z.literal('strike'), provinceId: z.number().int().nonnegative(),
+    x: z.number().finite(), z: z.number().finite(),
+  }),
 ]);
 export type CommandPayload = z.infer<typeof commandPayloadSchema>;
 

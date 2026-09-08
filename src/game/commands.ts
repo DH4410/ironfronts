@@ -8,6 +8,7 @@ import { queueUnit } from './production';
 import { queueBuilding } from './construction';
 import { issueAttack } from './commands/attack';
 import { issueSplit } from './commands/split';
+import { issueStrike } from './strike';
 import {
   declareWar, endAlliance, proposeDiplomacy, respondDiplomacy, sendDiplomaticMessage,
 } from './diplomacy';
@@ -18,7 +19,7 @@ export type {
   GameCommand, GameCommandType, MoveArmyCommand, ProduceCommand, RallyCommand,
   RetreatArmyCommand, SplitArmyCommand, StopArmyCommand, DeclareWarCommand,
   EndAllianceCommand, ProposeDiplomacyCommand, RespondDiplomacyCommand,
-  SendDiplomaticMessageCommand,
+  SendDiplomaticMessageCommand, StrikeCommand,
 } from './commands/types';
 
 function controlsArmy(ctx: SimContext, countryId: number, armyId: string): boolean {
@@ -74,5 +75,7 @@ export function applyCommand(ctx: SimContext, command: GameCommand): CommandResu
       return declareWar(ctx.state, command.countryId, command.targetCountryId);
     case 'endAlliance':
       return endAlliance(ctx.state, command.countryId, command.targetCountryId);
+    case 'strike':
+      return issueStrike(ctx, command);
   }
 }

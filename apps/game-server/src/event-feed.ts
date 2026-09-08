@@ -18,6 +18,9 @@ export interface PendingEventBatch {
     readonly frontId?: string;
     readonly armyId?: string;
     readonly targetArmyId?: string;
+    readonly x?: number;
+    readonly z?: number;
+    readonly provinceId?: number;
   }[];
   readonly publicEvents: readonly FilteredEvent[];
 }

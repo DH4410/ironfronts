@@ -239,7 +239,7 @@ let activeStopQuotes: (() => void) | null = null;
 let loaderHideTimer: number | undefined;
 let selectedArmyId: string | null = null;
 let awaitingMoveTarget = false;
-let targetingMode: 'move' | 'attack' | 'retreat' | 'split' | null = null;
+let targetingMode: 'move' | 'attack' | 'retreat' | 'split' | 'strike' | null = null;
 let pendingSplitGroups: Array<{ typeId: string; count: number }> | null = null;
 // Selected province: id + the renderer-supplied labels, kept so the card can be
 // re-projected from GameState (e.g. after a capture) without a reselect.
@@ -1016,7 +1016,20 @@ async function bootstrapGameSession(
     syncSimSpeedUi();
   }, 400);
   const onKey = (event: KeyboardEvent): void => {
-    if (event.repeat || !selectedArmyId) return;
+    if (event.repeat) return;
+    // Strategic strike is a nation-level order, not an army order, so it has a
+    // keyboard arm (N) — the only keyed order in the game. It needs no
+    // selection; the next map click picks the target province.
+    if (event.code === 'KeyN' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      armStrike(session);
+      return;
+    }
+    if (event.key === 'Escape' && targetingMode === 'strike') {
+      targetingMode = null;
+      pushNotification('information', 'Strike cancelled', 'The strategic strike was called off.');
+      return;
+    }
+    if (!selectedArmyId) return;
     // Army commands are intentionally click-only so camera/navigation keys can
     // never issue an order. Escape remains the universal cancel/deselect key.
     if (event.key === 'Escape') deselectArmy();
@@ -1475,6 +1488,21 @@ function chooseSplitGroups(session: RemoteGameSession, armyId: string): Promise<
 
 // ---- army selection + orders --------------------------
 
+/** Arm strategic-strike targeting: the next map click on an enemy province asks
+ *  for confirmation, then spends a warhead. Nation-level, no army selection. */
+function armStrike(session: RemoteGameSession): void {
+  const ready = session.ownCountry.warheads ?? 0;
+  if (ready < 1) {
+    pushNotification('warning', 'No warhead ready',
+      'Build and hold an Ordnance Workshop to stockpile a strategic warhead.');
+    return;
+  }
+  targetingMode = 'strike';
+  awaitingMoveTarget = false;
+  pushNotification('warning', 'Strategic strike armed',
+    `Click an enemy province to target. ${ready} warhead${ready === 1 ? '' : 's'} ready · Esc to cancel.`);
+}
+
 /** A one-shot red reticle that snaps onto the click point and fades. Pure DOM,
  *  no renderer pipeline — the immediate "acknowledged" cue for an attack order. */
 let attackFlashEl: HTMLDivElement | null = null;
@@ -1496,6 +1524,37 @@ function flashAttackTarget(clientX: number, clientY: number): void {
 function handleMapClick(
   renderer: WorldRenderer, session: RemoteGameSession, clientX: number, clientY: number,
 ): boolean {
+  // 0. Armed strategic strike -> confirm, then spend a warhead on the province.
+  if (targetingMode === 'strike') {
+    const ground = renderer.groundPointAt(clientX, clientY);
+    const provinceId = renderer.provinceIdAt(clientX, clientY);
+    targetingMode = null;
+    if (!ground || provinceId < 0) {
+      pushNotification('warning', 'Strike aborted', 'Aim at land inside an enemy province.');
+      return true;
+    }
+    if (session.ownsProvince(provinceId)) {
+      pushNotification('warning', 'Strike aborted', 'That is your own territory.');
+      return true;
+    }
+    const ownerId = session.state.provinceOwners[provinceId] ?? 0;
+    const ownerName = session.state.countries[ownerId]?.name;
+    void showGameConfirmation('Launch strategic strike?',
+      ownerName
+        ? `Devastate ${ownerName}'s province. This expends one warhead and forces open war.`
+        : 'Devastate this province. This expends one warhead.',
+    ).then((confirmed) => {
+      if (!confirmed) return;
+      const result = session.orderStrike(provinceId, ground[0], ground[1], () => {
+        void audio.playUiCue('confirm');
+        pushNotification('combat', 'Strike authorised', 'The warhead is away.');
+      });
+      if (!result.ok) {
+        pushNotification('warning', 'Strike failed', result.reason ?? 'The strike could not be ordered.');
+      }
+    });
+    return true;
+  }
   // 1. Armed destination order -> issue to the clicked ground point.
   if ((targetingMode === 'move' || targetingMode === 'split')
     && selectedArmyId && session.ownsArmy(selectedArmyId)) {
@@ -1775,7 +1834,9 @@ function refreshSelectedArmy(
       own: view.own,
       canExtract: view.own && !view.moveOrder && session.extractableNodeAt(view.id) !== null,
       awaitingMoveTarget: view.own && awaitingMoveTarget,
-      targetingMode: view.own ? targetingMode : null,
+      // 'strike' is a nation-level order, not an army targeting mode — the army
+      // card never reflects it.
+      targetingMode: view.own && targetingMode !== 'strike' ? targetingMode : null,
       canMove: view.own && view.status !== 'engaged' && view.status !== 'retreating',
       canAttack: view.own && view.status !== 'engaged' && view.status !== 'retreating',
       canRetreat: view.own && view.status === 'engaged' && Boolean(view.legalRetreatExits?.length),
@@ -1912,6 +1973,30 @@ function drainSessionEvents(session: RemoteGameSession): void {
     // moment contact is made, so it fires once per battle, not every tick.
     if (ev.attacker !== player && ev.defender !== player) continue;
     const mine = ev.defender === player;
+    if (ev.kind === 'strike') {
+      const sx = ev.x ?? 0;
+      const sz = ev.z ?? 0;
+      // Always shown — a strategic strike is never LOD-culled. A tight cluster
+      // of blasts plus a tall, slow smoke column reads as one large detonation.
+      combatEffects.spawn(EFFECT_KIND.targetFlash, sx, sz, { scale: 2.6 });
+      for (let i = 0; i < 6; i += 1) {
+        const ang = (i / 6) * Math.PI * 2;
+        const rad = i === 0 ? 0 : 22 + (i % 3) * 16;
+        window.setTimeout(() => {
+          combatEffects.spawn(EFFECT_KIND.explosion, sx + Math.cos(ang) * rad, sz + Math.sin(ang) * rad,
+            { scale: i === 0 ? 2.4 : 1.5 });
+          combatEffects.spawn(EFFECT_KIND.smoke, sx + Math.cos(ang) * rad, sz + Math.sin(ang) * rad,
+            { scale: 2.2, lifetimeMs: 6_000 });
+        }, i * 90);
+      }
+      pushNotification('combat',
+        mine ? 'Strategic strike on our soil' : 'Strategic strike lands',
+        mine ? 'An enemy warhead has devastated one of your provinces.'
+          : 'Your warhead has devastated the target province.',
+        { focus: { x: sx, z: sz } });
+      maybePlayCombatAlert();
+      continue;
+    }
     // World-space visuals for the same event, near-camera only (LOD gated).
     if (fxDensity > 0) {
       const atkSpot = battleSpotFor(ev.attacker, ev.attacker);
@@ -2195,7 +2280,7 @@ function playerResourceLines(session: RemoteGameSession): ResourceLine[] {
     id, label, value: Math.round(value),
     delta: delta === undefined ? undefined : Number(delta.toFixed(1)),
   });
-  return [
+  const lines = [
     line('money', 'Funds', s.funds, inc.funds),
     line('manpower', 'Manpower', s.manpower, inc.manpower),
     line('food', 'Food', s.food, inc.food),
@@ -2204,6 +2289,11 @@ function playerResourceLines(session: RemoteGameSession): ResourceLine[] {
     line('metal', 'Metal', s.metal, ext.metal ?? 0),
     line('oil', 'Oil', s.oil, ext.oil ?? 0),
   ];
+  // Only surfaced once a warhead is ready — a rare mechanic, not permanent
+  // clutter. The chip is the discovery hook for the N-to-strike order.
+  const warheads = Math.floor(country.warheads ?? 0);
+  if (warheads >= 1) lines.push(line('warheads', 'Warheads', warheads));
+  return lines;
 }
 
 function renderDiplomacyState(renderer: WorldRenderer, state: DiplomacyState): void {

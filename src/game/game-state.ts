@@ -39,6 +39,13 @@ export interface CountryState {
   income: Stockpile;
   /** Abstract build-throughput stat, not a stockpile. */
   industryCapacity: number;
+  /**
+   * Ready strategic warheads. Accrues slowly while the country holds an
+   * Ordnance Workshop; one is spent per strategic strike. Optional and
+   * defaulted on load so pre-strike v2 saves keep working (no GAME_VERSION
+   * bump — the save gate checks version/id, not shape).
+   */
+  warheads?: number;
 }
 
 export interface ProvinceBuildings {

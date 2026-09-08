@@ -13,6 +13,8 @@ interface OwnCountry {
   stockpile: Stockpile; income: Stockpile; industryCapacity: number;
   /** Live per-game-hour extraction rate by kind (stone/metal/oil); 0 when idle. */
   extraction?: { stone: number; metal: number; oil: number };
+  /** Ready strategic warheads (whole count). Absent on pre-strike projections. */
+  warheads?: number;
 }
 interface QueueOrder { id: string; unitTypeId: string; buildingId?: BuildingId; progressHours: number; totalHours: number }
 
@@ -23,7 +25,10 @@ export class RemoteGameSession extends EventTarget {
   readonly pendingBuildings: Array<{ provinceId: number; buildingId: BuildingId }> = [];
   readonly pendingCombat: Array<{
     attacker: number; defender: number;
-    kind: 'engaged' | 'reinforced' | 'combatPulse' | 'retreat' | 'destroyed' | 'bombardment' | 'battleEnded';
+    kind: 'engaged' | 'reinforced' | 'combatPulse' | 'retreat' | 'destroyed'
+      | 'bombardment' | 'battleEnded' | 'strike';
+    /** Strategic-strike impact point, world-space. Only on 'strike'. */
+    x?: number; z?: number; provinceId?: number;
   }> = [];
   readonly pendingCaptures: Array<{ provinceId: number; fromCountryId: number; toCountryId: number }> = [];
   private readonly optimistic = new Map<string, OptimisticMutation>();
@@ -59,12 +64,16 @@ export class RemoteGameSession extends EventTarget {
           toCountryId: Number(detail.toCountryId),
         });
       } else if ([
-        'engaged', 'reinforced', 'combatPulse', 'retreat', 'destroyed', 'bombardment', 'battleEnded',
+        'engaged', 'reinforced', 'combatPulse', 'retreat', 'destroyed', 'bombardment',
+        'battleEnded', 'strike',
       ].includes(kind)) {
         this.pendingCombat.push({
           kind: kind as (typeof this.pendingCombat)[number]['kind'],
           attacker: Number(detail.attacker),
           defender: Number(detail.defender),
+          ...(kind === 'strike' ? {
+            x: Number(detail.x), z: Number(detail.z), provinceId: Number(detail.provinceId),
+          } : {}),
         });
       }
     });
@@ -192,6 +201,16 @@ export class RemoteGameSession extends EventTarget {
       const army = state.armies[armyId];
       if (army) { army.status = 'moving'; army.moveIntent = 'attack'; }
     }, onAccepted);
+  }
+  /**
+   * Strategic strike on an enemy province. Country-level order (no army), never
+   * painted optimistically — the server consumes the warhead and declares war.
+   */
+  orderStrike(provinceId: number, x: number, z: number, onAccepted?: () => void) {
+    if ((this.ownCountry.warheads ?? 0) < 1) {
+      return { ok: false, reason: 'No warhead is ready.' } as const;
+    }
+    return this.send({ type: 'strike', provinceId, x, z }, () => undefined, onAccepted);
   }
   orderAttackArmy(armyId: string, targetArmyId: string, onAccepted?: () => void) {
     if (!this.ownsArmy(armyId)) return { ok: false, reason: 'Not your army.' } as const;

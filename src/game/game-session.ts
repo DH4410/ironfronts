@@ -24,6 +24,7 @@ import { stepExtraction } from './extraction';
 import { producibleUnits, stepProduction, type UnitCompletion } from './production';
 import { buildOptions, stepConstruction, type BuildingCompletion } from './construction';
 import { stepCombat, stepCapture, type CaptureEvent, type CombatEvent } from './combat';
+import { stepWarheads } from './strike';
 import { stepAi } from './ai/simple-ai';
 import { applyCommand as runCommand, type CommandResult, type GameCommand } from './commands';
 import { guaranteeStrategicBaseline } from './resource-bootstrap';
@@ -69,6 +70,9 @@ export class GameSession {
   /** Restore a validated plain-data snapshot while rebuilding world-derived graph caches. */
   static restore(state: GameState, world: WorldData): GameSession {
     const restored = cloneGameState(state);
+    // Additive field: pre-strike v2 saves have no `warheads`. Default it here so
+    // the sim never reads `undefined` (GAME_VERSION intentionally unchanged).
+    for (const country of Object.values(restored.countries)) country.warheads ??= 0;
     const scenario = scenarioById(restored.scenarioId);
     const scaffold = initGameState({
       scenarioId: restored.scenarioId,
@@ -114,6 +118,7 @@ export class GameSession {
     stepMovement(this, dtHours);
     stepExtraction(this, dtHours);
     for (const b of stepConstruction(this, dtHours)) this.pendingBuildings.push(b);
+    stepWarheads(this, dtHours);
     for (const done of stepProduction(this, dtHours)) this.pendingCompletions.push(done);
     for (const ev of stepCombat(this, dtHours)) this.pendingCombat.push(ev);
     for (const cap of stepCapture(this)) this.pendingCaptures.push(cap);
@@ -205,7 +210,20 @@ export class GameSession {
   // stamp the player's countryId onto a command for the HUD's convenience.
 
   applyCommand(command: GameCommand): CommandResult {
-    return runCommand(this, command);
+    const result = runCommand(this, command);
+    // A strategic strike lands outside the tick loop, so raise its presentation
+    // event here — the one place that sees both the result and the feed.
+    if (result.strike) {
+      this.pendingCombat.push({
+        kind: 'strike',
+        attacker: result.strike.attacker,
+        defender: result.strike.defender,
+        provinceId: result.strike.provinceId,
+        x: result.strike.x,
+        z: result.strike.z,
+      });
+    }
+    return result;
   }
 
   orderMove(countryId: number, armyId: string, x: number, z: number, intent: 'move' | 'attack' = 'move') {
