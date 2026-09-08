@@ -1160,22 +1160,27 @@ function syncArmyMarkers(
     if (army.own && army.id === selectedArmyId && army.moveRoute && army.moveRoute.length >= 2) {
       const colorFlag = army.moveIntent === 'attack' ? 1 : 0;
       const retreatFlag = army.status === 'retreating' ? 1 : 0;
-      const emitSegment = (ax: number, az: number, bx: number, bz: number, arrow: number): void => {
+      // `fraction` is 0 at the army and 1 at the destination; the route shader
+      // uses it for a head-to-tail brightening and a slow flow pulse.
+      const emitSegment = (
+        ax: number, az: number, bx: number, bz: number, arrow: number, fraction = 1,
+      ): void => {
         if (routeCount >= 4_096) return;
         routeScratch[routeCursor] = ax;
         routeScratch[routeCursor + 1] = az;
         routeScratch[routeCursor + 2] = bx;
         routeScratch[routeCursor + 3] = bz;
         routeScratch[routeCursor + 4] = colorFlag;
-        routeScratch[routeCursor + 5] = 0;
+        routeScratch[routeCursor + 5] = fraction;
         routeScratch[routeCursor + 6] = retreatFlag;
         routeScratch[routeCursor + 7] = arrow;
         routeCursor += 8;
         routeCount += 1;
       };
       const route = army.moveRoute;
+      const legs = Math.max(1, route.length - 1);
       for (let i = 0; i + 1 < route.length; i += 1) {
-        emitSegment(route[i].x, route[i].z, route[i + 1].x, route[i + 1].z, 0);
+        emitSegment(route[i].x, route[i].z, route[i + 1].x, route[i + 1].z, 0, (i + 0.5) / legs);
       }
       // Chevron at the destination, oriented by the final leg tangent, in the
       // route's own colour. Kept small so it never buries the end point.
