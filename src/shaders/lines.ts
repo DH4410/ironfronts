@@ -107,14 +107,18 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
     // Kept wide, low-alpha and desaturated so it reads as a ghosted intent
     // rather than a hard painted line; the fraction drives a head-to-tail
     // brightening and a slow pulse that flows toward the target.
-    widthPixels = 2.6 + nearFactor * 1.3;
-    var routeColor = vec4f(0.90, 0.86, 0.74, 0.58);
-    if (line.b.x > 1.5) { routeColor = vec4f(0.52, 0.66, 0.86, 0.56); }
-    else if (line.b.x > 0.5) { routeColor = vec4f(0.70, 0.46, 0.44, 0.50); }
-    if (line.b.z > 0.5) { routeColor = vec4f(0.78, 0.60, 0.44, 0.52); }
-    if (line.b.w > 0.5) { widthPixels += 0.3; }
-    let flow = 0.5 + 0.5 * sin(line.b.y * 26.0 - uniforms.sunTime.w * 2.6);
-    routeColor.a *= mix(0.6, 1.0, line.b.y) * (0.82 + 0.18 * flow);
+    widthPixels = 2.3 + nearFactor * 1.0;
+    var routeColor = vec4f(0.90, 0.86, 0.74, 0.55);
+    if (line.b.x > 1.5) { routeColor = vec4f(0.52, 0.66, 0.86, 0.54); }
+    else if (line.b.x > 0.5) { routeColor = vec4f(0.70, 0.46, 0.44, 0.48); }
+    if (line.b.z > 0.5) { routeColor = vec4f(0.78, 0.60, 0.44, 0.50); }
+    routeColor.a *= mix(0.62, 1.0, line.b.y);
+    // A faint white stripe crawls toward the destination — barely there.
+    let crawl = fract(line.b.y * 9.0 - uniforms.sunTime.w * 0.6);
+    let stripe = smoothstep(0.86, 1.0, crawl) + smoothstep(0.14, 0.0, crawl);
+    routeColor = mix(routeColor, vec4f(0.96, 0.96, 0.93, routeColor.a), stripe * 0.16);
+    // The destination chevron is a thin sharp mark, not a bar.
+    if (line.b.w > 0.5) { widthPixels *= 0.55; routeColor.a = min(1.0, routeColor.a * 1.5); }
     color = routeColor;
     innerColor = routeColor;
   }
