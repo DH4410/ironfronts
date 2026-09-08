@@ -1,12 +1,13 @@
 # Diplomacy feature handoff
 
-Resumed and completed on 2026-09-07.
+Completed on 2026-09-07, integrated with the RTS icon and production-queue work,
+and reverified on 2026-09-08.
 
 ## Git state
 
-- Working branch: `feat/diplomacy-window`
+- Published branch: `feat/rts-icon-controls`
 - Canonical base/tracking ref: `upstream/main`
-- Base commit at start: `d64ec60`
+- Upstream base at final verification: `d64ec60`
 - Do not merge `origin/main` blindly; it was a divergent fork while this work was developed.
 
 ## Delivered
@@ -23,7 +24,7 @@ Resumed and completed on 2026-09-07.
 
 ## Verification completed
 
-- `npm run check`: 73 files / 410 tests passed, including workspace typechecks, ESLint, and architecture checks.
+- Combined-branch `npm run check`: 75 files / 441 tests passed, including workspace typechecks, ESLint, and architecture checks.
 - Focused diplomacy UI check after final fixes: 7 tests passed.
 - Full production world/client build completed; a follow-up Vite production build confirmed the UI asset at `dist/ui/diplomatic-cable-watermark.png`.
 - Two isolated browser users claimed Finland and Poland. Poland sent a cable and alliance proposal; Finland received both and accepted; both clients changed to `Allied`. The alliance was then ended and war declared; both clients changed to `At war` and exposed `Offer peace`.
