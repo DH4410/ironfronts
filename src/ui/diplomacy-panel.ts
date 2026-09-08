@@ -85,6 +85,7 @@ export function createDiplomacyPanel(actions: DiplomacyPanelActions): DiplomacyP
   panel.append(header, body);
 
   const drafts = new Map<number, string>();
+  let rosterFilter = '';
   let renderedView: DiplomacyView | null = null;
   let wasOpen = false;
 
@@ -125,7 +126,29 @@ export function createDiplomacyPanel(actions: DiplomacyPanelActions): DiplomacyP
     summary.append(stat('allied', tally.allied), stat('war', tally.war), stat('neutral', tally.neutral));
     roster.append(summary);
 
+    // The world roster runs to hundreds of countries; a name filter keeps it
+    // usable. Filtering is DOM-only so a keystroke never re-runs render().
     const list = node('div', 'ifg-dip__country-list');
+    const applyFilter = (): void => {
+      const needle = rosterFilter.trim().toLowerCase();
+      for (const row of list.querySelectorAll<HTMLElement>('.ifg-dip__country')) {
+        const name = row.querySelector('strong')?.textContent?.toLowerCase() ?? '';
+        row.hidden = needle.length > 0 && !name.includes(needle);
+      }
+    };
+    if (view.countries.length > 12) {
+      const filterInput = node('input', 'ifg-dip__filter');
+      filterInput.type = 'search';
+      filterInput.placeholder = 'Filter countries…';
+      filterInput.value = rosterFilter;
+      filterInput.setAttribute('aria-label', 'Filter foreign countries by name');
+      filterInput.addEventListener('input', () => {
+        rosterFilter = filterInput.value;
+        applyFilter();
+      });
+      roster.append(filterInput);
+    }
+
     if (view.countries.length === 0) {
       list.append(node('p', 'ifg-dip__empty', 'No foreign countries are listed.'));
     }
@@ -151,6 +174,7 @@ export function createDiplomacyPanel(actions: DiplomacyPanelActions): DiplomacyP
       list.append(button);
     }
     roster.append(list);
+    applyFilter();
 
     const cable = node('section', 'ifg-dip__cable');
     const country = view.countries.find((entry) => entry.id === view.selectedCountryId) ?? null;

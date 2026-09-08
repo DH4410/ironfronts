@@ -335,6 +335,18 @@
 .ifg-dip__summary-stat[data-relation="war"] { border-top-color: var(--ifg-dip-war); background: rgba(193, 93, 69, 0.1); }
 .ifg-dip__summary-stat b { font-size: 15px; font-weight: 700; color: var(--ifg-text); font-variant-numeric: tabular-nums; }
 .ifg-dip__summary-stat span { font-size: 7.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ifg-dim); }
+.ifg-dip__filter {
+  margin: 7px 8px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ifg-text);
+  background: rgba(9, 11, 8, 0.6);
+  border: 1px solid var(--ifg-rule-soft);
+  border-radius: 2px;
+}
+.ifg-dip__filter:focus-visible { outline: none; border-color: var(--ifg-brass); }
+.ifg-dip__filter::placeholder { color: var(--ifg-dim); }
 .ifg-dip__roster {
   min-height: 0;
   display: flex;
