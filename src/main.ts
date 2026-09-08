@@ -1015,8 +1015,12 @@ async function bootstrapGameSession(
     drainSessionEvents(session);
     syncSimSpeedUi();
   }, 400);
+  const typingInField = (target: EventTarget | null): boolean => {
+    const el = target as HTMLElement | null;
+    return Boolean(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable));
+  };
   const onKey = (event: KeyboardEvent): void => {
-    if (event.repeat) return;
+    if (event.repeat || typingInField(event.target)) return;
     // Strategic strike is a nation-level order, not an army order, so it has a
     // keyboard arm (N) — the only keyed order in the game. It needs no
     // selection; the next map click picks the target province.
@@ -1974,8 +1978,18 @@ function drainSessionEvents(session: RemoteGameSession): void {
     if (ev.attacker !== player && ev.defender !== player) continue;
     const mine = ev.defender === player;
     if (ev.kind === 'strike') {
-      const sx = ev.x ?? 0;
-      const sz = ev.z ?? 0;
+      // Missing coords means the event lost its payload in transit — surface the
+      // news without detonating a blast at the world origin.
+      const sx = ev.x;
+      const sz = ev.z;
+      if (sx === undefined || sz === undefined || !Number.isFinite(sx) || !Number.isFinite(sz)) {
+        pushNotification('combat',
+          mine ? 'Strategic strike on our soil' : 'Strategic strike lands',
+          mine ? 'An enemy warhead has devastated one of your provinces.'
+            : 'Your warhead has devastated the target province.');
+        maybePlayCombatAlert();
+        continue;
+      }
       // Always shown — a strategic strike is never LOD-culled. A tight cluster
       // of blasts plus a tall, slow smoke column reads as one large detonation.
       combatEffects.spawn(EFFECT_KIND.targetFlash, sx, sz, { scale: 2.6 });

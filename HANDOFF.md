@@ -58,3 +58,22 @@ The browser QA stack used isolated ignored data under `artifacts/diplomacy-e2e-r
   / commander progression, each with save-compat + balance notes.
 - Diplomacy panel got a clarity pass (stance-count summary, relation sort,
   bold colour chips, a name filter for the ~200-country roster).
+
+### Strategic strike / "nuke" shipped (`9902a61`)
+
+- Nation-level order: press **N** (arms if a warhead is ready) → click an enemy
+  province → confirm. Spends one warhead, destroys every stack within 95 world
+  units of the aim point (owner-agnostic — friendly fire is intended), knocks a
+  tier off the province's buildings, voids its queues, forces war with the owner.
+- `CountryState.warheads` is optional/additive, defaulted in `GameSession.restore`,
+  seeded to 1 for selectable powers in `scenario-init`, accrued by `stepWarheads`
+  (one per Ordnance Workshop level / ~18 game-days, cap 3). **No `GAME_VERSION`
+  bump** — existing saves load with 0 and must build an Ordnance Workshop.
+- VFX is a placeholder: a cluster of the existing kind-6 explosion + long-lived
+  smoke. **Codex art:** the P2 "mushroom-cloud VFX" + "warhead / rocket build
+  icon" in `docs/ART-NEEDS.md` are the real deliverables — the warhead HUD chip
+  currently borrows `structure-ordnance`.
+- Known gap: a *third* country whose stack sits in the blast loses it with no
+  event routed to them (`eventsForCountry` only notifies attacker/defender), so
+  their replica just drops the army. Cosmetic until someone reads it as a
+  desync — widen the strike event's recipient set if it matters.
