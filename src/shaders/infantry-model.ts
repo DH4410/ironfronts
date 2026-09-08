@@ -59,7 +59,17 @@ fn infantryModelVertex(
   }
   let clip = animationParams.clips[state];
   let phase = fract(sin(dot(model.a.xy, vec2f(0.01371, 0.01993))) * 43758.5453);
-  let frame = u32(floor(uniforms.sunTime.w * f32(clip.z) + phase * f32(clip.y))) % max(1u, clip.y);
+  // model.d.xy is the leg destination, model.d.z its duration, model.d.w its
+  // start time; travel (below) is how far along that leg we are, 0..1.
+  let legTravel = select(0.0, clamp((uniforms.sunTime.w - model.d.w) / max(model.d.z, 0.0001), 0.0, 1.0), model.d.z > 0.0);
+  // Distance-phased gait: the walk cycle advances with ground covered, not with
+  // wall-clock, so the feet plant on the map instead of sliding. One clip loop
+  // per STRIDE world units of travel; clamped so a long leg never blurs and a
+  // short hop still takes a full step. A stationary unit (legTravel 0) holds a
+  // single pose rather than marching in place.
+  let STRIDE = 7.0;
+  let strideCycles = clamp(distance(model.d.xy, model.a.xy) / STRIDE, 1.0, 40.0);
+  let frame = u32(floor((legTravel * strideCycles + phase) * f32(clip.y))) % max(1u, clip.y);
   let palette = (clip.x + frame) * animationParams.jointCount;
   let skin = animationFrames[palette + joints.x] * weights.x
     + animationFrames[palette + joints.y] * weights.y
@@ -85,8 +95,7 @@ fn infantryModelVertex(
     localNormal.y,
     localNormal.x * sine + localNormal.z * cosine,
   ));
-  let travel = select(0.0, clamp((uniforms.sunTime.w - model.d.w) / max(model.d.z, 0.0001), 0.0, 1.0), model.d.z > 0.0);
-  let centerXZ = mix(model.a.xy, model.d.xy, travel) + vec2f(copyOffset, 0.0);
+  let centerXZ = mix(model.a.xy, model.d.xy, legTravel) + vec2f(copyOffset, 0.0);
   let ground = heightAt(centerXZ / uniforms.map.xy);
   let worldPosition = vec3f(centerXZ.x + rotated.x, ground + rotated.y + 0.12, centerXZ.y + rotated.z);
   var output: InfantryOut;
