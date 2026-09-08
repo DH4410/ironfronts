@@ -42,3 +42,19 @@ and reverified on 2026-09-08.
 ## Runtime note
 
 The browser QA stack used isolated ignored data under `artifacts/diplomacy-e2e-runtime-20260907-2024`; it did not touch the normal `data/` save or account database, and the temporary runtime data was removed after verification.
+
+---
+
+## Follow-on (2026-09-08, Claude)
+
+- `feat/callofwar-army-markers` (`dc31b1b`, painted marker plate) is folded
+  into local `main` = the consolidated line. It had one broken WGSL test
+  (`textureSample` in non-uniform control flow after conditional discards);
+  fixed with `textureSampleLevel`. If you resume the marker branch, rebase it
+  onto `main` first — `main` is ahead.
+- **`docs/ART-NEEDS.md`** — prioritised list of icons / portraits / VFX / SFX
+  to generate. Start at P1.
+- **`docs/FEATURE-IDEAS.md`** — design sketches for planes / strategic-strike
+  / commander progression, each with save-compat + balance notes.
+- Diplomacy panel got a clarity pass (stance-count summary, relation sort,
+  bold colour chips, a name filter for the ~200-country roster).
