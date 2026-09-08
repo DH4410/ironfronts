@@ -197,6 +197,21 @@ describe('gameplay vertical slice', () => {
     expect(s2.state.armies['sp-twin']).toBeDefined();
     expect(s2.state.armies[a2.id]).toBeDefined();
   });
+
+  it('a move order revalidation leaves no stack marching in place with an empty path', () => {
+    const s = spainSession();
+    const army = Object.values(s.state.armies).find((a) => a.ownerCountryId === SPAIN)!;
+    // The shape a blocked-border revalidation produces: status still 'moving',
+    // order still present, but its path is now empty (nothing legal ahead).
+    army.order = {
+      path: [], destX: army.x, destZ: army.z, intent: 'move', edgeProgress: 0,
+      target: { kind: 'position', x: army.x + 4000, z: army.z },
+    };
+    army.status = 'moving';
+    s.tick(1);
+    expect(army.order).toBeNull();
+    expect(army.status).toBe('idle');
+  });
 });
 
 function nearestOwned(s: GameSession, x: number, z: number): number {

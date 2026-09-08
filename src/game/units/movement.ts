@@ -359,7 +359,18 @@ export function stepMovement(session: SimContext, dtHours: number): void {
   for (const army of Object.values(session.state.armies)) {
     ensureArmyRuntimeState(army);
     const order = army.order;
-    if (!order || order.path.length === 0 || army.status === 'engaged') continue;
+    if (!order || army.status === 'engaged') continue;
+    // A revalidated order can be left with an empty path when the route now
+    // crosses ground this army may not enter (a neutral border it is not at
+    // war with). Resolve it to a clean stop instead of leaving the stack in
+    // `moving` forever, which had it marching in place at the frontier.
+    if (order.path.length === 0) {
+      army.order = null;
+      army.status = 'idle';
+      army.retreat = null;
+      mergeArrivedStack(session, army);
+      continue;
+    }
     revalidateOrder(session, army, order);
     let budget = stackBaseSpeed(army) * dtHours * STRATEGIC_MOVEMENT_SCALE
       * (army.status === 'retreating' ? 3 : 1);
