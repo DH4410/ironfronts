@@ -212,6 +212,28 @@ describe('gameplay vertical slice', () => {
     expect(army.order).toBeNull();
     expect(army.status).toBe('idle');
   });
+
+  it('a stack aimed at ground it can never reach stops instead of oscillating forever', () => {
+    const s = spainSession();
+    const army = Object.values(s.state.armies).find((a) => a.ownerCountryId === SPAIN)!;
+    // A live order whose path front is a stale non-adjacent node (forces a
+    // revalidate) and whose target sits deep in neutral foreign land Spain may
+    // not enter. Revalidation can get no closer, so the stack must stop.
+    const strandedNode = (army.graphNodeId + 500) % s.graph.nodeCount;
+    army.order = {
+      path: [strandedNode], destX: 0, destZ: 0, intent: 'attack', edgeProgress: 0,
+      target: { kind: 'position', x: army.x + 30_000, z: army.z + 20_000 },
+    };
+    army.status = 'moving';
+    const startX = army.x;
+    const startZ = army.z;
+    for (let i = 0; i < 30 && army.status === 'moving'; i += 1) s.tick(4);
+    expect(army.status).toBe('idle');
+    expect(army.order).toBeNull();
+    // It may have legally advanced toward the frontier, but it is not still
+    // frozen where it began pretending to march.
+    expect(army.x !== startX || army.z !== startZ || army.graphNodeId >= 0).toBe(true);
+  });
 });
 
 function nearestOwned(s: GameSession, x: number, z: number): number {

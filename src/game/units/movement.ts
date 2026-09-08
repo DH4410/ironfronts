@@ -236,7 +236,14 @@ function targetPoint(session: SimContext, army: ArmyStack, order: MoveOrder): [n
     : [order.destX, order.destZ];
 }
 
-function revalidateOrder(session: SimContext, army: ArmyStack, order: MoveOrder): void {
+/**
+ * Re-audit a live order against the current graph and diplomacy. Returns
+ * `false` when the order can no longer make progress toward its target — it is
+ * walled off by territory this army may not enter, or the destination is
+ * simply unreachable — so the caller can stop the stack cleanly instead of
+ * leaving it re-pathing in place every tick (which read as marching forever).
+ */
+function revalidateOrder(session: SimContext, army: ArmyStack, order: MoveOrder): boolean {
   const [targetX, targetZ] = targetPoint(session, army, order);
   const targetArmy = order.target?.kind === 'army' ? session.state.armies[order.target.armyId] : null;
   const targetVisible = targetArmy && order.target?.kind === 'army'
@@ -257,7 +264,7 @@ function revalidateOrder(session: SimContext, army: ArmyStack, order: MoveOrder)
     && (nextMissing || !edgeAllowed(army.graphNodeId, order.path[0]));
   const pursuitChanged = order.target?.kind === 'army'
     && targetNode >= 0 && order.path[order.path.length - 1] !== targetNode;
-  if (!nextInvalid && !pursuitChanged) return;
+  if (!nextInvalid && !pursuitChanged) return true;
 
   let path = targetNode >= 0
     ? findPath(session.graph, army.graphNodeId, targetNode, edgeAllowed)
@@ -271,6 +278,17 @@ function revalidateOrder(session: SimContext, army: ArmyStack, order: MoveOrder)
     destZ: session.graph.nodeZ[path[path.length - 1]] ?? army.z,
   });
   order.edgeProgress = 0;
+
+  if (order.path.length === 0) return false;
+  // The best the repath could reach must actually be nearer the target than we
+  // already are; otherwise the target is boxed off and we would just oscillate.
+  const endNode = path[path.length - 1];
+  const armyToTarget = wrappedDistance(army.x, army.z, targetX, targetZ, session.world.width);
+  const endToTarget = wrappedDistance(
+    session.graph.nodeX[endNode], session.graph.nodeZ[endNode],
+    targetX, targetZ, session.world.width,
+  );
+  return endToTarget < armyToTarget - 1;
 }
 
 export interface RetreatPath {
@@ -364,14 +382,13 @@ export function stepMovement(session: SimContext, dtHours: number): void {
     // crosses ground this army may not enter (a neutral border it is not at
     // war with). Resolve it to a clean stop instead of leaving the stack in
     // `moving` forever, which had it marching in place at the frontier.
-    if (order.path.length === 0) {
+    if (order.path.length === 0 || !revalidateOrder(session, army, order)) {
       army.order = null;
       army.status = 'idle';
       army.retreat = null;
       mergeArrivedStack(session, army);
       continue;
     }
-    revalidateOrder(session, army, order);
     let budget = stackBaseSpeed(army) * dtHours * STRATEGIC_MOVEMENT_SCALE
       * (army.status === 'retreating' ? 3 : 1);
 
