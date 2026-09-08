@@ -100,6 +100,10 @@ export interface ProjectedArmy {
   own: boolean;
   contact: 'contact' | 'visible';
   status: string;
+  /** Current road-graph node. Own armies only (server projection fills it);
+   *  the client needs it to tell whether the stack is actually on a deposit's
+   *  access node before offering Extract. */
+  graphNodeId?: number;
   composition: null | {
     unitCount: number;
     health: number;

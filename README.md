@@ -103,16 +103,21 @@ See [Development and QA](docs/development.md) for environment details, focused c
 
 | Input | Action |
 |---|---|
-| Left drag / one-finger drag | Pan |
-| Right drag | Orbit and tilt |
-| Wheel / pinch | Cursor-centered zoom |
+| Left drag | Orbit and tilt |
+| Middle drag | Pan |
+| One-finger drag | Pan |
+| Right click | Issue the selected army's order (never moves the camera) |
+| Wheel / ctrl+wheel / pinch | Cursor-centered zoom |
+| Two-finger trackpad swipe | Pan (auto-detected) |
 | WASD or arrow keys | Pan relative to camera |
-| M with army selected | Move targeting |
-| S with army selected | Stop |
-| E with army selected | Extract |
-| Escape | Deselect/cancel context |
+| `=` / `-` (or numpad `+` / `-`) | Zoom in / out |
+| N | Arm a strategic strike (if a warhead is ready), then click an enemy province |
+| Escape | Deselect / cancel the current targeting context |
 
-Move, Attack, Retreat, Split, Stop, and Extract are also available from the army action panel. Map modes, production/construction, rally points, resources, battle summaries, and artillery state are exposed through the HUD.
+Move, Attack, Retreat, Split, Stop, and Extract are issued from the army action
+panel and then a map click — there are no per-command keyboard shortcuts. Map
+modes, production/construction, rally points, resources, battle summaries, and
+artillery state are exposed through the HUD.
 
 Append `?debug` to enable the inspector. F3 toggles it and `[`/`]` cycle renderer views while open.
 

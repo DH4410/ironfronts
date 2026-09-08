@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 import { GameSession } from '../../src/game/game-session';
+import { stepWarheads } from '../../src/game/strike';
 import { relationOf } from '../../src/game/game-state';
 import { buildScenarioSelection } from '../../src/game/scenario-catalog';
 import { CATALOG_COUNTRY_BY_NAME } from '../../src/game/data/countries.generated';
@@ -73,14 +74,21 @@ describe('strategic strike', () => {
     expect(s.state.countries[SPAIN].warheads).toBe(1);
   });
 
-  it('accrues warheads while holding an Ordnance Workshop', () => {
+  it('accrues warheads while holding an Ordnance Workshop, and not without one', () => {
     const s = session();
     const own = world.provinces.find((p) => s.state.provinceOwners[p.id] === SPAIN)!;
     s.state.countries[SPAIN].warheads = 0;
-    s.state.provinceBuildings[own.id] = { barracks: 0, tankPlant: 0, ordnance: 1 };
 
-    s.tick(18 * 24 + 10); // just over one warhead's worth of game-hours
+    // No ordnance anywhere Spain holds — no accrual.
+    for (const [pid, b] of Object.entries(s.state.provinceBuildings)) {
+      if (s.state.provinceOwners[Number(pid)] === SPAIN) b.ordnance = 0;
+    }
+    stepWarheads(s, 18 * 24 + 10);
+    expect(s.state.countries[SPAIN].warheads).toBe(0);
 
-    expect(s.state.countries[SPAIN].warheads ?? 0).toBeGreaterThanOrEqual(1);
+    // With one, just over a warhead's worth of game-hours yields one.
+    s.state.provinceBuildings[own.id] = { barracks: 1, tankPlant: 0, ordnance: 1 };
+    stepWarheads(s, 18 * 24 + 10);
+    expect(Math.floor(s.state.countries[SPAIN].warheads ?? 0)).toBe(1);
   });
 });

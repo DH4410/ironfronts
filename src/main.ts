@@ -473,6 +473,21 @@ async function startGame(token: number): Promise<void> {
   const attemptListener = { signal: attemptEvents.signal } as const;
   launchDisposers.push(() => attemptEvents.abort());
 
+  // The connection reconnects on its own (1s, then every 2.5s) but did so
+  // silently — an unstable link just looked like a frozen game. Surface it, and
+  // confirm when the stream recovers.
+  let connectionDropped = false;
+  connection.addEventListener('connection-error', () => {
+    if (connectionDropped) return;
+    connectionDropped = true;
+    pushNotification('warning', 'Connection lost', 'Reconnecting to the command server…');
+  }, attemptListener);
+  connection.addEventListener('state', () => {
+    if (!connectionDropped) return;
+    connectionDropped = false;
+    pushNotification('information', 'Reconnected', 'Live command stream restored.');
+  }, attemptListener);
+
   const disposeRendererOnPagehide = (event: PageTransitionEvent): void => {
     if (!event.persisted) renderer.dispose();
   };

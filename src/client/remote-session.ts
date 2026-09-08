@@ -303,10 +303,29 @@ export class RemoteGameSession extends EventTarget {
     return Object.entries(cost).every(([key, amount]) =>
       typeof amount !== 'number' || (this.ownCountry.stockpile[key as keyof Stockpile] ?? 0) >= amount);
   }
-  extractableNodeAt(_armyId: string): number | null {
+  /**
+   * The deposit this army could start extracting right now, or null. Mirrors the
+   * server's `issueExtract` rule so the HUD never offers Extract where the order
+   * will be refused: the stack must be idle, on a controlled non-empty deposit's
+   * access node, and carry an extraction-capable unit.
+   */
+  extractableNodeAt(armyId: string): number | null {
+    const army = this.state.armies[armyId];
+    if (!army || !army.own || army.graphNodeId === undefined) return null;
+    if (army.moveOrder || army.status === 'moving' || army.status === 'engaged'
+      || army.status === 'retreating') return null;
+    const canExtract = (army.composition?.groups ?? []).some((group) => {
+      const rate = Number(
+        (this.unit(group.typeId) as { extractionRate?: number } | undefined)?.extractionRate ?? 0,
+      );
+      return rate > 0;
+    });
+    if (!canExtract) return null;
     const node = Object.values(this.state.resourceNodes).find((value) => {
-      const candidate = value as { remaining?: number; extractorArmyId?: string | null; controllerCountryId?: number };
-      return (candidate.remaining ?? 0) > 0 && candidate.controllerCountryId === this.playerCountryId;
+      const n = value as { accessNodeId?: number; remaining?: number; controllerCountryId?: number };
+      return n.accessNodeId === army.graphNodeId
+        && (n.remaining ?? 0) > 0
+        && n.controllerCountryId === this.playerCountryId;
     }) as { id?: number } | undefined;
     return node?.id ?? null;
   }

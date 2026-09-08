@@ -117,6 +117,29 @@ describe('applyCommand ownership gate', () => {
     expect(c.state.rallyPoints[10]).toBeUndefined();
   });
 
+  it('setRally rejects a target with no land route from the province', () => {
+    const c: SimContext = {
+      ...ctx(),
+      // Second, disconnected graph component far from province 10's node.
+      graph: buildLandGraph(new Float32Array([
+        100, 100, 300, 100, 1, 0, 0, 0,
+        300, 100, 500, 100, 1, 0, 0, 0,
+        5_000, 4_000, 5_200, 4_000, 1, 0, 0, 0,
+      ]), 10_000, 5_000),
+    };
+
+    const res = applyCommand(c, {
+      type: 'setRally', countryId: 1, provinceId: 10, target: { x: 5_100, z: 4_000 },
+    });
+    expect(res.ok).toBe(false);
+    expect(c.state.rallyPoints[10]).toBeUndefined();
+
+    // A reachable target on the same component still works.
+    expect(applyCommand(c, {
+      type: 'setRally', countryId: 1, provinceId: 10, target: { x: 500, z: 100 },
+    }).ok).toBe(true);
+  });
+
   it('a produced unit marches to the rally point', () => {
     const c = ctx();
     applyCommand(c, {

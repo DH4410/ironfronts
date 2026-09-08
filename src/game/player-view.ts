@@ -51,6 +51,9 @@ export interface PlayerArmyView {
   readonly contact: Exclude<ContactLevel, 'hidden'>;
   /** Real status for own/visible armies; 'unknown' at contact range. */
   readonly status: ArmyStatus | 'unknown';
+  /** Current road-graph node — own armies only. Lets the client tell whether the
+   *  stack is on a deposit's access node before offering Extract. */
+  readonly graphNodeId?: number;
   /** Composition, only when own or fully visible; null at contact range. */
   readonly composition: {
     readonly unitCount: number;
@@ -173,6 +176,7 @@ export function projectArmyView(
     z: army.z,
     own,
     contact: level,
+    graphNodeId: own ? army.graphNodeId : undefined,
     status: fullyVisible ? army.status : 'unknown',
     composition: fullyVisible ? composition(army) : null,
     moveOrder: own && army.order ? { x: army.order.destX, z: army.order.destZ } : null,

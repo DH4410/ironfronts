@@ -359,7 +359,11 @@ export class StrategyCamera {
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+    // Never let WASD/arrow pan fire while the player is typing (diplomacy
+    // message body, roster filter, any future text field).
+    const target = event.target as HTMLElement | null;
+    if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement
+      || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
     this.keys.add(event.code);
   };
 
