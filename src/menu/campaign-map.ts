@@ -114,28 +114,53 @@ export function mountCampaignMap(
     return { left: rect.left + (rect.width - width) / 2, top: rect.top + (rect.height - height) / 2, width, height };
   };
 
+  // Colour for one raster pixel: ocean, an anti-aliasable boundary (any of the
+  // four neighbours belongs to a different country), or the fill for its state.
+  const colorAt = (rx: number, ry: number): readonly number[] => {
+    const index = ry * CAMPAIGN_MAP_WIDTH + rx;
+    const id = ids![index];
+    if (id === 0) return COLORS.ocean;
+    const boundary = (rx > 0 && ids![index - 1] !== id)
+      || (rx < CAMPAIGN_MAP_WIDTH - 1 && ids![index + 1] !== id)
+      || (ry > 0 && ids![index - CAMPAIGN_MAP_WIDTH] !== id)
+      || (ry < CAMPAIGN_MAP_HEIGHT - 1 && ids![index + CAMPAIGN_MAP_WIDTH] !== id);
+    if (boundary) return COLORS.border;
+    return id === selectedCountryId
+      ? COLORS.selected
+      : playableIds.has(id) ? COLORS.available : COLORS.unavailable;
+  };
+
   const draw = (): void => {
     if (!ids) return;
     const image = context.createImageData(CAMPAIGN_MAP_WIDTH, CAMPAIGN_MAP_HEIGHT);
     const [winW, winH] = windowSize();
+    // Nearest-neighbour sampling stair-steps borders once zoomed in. Above 1x,
+    // average an NxN grid of sub-samples per pixel so coastlines and country
+    // edges anti-alias instead of turning blocky.
+    const grid = view.zoom > 1.05 ? 3 : 1;
+    const inv = 1 / grid;
+    const n = grid * grid;
     for (let cy = 0; cy < CAMPAIGN_MAP_HEIGHT; cy += 1) {
-      const ry = Math.min(CAMPAIGN_MAP_HEIGHT - 1, Math.floor(view.originY + (cy / CAMPAIGN_MAP_HEIGHT) * winH));
       for (let cx = 0; cx < CAMPAIGN_MAP_WIDTH; cx += 1) {
-        const rx = Math.min(CAMPAIGN_MAP_WIDTH - 1, Math.floor(view.originX + (cx / CAMPAIGN_MAP_WIDTH) * winW));
-        const index = ry * CAMPAIGN_MAP_WIDTH + rx;
-        const id = ids[index];
-        const boundary = id > 0 && (
-          (rx > 0 && ids[index - 1] !== id)
-          || (ry > 0 && ids[index - CAMPAIGN_MAP_WIDTH] !== id)
-        );
-        const color = id === 0
-          ? COLORS.ocean
-          : boundary
-            ? COLORS.border
-            : id === selectedCountryId
-              ? COLORS.selected
-              : playableIds.has(id) ? COLORS.available : COLORS.unavailable;
-        image.data.set(color, (cy * CAMPAIGN_MAP_WIDTH + cx) * 4);
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let a = 0;
+        for (let sy = 0; sy < grid; sy += 1) {
+          const fy = (cy + (sy + 0.5) * inv) / CAMPAIGN_MAP_HEIGHT;
+          const ry = Math.min(CAMPAIGN_MAP_HEIGHT - 1, Math.floor(view.originY + fy * winH));
+          for (let sx = 0; sx < grid; sx += 1) {
+            const fx = (cx + (sx + 0.5) * inv) / CAMPAIGN_MAP_WIDTH;
+            const rx = Math.min(CAMPAIGN_MAP_WIDTH - 1, Math.floor(view.originX + fx * winW));
+            const c = colorAt(rx, ry);
+            r += c[0]; g += c[1]; b += c[2]; a += c[3];
+          }
+        }
+        const o = (cy * CAMPAIGN_MAP_WIDTH + cx) * 4;
+        image.data[o] = r / n;
+        image.data[o + 1] = g / n;
+        image.data[o + 2] = b / n;
+        image.data[o + 3] = a / n;
       }
     }
     context.putImageData(image, 0, 0);
