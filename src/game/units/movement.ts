@@ -2,7 +2,7 @@
 
 import type { SimContext } from '../sim-context';
 import type { ArmyStack, MoveOrder } from './army';
-import { ensureArmyRuntimeState, stackBaseSpeed } from './army';
+import { ensureArmyRuntimeState, mergeStacks, stackBaseSpeed } from './army';
 import {
   closestReachablePath, findPath, pathLength, type EdgeAllowed,
 } from '../movement/pathfind';
@@ -329,7 +329,31 @@ export function issueRetreatOrder(session: SimContext, army: ArmyStack, route: R
   };
 }
 
-/** Advance every ordered stack. Friendly armies deliberately never auto-merge. */
+/**
+ * Fold a just-arrived stack into a friendly stack already resting on the same
+ * graph node. Both stacks must be genuinely at rest — no order, status `idle`,
+ * and not referenced by any battle front — so a merge can never absorb a stack
+ * that combat still tracks. The pre-existing stack keeps its id (selection and
+ * any rally wiring stay put); the arriving one is removed and replication drops
+ * it from the client on the next delta.
+ */
+function mergeArrivedStack(session: SimContext, arrived: ArmyStack): void {
+  if (arrived.order || arrived.status !== 'idle' || arrived.battleFrontIds?.length) return;
+  for (const other of Object.values(session.state.armies)) {
+    if (other === arrived) continue;
+    if (other.ownerCountryId !== arrived.ownerCountryId) continue;
+    if (other.graphNodeId !== arrived.graphNodeId) continue;
+    if (other.order || other.status !== 'idle' || other.battleFrontIds?.length) continue;
+    mergeStacks(other, arrived);
+    delete session.state.armies[arrived.id];
+    return;
+  }
+}
+
+/**
+ * Advance every ordered stack. On arrival a friendly stack now merges into an
+ * idle friendly stack already on the destination node (see `mergeArrivedStack`).
+ */
 export function stepMovement(session: SimContext, dtHours: number): void {
   const { graph, world } = session;
   for (const army of Object.values(session.state.armies)) {
@@ -379,6 +403,7 @@ export function stepMovement(session: SimContext, dtHours: number): void {
       army.order = null;
       army.status = 'idle';
       army.retreat = null;
+      mergeArrivedStack(session, army);
     }
   }
 }

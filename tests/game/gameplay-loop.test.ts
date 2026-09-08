@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 import { GameSession } from '../../src/game/game-session';
 import { stepCombat } from '../../src/game/combat';
+import { stackUnitCount } from '../../src/game/units/army';
 import { buildScenarioSelection } from '../../src/game/scenario-catalog';
 import { CATALOG_COUNTRY_BY_NAME } from '../../src/game/data/countries.generated';
 import { loadWorld, type LoadedWorld } from './load-world';
@@ -156,6 +157,45 @@ describe('gameplay vertical slice', () => {
     s.tick(2);
     expect(s.state.provinceOwners[enemyProvince.id]).toBe(SPAIN);
     expect(s.isAtWar(SPAIN, enemyId!)).toBe(true);
+  });
+
+  it('a friendly stack folds into an idle stack already on the destination node', () => {
+    const s = spainSession();
+    const mover = Object.values(s.state.armies).find((a) => a.ownerCountryId === SPAIN)!;
+    // A direct land-graph neighbour of the mover's node hosts the resident stack,
+    // so a single-hop order lands the mover exactly on it.
+    const restNode = s.graph.adjacency[mover.graphNodeId][0];
+    expect(restNode).toBeGreaterThanOrEqual(0);
+    s.state.armies['sp-rest'] = {
+      id: 'sp-rest', ownerCountryId: SPAIN, name: 'Garrison',
+      x: s.graph.nodeX[restNode], z: s.graph.nodeZ[restNode], graphNodeId: restNode,
+      units: [{ typeId: 'infantry', count: 3, hp: 300, experience: 0 }],
+      status: 'idle', order: null, extractingNodeId: null,
+    };
+    const moverUnits = stackUnitCount(mover);
+    const res = s.orderMove(SPAIN, mover.id, s.graph.nodeX[restNode], s.graph.nodeZ[restNode], 'move');
+    expect(res.ok).toBe(true);
+
+    for (let i = 0; i < 120 && s.state.armies[mover.id]; i += 1) s.tick(6);
+
+    expect(s.state.armies[mover.id]).toBeUndefined(); // the mover was folded away
+    const survivor = s.state.armies['sp-rest'];
+    expect(survivor).toBeDefined();
+    expect(stackUnitCount(survivor)).toBe(3 + moverUnits); // it absorbed the mover's units
+
+    // Sanity: two idle friendly stacks that never move do NOT merge on their own
+    // (the merge is an arrival event, not a proximity sweep).
+    const s2 = spainSession();
+    const a2 = Object.values(s2.state.armies).find((a) => a.ownerCountryId === SPAIN)!;
+    s2.state.armies['sp-twin'] = {
+      id: 'sp-twin', ownerCountryId: SPAIN, name: 'Twin',
+      x: a2.x, z: a2.z, graphNodeId: a2.graphNodeId,
+      units: [{ typeId: 'infantry', count: 1, hp: 100, experience: 0 }],
+      status: 'idle', order: null, extractingNodeId: null,
+    };
+    s2.tick(6);
+    expect(s2.state.armies['sp-twin']).toBeDefined();
+    expect(s2.state.armies[a2.id]).toBeDefined();
   });
 });
 
