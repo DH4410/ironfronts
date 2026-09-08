@@ -108,11 +108,28 @@ export function createDiplomacyPanel(actions: DiplomacyPanelActions): DiplomacyP
     const rosterHeading = node('p', 'ifg-dip__section-label', 'Country ledger');
     roster.append(rosterHeading);
 
+    // Standing at a glance, then the roster with the relationships that matter
+    // (allies, then wars) floated to the top — the 0 A.D. stance board read.
+    const RELATION_ORDER: Record<DiplomacyRelation, number> = { allied: 0, war: 1, neutral: 2 };
+    const sorted = [...view.countries].sort((a, b) =>
+      RELATION_ORDER[a.relation] - RELATION_ORDER[b.relation] || a.name.localeCompare(b.name));
+    const tally = { allied: 0, war: 0, neutral: 0 };
+    for (const entry of view.countries) tally[entry.relation] += 1;
+    const summary = node('div', 'ifg-dip__summary');
+    const stat = (relation: DiplomacyRelation, count: number): HTMLElement => {
+      const chip = node('span', 'ifg-dip__summary-stat');
+      chip.dataset.relation = relation;
+      chip.append(node('b', undefined, String(count)), node('span', undefined, diplomacyRelationLabel(relation)));
+      return chip;
+    };
+    summary.append(stat('allied', tally.allied), stat('war', tally.war), stat('neutral', tally.neutral));
+    roster.append(summary);
+
     const list = node('div', 'ifg-dip__country-list');
     if (view.countries.length === 0) {
       list.append(node('p', 'ifg-dip__empty', 'No foreign countries are listed.'));
     }
-    for (const country of view.countries) {
+    for (const country of sorted) {
       const button = node('button', 'ifg-dip__country');
       button.type = 'button';
       button.dataset.relation = country.relation;

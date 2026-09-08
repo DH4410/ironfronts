@@ -311,8 +311,30 @@
   height: calc(100% - 60px);
   min-height: 0;
   display: grid;
-  grid-template-columns: 198px minmax(0, 1fr);
+  grid-template-columns: 224px minmax(0, 1fr);
 }
+/* Stance board — the count of each relationship, colour-coded, above the list. */
+.ifg-dip__summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 8px 8px 7px;
+  border-bottom: 1px solid var(--ifg-rule-soft);
+}
+.ifg-dip__summary-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 5px 2px 4px;
+  border: 1px solid var(--ifg-rule-soft);
+  border-top: 2px solid var(--ifg-dip-neutral);
+  background: rgba(120, 129, 115, 0.08);
+}
+.ifg-dip__summary-stat[data-relation="allied"] { border-top-color: var(--ifg-dip-allied); background: rgba(94, 139, 171, 0.1); }
+.ifg-dip__summary-stat[data-relation="war"] { border-top-color: var(--ifg-dip-war); background: rgba(193, 93, 69, 0.1); }
+.ifg-dip__summary-stat b { font-size: 15px; font-weight: 700; color: var(--ifg-text); font-variant-numeric: tabular-nums; }
+.ifg-dip__summary-stat span { font-size: 7.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ifg-dim); }
 .ifg-dip__roster {
   min-height: 0;
   display: flex;
@@ -334,7 +356,7 @@
   width: 100%;
   min-height: 49px;
   display: grid !important;
-  grid-template-columns: 3px minmax(0, 1fr) auto;
+  grid-template-columns: 4px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   padding: 6px 8px 6px 0;
@@ -353,9 +375,24 @@
 .ifg-dip__country-identity { min-width: 0; display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 7px; }
 .ifg-dip__country-identity strong { overflow: hidden; color: #ded8c8; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .ifg-dip__country-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
-.ifg-dip__relation { color: var(--ifg-dim); font-size: 8.5px; white-space: nowrap; }
-.ifg-dip__country[data-relation="allied"] .ifg-dip__relation { color: #8eb6d3; }
-.ifg-dip__country[data-relation="war"] .ifg-dip__relation { color: #e28a73; }
+.ifg-dip__relation {
+  padding: 2px 6px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #cfd3c8;
+  background: rgba(120, 129, 115, 0.22);
+  border: 1px solid var(--ifg-dip-neutral);
+  border-radius: 2px;
+}
+.ifg-dip__country[data-relation="allied"] .ifg-dip__relation {
+  color: #bcd8ea; background: rgba(94, 139, 171, 0.24); border-color: var(--ifg-dip-allied);
+}
+.ifg-dip__country[data-relation="war"] .ifg-dip__relation {
+  color: #f0b6a6; background: rgba(193, 93, 69, 0.26); border-color: var(--ifg-dip-war);
+}
 .ifg-dip__attention {
   min-width: 17px;
   height: 17px;
