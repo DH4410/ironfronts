@@ -143,8 +143,11 @@ describe('WGSL programs', () => {
 
   it('derives political tint and country borders from mutable province ownership', () => {
     expect(terrainShader).toContain('let politicalColor = politicalColorAt(input.mapUv)');
-    expect(terrainShader).toContain('diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode');
+    expect(terrainShader).toContain('diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode || strategicMode');
     expect(terrainShader).toContain('diplomacyColor.rgb * 1.30');
+    // Strategic default mode also greys foreign land so ownership reads at play zoom.
+    expect(terrainShader).toContain('let strategicMode = uniforms.interaction.z > 0.5 && uniforms.interaction.z < 1.5');
+    expect(terrainShader).toContain('if (!isPlayer && !hasRelationship && strategicMode)');
     expect(terrainShader).toContain('overlayStrength = max(overlayStrength, 0.30)');
     expect(terrainShader).toContain('let isPlayer = diplomacyColor.a > 0.25 && diplomacyColor.a < 0.75');
     expect(terrainShader).toContain('select(0.45, 0.85, uniforms.interaction.z > 1.5)');

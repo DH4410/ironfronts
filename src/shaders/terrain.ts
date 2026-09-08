@@ -190,10 +190,14 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     let owner = u32(round(politicalColor.a * 255.0));
     if (owner > 0u) {
       let diplomacyMode = uniforms.interaction.z > 2.5;
+      // Balanced / "strategic" default mode (z ~1). Foreign land reads through
+      // the diplomacy palette here too so you can tell your ground (gold) from
+      // neutral (grey) and hostile (red) without switching to a dedicated mode.
+      let strategicMode = uniforms.interaction.z > 0.5 && uniforms.interaction.z < 1.5;
       let diplomacyColor = diplomacyColorFor(owner);
       let isPlayer = diplomacyColor.a > 0.25 && diplomacyColor.a < 0.75;
       let hasRelationship = diplomacyColor.a > 0.75;
-      var overlayColor = select(politicalColor.rgb, diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode);
+      var overlayColor = select(politicalColor.rgb, diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode || strategicMode);
       if (hasRelationship) {
         overlayColor = min(diplomacyColor.rgb * 1.30, vec3f(1.0));
       }
@@ -247,6 +251,12 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
       }
       if (hasRelationship) {
         overlayStrength = ${POLITICAL_MAP_TINT_STRENGTH.toFixed(2)};
+      }
+      // Neutral foreign land: a light grey wash in strategic mode so ownership
+      // reads at gameplay zoom without drowning the terrain. (War / allied land
+      // is already forced to the full tint above; the player's own is below.)
+      if (!isPlayer && !hasRelationship && strategicMode) {
+        overlayStrength = max(overlayStrength, 0.20);
       }
       baseColor = mix(baseColor, coloredSurface, overlayStrength);
       // Political and diplomacy modes are ownership-first at every zoom.
