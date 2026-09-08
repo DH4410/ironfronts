@@ -951,7 +951,7 @@
 }
 .ifg-buildbtn__thumb.ifg-icon { display: grid; place-items: center; }
 .ifg-buildbtn__thumb.ifg-icon img,
-.ifg-buildbtn__thumb.ifg-icon svg { width: 44px; height: 44px; }
+.ifg-buildbtn__thumb.ifg-icon svg { width: 48px; height: 48px; }
 .ifg-buildbtn__thumb svg { display: block; width: 100%; height: 100%; }
 .ifg-card__prodlist--buildings { gap: 8px; }
 .ifg-card__prodlist--buildings .ifg-buildbtn { width: 84px; min-height: 84px; }

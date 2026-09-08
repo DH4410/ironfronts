@@ -6,7 +6,7 @@ const root = process.cwd();
 const assetDirectory = path.join(root, 'src/ui/assets/icons/ironfronts');
 const iconRegistry = readFileSync(path.join(root, 'src/ui/icons.ts'), 'utf8');
 
-const generatedIcons = [
+const paintedIcons = [
   'unit-engineer-icon.png',
   'unit-armored-car-icon.png',
   'unit-light-tank-icon.png',
@@ -22,8 +22,8 @@ const generatedIcons = [
   'command-extract.png',
 ] as const;
 
-describe('generated 0 A.D.-inspired icon assets', () => {
-  it.each(generatedIcons)('%s is a compact 256px RGBA PNG', (name) => {
+describe('painted WW2 icon assets', () => {
+  it.each(paintedIcons)('%s is a compact 256px RGBA PNG', (name) => {
     const bytes = readFileSync(path.join(assetDirectory, name));
     expect(bytes.subarray(0, 8)).toEqual(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
     expect(bytes.readUInt32BE(16)).toBe(256);
@@ -32,7 +32,7 @@ describe('generated 0 A.D.-inspired icon assets', () => {
     expect(bytes.byteLength).toBeLessThan(140_000);
   });
 
-  it.each(generatedIcons)('%s is wired through the HUD icon registry', (name) => {
+  it.each(paintedIcons)('%s is wired through the HUD icon registry', (name) => {
     expect(iconRegistry).toContain(`ironfrontsPng('${name.slice(0, -4)}')`);
   });
 });

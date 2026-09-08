@@ -6,8 +6,8 @@
  *    docs/ASSET_CREDITS.md) rendered as <img>;
  *  - flat monochrome line icons authored for Ironfronts, inlined as SVG so
  *    they inherit `currentColor` for hover / active states;
- *  - generated 0 A.D.-inspired painted pictograms for unit, building, and
- *    command buttons, rendered as transparent PNGs.
+ *  - grounded WW2 portrait art for unit, building, and command buttons,
+ *    rendered as transparent PNGs.
  *
  * No Unicode / emoji glyphs anywhere in the player HUD.
  */
@@ -83,7 +83,7 @@ const ICONS: Record<IconName, IconDef> = {
   'node-metal': { kind: 'img', value: png('metal') },
   'node-oil': { kind: 'svg', value: svg('oil') },
   'resource-water': { kind: 'img', value: ironfrontsPng('water') },
-  // The six live orders share one WW2, 0 A.D.-inspired painted family.
+  // The six live orders share one restrained, hand-painted WW2 family.
   'cmd-move': { kind: 'img', value: ironfrontsPng('command-move') },
   'cmd-attack': { kind: 'img', value: ironfrontsPng('command-attack') },
   'cmd-retreat': { kind: 'img', value: ironfrontsPng('command-retreat') },

@@ -158,23 +158,29 @@ as the Ironfronts repository). Used where no suitable 0 A.D. artwork exists:
 (map modes), `pickaxe.svg` (resource overlay toggle), `provinces.svg`,
 `event.svg`, `close.svg`, `focus.svg`.
 
-### Generated WW2 RTS button icons
+### Painted WW2 RTS button icons
 
-**Source:** Original Ironfronts assets generated with OpenAI's built-in image
-generator on 2026-09-08. They are not copied from 0 A.D. or another third
-party and carry the same licence as the Ironfronts repository.
+**Source:** Original Ironfronts assets prepared on 2026-09-08. The four unit
+buttons are 256 px derivatives of the established Ironfronts unit portraits
+listed below. The building and command illustrations were generated with
+OpenAI's built-in image generator. They are not copied from 0 A.D., Call of
+War, or another third party and carry the same licence as this repository.
 
-**Prompt direction:** compact 64-72 px classic RTS icons on true transparent
-alpha; hand-painted, dimensional, 0 A.D.-inspired interface art with rich
-earth colors, warm highlights, worn steel/leather/brick, exaggerated readable
-proportions, and a deep dark-brown outer contour. Each prompt requested one
-clear WW2 subject and prohibited text, flags, frames, backgrounds, and modern
-flat-vector or pale monochrome treatment. The final selected set was generated
-without reference-image inputs.
+**Prompt direction:** realistic historical-strategy illustration on true
+transparent alpha; hand-painted gouache and opaque watercolor, believable
+WW2 construction and proportions, strong silhouettes, muted olive/khaki/
+gunmetal/brick colors, visible brushwork, and softly broken edges. Command
+prompts requested sober military objects and field-map marks. Building prompts
+requested ground-level wartime architecture rather than toy-like isometric
+facilities. Every prompt prohibited text, frames, badges, glossy gold, thick
+cartoon outlines, and mobile-game rendering. The direction was informed by
+the official [0 A.D. icon showcase](https://play0ad.com/team-blog-icon-showcase/)
+and the role clarity of the official [Call of War unit roster](https://wiki.callofwar.com/wiki/UNITS/),
+without using either game's artwork as generator input.
 
-**Modification:** the 1199-1312 px generator outputs were high-quality bicubic
-downscaled without changing aspect ratio, centered on 256x256 transparent RGBA
-canvases for runtime use.
+**Modification:** the 320 px portrait derivatives and 1254-1536 px generator
+outputs were high-quality bicubic downscaled without changing aspect ratio,
+centered on 256x256 transparent RGBA canvases for runtime use.
 
 | Runtime file | Slot |
 |---|---|
