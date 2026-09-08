@@ -13,7 +13,8 @@ import { commonWgsl } from './common';
  *   packedRGB: country colour, r*65536 + g*256 + b (0..255 each)
  *   state: 1 = visible (full), 2 = contact (enemy seen, composition unknown)
  *          hidden stacks are simply not emitted (fog is resolved CPU-side)
- * ArmyMarker.b = (unitCount, health01, selected, dominantKind)
+ * ArmyMarker.b = (unitCount, health01, flags, dominantKind)
+ *   flags: bit 0 selected, bit 1 engaged / under fire
  * ArmyMarker.c = counts for up to four close-range composition rows
  * ArmyMarker.d = visual kinds for those rows (0 infantry, 1 light armor,
  *                2 medium armor, 3 artillery; 4 means unused)
@@ -29,6 +30,8 @@ struct ArmyMarker { a: vec4f, b: vec4f, c: vec4f, d: vec4f, e: vec4f };
 struct ArmyParams { count: u32, mode: u32, pad0: u32, pad1: u32 };
 @group(1) @binding(0) var<storage, read> armyMarkers: array<ArmyMarker>;
 @group(1) @binding(1) var<uniform> armyParams: ArmyParams;
+@group(0) @binding(14) var armyMarkerPlate: texture_2d<f32>;
+@group(0) @binding(15) var armyMarkerPlateSampler: sampler;
 
 struct ArmyOut {
   @builtin(position) position: vec4f,
@@ -40,6 +43,7 @@ struct ArmyOut {
   @location(5) @interpolate(flat) selected: f32,
   @location(6) alpha: f32,
   @location(7) @interpolate(flat) kind: f32,
+  @location(8) @interpolate(flat) engaged: f32,
 };
 
 fn unpackRgb(packed: f32) -> vec3f {
@@ -92,8 +96,8 @@ fn armyMarkerVertex(
   let closeFade = select(smoothstep(1400.0, 1800.0, zoom), 1.0, contact);
   let rangeFade = closeFade * (1.0 - smoothstep(4400.0, 5000.0, zoom));
   let zoomScale = mix(0.8, 1.25, smoothstep(4600.0, 900.0, zoom));
-  // Plaque is a touch wider than tall.
-  let half = vec2f(26.0, 15.0) * zoomScale;
+  // Large enough to read as a two-compartment military counter at map zoom.
+  let half = vec2f(34.0, 20.0) * zoomScale;
 
   var output: ArmyOut;
   output.uv = corner;
@@ -101,7 +105,9 @@ fn armyMarkerVertex(
   output.state = marker.a.w;
   output.count = marker.b.x;
   output.health = clamp(marker.b.y, 0.0, 1.0);
-  output.selected = marker.b.z;
+  let markerFlags = u32(marker.b.z + 0.5);
+  output.selected = f32(markerFlags & 1u);
+  output.engaged = f32((markerFlags >> 1u) & 1u);
   output.kind = marker.b.w;
   output.alpha = rangeFade * (1.0 - horizontalWorldFog(worldPos.x));
   if (clip.w <= 0.0001) {
@@ -186,7 +192,7 @@ fn unitKindIcon(kind: i32, q: vec2f) -> f32 {
 }
 
 fn dominantIcon(kind: i32, p: vec2f) -> f32 {
-  return unitKindIcon(kind, (p - vec2f(-0.46, 0.06)) / vec2f(0.38, 0.62));
+  return unitKindIcon(kind, (p - vec2f(-0.52, 0.12)) / vec2f(0.28, 0.47));
 }
 
 struct CompositionOut {
@@ -232,7 +238,7 @@ fn armyCompositionVertex(
   output.counts = marker.c;
   output.kinds = marker.d;
   output.health = clamp(marker.b.y, 0.0, 1.0);
-  output.selected = marker.b.z;
+  output.selected = f32(u32(marker.b.z + 0.5) & 1u);
   let identified = marker.a.w < 1.5;
   output.alpha = select(0.0, 1.0 - smoothstep(1400.0, 1800.0, uniforms.interaction.y), identified)
     * (1.0 - horizontalWorldFog(worldPos.x));
@@ -320,54 +326,70 @@ fn armyMarkerFragment(input: ArmyOut) -> @location(0) vec4f {
   }
 
   let contact = input.state > 1.5;
-  let bodyCol = select(input.rgb, vec3f(0.44, 0.44, 0.42), contact);
-  let ink = vec3f(0.06, 0.07, 0.05);
+  let bodyCol = select(input.rgb, vec3f(0.42), contact);
+  let plateUv = vec2f(uv.x * 0.5 + 0.5, 0.5 - uv.y * 0.5);
+  let plate = textureSample(armyMarkerPlate, armyMarkerPlateSampler, plateUv);
+  let plateSd = roundedBox(uv, vec2f(0.96, 0.90), 0.18);
+  let plateShape = 1.0 - smoothstep(-0.025, 0.025, plateSd);
+  let plateCoverage = plate.a * plateShape;
+  if (plateCoverage < 0.02 && input.selected < 0.5) { discard; }
 
-  // Plaque body.
-  let sd = roundedBox(uv, vec2f(0.9, 0.86), 0.26);
-  let inside = 1.0 - smoothstep(-0.03, 0.03, sd);
-  let outline = (1.0 - smoothstep(-0.03, 0.03, sd - 0.20)) - inside;
-  if (inside + outline < 0.02 && input.selected < 0.5) { discard; }
-
-  // Body: country colour with a strong dark vignette toward the centre so a
-  // pale nation colour still gives the digit contrast.
-  let centreDist = length(uv * vec2f(1.0, 1.15));
-  let core = mix(bodyCol * 0.34, bodyCol, smoothstep(0.15, 0.95, centreDist));
-  var rgb = mix(core, bodyCol, inside);
-  rgb = mix(rgb, ink, clamp(outline * 1.3, 0.0, 1.0));
-  rgb *= mix(1.1, 0.82, uv.y * 0.5 + 0.5); // top-lit relief
-
-  // Digits / contact mark, centred, upper-middle.
-  var glyphC = 0.0;
+  // The painted texture provides the physical counter. Country colour is an
+  // inset signal rather than the entire background, so pale flags cannot wash
+  // out the live white silhouette and count.
+  var rgb = plate.rgb * 0.86;
+  let iconBay = step(uv.x, -0.12) * step(-0.57, uv.y) * step(uv.y, 0.65) * plateCoverage;
+  rgb = mix(rgb, mix(rgb, bodyCol * 0.82, 0.52), iconBay * 0.72);
+  let ownerEdge = step(uv.x, -0.86) * step(abs(uv.y), 0.68) * plateCoverage;
+  rgb = mix(rgb, bodyCol * 1.22, ownerEdge * 0.88);
   if (contact) {
-    glyphC = glyphCoverage(10, uv - vec2f(0.0, 0.05), 0.34, 0.58, 0.0);
+    let gray = dot(rgb, vec3f(0.299, 0.587, 0.114));
+    rgb = mix(rgb, vec3f(gray), 0.78);
+  }
+
+  // The number owns the right bay. Three-digit stacks remain readable instead
+  // of silently clamping to 99.
+  var glyphC = 0.0;
+  let glyphUv = uv - vec2f(0.0, 0.12);
+  if (contact) {
+    glyphC = glyphCoverage(10, glyphUv, 0.22, 0.49, 0.36);
   } else {
-    let n = i32(clamp(input.count + 0.5, 1.0, 99.0));
+    let n = i32(clamp(input.count + 0.5, 1.0, 999.0));
     if (n < 10) {
-      glyphC = glyphCoverage(n, uv - vec2f(0.0, 0.05), 0.34, 0.60, 0.34);
+      glyphC = glyphCoverage(n, glyphUv, 0.22, 0.49, 0.36);
+    } else if (n < 100) {
+      glyphC = glyphCoverage(n / 10, glyphUv, 0.17, 0.47, 0.13)
+        + glyphCoverage(n % 10, glyphUv, 0.17, 0.47, 0.58);
     } else {
-      let tens = n / 10;
-      let ones = n % 10;
-      glyphC += glyphCoverage(tens, uv - vec2f(0.0, 0.05), 0.28, 0.56, 0.10);
-      glyphC += glyphCoverage(ones, uv - vec2f(0.0, 0.05), 0.28, 0.56, 0.56);
+      glyphC = glyphCoverage(n / 100, glyphUv, 0.13, 0.44, 0.02)
+        + glyphCoverage((n / 10) % 10, glyphUv, 0.13, 0.44, 0.36)
+        + glyphCoverage(n % 10, glyphUv, 0.13, 0.44, 0.70);
     }
   }
   let iconC = select(dominantIcon(i32(input.kind + 0.5), uv), 0.0, contact);
-  rgb = mix(rgb, vec3f(0.94, 0.92, 0.82), clamp(iconC, 0.0, 1.0) * inside);
-  rgb = mix(rgb, vec3f(0.99, 0.98, 0.93), clamp(glyphC, 0.0, 1.0) * inside);
+  let liveInk = vec3f(0.98, 0.97, 0.89);
+  rgb = mix(rgb, vec3f(0.025), clamp(iconC + glyphC, 0.0, 1.0) * plateCoverage * 0.58);
+  rgb = mix(rgb, liveInk, clamp(iconC + glyphC, 0.0, 1.0) * plateCoverage);
 
-  // Condition bar along the bottom inner edge.
-  let barY = -0.66;
-  let inBarBand = step(abs(uv.y - barY), 0.09) * step(abs(uv.x), 0.74) * inside;
-  let filled = step(uv.x, -0.74 + 1.48 * input.health);
-  let barCol = mix(vec3f(0.86, 0.24, 0.16), vec3f(0.42, 0.78, 0.34), input.health);
-  rgb = mix(rgb, vec3f(0.05, 0.05, 0.05), inBarBand * (1.0 - filled) * 0.8);
-  rgb = mix(rgb, barCol, inBarBand * filled);
+  // A thick, threshold-coloured condition strip fills the plate's recessed
+  // channel. Unknown contacts keep a neutral channel instead of implying 0 HP.
+  let barY = -0.69;
+  let inBarBand = step(abs(uv.y - barY), 0.095) * step(abs(uv.x), 0.72) * plateCoverage;
+  let filled = step(uv.x, -0.72 + 1.44 * input.health);
+  var barCol = mix(vec3f(0.73, 0.19, 0.14), vec3f(0.76, 0.49, 0.16), step(0.34, input.health));
+  barCol = mix(barCol, vec3f(0.37, 0.68, 0.28), step(0.67, input.health));
+  rgb = mix(rgb, vec3f(0.025), inBarBand * 0.90);
+  rgb = mix(rgb, barCol, inBarBand * filled * select(1.0, 0.0, contact));
+  rgb = mix(rgb, vec3f(0.34), inBarBand * select(0.0, 0.72, contact));
 
-  // Selection ring just outside the plaque.
-  var coverage = clamp(inside + outline, 0.0, 1.0);
+  // Engaged stacks carry a static red command tab: unmistakable without
+  // adding another animated effect to an already active battle.
+  let engagedTab = step(0.67, uv.x) * step(0.52, uv.y) * plateCoverage * input.engaged;
+  rgb = mix(rgb, vec3f(0.76, 0.18, 0.12), engagedTab * 0.92);
+
+  var coverage = plateCoverage;
   if (input.selected > 0.5) {
-    let ring = (1.0 - smoothstep(0.0, 0.05, abs(sd + 0.06)));
+    let ring = 1.0 - smoothstep(0.0, 0.045, abs(plateSd + 0.045));
     rgb = mix(rgb, vec3f(1.0, 0.92, 0.55), ring);
     coverage = max(coverage, ring);
   }

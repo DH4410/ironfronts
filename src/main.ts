@@ -1212,7 +1212,9 @@ function syncArmyMarkers(
     // Contact markers render as '?'; don't ship the real strength/health.
     armyMarkerScratch[cursor + 4] = identified ? army.composition?.unitCount ?? 0 : 0;
     armyMarkerScratch[cursor + 5] = identified ? army.composition?.health ?? 0 : 0;
-    armyMarkerScratch[cursor + 6] = army.id === selectedArmyId ? 1 : 0;
+    // Marker flags: bit 0 selected, bit 1 engaged / under fire.
+    armyMarkerScratch[cursor + 6] = (army.id === selectedArmyId ? 1 : 0)
+      | (army.status === 'engaged' ? 2 : 0);
     armyMarkerScratch[cursor + 7] = identified ? dominantVisualKind(formation) : 4;
     for (let row = 0; row < 4; row += 1) {
       armyMarkerScratch[cursor + 8 + row] = compositionRows[row]?.count ?? 0;

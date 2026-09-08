@@ -44,6 +44,7 @@ import { loadWorldAssetBuffers, worldAssetUrl } from './world-assets';
 import { getVisibleInstanceView, updateVisibleInstanceView } from './visible-instance-cache';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
+const ARMY_MARKER_PLATE_URL = new URL('./ui/assets/army-marker-plate.png', import.meta.url).href;
 
 /** Player-start camera: north-up, near top-down (~83°; a true 90° breaks picking). */
 const PLAYER_START_YAW = 0;
@@ -139,6 +140,7 @@ export class WorldRenderer {
   private treeMaterialTexture!: GPUTexture;
   private provincePoliticalColorTexture!: GPUTexture;
   private diplomacyColorTexture!: GPUTexture;
+  private armyMarkerPlateTexture!: GPUTexture;
   private politicalCache!: PoliticalCache;
   private countryColors!: Float32Array;
   private visibleTerrainBuffer!: GPUBuffer;
@@ -521,9 +523,10 @@ export class WorldRenderer {
     );
 
     report('Preparing terrain and tree materials', 0.49);
-    [this.materialTexture, this.treeMaterialTexture] = await Promise.all([
+    [this.materialTexture, this.treeMaterialTexture, this.armyMarkerPlateTexture] = await Promise.all([
       createMaterialTexture(this.device),
       createTreeMaterialTexture(this.device),
+      this.loadArmyMarkerPlateTexture(),
     ]);
     this.uniformBuffer = this.device.createBuffer({
       label: 'frame uniforms',
@@ -553,6 +556,10 @@ export class WorldRenderer {
         { binding: 11, resource: this.diplomacyColorTexture.createView() },
         { binding: 12, resource: { buffer: this.visibleTerrainBuffer } },
         { binding: 13, resource: this.terrainAlbedoTexture.createView() },
+        { binding: 14, resource: this.armyMarkerPlateTexture.createView() },
+        { binding: 15, resource: this.device.createSampler({
+          magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear',
+        }) },
       ],
     });
 
@@ -1031,6 +1038,40 @@ export class WorldRenderer {
     this.combatEffects = this.createInstanceLayer(
       'combat effects', zeroEffects.buffer as ArrayBuffer, 0, 0, this.lineLayout,
     );
+  }
+
+  private async loadArmyMarkerPlateTexture(): Promise<GPUTexture> {
+    try {
+      const response = await fetch(ARMY_MARKER_PLATE_URL);
+      if (!response.ok) throw new Error(`Marker plate request failed: ${response.status}`);
+      const bitmap = await createImageBitmap(await response.blob());
+      const texture = this.device.createTexture({
+        label: 'painted army marker plate',
+        size: [bitmap.width, bitmap.height],
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      this.device.queue.copyExternalImageToTexture(
+        { source: bitmap }, { texture }, [bitmap.width, bitmap.height],
+      );
+      bitmap.close();
+      return texture;
+    } catch (error) {
+      // Keep the strategic layer usable if the optional painted surface cannot
+      // load. The shader still supplies its border, unit glyph, count and bar.
+      console.warn('Could not load the painted army marker plate; using a flat fallback.', error);
+      const texture = this.device.createTexture({
+        label: 'flat army marker fallback',
+        size: [1, 1],
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      this.device.queue.writeTexture(
+        { texture }, new Uint8Array([48, 58, 48, 255]),
+        { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1],
+      );
+      return texture;
+    }
   }
 
   /**
