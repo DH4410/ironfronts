@@ -97,7 +97,9 @@ fn armyMarkerVertex(
   let rangeFade = closeFade * (1.0 - smoothstep(4400.0, 5000.0, zoom));
   let zoomScale = mix(0.8, 1.25, smoothstep(4600.0, 900.0, zoom));
   // Large enough to read as a two-compartment military counter at map zoom.
-  let half = vec2f(34.0, 20.0) * zoomScale;
+  // viewport.z (render-scale) keeps the on-screen size constant across
+  // graphics presets so it never balloons at low quality.
+  let half = vec2f(34.0, 20.0) * zoomScale * uniforms.viewport.z;
 
   var output: ArmyOut;
   output.uv = corner;
@@ -229,8 +231,8 @@ fn armyCompositionVertex(
   let worldPos = vec3f(worldXZ.x, heightAt(markerXZ / uniforms.map.xy) + 17.0, worldXZ.y);
   let clip = uniforms.viewProjection * vec4f(worldPos, 1.0);
   let rows = compositionRowCount(marker.c);
-  let half = vec2f(29.0, 6.0 + rows * 7.5);
-  let pixelCenter = vec2f(38.0, 2.0);
+  let half = vec2f(29.0, 6.0 + rows * 7.5) * uniforms.viewport.z;
+  let pixelCenter = vec2f(38.0, 2.0) * uniforms.viewport.z;
 
   var output: CompositionOut;
   output.uv = corner;

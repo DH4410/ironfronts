@@ -87,7 +87,7 @@ fn combatEffectVertex(
 
   let zoom = uniforms.interaction.y;
   let zoomScale = mix(0.7, 1.35, smoothstep(4600.0, 700.0, zoom));
-  let half = effectPixelSize(kind) * max(0.15, effect.b.y) * sizeAge * zoomScale;
+  let half = effectPixelSize(kind) * max(0.15, effect.b.y) * sizeAge * zoomScale * uniforms.viewport.z;
 
   // Fade: transients fade over their life; the battle marker holds (its pulse
   // is size + fragment glow). Everything fades out past strategic zoom.
