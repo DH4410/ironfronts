@@ -172,7 +172,10 @@ WW2 construction and proportions, strong silhouettes, muted olive/khaki/
 gunmetal/brick colors, visible brushwork, and softly broken edges. Command
 prompts requested sober military objects and field-map marks. Building prompts
 requested ground-level wartime architecture rather than toy-like isometric
-facilities. Every prompt prohibited text, frames, badges, glossy gold, thick
+facilities. Their selected silhouettes use infantry and rifle racks for the
+barracks, an emerging tank for the tank plant, and a field gun plus shells for
+the ordnance works so each remains identifiable at 64 px. Every prompt
+prohibited text, frames, badges, glossy gold, thick
 cartoon outlines, and mobile-game rendering. The direction was informed by
 the official [0 A.D. icon showcase](https://play0ad.com/team-blog-icon-showcase/)
 and the role clarity of the official [Call of War unit roster](https://wiki.callofwar.com/wiki/UNITS/),

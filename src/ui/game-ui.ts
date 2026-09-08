@@ -16,6 +16,7 @@ import { renderSelectedArmyPanel, type ArmyPanelCommand } from './army';
 import { createFlag } from './flags';
 import { createIcon, type IconName } from './icons';
 import { buildNotification } from './notifications';
+import { groupQueueItems, type QueueGroup } from './queue-presentation';
 import { bindTooltip } from './tooltip';
 import { createUnitPortrait, UNIT_ROLE_NOTE } from './unit-portraits';
 import type {
@@ -114,36 +115,122 @@ function formatEta(seconds: number): string {
 }
 
 /**
- * A 0 A.D.-style production/construction queue: the active order gets a
- * thumbnail, a fill bar, and a countdown; anything queued behind it is a
- * smaller inert thumbnail. Rebuilt whenever the caller's cache key changes
- * (see the pvResourceKey gate) rather than diffed in place — a queue is at
- * most a handful of items.
+ * Persistent visual state for one 0 A.D.-style queue slot. 0 A.D.'s
+ * selection panel keeps its queue button and resizes a progress overlay;
+ * keeping these nodes stable gives the browser transition real endpoints.
  */
-function renderQueue(
+interface QueueSlot {
+  readonly root: HTMLDivElement;
+  readonly mask: HTMLSpanElement;
+  readonly count: HTMLSpanElement;
+  readonly meta: HTMLDivElement;
+  readonly percent: HTMLSpanElement;
+  readonly eta: HTMLSpanElement;
+  readonly bar: HTMLDivElement;
+  readonly fill: HTMLElement;
+  item: QueueGroup;
+}
+
+interface QueueView {
+  readonly slots: Map<string, QueueSlot>;
+  orderKey: string;
+}
+
+const queueViews = new WeakMap<HTMLElement, QueueView>();
+
+function createQueueSlot(
+  item: QueueGroup, thumbFor: (id: string, label: string) => HTMLElement,
+): QueueSlot {
+  const root = el('div', 'ifg-queue__item');
+  root.setAttribute('role', 'listitem');
+
+  const portrait = el('div', 'ifg-queue__portrait');
+  const mask = el('span', 'ifg-queue__progress-mask');
+  mask.setAttribute('aria-hidden', 'true');
+  const count = el('span', 'ifg-queue__count');
+  count.setAttribute('aria-hidden', 'true');
+  portrait.append(thumbFor(item.id, item.label), mask, count);
+
+  const percent = el('span', 'ifg-queue__percent');
+  const eta = el('span', 'ifg-queue__eta');
+  const status = el('div', 'ifg-queue__status');
+  status.append(percent, eta);
+  const bar = el('div', 'ifg-queue__bar');
+  bar.setAttribute('role', 'progressbar');
+  bar.setAttribute('aria-valuemin', '0');
+  bar.setAttribute('aria-valuemax', '100');
+  const fill = el('i');
+  bar.append(fill);
+  const meta = el('div', 'ifg-queue__meta');
+  meta.append(status, bar);
+  root.append(portrait, meta);
+
+  const slot: QueueSlot = { root, mask, count, meta, percent, eta, bar, fill, item };
+  bindTooltip(root, () => {
+    const current = slot.item;
+    const queued = current.count > 1 ? ` · ${current.count - 1} queued` : '';
+    return {
+      title: current.label,
+      status: current.active
+        ? `${Math.round(current.progress * 100)}% · ${formatEta(current.etaSeconds)} left${queued}`
+        : current.count > 1 ? `${current.count} queued` : 'Queued',
+    };
+  });
+  return slot;
+}
+
+/**
+ * Update persistent queue slots in place. Progress ticks never replace the
+ * artwork or fill nodes, so the clipped overlay and bar can move smoothly.
+ */
+function updateQueue(
   container: HTMLElement, items: readonly import('./ui-state').QueueItem[],
   thumbFor: (id: string, label: string) => HTMLElement,
 ): void {
-  container.replaceChildren(...items.map((item) => {
-    const row = el('div', 'ifg-queue__item');
-    row.classList.toggle('is-active', item.active);
-    row.append(thumbFor(item.id, item.label));
-    if (item.active) {
-      const bar = el('div', 'ifg-queue__bar');
-      const fill = el('i');
-      fill.style.width = `${Math.round(item.progress * 100)}%`;
-      bar.append(fill);
-      const eta = el('span', 'ifg-queue__eta', formatEta(item.etaSeconds));
-      const meta = el('div', 'ifg-queue__meta');
-      meta.append(bar, eta);
-      row.append(meta);
+  const grouped = groupQueueItems(items);
+  let view = queueViews.get(container);
+  if (!view) {
+    view = { slots: new Map(), orderKey: '' };
+    queueViews.set(container, view);
+  }
+
+  const liveKeys = new Set(grouped.map((item) => item.key));
+  for (const key of view.slots.keys()) {
+    if (!liveKeys.has(key)) view.slots.delete(key);
+  }
+
+  const roots = grouped.map((item) => {
+    let slot = view.slots.get(item.key);
+    if (!slot) {
+      slot = createQueueSlot(item, thumbFor);
+      view.slots.set(item.key, slot);
     }
-    bindTooltip(row, () => ({
-      title: item.label,
-      status: item.active ? `${Math.round(item.progress * 100)}% — ${formatEta(item.etaSeconds)} left` : 'Queued',
-    }));
-    return row;
-  }));
+    slot.item = item;
+
+    const progress = Math.max(0, Math.min(100, Math.round(item.progress * 100)));
+    slot.root.classList.toggle('is-active', item.active);
+    slot.root.classList.toggle('is-queued', !item.active);
+    slot.root.dataset.count = String(item.count);
+    slot.meta.hidden = !item.active;
+    slot.count.hidden = item.count < 2;
+    slot.count.textContent = `×${item.count}`;
+    slot.mask.style.transform = `translateY(${item.active ? progress : 0}%)`;
+    slot.fill.style.width = `${progress}%`;
+    slot.percent.textContent = `${progress}%`;
+    slot.eta.textContent = `${formatEta(item.etaSeconds)} left`;
+    slot.bar.setAttribute('aria-valuenow', String(progress));
+    slot.bar.setAttribute('aria-label', `${item.label} progress`);
+    slot.root.setAttribute('aria-label', item.active
+      ? `${item.label}, ${progress} percent, ${formatEta(item.etaSeconds)} remaining${item.count > 1 ? `, ${item.count - 1} more queued` : ''}`
+      : `${item.label}, ${item.count > 1 ? `${item.count} orders queued` : 'queued'}`);
+    return slot.root;
+  });
+
+  const nextOrderKey = grouped.map((item) => item.key).join('|');
+  if (view.orderKey !== nextOrderKey) {
+    container.replaceChildren(...roots);
+    view.orderKey = nextOrderKey;
+  }
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -354,7 +441,9 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   pvProduce.append(el('small', 'ifg-card__restitle', 'Produce'));
   const pvProduceList = el('div', 'ifg-card__prodlist');
   pvProduce.append(pvProduceList);
-  const pvQueue = el('div', 'ifg-queue');
+  const pvQueue = el('div', 'ifg-queue ifg-queue--production');
+  pvQueue.setAttribute('role', 'list');
+  pvQueue.setAttribute('aria-label', 'Unit production queue');
   pvQueue.hidden = true;
   pvProduce.append(pvQueue);
   const pvRally = el('div', 'ifg-card__actions');
@@ -373,7 +462,9 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   pvBuild.append(el('small', 'ifg-card__restitle', 'Build'));
   const pvBuildList = el('div', 'ifg-card__prodlist ifg-card__prodlist--buildings');
   pvBuild.append(pvBuildList);
-  const pvConstruction = el('div', 'ifg-queue');
+  const pvConstruction = el('div', 'ifg-queue ifg-queue--construction');
+  pvConstruction.setAttribute('role', 'list');
+  pvConstruction.setAttribute('aria-label', 'Building construction queue');
   pvConstruction.hidden = true;
   pvBuild.append(pvConstruction);
 
@@ -638,6 +729,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
 
         // PRODUCE panel.
         const prod = province.producible ?? [];
+        const q = province.queue ?? [];
         pvProduce.hidden = !(province.isOwn && prod.length > 0);
         if (province.isOwn && prod.length > 0) {
           pvProduceList.replaceChildren(...prod.map((u) => {
@@ -660,16 +752,6 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
             b.addEventListener('click', () => actions.produceUnit(province.id, u.id));
             return b;
           }));
-          const q = province.queue ?? [];
-          pvQueue.hidden = q.length === 0;
-          if (q.length) {
-            renderQueue(pvQueue, q, (id, label) => {
-              const thumb = createUnitPortrait(id, label);
-              thumb.classList.add('ifg-queue__thumb');
-              return thumb;
-            });
-          }
-
           // Rally point: where finished units march. Placed by a map click.
           pvRally.hidden = false;
           pvRallyBtn.textContent = province.awaitingRallyTarget
@@ -682,6 +764,12 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         } else {
           pvRally.hidden = true;
         }
+        pvQueue.hidden = q.length === 0;
+        updateQueue(pvQueue, q, (id, label) => {
+          const thumb = createUnitPortrait(id, label);
+          thumb.classList.add('ifg-queue__thumb');
+          return thumb;
+        });
 
         // BUILD panel — offered buildings and anything under construction.
         const buildable = province.buildable ?? [];
@@ -708,16 +796,14 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
             }
             return btn;
           }));
-          pvConstruction.hidden = construction.length === 0;
-          if (construction.length) {
-            renderQueue(pvConstruction, construction, (id, label) => {
-              const icon = FACILITY_ICON[id];
-              const thumb = icon ? createIcon(icon, 'ifg-queue__thumb ifg-icon') : el('span', 'ifg-queue__thumb');
-              if (!icon) thumb.textContent = label.slice(0, 1);
-              return thumb;
-            });
-          }
         }
+        pvConstruction.hidden = construction.length === 0;
+        updateQueue(pvConstruction, construction, (id, label) => {
+          const icon = FACILITY_ICON[id];
+          const thumb = icon ? createIcon(icon, 'ifg-queue__thumb ifg-icon') : el('span', 'ifg-queue__thumb');
+          if (!icon) thumb.textContent = label.slice(0, 1);
+          return thumb;
+        });
 
         if (dep && hasDeposits) {
           pvResStatus.hidden = false;

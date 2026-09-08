@@ -7,18 +7,29 @@ const gameUi = readFileSync(path.join(root, 'src/ui/game-ui.ts'), 'utf8');
 const mainTs = readFileSync(path.join(root, 'src/main.ts'), 'utf8');
 
 describe('0 A.D.-style production/construction queue', () => {
-  it('renders the active order as a thumbnail + fill bar + countdown, not plain text', () => {
-    expect(gameUi).toContain("fill.style.width = `${Math.round(item.progress * 100)}%`");
+  it('updates persistent progress nodes instead of rebuilding them on every tick', () => {
+    expect(gameUi).toContain('const queueViews = new WeakMap<HTMLElement, QueueView>();');
+    expect(gameUi).toContain('if (view.orderKey !== nextOrderKey)');
+    expect(gameUi).toContain('slot.mask.style.transform = `translateY(${item.active ? progress : 0}%)`');
+    expect(gameUi).toContain('slot.fill.style.width = `${progress}%`');
     expect(gameUi).toContain('formatEta(item.etaSeconds)');
+    expect(gameUi).not.toContain('container.replaceChildren(...items.map');
     expect(gameUi).not.toMatch(/Queue:\s*\$\{/);
     expect(gameUi).not.toMatch(/Under construction:\s*\$\{/);
+  });
+
+  it('uses separate construction and production treatments with batch counts', () => {
+    expect(gameUi).toContain("groupQueueItems(items)");
+    expect(gameUi).toContain("slot.count.textContent = `×${item.count}`");
+    expect(gameUi).toContain("el('div', 'ifg-queue ifg-queue--production')");
+    expect(gameUi).toContain("el('div', 'ifg-queue ifg-queue--construction')");
   });
 
   it('uses dedicated production pictograms and facility icons without permanent button labels', () => {
     expect(gameUi).toContain('const productionIcon = UNIT_PRODUCTION_ICON[u.id];');
     expect(gameUi).toContain("createIcon(productionIcon, 'ifg-buildbtn__thumb')");
     expect(gameUi).not.toContain("el('span', 'ifg-buildbtn__label'");
-    expect(gameUi).toContain('renderQueue(pvQueue, q, (id, label) => {');
+    expect(gameUi).toContain('updateQueue(pvQueue, q, (id, label) => {');
     expect(gameUi).toContain('const thumb = createUnitPortrait(id, label);');
     expect(gameUi).toContain('const icon = FACILITY_ICON[id];');
   });
