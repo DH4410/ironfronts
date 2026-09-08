@@ -330,7 +330,10 @@ fn armyMarkerFragment(input: ArmyOut) -> @location(0) vec4f {
   let contact = input.state > 1.5;
   let bodyCol = select(input.rgb, vec3f(0.42), contact);
   let plateUv = vec2f(uv.x * 0.5 + 0.5, 0.5 - uv.y * 0.5);
-  let plate = textureSample(armyMarkerPlate, armyMarkerPlateSampler, plateUv);
+  // textureSampleLevel (not textureSample): this fragment has already taken
+  // conditional discards/returns above, so implicit-derivative sampling is not
+  // in uniform control flow. The plate is a fixed-size HUD sprite — LOD 0 is fine.
+  let plate = textureSampleLevel(armyMarkerPlate, armyMarkerPlateSampler, plateUv, 0.0);
   let plateSd = roundedBox(uv, vec2f(0.96, 0.90), 0.18);
   let plateShape = 1.0 - smoothstep(-0.025, 0.025, plateSd);
   let plateCoverage = plate.a * plateShape;
