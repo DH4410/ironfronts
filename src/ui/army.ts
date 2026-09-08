@@ -165,11 +165,11 @@ export function renderSelectedArmyPanel(
   summary.append(health, stats);
 
   const commands = node('div', 'ifg-army-panel__commands ifg-army-panel__commands--primary');
-  // Icon-first: the glyph carries the meaning, a short caption sits under it, and
-  // the full label + explanation live on aria-label + the shared rich tooltip.
+  // Text-free order tiles: the pictogram carries the meaning while the full
+  // label and explanation remain available to assistive tech and on hover/focus.
   interface CommandTip { description?: string; disabledReason?: string; }
   const command = (
-    label: string, caption: string, icon: IconName, key: ArmyPanelCommand,
+    label: string, icon: IconName, key: ArmyPanelCommand,
     enabled: boolean, active = false, tip: CommandTip = {},
   ): HTMLButtonElement => {
     const button = node('button', 'ifg-army-panel__command');
@@ -177,7 +177,7 @@ export function renderSelectedArmyPanel(
     button.disabled = !enabled;
     button.classList.toggle('is-active', active);
     button.setAttribute('aria-label', label);
-    button.append(createIcon(icon, 'ifg-army-panel__command-icon'), node('span', 'ifg-army-panel__command-label', caption));
+    button.append(createIcon(icon, 'ifg-army-panel__command-icon'));
     bindTooltip(button, () => ({
       title: label,
       description: tip.description,
@@ -200,27 +200,27 @@ export function renderSelectedArmyPanel(
     const retreatActive = army.targetingMode === 'retreat';
     const splitActive = army.targetingMode === 'split';
     commands.append(
-      command('Move', moveActive ? 'Pick spot' : 'Move', 'cmd-move', 'move', army.canMove === true, moveActive, {
+      command('Move', 'cmd-move', 'move', army.canMove === true, moveActive, {
         description: 'Move this army to a chosen destination in your territory or discovered ground.',
         disabledReason: 'This formation is currently locked in combat.',
       }),
-      command('Attack', attackActive ? 'Pick target' : 'Attack', 'cmd-attack', 'attack', army.canAttack === true, attackActive, {
+      command('Attack', 'cmd-attack', 'attack', army.canAttack === true, attackActive, {
         description: 'Advance to contact against a visible hostile force or province.',
         disabledReason: 'No visible hostile target in range.',
       }),
-      command('Retreat', retreatActive ? 'Pick spot' : 'Retreat', 'cmd-retreat', 'retreat', army.canRetreat === true, retreatActive, {
+      command('Retreat', 'cmd-retreat', 'retreat', army.canRetreat === true, retreatActive, {
         description: 'Choose a friendly destination away from the enemy line.',
         disabledReason: retreatHint,
       }),
-      command('Split', splitActive ? 'Pick spot' : 'Split', 'cmd-split', 'split', army.canSplit === true, splitActive, {
+      command('Split', 'cmd-split', 'split', army.canSplit === true, splitActive, {
         description: 'Divide this force into two separate formations.',
         disabledReason: 'This force is too small to divide.',
       }),
-      command('Stop', 'Stop', 'cmd-stop', 'stop', army.canStop === true, false, {
+      command('Stop', 'cmd-stop', 'stop', army.canStop === true, false, {
         description: 'Cancel the current movement or order and hold position.',
         disabledReason: 'No active order to cancel.',
       }),
-      command('Extract', 'Extract', 'cmd-extract', 'extract', army.canExtract === true, false, {
+      command('Extract', 'cmd-extract', 'extract', army.canExtract === true, false, {
         description: 'Begin resource extraction at the deposit under this stack.',
         disabledReason: 'No extractable resource deposit at this position.',
       }),

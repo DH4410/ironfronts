@@ -1,11 +1,13 @@
 /**
  * HUD icon registry.
  *
- * Two tiers, on purpose:
+ * Three tiers, on purpose:
  *  - painterly resource / action icons from 0 A.D. (CC BY-SA 3.0, see
  *    docs/ASSET_CREDITS.md) rendered as <img>;
  *  - flat monochrome line icons authored for Ironfronts, inlined as SVG so
- *    they inherit `currentColor` for hover / active states.
+ *    they inherit `currentColor` for hover / active states;
+ *  - generated 0 A.D.-inspired painted pictograms for unit, building, and
+ *    command buttons, rendered as transparent PNGs.
  *
  * No Unicode / emoji glyphs anywhere in the player HUD.
  */
@@ -38,6 +40,7 @@ export type IconName =
   | 'node-stone' | 'node-metal' | 'node-oil' | 'resource-water'
   | 'cmd-move' | 'cmd-attack' | 'cmd-retreat' | 'cmd-split' | 'cmd-stop' | 'cmd-extract'
   | 'cmd-patrol' | 'cmd-garrison'
+  | 'unit-engineer' | 'unit-armored-car' | 'unit-light-tank' | 'unit-medium-tank'
   | 'stat-health' | 'stat-attack' | 'stat-defence' | 'stat-speed' | 'stat-troops'
   | 'structure-barracks' | 'structure-plant' | 'structure-ordnance'
   | 'structure-fortress' | 'structure-city'
@@ -80,25 +83,27 @@ const ICONS: Record<IconName, IconDef> = {
   'node-metal': { kind: 'img', value: png('metal') },
   'node-oil': { kind: 'svg', value: svg('oil') },
   'resource-water': { kind: 'img', value: ironfrontsPng('water') },
-  // Army command grid — 0 A.D. session icons where the action is generic
-  // (attack, stop, patrol, garrison, split/groups); authored WW2-neutral
-  // glyphs for move / retreat / extract, which 0 A.D. has no clean art for.
-  'cmd-move': { kind: 'svg', value: svg('move') },
-  'cmd-attack': { kind: 'img', value: png('kill') },
-  'cmd-retreat': { kind: 'svg', value: svg('retreat') },
-  'cmd-split': { kind: 'img', value: png('groups') },
-  'cmd-stop': { kind: 'img', value: png('stop') },
-  'cmd-extract': { kind: 'svg', value: svg('pickaxe') },
+  // The six live orders share one WW2, 0 A.D.-inspired painted family.
+  'cmd-move': { kind: 'img', value: ironfrontsPng('command-move') },
+  'cmd-attack': { kind: 'img', value: ironfrontsPng('command-attack') },
+  'cmd-retreat': { kind: 'img', value: ironfrontsPng('command-retreat') },
+  'cmd-split': { kind: 'img', value: ironfrontsPng('command-split') },
+  'cmd-stop': { kind: 'img', value: ironfrontsPng('command-stop') },
+  'cmd-extract': { kind: 'img', value: ironfrontsPng('command-extract') },
   'cmd-patrol': { kind: 'img', value: png('patrol') },
   'cmd-garrison': { kind: 'img', value: png('garrison') },
+  'unit-engineer': { kind: 'img', value: ironfrontsPng('unit-engineer-icon') },
+  'unit-armored-car': { kind: 'img', value: ironfrontsPng('unit-armored-car-icon') },
+  'unit-light-tank': { kind: 'img', value: ironfrontsPng('unit-light-tank-icon') },
+  'unit-medium-tank': { kind: 'img', value: ironfrontsPng('unit-medium-tank-icon') },
   'stat-health': { kind: 'img', value: png('heal') },
   'stat-attack': { kind: 'svg', value: svg('crossed-blades') },
   'stat-defence': { kind: 'svg', value: svg('shield') },
   'stat-speed': { kind: 'svg', value: svg('speed') },
   'stat-troops': { kind: 'svg', value: svg('troops') },
-  'structure-barracks': { kind: 'img', value: ironfrontsPng('barracks') },
-  'structure-plant': { kind: 'img', value: ironfrontsPng('tank-plant') },
-  'structure-ordnance': { kind: 'img', value: ironfrontsPng('ordnance') },
+  'structure-barracks': { kind: 'img', value: ironfrontsPng('structure-barracks-icon') },
+  'structure-plant': { kind: 'img', value: ironfrontsPng('structure-tank-plant-icon') },
+  'structure-ordnance': { kind: 'img', value: ironfrontsPng('structure-ordnance-icon') },
   // Reserved — committed painterly art (project owner, see ASSET_CREDITS.md)
   // with no wired mechanic yet: no fortress / city building, no army-stance system.
   'structure-fortress': { kind: 'img', value: ironfrontsPng('fortress') },

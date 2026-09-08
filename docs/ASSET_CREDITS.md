@@ -158,6 +158,40 @@ as the Ironfronts repository). Used where no suitable 0 A.D. artwork exists:
 (map modes), `pickaxe.svg` (resource overlay toggle), `provinces.svg`,
 `event.svg`, `close.svg`, `focus.svg`.
 
+### Generated WW2 RTS button icons
+
+**Source:** Original Ironfronts assets generated with OpenAI's built-in image
+generator on 2026-09-08. They are not copied from 0 A.D. or another third
+party and carry the same licence as the Ironfronts repository.
+
+**Prompt direction:** compact 64-72 px classic RTS icons on true transparent
+alpha; hand-painted, dimensional, 0 A.D.-inspired interface art with rich
+earth colors, warm highlights, worn steel/leather/brick, exaggerated readable
+proportions, and a deep dark-brown outer contour. Each prompt requested one
+clear WW2 subject and prohibited text, flags, frames, backgrounds, and modern
+flat-vector or pale monochrome treatment. The final selected set was generated
+without reference-image inputs.
+
+**Modification:** the 1199-1312 px generator outputs were high-quality bicubic
+downscaled without changing aspect ratio, centered on 256x256 transparent RGBA
+canvases for runtime use.
+
+| Runtime file | Slot |
+|---|---|
+| `src/ui/assets/icons/ironfronts/unit-engineer-icon.png` | Engineer production button |
+| `src/ui/assets/icons/ironfronts/unit-armored-car-icon.png` | Armored-car production button |
+| `src/ui/assets/icons/ironfronts/unit-light-tank-icon.png` | Light-tank production button |
+| `src/ui/assets/icons/ironfronts/unit-medium-tank-icon.png` | Medium-tank production button |
+| `src/ui/assets/icons/ironfronts/structure-barracks-icon.png` | Barracks build button |
+| `src/ui/assets/icons/ironfronts/structure-tank-plant-icon.png` | Tank-plant build button |
+| `src/ui/assets/icons/ironfronts/structure-ordnance-icon.png` | Ordnance-works build button |
+| `src/ui/assets/icons/ironfronts/command-move.png` | Move command |
+| `src/ui/assets/icons/ironfronts/command-attack.png` | Attack command |
+| `src/ui/assets/icons/ironfronts/command-retreat.png` | Retreat command |
+| `src/ui/assets/icons/ironfronts/command-split.png` | Split command |
+| `src/ui/assets/icons/ironfronts/command-stop.png` | Stop command |
+| `src/ui/assets/icons/ironfronts/command-extract.png` | Extract command |
+
 ### `water.png`
 
 **Source: User-provided Ironfronts asset.** A painterly water-drop-in-a-bowl
@@ -189,9 +223,9 @@ Lanczos-downscaled with Pillow — portraits to 384 px, icons to 256 px
 | `src/ui/assets/units/light-tank.png` | Light-tank portrait | yes |
 | `src/ui/assets/units/medium-tank.png` | Medium-tank portrait | yes |
 | `src/ui/assets/units/artillery.png` | Artillery portrait | yes |
-| `src/ui/assets/icons/ironfronts/barracks.png` | `structure-barracks` — Build row | yes (replaces 0 A.D. `training.png`) |
-| `src/ui/assets/icons/ironfronts/tank-plant.png` | `structure-plant` — Build row | yes (replaces 0 A.D. `production.png`) |
-| `src/ui/assets/icons/ironfronts/ordnance.png` | `structure-ordnance` — Build row | yes (replaces 0 A.D. `construction.png`) |
+| `src/ui/assets/icons/ironfronts/barracks.png` | Detailed barracks art | legacy; replaced in Build row by the compact generated icon above |
+| `src/ui/assets/icons/ironfronts/tank-plant.png` | Detailed tank-plant art | legacy; replaced in Build row by the compact generated icon above |
+| `src/ui/assets/icons/ironfronts/ordnance.png` | Detailed ordnance art | legacy; replaced in Build row by the compact generated icon above |
 | `src/ui/assets/icons/ironfronts/fortress.png` | `structure-fortress` | reserved — no fortress building exists yet |
 | `src/ui/assets/icons/ironfronts/settlement.png` | `structure-city` (walled town) | reserved — no city/settlement icon slot yet |
 | `src/ui/assets/icons/ironfronts/stance-attack.png` | `stance-attack` (three swords) | reserved — no army-stance system |

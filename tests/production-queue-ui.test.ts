@@ -14,7 +14,10 @@ describe('0 A.D.-style production/construction queue', () => {
     expect(gameUi).not.toMatch(/Under construction:\s*\$\{/);
   });
 
-  it('reuses the unit portrait for produce and the 0 A.D. facility icon for build', () => {
+  it('uses dedicated production pictograms and facility icons without permanent button labels', () => {
+    expect(gameUi).toContain('const productionIcon = UNIT_PRODUCTION_ICON[u.id];');
+    expect(gameUi).toContain("createIcon(productionIcon, 'ifg-buildbtn__thumb')");
+    expect(gameUi).not.toContain("el('span', 'ifg-buildbtn__label'");
     expect(gameUi).toContain('renderQueue(pvQueue, q, (id, label) => {');
     expect(gameUi).toContain('const thumb = createUnitPortrait(id, label);');
     expect(gameUi).toContain('const icon = FACILITY_ICON[id];');

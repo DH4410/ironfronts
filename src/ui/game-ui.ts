@@ -89,6 +89,14 @@ const FACILITY_ICON: Record<string, IconName> = {
   ordnance: 'structure-ordnance',
 };
 
+/** Compact painted marks for production types that lacked button icons. */
+const UNIT_PRODUCTION_ICON: Readonly<Partial<Record<string, IconName>>> = {
+  engineer: 'unit-engineer',
+  'armored-car': 'unit-armored-car',
+  'light-tank': 'unit-light-tank',
+  'medium-tank': 'unit-medium-tank',
+};
+
 /** Building id → one-line note for the Build tooltip. */
 const FACILITY_NOTE: Record<string, string> = {
   barracks: 'Trains infantry and engineers.',
@@ -363,7 +371,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   const pvBuild = el('div', 'ifg-card__resources');
   pvBuild.hidden = true;
   pvBuild.append(el('small', 'ifg-card__restitle', 'Build'));
-  const pvBuildList = el('div', 'ifg-card__prodlist');
+  const pvBuildList = el('div', 'ifg-card__prodlist ifg-card__prodlist--buildings');
   pvBuild.append(pvBuildList);
   const pvConstruction = el('div', 'ifg-queue');
   pvConstruction.hidden = true;
@@ -633,13 +641,16 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         pvProduce.hidden = !(province.isOwn && prod.length > 0);
         if (province.isOwn && prod.length > 0) {
           pvProduceList.replaceChildren(...prod.map((u) => {
-            // Portrait-thumb button, RTS build-panel style: the drawing reads
-            // first, the cost + role sit on the hover tooltip.
+            // Text-free RTS button: a dedicated painted unit mark wins
+            // when available; the full name, role, and cost stay on tooltip.
             const b = el('button', 'ifg-buildbtn');
             b.type = 'button';
-            const thumb = createUnitPortrait(u.id, u.name);
+            const productionIcon = UNIT_PRODUCTION_ICON[u.id];
+            const thumb = productionIcon
+              ? createIcon(productionIcon, 'ifg-buildbtn__thumb')
+              : createUnitPortrait(u.id, u.name);
             thumb.classList.add('ifg-buildbtn__thumb');
-            b.append(thumb, el('span', 'ifg-buildbtn__label', u.name));
+            b.append(thumb);
             b.setAttribute('aria-label', `${u.name} — ${u.costLabel}`);
             bindTooltip(b, () => ({
               title: u.name,
@@ -678,14 +689,12 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         pvBuild.hidden = !province.isOwn || (buildable.length === 0 && construction.length === 0);
         if (!pvBuild.hidden) {
           pvBuildList.replaceChildren(...buildable.map((b) => {
-            // Facility icon (0 A.D. art) + short label. Unaffordable buildings
-            // stay on the list, disabled, with the cost on the tooltip so the
-            // player knows what to save for.
+            // Large, text-free facility tile. Unaffordable buildings stay on
+            // the list with name, cost, and reason available on hover/focus.
             const btn = el('button', 'ifg-buildbtn');
             btn.type = 'button';
             const icon = FACILITY_ICON[b.id];
             if (icon) btn.append(createIcon(icon, 'ifg-buildbtn__thumb'));
-            btn.append(el('span', 'ifg-buildbtn__label', b.name));
             btn.disabled = !b.affordable;
             btn.setAttribute('aria-label', `${b.name} — ${b.costLabel}`);
             bindTooltip(btn, () => ({
