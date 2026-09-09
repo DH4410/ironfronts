@@ -1674,13 +1674,17 @@ function handleMapClick(
       return true;
     }
   }
-  // 2. Otherwise, army pick.
+  // 2. Army pick. Clicking a different army selects it. Clicking the army that
+  //    is already selected drops it and falls through to the province beneath —
+  //    so a city with a garrison sitting on it is still selectable to queue
+  //    production or start a building.
   const hit = renderer.pickArmyAt(clientX, clientY);
-  if (hit) {
+  if (hit && hit !== selectedArmyId) {
     selectArmy(session, hit);
     return true;
   }
-  // 3. Nothing — let province selection proceed, and drop any army selection.
+  // 3. Nothing new picked — drop any army selection and let province
+  //    selection proceed on this same click.
   if (selectedArmyId) deselectArmy();
   return false;
 }

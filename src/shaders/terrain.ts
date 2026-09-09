@@ -199,7 +199,9 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
       let hasRelationship = diplomacyColor.a > 0.75;
       var overlayColor = select(politicalColor.rgb, diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode || strategicMode);
       if (hasRelationship) {
-        overlayColor = min(diplomacyColor.rgb * 1.30, vec3f(1.0));
+        // A gentle lift only — the palette is already tuned; the old 1.30x
+        // pushed war red and allied blue into lurid territory.
+        overlayColor = min(diplomacyColor.rgb * 1.08, vec3f(1.0));
       }
       let overview = smoothstep(
         ${POLITICAL_OVERVIEW_START_ALTITUDE.toFixed(1)},
@@ -293,7 +295,9 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let sunFacing = clamp(dot(shadeNormal, sunDirection) * 0.5 + 0.5, 0.0, 1.0);
   let reliefStrength = smoothstep(0.05, 0.36, slope) * uniforms.lighting.x;
   let relief = mix(1.0, mix(0.5, 1.45, sunFacing), reliefStrength);
-  var lit = baseColor * max(surfaceLight(shadeNormal) * relief, vec3f(0.4));
+  // Floor lifted so a shadowed slope at night is still readable — the player
+  // needs to see their own units after dark, not a black patch.
+  var lit = baseColor * max(surfaceLight(shadeNormal) * relief, vec3f(0.52));
   lit += vec3f(0.12, 0.15, 0.13) * pow(max(dot(normal, normalize(sunDirection + normalize(uniforms.camera.xyz - input.worldPosition))), 0.0), 24.0) * 0.08 * uniforms.lighting.x;
   lit += wetSurfaceSheen(normal, input.worldPosition);
   if (nightMapCompensation > 0.001) {

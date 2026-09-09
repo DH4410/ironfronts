@@ -150,7 +150,7 @@ describe('WGSL programs', () => {
   it('derives political tint and country borders from mutable province ownership', () => {
     expect(terrainShader).toContain('let politicalColor = politicalColorAt(input.mapUv)');
     expect(terrainShader).toContain('diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode || strategicMode');
-    expect(terrainShader).toContain('diplomacyColor.rgb * 1.30');
+    expect(terrainShader).toContain('diplomacyColor.rgb * 1.08');
     // Strategic default mode also greys foreign land so ownership reads at play zoom.
     expect(terrainShader).toContain('let strategicMode = uniforms.interaction.z > 0.5 && uniforms.interaction.z < 1.5');
     expect(terrainShader).toContain('if (!isPlayer && !hasRelationship && strategicMode)');
@@ -172,7 +172,7 @@ describe('WGSL programs', () => {
     expect(lineShader).toContain('let countryBoundary = line.b.z < 0.0 && line.b.y > 0.5');
     expect(lineShader).toContain('height0 = abs(line.b.z) + 0.8');
     expect(lineShader).toContain('(lineParams.enabled & 2u) != 0u');
-    expect(lineShader).toContain('mix(0.60, 0.94, nearFactor)');
+    expect(lineShader).toContain('mix(0.82, 0.97, nearFactor)');
     expect(lineShader).toContain('if (riverSignal >= 0.15) { discard; }');
     expect(lineShader).toContain('styledColor = mix(input.outerColor, input.innerColor, centerCoverage)');
     expect(lineShader).toContain('mix(0.30, 0.10, nearFactor)');
@@ -187,7 +187,7 @@ describe('WGSL programs', () => {
     expect(lineShader).toContain('color.a = mix(color.a, 0.92, overviewFade * 0.6)');
     expect(lineShader).toContain('color.a *= mix(1.0, 0.22, overviewFade)');
     // The pre-existing near-zoom weights are still the baseline the fade builds on.
-    expect(lineShader).toContain('mix(0.60, 0.94, nearFactor)');
+    expect(lineShader).toContain('mix(0.82, 0.97, nearFactor)');
     expect(lineShader).toContain('mix(0.30, 0.10, nearFactor)');
   });
 

@@ -75,9 +75,12 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
     // political boundary merely because its implicit owner differs.
     let countryBoundary = line.b.z < 0.0 && line.b.y > 0.5;
     if (countryBoundary && countryBordersVisible) {
-      widthPixels = 2.65 - nearFactor * 0.58;
-      color = vec4f(0.035, 0.047, 0.043, mix(0.60, 0.94, nearFactor));
-      innerColor = vec4f(0.77, 0.71, 0.57, mix(0.52, 0.86, nearFactor));
+      // Bold, high-contrast national outline: a near-black casing under a bright
+      // bone line, thick and opaque at every zoom so ownership stays legible
+      // even where the terrain colour shifts under it.
+      widthPixels = 3.6 - nearFactor * 0.5;
+      color = vec4f(0.03, 0.035, 0.03, mix(0.82, 0.97, nearFactor));
+      innerColor = vec4f(0.87, 0.81, 0.63, mix(0.72, 0.96, nearFactor));
       countryCasing = 1.0;
     } else if (!provinceBordersVisible) {
       color.a = 0.0;

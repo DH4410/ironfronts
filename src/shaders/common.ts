@@ -135,7 +135,9 @@ fn surfaceLight(normalInput: vec3f) -> vec3f {
   let daylight = uniforms.lighting.x;
   let diffuse = max(dot(normal, normalize(uniforms.sunTime.xyz)), 0.0) * daylight;
   let dayAmbient = vec3f(0.46 + normal.y * 0.22);
-  let nightAmbient = vec3f(0.30, 0.36, 0.52) * (0.84 + normal.y * 0.12);
+  // Night lifted well off the old near-black so units and terrain stay visible
+  // after dark; the cool blue cast still reads as night.
+  let nightAmbient = vec3f(0.44, 0.49, 0.62) * (0.86 + normal.y * 0.12);
   let sunsetWarmth = vec3f(0.13, 0.055, 0.015) * uniforms.lighting.y * max(0.0, normal.y);
   return mix(nightAmbient, dayAmbient, daylight) + vec3f(diffuse * 0.62) + sunsetWarmth;
 }
