@@ -672,6 +672,14 @@ async function startGame(token: number): Promise<void> {
     } else if (state.enemies.length === 0 && music.getState() === 'war') {
       void music.setState('peace');
     }
+    // Spell out the win condition the first time each war opens: taking that
+    // country's capital is what ends it.
+    for (const enemy of state.enemies) {
+      if (announcedWarAims.has(enemy.id)) continue;
+      announcedWarAims.add(enemy.id);
+      pushNotification('information', 'War aims',
+        `Capture ${enemy.name}'s capital to knock them out of the war.`);
+    }
   };
   renderer.onProvinceSelected = (info) => {
     if (!info) {
@@ -1969,6 +1977,8 @@ function syncCombatMarkers(session: RemoteGameSession): void {
 }
 
 let campaignOutcomeShown = false;
+/** Enemy country ids whose "take their capital" war-aim has been announced. */
+const announcedWarAims = new Set<number>();
 
 function drainSessionEvents(session: RemoteGameSession): void {
   const player = session.playerCountryId;
