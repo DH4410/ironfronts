@@ -4,8 +4,9 @@
  * AI-controlled countries go through the SAME `applyCommand` boundary the player
  * does (with their own countryId) — never direct state edits.
  * v1 goals: keep producing cheap infantry, work owned resource nodes, garrison
- * cities, and only push out to retake a lost home province or hit an obviously
- * weaker adjacent enemy stack. Nothing clever.
+ * cities, hit an obviously weaker adjacent enemy stack, and — once it has troops
+ * to spare — march one column at an enemy capital so wars actually threaten the
+ * player. Nothing clever.
  */
 
 import type { SimContext } from '../sim-context';
@@ -79,6 +80,45 @@ export function stepAi(session: SimContext, _dtHours: number): void {
       applyCommand(session, {
         type: 'attackArmy', countryId: country.id, armyId: strongest.id,
         target: { kind: 'army', armyId: target.e.id },
+      });
+      continue;
+    }
+
+    // 4. Offensive push. Only once the country can spare a column (>= 3 stacks,
+    //    so two stay home) send its strongest idle stack at the nearest hostile
+    //    province, preferring an enemy capital. attackArmy on a province is a
+    //    standing order, so this fires once per free stack, not every pass.
+    if (armies.length < 3) continue;
+    const spearhead = armies
+      .filter((a) => !a.order && a.status !== 'engaged' && a.extractingNodeId === null)
+      .sort((a, b) => stackUnitCount(b) - stackUnitCount(a))[0];
+    if (!spearhead || stackUnitCount(spearhead) < 4) continue;
+
+    const enemyIds = new Set(
+      Object.values(state.countries)
+        .filter((o) => o.id !== country.id && relationOf(state, country.id, o.id) === 'war')
+        .map((o) => o.id),
+    );
+    const enemyCapitals = new Set(
+      [...enemyIds]
+        .map((id) => session.world.countries.find((c) => c.id === id)?.capitalProvinceId)
+        .filter((id): id is number => id !== undefined),
+    );
+    const objective = session.world.provinces
+      .filter((p) => enemyIds.has(state.provinceOwners[p.id] ?? 0))
+      .map((p) => ({
+        p,
+        d: wrappedDistance(spearhead.x, spearhead.z, p.center[0], p.center[1], session.world.width)
+          * (enemyCapitals.has(p.id) ? 0.6 : 1),
+      }))
+      .sort((a, b) => a.d - b.d)[0];
+    if (objective) {
+      applyCommand(session, {
+        type: 'attackArmy', countryId: country.id, armyId: spearhead.id,
+        target: {
+          kind: 'province', provinceId: objective.p.id,
+          x: objective.p.center[0], z: objective.p.center[1],
+        },
       });
     }
   }
