@@ -396,7 +396,26 @@ export function stepMovement(session: SimContext, dtHours: number): void {
       const targetNode = order.path[0];
       const tx = graph.nodeX[targetNode];
       const tz = graph.nodeZ[targetNode];
-      const segLen = Math.max(1, wrappedDistance(army.x, army.z, tx, tz, world.width));
+      const rawSegLen = wrappedDistance(army.x, army.z, tx, tz, world.width);
+      // Coincident graph nodes (a zero-length road-graph edge) must not trap the
+      // stack. The partial-move branch below only clears a node once the tick's
+      // step reaches `segLen` — which the `Math.max(1, …)` floor keeps at 1 even
+      // for a duplicate node — and on slow terrain (mountain 0.48 × road 1.35 ⇒
+      // advance ≈ 0.83 < 1) that never happens, so the stack sits on the node
+      // reporting "moving" forever. Step through any sub-unit segment for free.
+      if (rawSegLen < 1) {
+        army.x = tx;
+        army.z = tz;
+        army.lastGraphNodeId = army.graphNodeId;
+        army.graphNodeId = targetNode;
+        order.path.shift();
+        order.edgeProgress = 0;
+        if (army.retreat?.protected && targetNode === army.retreat.protectedUntilNodeId) {
+          army.retreat.protected = false;
+        }
+        continue;
+      }
+      const segLen = rawSegLen;
       const speedScale = (TERRAIN_SPEED[world.terrainClassAt(army.x, army.z)] ?? 0.9) * ROAD_BONUS;
       const advance = budget * speedScale;
       if (advance >= segLen) {
