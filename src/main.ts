@@ -1989,9 +1989,13 @@ function drainSessionEvents(session: RemoteGameSession): void {
   if (outcome && !campaignOutcomeShown) {
     campaignOutcomeShown = true;
     const won = outcome.result === 'victory';
+    const day = Math.max(1, Math.floor(outcome.atGameHours / 24) + 1);
     pushNotification(won ? 'completed' : 'warning',
-      won ? 'Victory' : 'Defeat', outcome.reason, { sticky: true });
+      won ? 'Victory' : 'Defeat',
+      `${outcome.reason} Campaign ${won ? 'won' : 'lost'} on day ${day}.`,
+      { sticky: true });
     uiStore.patch({ paused: true });
+    void music.setState(won ? 'victory' : 'peace');
   }
 
   for (const done of session.pendingCompletions.splice(0)) {
