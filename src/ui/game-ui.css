@@ -778,8 +778,8 @@
   position: absolute;
   left: 50%;
   bottom: 18px;
-  width: min(1040px, calc(100vw - 80px));
-  height: 286px;
+  width: min(880px, calc(100vw - 80px));
+  height: 244px;
   max-height: calc(100vh - 36px);
   box-sizing: border-box;
   color: var(--ifg-text);
@@ -848,7 +848,7 @@
   height: calc(100% - 34px);
   min-height: 0;
   display: grid;
-  grid-template-columns: 220px minmax(350px, 1fr) 330px;
+  grid-template-columns: 190px minmax(280px, 1fr) 250px;
   overflow: hidden;
 }
 .ifg-army-panel__summary,
@@ -1717,14 +1717,16 @@
   .ifg-card__iconbtn,
   .ifg-army-panel__command
 ) {
-  background-color: transparent;
+  /* Solid dark chip UNDER the painted plate so the control always reads as a
+     control — the plate art alone was disappearing into the panel. */
+  background-color: rgba(18, 20, 15, 0.92);
   background-image: var(--ifg-skin-control);
   background-position: center;
-  background-size: contain;
+  background-size: 100% 100%;
   background-repeat: no-repeat;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 1px rgba(232, 201, 136, 0.14);
   filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.48));
 }
 
@@ -1900,14 +1902,16 @@
 }
 
 .ifg-army-panel__units {
-  grid-template-columns: repeat(auto-fill, minmax(116px, 148px));
-  gap: 10px;
+  /* Compact cards so all six unit families fit without a scroll, and a stack
+     with trucks/support types added stays inside the panel. */
+  grid-template-columns: repeat(auto-fill, minmax(70px, 88px));
+  gap: 7px;
 }
 
 .ifg-army-unit,
 .ifg-army-panel__units.is-dense .ifg-army-unit {
   aspect-ratio: 3 / 4;
-  grid-template-rows: minmax(0, 1fr) 21px 5px;
+  grid-template-rows: minmax(0, 1fr) 16px 4px;
   overflow: hidden;
   background: #10120e;
   border: 0;
@@ -1942,15 +1946,16 @@
 }
 
 .ifg-army-unit__count {
-  right: 13px;
-  bottom: 10px;
+  right: 8px;
+  bottom: 6px;
   z-index: 5;
   padding: 0;
+  font-size: 10px;
   color: var(--ifg-brass-lit);
   background: transparent;
   border: 0;
   border-radius: 0;
-  text-shadow: 0 1px 2px #000;
+  text-shadow: 0 1px 2px #000, 0 0 3px #000;
 }
 
 .ifg-army-unit__details {

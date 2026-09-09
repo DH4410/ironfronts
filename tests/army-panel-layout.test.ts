@@ -6,7 +6,7 @@ const armyUi = readFileSync(new URL('../src/ui/army.ts', import.meta.url), 'utf8
 
 describe('selected army panel containment', () => {
   it('locks the overlay height and contains variable content inside its sections', () => {
-    expect(css).toContain('height: 286px;');
+    expect(css).toContain('height: 244px;');
     expect(css).toContain('max-height: calc(100vh - 36px);');
     expect(css).toMatch(/\.ifg-army-panel__body\s*\{[^}]*height: calc\(100% - 34px\);[^}]*overflow: hidden;/s);
     expect(css).toMatch(/\.ifg-army-panel__activity\s*\{[^}]*overflow: auto;/s);
