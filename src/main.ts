@@ -1890,8 +1890,8 @@ function projectSelectedProvince(
     coastal: false,
     buildings: summary.isOwn
       ? ((session.state.provinceBuildings[provinceId] as {
-          barracks: number; tankPlant: number; ordnance: number;
-        } | undefined) ?? { barracks: 0, tankPlant: 0, ordnance: 0 })
+          barracks: number; tankPlant: number; ordnance: number; missileSite: number;
+        } | undefined) ?? { barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 0 })
       : null,
     deposits: summary.resources
       ? { controlled: summary.controlled, extracting: summary.extracting }

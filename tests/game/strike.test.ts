@@ -23,14 +23,39 @@ function foreignProvince(s: GameSession) {
   return { province: p, ownerId: s.state.provinceOwners[p.id] };
 }
 
+/**
+ * A strike now needs a friendly Missile Site within range of the aim point.
+ * Pick the closest Spain / foreign province pair and stamp a site on the Spain
+ * side so the target is reachable.
+ */
+function strikeableForeignProvince(s: GameSession) {
+  const own = world.provinces.filter((p) => s.state.provinceOwners[p.id] === SPAIN);
+  let best: { province: typeof world.provinces[number]; site: typeof own[number]; d: number } | null = null;
+  for (const province of world.provinces) {
+    const owner = s.state.provinceOwners[province.id];
+    if (!owner || owner === SPAIN) continue;
+    for (const site of own) {
+      const d = Math.hypot(site.center[0] - province.center[0], site.center[1] - province.center[1]);
+      if (!best || d < best.d) best = { province, site, d };
+    }
+  }
+  if (!best) throw new Error('no foreign province in scenario');
+  s.state.provinceBuildings[best.site.id] = { barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 1 };
+  return {
+    province: best.province,
+    ownerId: s.state.provinceOwners[best.province.id],
+    siteProvinceId: best.site.id,
+  };
+}
+
 describe('strategic strike', () => {
   it('spends a warhead, wipes stacks, levels buildings and forces war', () => {
     const s = session();
-    const { province, ownerId } = foreignProvince(s);
+    const { province, ownerId } = strikeableForeignProvince(s);
     const [x, z] = province.center;
 
     s.state.countries[SPAIN].warheads = 1;
-    s.state.provinceBuildings[province.id] = { barracks: 2, tankPlant: 1, ordnance: 0 };
+    s.state.provinceBuildings[province.id] = { barracks: 2, tankPlant: 1, ordnance: 0, missileSite: 0 };
     s.state.armies['victim'] = {
       id: 'victim', ownerCountryId: ownerId, name: 'Garrison', x, z,
       graphNodeId: 0, units: [{ typeId: 'infantry', count: 3, hp: 240, experience: 0 }],
@@ -79,16 +104,64 @@ describe('strategic strike', () => {
     const own = world.provinces.find((p) => s.state.provinceOwners[p.id] === SPAIN)!;
     s.state.countries[SPAIN].warheads = 0;
 
-    // No ordnance anywhere Spain holds — no accrual.
+    // No ordnance or missile site anywhere Spain holds — no accrual.
     for (const [pid, b] of Object.entries(s.state.provinceBuildings)) {
-      if (s.state.provinceOwners[Number(pid)] === SPAIN) b.ordnance = 0;
+      if (s.state.provinceOwners[Number(pid)] === SPAIN) { b.ordnance = 0; b.missileSite = 0; }
     }
     stepWarheads(s, 18 * 24 + 10);
     expect(s.state.countries[SPAIN].warheads).toBe(0);
 
     // With one, just over a warhead's worth of game-hours yields one.
-    s.state.provinceBuildings[own.id] = { barracks: 1, tankPlant: 0, ordnance: 1 };
+    s.state.provinceBuildings[own.id] = { barracks: 1, tankPlant: 0, ordnance: 1, missileSite: 0 };
     stepWarheads(s, 18 * 24 + 10);
     expect(Math.floor(s.state.countries[SPAIN].warheads ?? 0)).toBe(1);
+  });
+
+  it('a Missile Site accrues warheads on its own', () => {
+    const s = session();
+    const own = world.provinces.find((p) => s.state.provinceOwners[p.id] === SPAIN)!;
+    s.state.countries[SPAIN].warheads = 0;
+    for (const [pid, b] of Object.entries(s.state.provinceBuildings)) {
+      if (s.state.provinceOwners[Number(pid)] === SPAIN) { b.ordnance = 0; b.missileSite = 0; }
+    }
+    s.state.provinceBuildings[own.id] = { barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 1 };
+    stepWarheads(s, 18 * 24 + 10);
+    expect(Math.floor(s.state.countries[SPAIN].warheads ?? 0)).toBe(1);
+  });
+
+  it('refuses to launch without a Missile Site, and when the target is out of range', () => {
+    const s = session();
+    const { province } = foreignProvince(s);
+    const [x, z] = province.center;
+    s.state.countries[SPAIN].warheads = 2;
+    for (const b of Object.values(s.state.provinceBuildings)) b.missileSite = 0;
+
+    const noSite = s.applyCommand({ type: 'strike', countryId: SPAIN, provinceId: province.id, x, z });
+    expect(noSite).toMatchObject({ ok: false });
+    expect(s.state.countries[SPAIN].warheads).toBe(2);
+
+    // A site exists but nowhere near the target — still refused, warhead kept.
+    const far = world.provinces
+      .filter((p) => s.state.provinceOwners[p.id] === SPAIN)
+      .sort((a, b) =>
+        Math.hypot(b.center[0] - x, b.center[1] - z) - Math.hypot(a.center[0] - x, a.center[1] - z))[0];
+    s.state.provinceBuildings[far.id] = { barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 1 };
+    const outOfRange = s.applyCommand({ type: 'strike', countryId: SPAIN, provinceId: province.id, x, z });
+    if (Math.hypot(far.center[0] - x, far.center[1] - z) > 3200) {
+      expect(outOfRange).toMatchObject({ ok: false });
+      expect(s.state.countries[SPAIN].warheads).toBe(2);
+    }
+  });
+
+  it('launches when a Missile Site is within range', () => {
+    const s = session();
+    const { province, ownerId } = strikeableForeignProvince(s);
+    const [x, z] = province.center;
+    s.state.countries[SPAIN].warheads = 1;
+
+    const res = s.applyCommand({ type: 'strike', countryId: SPAIN, provinceId: province.id, x, z });
+    expect(res.ok).toBe(true);
+    expect(res.strike).toMatchObject({ attacker: SPAIN, defender: ownerId, provinceId: province.id });
+    expect(s.state.countries[SPAIN].warheads).toBe(0);
   });
 });

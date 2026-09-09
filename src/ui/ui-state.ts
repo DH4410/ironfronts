@@ -99,6 +99,7 @@ export interface SelectedProvince {
     readonly barracks: number;
     readonly tankPlant: number;
     readonly ordnance: number;
+    readonly missileSite: number;
   } | null;
   /** Deposit control/extraction state, own provinces only. */
   readonly deposits?: {

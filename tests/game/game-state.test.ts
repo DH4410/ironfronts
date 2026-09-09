@@ -21,7 +21,7 @@ function minimalState(): GameState {
       },
     },
     provinceOwners: { 294: 24, 295: 41 },
-    provinceBuildings: { 294: { barracks: 1, tankPlant: 1, ordnance: 0 } },
+    provinceBuildings: { 294: { barracks: 1, tankPlant: 1, ordnance: 0, missileSite: 0 } },
     productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: {
       'army-1': {

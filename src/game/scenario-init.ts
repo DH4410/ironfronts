@@ -109,7 +109,7 @@ function assignStartingBuildings(
   const out = new Map<number, ProvinceBuildings>();
   const ordered = [...cities].sort((a, b) => b.population - a.population);
   ordered.forEach((province, index) => {
-    const buildings: ProvinceBuildings = { barracks: 0, tankPlant: 0, ordnance: 0 };
+    const buildings: ProvinceBuildings = { barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 0 };
     if (province.id === capitalId) {
       buildings.barracks = 1;
       buildings.tankPlant = 1;
@@ -230,7 +230,7 @@ export function initGameState(
         provinceBuildings[provinceId] = buildings;
       }
     } else if (cities[0]) {
-      provinceBuildings[cities[0].id] = { barracks: 1, tankPlant: 0, ordnance: 0 };
+      provinceBuildings[cities[0].id] = { barracks: 1, tankPlant: 0, ordnance: 0, missileSite: 0 };
     }
   }
 

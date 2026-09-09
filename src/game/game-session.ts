@@ -73,6 +73,7 @@ export class GameSession {
     // Additive field: pre-strike v2 saves have no `warheads`. Default it here so
     // the sim never reads `undefined` (GAME_VERSION intentionally unchanged).
     for (const country of Object.values(restored.countries)) country.warheads ??= 0;
+    for (const buildings of Object.values(restored.provinceBuildings)) buildings.missileSite ??= 0;
     restored.provinceDevastation ??= {};
     const scenario = scenarioById(restored.scenarioId);
     const scaffold = initGameState({

@@ -292,9 +292,10 @@ export class RemoteGameSession extends EventTarget {
   }
   buildable(provinceId: number): Array<{ id: BuildingId; affordable: boolean }> {
     if (!this.ownsProvince(provinceId)) return [];
-    const current = this.state.provinceBuildings[provinceId] ?? { barracks: 0, tankPlant: 0, ordnance: 0 };
+    const current = this.state.provinceBuildings[provinceId]
+      ?? { barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 0 };
     const queued = this.state.constructionQueues[provinceId] as QueueOrder[] | undefined;
-    return (['barracks', 'tankPlant', 'ordnance'] as BuildingId[])
+    return (['barracks', 'tankPlant', 'ordnance', 'missileSite'] as BuildingId[])
       .filter((id) => current[id] < 1 && !queued?.some((order) => order.buildingId === id))
       .map((id) => ({ id, affordable: this.affordable(this.building(id)?.cost) }));
   }

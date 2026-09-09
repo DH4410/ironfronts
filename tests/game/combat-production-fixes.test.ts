@@ -54,7 +54,7 @@ function baseState(): GameState {
       2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
     },
     provinceOwners: { 10: 1 },
-    provinceBuildings: { 10: { barracks: 1, tankPlant: 0, ordnance: 0 } },
+    provinceBuildings: { 10: { barracks: 1, tankPlant: 0, ordnance: 0, missileSite: 0 } },
     productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: {},
     resourceNodes: {},

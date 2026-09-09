@@ -25,8 +25,16 @@ const BLAST_RADIUS = 95;
  * does fall the moment a stack walks in after the strike. ~6 game-days.
  */
 const DEVASTATION_HOURS = 6 * 24;
+/**
+ * World-space reach of a Missile Site. A strike must land within this distance
+ * of one of the launching country's own Missile Sites — the CoW-style "build
+ * the launcher where you want coverage" constraint. World width is ~13.5k, so
+ * one well-placed site covers a large theatre without being global.
+ */
+const MISSILE_RANGE = 3200;
 
-/** Passive warhead accrual — one slow pass per tick, driven by Ordnance Workshops. */
+/** Passive warhead accrual — one slow pass per tick, driven by Missile Sites
+ *  and (at the same rate) legacy Ordnance Workshops. */
 export function stepWarheads(ctx: SimContext, dtHours: number): void {
   if (dtHours <= 0) return;
   // Drop devastation entries whose window has passed so the save stays sparse.
@@ -39,10 +47,11 @@ export function stepWarheads(ctx: SimContext, dtHours: number): void {
   }
   const levelsByCountry = new Map<number, number>();
   for (const [provinceIdRaw, buildings] of Object.entries(ctx.state.provinceBuildings)) {
-    if (!buildings.ordnance) continue;
+    const levels = (buildings.ordnance ?? 0) + (buildings.missileSite ?? 0);
+    if (!levels) continue;
     const owner = ctx.state.provinceOwners[Number(provinceIdRaw)];
     if (!owner) continue;
-    levelsByCountry.set(owner, (levelsByCountry.get(owner) ?? 0) + buildings.ordnance);
+    levelsByCountry.set(owner, (levelsByCountry.get(owner) ?? 0) + levels);
   }
   for (const [countryId, levels] of levelsByCountry) {
     const country = ctx.state.countries[countryId];
@@ -65,6 +74,22 @@ export function issueStrike(ctx: SimContext, command: StrikeCommand): CommandRes
   }
   const owner = ctx.state.provinceOwners[provinceId] ?? 0;
   if (owner === countryId) return { ok: false, reason: 'That is your own province.' };
+
+  // The aim point must sit within reach of one of the country's Missile Sites.
+  const sites: Array<readonly [number, number]> = [];
+  for (const [siteProvinceRaw, buildings] of Object.entries(ctx.state.provinceBuildings)) {
+    if (!buildings.missileSite) continue;
+    if (ctx.state.provinceOwners[Number(siteProvinceRaw)] !== countryId) continue;
+    const p = ctx.world.provinces.find((q) => q.id === Number(siteProvinceRaw));
+    if (p) sites.push([p.center[0], p.center[1]]);
+  }
+  if (sites.length === 0) {
+    return { ok: false, reason: 'Build a Missile Site to launch strikes.' };
+  }
+  const inRange = sites.some(
+    ([sx, sz]) => wrappedDistance(sx, sz, x, z, ctx.world.width) <= MISSILE_RANGE,
+  );
+  if (!inRange) return { ok: false, reason: 'Target is beyond Missile Site range.' };
 
   country.warheads = (country.warheads ?? 0) - 1;
 

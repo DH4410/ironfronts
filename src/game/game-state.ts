@@ -52,6 +52,10 @@ export interface ProvinceBuildings {
   barracks: number;
   tankPlant: number;
   ordnance: number;
+  /** Rocket-launch site: accrues strategic warheads and defines the reach a
+   *  strike can be aimed within. Additive field — pre-missile v2 saves default
+   *  it to 0 on load (see GameSession.restore), no GAME_VERSION bump. */
+  missileSite: number;
 }
 
 /** One queued building. Same capture rule as a `ProductionOrder`: it belongs to

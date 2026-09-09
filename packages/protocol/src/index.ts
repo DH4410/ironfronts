@@ -25,7 +25,7 @@ export const commandPayloadSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('stopArmy'), armyId: z.string() }),
   z.object({ type: z.literal('extract'), armyId: z.string() }),
   z.object({ type: z.literal('produce'), provinceId: z.number().int().nonnegative(), unitTypeId: z.string() }),
-  z.object({ type: z.literal('build'), provinceId: z.number().int().nonnegative(), buildingId: z.enum(['barracks', 'tankPlant', 'ordnance']) }),
+  z.object({ type: z.literal('build'), provinceId: z.number().int().nonnegative(), buildingId: z.enum(['barracks', 'tankPlant', 'ordnance', 'missileSite']) }),
   z.object({ type: z.literal('setRally'), provinceId: z.number().int().nonnegative(), target: z.object({ x: z.number().finite(), z: z.number().finite() }).nullable() }),
   z.object({
     type: z.literal('sendDiplomaticMessage'),
@@ -147,7 +147,7 @@ export interface PlayerProjection {
   startCamera: { x: number; z: number; distance: number };
   countries: Record<number, PublicCountry>;
   provinceOwners: Record<number, number>;
-  provinceBuildings: Record<number, { barracks: number; tankPlant: number; ordnance: number }>;
+  provinceBuildings: Record<number, { barracks: number; tankPlant: number; ordnance: number; missileSite: number }>;
   productionQueues: Record<number, unknown[]>;
   constructionQueues: Record<number, unknown[]>;
   // `route` is the server-derived road polyline from the province's node to the
