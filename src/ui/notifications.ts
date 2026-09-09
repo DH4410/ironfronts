@@ -21,7 +21,10 @@ export function buildNotification(
   const item = element('article', 'ifg-notify__item');
   item.dataset.kind = notification.kind;
   const body = element('div', 'ifg-notify__body');
-  body.append(element('strong', undefined, notification.title));
+  const heading = notification.count && notification.count > 1
+    ? `${notification.title} ×${notification.count}`
+    : notification.title;
+  body.append(element('strong', undefined, heading));
   if (notification.body) body.append(element('span', undefined, notification.body));
   const dismiss = element('button', 'ifg-notify__dismiss');
   dismiss.type = 'button';

@@ -198,6 +198,9 @@ export interface GameNotification {
   /** World point this event happened at. When present the toast is clickable
    *  and re-centres the camera there (e.g. "force under attack"). */
   readonly focus?: { readonly x: number; readonly z: number };
+  /** Number of identical events folded into this toast. Absent or 1 = a single
+   *  event; >1 renders a "×N" tally so a burst does not stack up separate cards. */
+  readonly count?: number;
 }
 
 export type CombatStatus = 'idle' | 'moving' | 'engaged' | 'retreating';

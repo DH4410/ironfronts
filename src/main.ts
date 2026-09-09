@@ -2153,15 +2153,34 @@ function pushNotification(
   kind: GameNotification['kind'], title: string, body?: string,
   options: { sticky?: boolean; focus?: { x: number; z: number } } = {},
 ): void {
-  const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const sticky = isSticky(kind, options.sticky);
   const previous = uiStore.get().notifications;
+  const delay = autoDismissDelay(kind, options.sticky);
+
+  // Fold a burst of identical events (same kind + title, e.g. "Province captured"
+  // through an offensive) into the existing toast with a running "×N" tally
+  // rather than letting near-duplicate cards crowd the stack. Sticky,
+  // action-required toasts are never merged — each may point somewhere different.
+  const twin = previous.find((entry) => entry.kind === kind && entry.title === title && !entry.sticky);
+  if (twin) {
+    const merged = {
+      ...twin, body, at: Date.now(),
+      count: (twin.count ?? 1) + 1, focus: options.focus ?? twin.focus,
+    };
+    uiStore.patch({ notifications: previous.map((entry) => (entry.id === twin.id ? merged : entry)) });
+    if (delay !== null) {
+      clearNotificationTimer(twin.id);
+      notificationTimers.set(twin.id, window.setTimeout(() => removeNotification(twin.id), delay));
+    }
+    return;
+  }
+
+  const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const notifications = [...previous, { id, kind, title, body, at: Date.now(), sticky, focus: options.focus }].slice(-4);
   // Anything the last-4 cap just dropped no longer needs its auto-dismiss timer.
   const kept = new Set(notifications.map((entry) => entry.id));
   for (const entry of previous) if (!kept.has(entry.id)) clearNotificationTimer(entry.id);
   uiStore.patch({ notifications });
-  const delay = autoDismissDelay(kind, options.sticky);
   if (delay !== null) {
     notificationTimers.set(id, window.setTimeout(() => removeNotification(id), delay));
   }
