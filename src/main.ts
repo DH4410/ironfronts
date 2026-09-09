@@ -2069,6 +2069,15 @@ function drainSessionEvents(session: RemoteGameSession): void {
             { scale: 3.0, lifetimeMs: 7_000 });
         }
       }, 900);
+      // The province keeps smouldering: a lazy plume every few seconds for ~45s
+      // so a freshly struck city reads as devastated well after the blast.
+      for (let wisp = 0; wisp < 9; wisp += 1) {
+        window.setTimeout(() => {
+          const drift = (Math.random() - 0.5) * 40;
+          combatEffects.spawn(EFFECT_KIND.smoke, sx + drift, sz + (Math.random() - 0.5) * 40,
+            { scale: 2.0 + Math.random() * 1.4, lifetimeMs: 5_500 });
+        }, 2_500 + wisp * 4_800);
+      }
       pushNotification('combat',
         mine ? 'Strategic strike on our soil' : 'Strategic strike lands',
         mine ? 'An enemy warhead has devastated one of your provinces.'
