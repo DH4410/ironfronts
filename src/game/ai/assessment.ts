@@ -101,6 +101,7 @@ export function strengthNear(
 export interface CityStatus {
   readonly province: WorldProvince;
   readonly node: number;
+  readonly isCapital: boolean;
   readonly garrison: ArmyStack[];
   readonly garrisonStrength: number;
   readonly threatStrength: number;
@@ -188,6 +189,7 @@ export function assess(
     const status: CityStatus = {
       province,
       node,
+      isCapital: province.id === capitalId,
       garrison,
       garrisonStrength,
       threatStrength: strengthNear(

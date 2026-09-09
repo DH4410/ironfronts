@@ -25,13 +25,19 @@ import { applyCommand } from '../commands';
 import { producibleUnits } from '../production';
 import { buildableBuildings } from '../construction';
 import { canExtract, stackHealthFraction, type ArmyStack } from '../units/army';
+import { unitType } from '../units/unit-catalog';
 import type { BuildingId } from '../units/unit-types';
+import type { WorldProvince } from '../world-data';
 import { wrappedDistance } from '../geometry';
 import {
   CONTACT_RADIUS, aiMemory, assess, combatStrength, indexArmies, indexProvinces,
-  provinceNode, strengthNear, type AiMemory, type Assessment,
+  provinceNode, strengthNear, type AiMemory, type Assessment, type CityStatus,
 } from './assessment';
 
+/** A threatened city keeps this much more weight than is bearing down on it. */
+const DEFENCE_MARGIN = 1.5;
+/** ~3 infantry: the token the capital always keeps back. */
+const MIN_GARRISON_STRENGTH = 300;
 /** Enemy weight counted around an engaged stack when judging the battle. */
 const MELEE_RADIUS = 150;
 /** Break off below this share of full hp... */
@@ -81,6 +87,7 @@ export function stepAi(session: SimContext, _dtHours: number): void {
     produceUnits(session, situation);
     buildIndustry(session, situation);
     if (!situation.atWar) continue;
+    mobilise(session, memory, situation);
     concentrate(session, memory, situation);
     assault(session, situation);
     strategicStrike(session, memory, situation);
@@ -89,21 +96,39 @@ export function stepAi(session: SimContext, _dtHours: number): void {
 }
 
 /**
- * Stacks free to be given a new job. Excludes the last defender of the capital
- * or of any threatened city — that garrison is never stripped, whatever else
- * the country wants to do — and excludes pure mining stacks, which have no
- * combat weight.
+ * What a city must keep back: cover for whatever is bearing down on it, a token
+ * force at the capital whatever the map looks like, and nothing at all at a
+ * quiet rear city — a province no one is near does not tie down a field army.
+ */
+function requiredGarrison(city: CityStatus): number {
+  if (city.threatStrength > 0) {
+    return Math.max(city.threatStrength * DEFENCE_MARGIN, MIN_GARRISON_STRENGTH);
+  }
+  return city.isCapital ? MIN_GARRISON_STRENGTH : 0;
+}
+
+/**
+ * Stacks free to be given a new job. A stack standing on one of our cities may
+ * only leave if the city still covers the threat against it once he is gone —
+ * so the last defender of the capital or of a pressed city is never stripped,
+ * while a garrison sitting on ten times what it needs is not frozen either.
+ * Strengths are re-read live, so a split earlier in this pass counts.
  */
 function availableStacks(situation: Assessment): ArmyStack[] {
-  const held = new Set<number>();
+  const spareByNode = new Map<number, number>();
   for (const city of situation.cities) {
-    if (city.garrison.length <= 1 && (city.threatStrength > 0 || city === situation.capital)) {
-      held.add(city.node);
-    }
+    let held = 0;
+    for (const army of city.garrison) held += combatStrength(army);
+    const spare = held - requiredGarrison(city);
+    spareByNode.set(city.node, Math.min(spareByNode.get(city.node) ?? Infinity, spare));
   }
-  return situation.armies.filter((army) => !army.order && army.status === 'idle'
-    && army.extractingNodeId === null && !held.has(army.graphNodeId)
-    && combatStrength(army) > 0);
+  return situation.armies.filter((army) => {
+    if (army.order || army.status !== 'idle' || army.extractingNodeId !== null) return false;
+    const strength = combatStrength(army);
+    if (strength <= 0) return false;
+    const spare = spareByNode.get(army.graphNodeId);
+    return spare === undefined || strength <= spare;
+  });
 }
 
 /** 1. A stack that is losing its battle walks back into friendly territory. */
@@ -264,7 +289,54 @@ function buildIndustry(session: SimContext, situation: Assessment): void {
 }
 
 /**
- * 6. Gather. Loose stacks march on ONE staging province behind the front, where
+ * 6a. Mobilise. A country whose whole army IS its capital garrison can never
+ * free a stack the normal way — the stack is worth more than the city can
+ * spare. Split the surplus off instead: the covering garrison stays put and the
+ * field army marches. Without this a small nation just sat on its capital.
+ */
+function mobilise(session: SimContext, memory: AiMemory, situation: Assessment): void {
+  const staging = situation.staging;
+  if (!staging) return;
+  const stagingNode = provinceNode(session, memory, staging);
+  for (const city of situation.cities) {
+    if (city.node === stagingNode) continue; // the fist already forms here
+    let held = 0;
+    for (const army of city.garrison) held += combatStrength(army);
+    const spare = held - requiredGarrison(city);
+    if (spare < MIN_ASSAULT_STRENGTH) continue;
+    // Only stacks too big to march off on their own need cutting down.
+    const parent = city.garrison.find((army) => !army.order && army.status === 'idle'
+      && army.extractingNodeId === null && combatStrength(army) > spare);
+    if (!parent) continue;
+    const groups = detachment(parent, spare);
+    if (groups.length === 0) continue;
+    const done = applyCommand(session, {
+      type: 'splitArmy', countryId: situation.countryId, armyId: parent.id,
+      groups, x: staging.center[0], z: staging.center[1],
+    }).ok;
+    if (done) return;
+  }
+}
+
+/** Up to `budget` worth of fighting units; engineers stay home and mine. */
+function detachment(
+  stack: ArmyStack, budget: number,
+): { typeId: string; count: number }[] {
+  const groups: { typeId: string; count: number }[] = [];
+  let remaining = budget;
+  for (const group of stack.units) {
+    if (group.count <= 0 || unitType(group.typeId).category === 'engineer') continue;
+    const perUnit = group.hp / group.count;
+    const take = Math.min(group.count, Math.floor(remaining / Math.max(perUnit, 1)));
+    if (take <= 0) continue;
+    groups.push({ typeId: group.typeId, count: take });
+    remaining -= take * perUnit;
+  }
+  return groups;
+}
+
+/**
+ * 6b. Gather. Loose stacks march on ONE staging province behind the front, where
  * `stepMovement` folds arrivals into the stack already resting there — so the
  * country builds a fist instead of feeding the enemy one stack at a time. Rear
  * cities rally their production to the same point.
@@ -333,10 +405,7 @@ function assault(session: SimContext, situation: Assessment): void {
     .sort((a, b) => a.score - b.score);
   let tried = 0;
   for (const { province } of objectives) {
-    const defenders = strengthNear(
-      situation.enemyArmies, province.center[0], province.center[1], CONTACT_RADIUS, width,
-    );
-    if (strength < defenders * COMMIT_RATIO) continue;
+    if (strength < oppositionTo(situation, spearhead, province, width) * COMMIT_RATIO) continue;
     // No aim point: `issueAttack` then marches on the province centre without a
     // point-in-province check, and reports failure for ground we cannot reach.
     const done = applyCommand(session, {
@@ -345,6 +414,28 @@ function assault(session: SimContext, situation: Assessment): void {
     }).ok;
     if (done || (tried += 1) >= OBJECTIVE_TRIES) return;
   }
+}
+
+/**
+ * Enemy weight standing in the way of an assault: whatever holds the objective,
+ * plus every stack between us and it. A province that looks undefended because
+ * it sits behind an intact enemy field army is not undefended, and marching a
+ * column past that army to reach it is how the old AI lost its stacks.
+ */
+function oppositionTo(
+  situation: Assessment, from: ArmyStack, target: WorldProvince, width: number,
+): number {
+  const reach = wrappedDistance(from.x, from.z, target.center[0], target.center[1], width);
+  let total = 0;
+  for (const enemy of situation.enemyArmies) {
+    const toObjective = wrappedDistance(
+      enemy.x, enemy.z, target.center[0], target.center[1], width,
+    );
+    const toUs = wrappedDistance(from.x, from.z, enemy.x, enemy.z, width);
+    if (toObjective > CONTACT_RADIUS && (toUs > reach || toObjective > reach)) continue;
+    total += combatStrength(enemy);
+  }
+  return total;
 }
 
 /** 8. One warhead at the most valuable reachable enemy province, rarely. */
