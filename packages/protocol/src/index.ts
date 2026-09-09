@@ -162,6 +162,12 @@ export interface PlayerProjection {
     messages: DiplomacyMessage[];
     proposals: DiplomacyProposal[];
   };
+  /** Set once the campaign is decided from the viewer's point of view. */
+  outcome?: {
+    result: 'victory' | 'defeat';
+    reason: string;
+    atGameHours: number;
+  };
 }
 
 /**

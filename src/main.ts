@@ -1968,8 +1968,22 @@ function syncCombatMarkers(session: RemoteGameSession): void {
   combatEffects.syncBattles([...seen.values()]);
 }
 
+let campaignOutcomeShown = false;
+
 function drainSessionEvents(session: RemoteGameSession): void {
   const player = session.playerCountryId;
+
+  // Campaign decided — announce it once and pause the clock. The authoritative
+  // sim has already frozen; this is the player-facing acknowledgement.
+  const outcome = session.state.outcome;
+  if (outcome && !campaignOutcomeShown) {
+    campaignOutcomeShown = true;
+    const won = outcome.result === 'victory';
+    pushNotification(won ? 'completed' : 'warning',
+      won ? 'Victory' : 'Defeat', outcome.reason, { sticky: true });
+    uiStore.patch({ paused: true });
+  }
+
   for (const done of session.pendingCompletions.splice(0)) {
     // Only the player's own production is player news.
     if (session.state.provinceOwners[done.provinceId] !== player) continue;

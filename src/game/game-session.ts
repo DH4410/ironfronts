@@ -11,7 +11,7 @@
  * `tick` systems; their hooks are marked below.
  */
 
-import type { GameState } from './game-state';
+import type { GameOutcome, GameState } from './game-state';
 import { cloneGameState, relationOf, serializeGameState, setRelation } from './game-state';
 import type { LandGraph } from './movement/graph';
 import type { ScenarioSelection } from './scenario';
@@ -25,6 +25,7 @@ import { producibleUnits, stepProduction, type UnitCompletion } from './producti
 import { buildOptions, stepConstruction, type BuildingCompletion } from './construction';
 import { stepCombat, stepCapture, type CaptureEvent, type CombatEvent } from './combat';
 import { stepWarheads } from './strike';
+import { stepVictory } from './victory';
 import { stepAi } from './ai/simple-ai';
 import { applyCommand as runCommand, type CommandResult, type GameCommand } from './commands';
 import { guaranteeStrategicBaseline } from './resource-bootstrap';
@@ -53,6 +54,8 @@ export class GameSession {
   readonly pendingBuildings: BuildingCompletion[] = [];
   readonly pendingCaptures: CaptureEvent[] = [];
   readonly pendingCombat: CombatEvent[] = [];
+  /** Populated on the single tick the campaign is decided. */
+  readonly pendingOutcome: GameOutcome[] = [];
 
   private constructor(init: InitResult, world: WorldData) {
     this.state = init.state;
@@ -106,6 +109,9 @@ export class GameSession {
     this.state.simulationTick += 1;
     this.state.clock.gameTimeHours += dtHours;
 
+    // Campaign already decided — freeze the simulation, keep serving state.
+    if (this.state.outcome) return;
+
     // --- economy -------------------------------------------------
     if (this.state.economyEnabled) {
       this.incomeClock += dtHours;
@@ -124,6 +130,8 @@ export class GameSession {
     for (const done of stepProduction(this, dtHours)) this.pendingCompletions.push(done);
     for (const ev of stepCombat(this, dtHours)) this.pendingCombat.push(ev);
     for (const cap of stepCapture(this)) this.pendingCaptures.push(cap);
+    const outcome = stepVictory(this);
+    if (outcome) this.pendingOutcome.push(outcome);
 
     // --- simple defensive AI (slow cadence) -----------------------
     this.aiClock += dtHours;

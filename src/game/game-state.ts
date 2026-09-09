@@ -48,6 +48,14 @@ export interface CountryState {
   warheads?: number;
 }
 
+/** Terminal state of a campaign, from the human player's point of view. */
+export interface GameOutcome {
+  readonly result: 'victory' | 'defeat';
+  readonly reason: string;
+  /** Game-hour the campaign was decided. */
+  readonly atGameHours: number;
+}
+
 export interface ProvinceBuildings {
   barracks: number;
   tankPlant: number;
@@ -206,6 +214,12 @@ export interface GameState {
    * field — pre-strike v2 saves default it to `{}` on load, no GAME_VERSION bump.
    */
   provinceDevastation?: Record<number, number>;
+
+  /**
+   * Set once the campaign is decided, then frozen. Absent = still in progress.
+   * Additive optional field — no GAME_VERSION bump.
+   */
+  outcome?: GameOutcome;
 
   /** Optional for compatibility with v2 snapshots created before diplomacy. */
   diplomacyMessages?: Record<string, DiplomacyMessage>;
