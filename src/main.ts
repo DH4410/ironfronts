@@ -2009,19 +2009,41 @@ function drainSessionEvents(session: RemoteGameSession): void {
         maybePlayCombatAlert();
         continue;
       }
-      // Always shown — a strategic strike is never LOD-culled. A tight cluster
-      // of blasts plus a tall, slow smoke column reads as one large detonation.
-      combatEffects.spawn(EFFECT_KIND.targetFlash, sx, sz, { scale: 2.6 });
-      for (let i = 0; i < 6; i += 1) {
-        const ang = (i / 6) * Math.PI * 2;
-        const rad = i === 0 ? 0 : 22 + (i % 3) * 16;
+      // Always shown — a strategic strike is never LOD-culled. Choreographed in
+      // phases so it reads as a real detonation with motion: a blinding flash
+      // and core fireball, a shockwave of dust racing outward along the ground,
+      // a stalk of smoke climbing from the impact point (smoke rises with age,
+      // so older puffs sit higher), then a slow mushroom cap and lingering haze.
+      combatEffects.spawn(EFFECT_KIND.targetFlash, sx, sz, { scale: 3.0 });
+      combatEffects.spawn(EFFECT_KIND.explosion, sx, sz, { scale: 2.8 });
+      for (let ring = 0; ring < 3; ring += 1) {
         window.setTimeout(() => {
-          combatEffects.spawn(EFFECT_KIND.explosion, sx + Math.cos(ang) * rad, sz + Math.sin(ang) * rad,
-            { scale: i === 0 ? 2.4 : 1.5 });
-          combatEffects.spawn(EFFECT_KIND.smoke, sx + Math.cos(ang) * rad, sz + Math.sin(ang) * rad,
-            { scale: 2.2, lifetimeMs: 6_000 });
-        }, i * 90);
+          const rad = 40 + ring * 70;
+          for (let k = 0; k < 8; k += 1) {
+            const ang = (k / 8) * Math.PI * 2 + ring * 0.4;
+            combatEffects.spawn(EFFECT_KIND.dust, sx + Math.cos(ang) * rad, sz + Math.sin(ang) * rad,
+              { scale: 1.6 - ring * 0.3, lifetimeMs: 1_600 });
+          }
+        }, 40 + ring * 130);
       }
+      for (let step = 0; step < 6; step += 1) {
+        window.setTimeout(() => {
+          const jitter = (step % 2 === 0 ? 1 : -1) * (6 + step * 3);
+          combatEffects.spawn(EFFECT_KIND.smoke, sx + jitter, sz - jitter * 0.5,
+            { scale: 1.6 + step * 0.35, lifetimeMs: 6_500 });
+          if (step === 2 || step === 4) {
+            combatEffects.spawn(EFFECT_KIND.explosion, sx + jitter, sz + jitter, { scale: 1.4 });
+          }
+        }, 120 + step * 140);
+      }
+      window.setTimeout(() => {
+        combatEffects.spawn(EFFECT_KIND.smoke, sx, sz, { scale: 4.2, lifetimeMs: 8_000 });
+        for (let k = 0; k < 4; k += 1) {
+          const ang = (k / 4) * Math.PI * 2;
+          combatEffects.spawn(EFFECT_KIND.smoke, sx + Math.cos(ang) * 34, sz + Math.sin(ang) * 34,
+            { scale: 3.0, lifetimeMs: 7_000 });
+        }
+      }, 900);
       pushNotification('combat',
         mine ? 'Strategic strike on our soil' : 'Strategic strike lands',
         mine ? 'An enemy warhead has devastated one of your provinces.'
