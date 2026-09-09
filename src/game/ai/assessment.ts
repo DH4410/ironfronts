@@ -119,6 +119,8 @@ export interface Assessment {
   readonly enemyProvinces: readonly WorldProvince[];
   /** enemy country id -> provinces it holds, for "who is the strongest enemy". */
   readonly enemySizes: ReadonlyMap<number, number>;
+  /** Enemy capital province ids — the objectives worth weighting. */
+  readonly enemyCapitals: ReadonlySet<number>;
   /** Enemy province nearest our capital — the axis the front forms along. */
   readonly frontTarget: WorldProvince | null;
   /** Our own province nearest `frontTarget`; where loose stacks gather. */
@@ -170,11 +172,14 @@ export function assess(
   const enemyArmies: ArmyStack[] = [];
   const enemyProvinces: WorldProvince[] = [];
   const enemySizes = new Map<number, number>();
+  const enemyCapitals = new Set<number>();
   for (const enemyId of enemyIds) {
     for (const army of armiesByOwner.get(enemyId) ?? []) enemyArmies.push(army);
     const held = provincesByOwner.get(enemyId) ?? [];
     for (const province of held) enemyProvinces.push(province);
     enemySizes.set(enemyId, held.length);
+    const seat = world.countries.find((c) => c.id === enemyId)?.capitalProvinceId;
+    if (seat !== undefined) enemyCapitals.add(seat);
   }
 
   const capitalId = world.countries.find((c) => c.id === countryId)?.capitalProvinceId ?? -1;
@@ -220,6 +225,7 @@ export function assess(
     enemyArmies,
     enemyProvinces,
     enemySizes,
+    enemyCapitals,
     frontTarget,
     staging,
     atWar: enemyIds.size > 0,

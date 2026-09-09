@@ -390,17 +390,12 @@ function assault(session: SimContext, situation: Assessment): void {
     if (done) return;
   }
 
-  const enemyCapitals = new Set(
-    [...situation.enemyIds]
-      .map((id) => session.world.countries.find((c) => c.id === id)?.capitalProvinceId)
-      .filter((id): id is number => id !== undefined),
-  );
   const objectives = situation.enemyProvinces
     .map((province) => ({
       province,
       score: wrappedDistance(
         spearhead.x, spearhead.z, province.center[0], province.center[1], width,
-      ) * (enemyCapitals.has(province.id) ? 0.6 : 1),
+      ) * (situation.enemyCapitals.has(province.id) ? 0.6 : 1),
     }))
     .sort((a, b) => a.score - b.score);
   let tried = 0;
@@ -453,11 +448,6 @@ function strategicStrike(
   if (sites.length === 0) return;
 
   const width = session.world.width;
-  const enemyCapitals = new Set(
-    [...situation.enemyIds]
-      .map((id) => session.world.countries.find((c) => c.id === id)?.capitalProvinceId)
-      .filter((id): id is number => id !== undefined),
-  );
   let best = situation.enemyProvinces[0] ?? null;
   let bestValue = 0;
   for (const province of situation.enemyProvinces) {
@@ -467,7 +457,7 @@ function strategicStrike(
     if (!inRange) continue;
     const value = strengthNear(
       situation.enemyArmies, province.center[0], province.center[1], CONTACT_RADIUS, width,
-    ) + (enemyCapitals.has(province.id) ? 1500 : 0);
+    ) + (situation.enemyCapitals.has(province.id) ? 1500 : 0);
     if (value > bestValue) {
       bestValue = value;
       best = province;
