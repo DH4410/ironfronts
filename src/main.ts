@@ -625,6 +625,7 @@ async function startGame(token: number): Promise<void> {
     openDebugInspector: () => {
       if (debugEnabled) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3', key: 'F3' }));
     },
+    armStrike: () => armStrike(session),
     focusWorld: (x, z) => renderer.focus(x, z, 900),
     armyCommand: (command) => handleArmyCommand(command),
     produceUnit: (provinceId, unitTypeId) => handleProduce(provinceId, unitTypeId),
@@ -1517,13 +1518,13 @@ function armStrike(session: RemoteGameSession): void {
   const ready = session.ownCountry.warheads ?? 0;
   if (ready < 1) {
     pushNotification('warning', 'No warhead ready',
-      'Build and hold an Ordnance Workshop to stockpile a strategic warhead.');
+      'Build a Missile Site to stockpile strategic warheads.');
     return;
   }
   targetingMode = 'strike';
   awaitingMoveTarget = false;
   pushNotification('warning', 'Strategic strike armed',
-    `Click an enemy province to target. ${ready} warhead${ready === 1 ? '' : 's'} ready · Esc to cancel.`);
+    `Click an enemy province within Missile Site range. ${ready} warhead${ready === 1 ? '' : 's'} ready · Esc to cancel.`);
 }
 
 /** A one-shot red reticle that snaps onto the click point and fades. Pure DOM,

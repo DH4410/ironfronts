@@ -40,6 +40,8 @@ export interface GameUiActions {
   togglePause(open: boolean): void;
   returnToMenu(): void;
   openDebugInspector(): void;
+  /** Arm map-click targeting for a strategic strike (the Warheads chip / N key). */
+  armStrike?: () => void;
   focusSelected?: () => void;
   /** Re-centre the camera on a world point (locatable notifications). */
   focusWorld?: (x: number, z: number) => void;
@@ -84,11 +86,12 @@ const PROVINCE_FIELDS = ['Allegiance', 'Terrain', 'Deposits', 'Extraction'] as c
 type ProvinceFieldKey = (typeof PROVINCE_FIELDS)[number];
 
 const FACILITY_CHIPS: ReadonlyArray<{
-  key: 'barracks' | 'tankPlant' | 'ordnance'; label: string; icon: IconName;
+  key: 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite'; label: string; icon: IconName;
 }> = [
   { key: 'barracks', label: 'Barracks', icon: 'structure-barracks' },
   { key: 'tankPlant', label: 'Tank plant', icon: 'structure-plant' },
   { key: 'ordnance', label: 'Ordnance works', icon: 'structure-ordnance' },
+  { key: 'missileSite', label: 'Missile site', icon: 'structure-ordnance' },
 ];
 
 /** Building id → 0 A.D. facility icon, for the graphical Build row. */
@@ -96,6 +99,7 @@ const FACILITY_ICON: Record<string, IconName> = {
   barracks: 'structure-barracks',
   tankPlant: 'structure-plant',
   ordnance: 'structure-ordnance',
+  missileSite: 'structure-ordnance',
 };
 
 /** Compact painted marks for production types that lacked button icons. */
@@ -111,6 +115,7 @@ const FACILITY_NOTE: Record<string, string> = {
   barracks: 'Trains infantry and engineers.',
   tankPlant: 'Builds armoured cars and tanks.',
   ordnance: 'Builds artillery and heavy ordnance.',
+  missileSite: 'Stockpiles strategic warheads and launches strikes within range.',
 };
 
 const numberFormat = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
@@ -634,8 +639,23 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     const slots = state.resources.map((r) => r.id).join(',');
     if (slots !== resourceSlots) {
       resourceStrip.replaceChildren(...state.resources.map((line) => {
+        // The Warheads chip doubles as the strike trigger — activating it arms
+        // map-click targeting, the same order the N key gives. Kept as a <span>
+        // (not <button>) so it inherits the chip styling unchanged.
         const chip = el('span', 'ifg-res');
         chip.dataset.res = line.id;
+        if (line.id === 'warheads' && actions.armStrike) {
+          const arm = actions.armStrike;
+          chip.classList.add('is-actionable');
+          chip.setAttribute('role', 'button');
+          chip.tabIndex = 0;
+          chip.style.cursor = 'pointer';
+          chip.title = 'Launch strategic strike (or press N)';
+          chip.addEventListener('click', () => arm());
+          chip.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); arm(); }
+          });
+        }
         const ic = resourceIcon[line.id];
         if (ic) chip.append(createIcon(ic, 'ifg-res__icon'));
         const stack = el('span', 'ifg-res__stack');
@@ -740,7 +760,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
 
       // Facilities row — own provinces only, shown when at least one stands.
       const b = province.buildings;
-      const anyFacility = Boolean(b && (b.barracks > 0 || b.tankPlant > 0 || b.ordnance > 0));
+      const anyFacility = Boolean(b && (b.barracks > 0 || b.tankPlant > 0 || b.ordnance > 0 || b.missileSite > 0));
       pvFacilities.hidden = !anyFacility;
       if (b) {
         for (const { key } of FACILITY_CHIPS) {
