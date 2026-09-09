@@ -2181,14 +2181,15 @@ function pushNotification(
 
   // Fold a burst of identical events (same kind + title, e.g. "Province captured"
   // through an offensive) into the existing toast with a running "×N" tally
-  // rather than letting near-duplicate cards crowd the stack. Sticky,
-  // action-required toasts are never merged — each may point somewhere different.
-  const twin = previous.find((entry) => entry.kind === kind && entry.title === title && !entry.sticky);
+  // rather than letting near-duplicate cards crowd the stack. Never merge a
+  // toast that carries a focus point (a located battle you can click to fly to)
+  // or a sticky one — each of those points somewhere specific.
+  const twin = options.focus
+    ? undefined
+    : previous.find((entry) => entry.kind === kind && entry.title === title
+        && !entry.sticky && !entry.focus);
   if (twin) {
-    const merged = {
-      ...twin, body, at: Date.now(),
-      count: (twin.count ?? 1) + 1, focus: options.focus ?? twin.focus,
-    };
+    const merged = { ...twin, body, at: Date.now(), count: (twin.count ?? 1) + 1 };
     uiStore.patch({ notifications: previous.map((entry) => (entry.id === twin.id ? merged : entry)) });
     if (delay !== null) {
       clearNotificationTimer(twin.id);
