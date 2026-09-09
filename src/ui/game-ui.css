@@ -2,11 +2,23 @@
  * In-game command UI (v2) — map-first composition.
  *
  * Design intent: a lighter register of the main-menu war-room language.
- * Oxidised charcoal, thin aged-brass rules, cream type, mostly-square
- * geometry, painterly resource icons over flat line icons for controls.
+ * Oxidised charcoal, aged brass, cream type, and generated irregular
+ * field-command skins. Painterly art supplies every major visual surface;
+ * CSS remains responsible for layout, state, and accessibility.
  * Small floating control clusters — never a full-height rail or a
  * full-width bottom drawer. The map is the primary interface.
  */
+
+:root {
+  --ifg-skin-panel: url('./assets/skins/hud-panel-frame.png');
+  --ifg-skin-control: url('./assets/skins/hud-control-plate.png');
+  --ifg-skin-building: url('./assets/skins/hud-building-plaque.png');
+  --ifg-skin-queue: url('./assets/skins/hud-queue-slot.png');
+  --ifg-skin-ribbon: url('./assets/skins/hud-action-ribbon.png');
+  --ifg-skin-counter: url('./assets/skins/army-counter-cartouche.png');
+  --ifg-skin-unit-frame: url('./assets/skins/army-unit-card-frame.png');
+  --ifg-skin-unit-mask: url('./assets/skins/army-unit-card-mask.png');
+}
 
 .ifg {
   --ifg-ink: #12140f;
@@ -22,7 +34,6 @@
   --ifg-serif: var(--ifm-serif, Georgia, "Times New Roman", serif);
   --ifg-ease: var(--ifm-ease, cubic-bezier(0.22, 0.76, 0.19, 1));
   --ifg-lift: 0 12px 30px rgba(0, 0, 0, 0.5);
-
   position: fixed;
   inset: 0;
   z-index: 30;
@@ -34,6 +45,17 @@
 .ifg[hidden] { display: none; }
 .ifg [hidden] { display: none !important; }
 .ifg * { box-sizing: border-box; }
+.ifg * { scrollbar-width: thin; scrollbar-color: #82765a transparent; }
+.ifg *::-webkit-scrollbar { width: 8px; height: 8px; }
+.ifg *::-webkit-scrollbar-track { background: transparent; }
+.ifg *::-webkit-scrollbar-thumb {
+  min-height: 24px;
+  background: linear-gradient(180deg, #9d8858, #514a38);
+  background-clip: content-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+.ifg *::-webkit-scrollbar-thumb:hover { background-color: #b79b61; }
 .ifg button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
 .ifg button:disabled { cursor: default; }
 .ifg > * { pointer-events: auto; }
@@ -1187,13 +1209,13 @@
   transition: border-color 0.1s ease, background 0.1s ease, transform 0.06s ease;
 }
 .ifg-army-panel__commands--primary .ifg-army-panel__command {
-  width: 62px;
-  height: 62px;
-  min-width: 62px;
-  flex: 0 0 62px;
-  padding: 8px;
+  width: 72px;
+  height: 48px;
+  min-width: 72px;
+  flex: 0 0 72px;
+  padding: 7px 12px;
 }
-.ifg-army-panel__commands--primary .ifg-army-panel__command-icon { width: 42px; height: 42px; }
+.ifg-army-panel__commands--primary .ifg-army-panel__command-icon { width: 36px; height: 36px; }
 .ifg-army-panel__command-icon { width: 32px; height: 32px; color: inherit; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6)); }
 .ifg-army-panel__command:not(:disabled):hover {
   color: var(--ifg-brass-lit);
@@ -1653,3 +1675,312 @@
   color: #f1e2be;
   text-align: center;
 }
+
+/* ================= illustrated surface grammar =================
+ * These skins replace generic square fills while preserving semantic layout.
+ * Large surfaces use nine-slice borders; fixed-size controls use contained
+ * art so neither the generated metalwork nor the live icon is stretched.
+ */
+.ifg-topbar,
+.ifg-dip,
+.ifg-card,
+.ifg-army-panel,
+.ifg-command-dialog,
+.ifg-overlay__card,
+.ifg-notify__item {
+  background-color: transparent;
+  background-image: none;
+  border: 8px solid transparent;
+  border-image-source: var(--ifg-skin-panel);
+  border-image-slice: 42 fill;
+  border-image-width: 8px;
+  border-image-repeat: stretch;
+  border-radius: 0;
+}
+
+.ifg-topbar {
+  border-width: 5px;
+  border-image-width: 5px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55);
+}
+
+.ifg-card::after { content: none; }
+.ifg-card::before,
+.ifg-army-panel::before {
+  inset: 7px auto 7px 3px;
+  width: 3px;
+}
+
+:is(
+  .ifg-dock__btn,
+  .ifg-topbar__system,
+  .ifg-card__iconbtn,
+  .ifg-army-panel__command
+) {
+  background-color: transparent;
+  background-image: var(--ifg-skin-control);
+  background-position: center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.48));
+}
+
+:is(
+  .ifg-dock__btn,
+  .ifg-topbar__system,
+  .ifg-card__iconbtn,
+  .ifg-army-panel__command
+):not(:disabled):hover {
+  filter: brightness(1.16) drop-shadow(0 6px 9px rgba(0, 0, 0, 0.55));
+}
+
+.ifg-army-panel__command.is-active,
+.ifg-dock__btn--primary.is-on {
+  background-image: var(--ifg-skin-control);
+  filter: sepia(0.18) saturate(1.2) brightness(1.12) drop-shadow(0 0 7px rgba(201, 164, 99, 0.4));
+}
+
+:is(
+  .ifg-card__act,
+  .ifg-dip__action,
+  .ifg-command-dialog button,
+  .ifg-overlay__primary,
+  .ifg-army-panel__activity-value,
+  .ifg-army-panel__stat-meta > span,
+  .ifg-battle-side,
+  .ifg-dip__summary-stat,
+  .ifg-tip
+) {
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 7px solid transparent !important;
+  border-image-source: var(--ifg-skin-ribbon) !important;
+  border-image-slice: 42 76 fill !important;
+  border-image-width: 7px 12px !important;
+  border-image-repeat: stretch !important;
+  border-radius: 0 !important;
+}
+
+:is(.ifg-card__act, .ifg-dip__action, .ifg-command-dialog button, .ifg-overlay__primary):not(:disabled):hover {
+  color: var(--ifg-brass-lit) !important;
+  filter: brightness(1.14);
+}
+
+.ifg-army-panel__commands--primary .ifg-army-panel__command {
+  width: 72px;
+  height: 48px;
+  min-width: 72px;
+  flex-basis: 72px;
+}
+
+.ifg-buildbtn,
+.ifg-card__prodlist--buildings .ifg-buildbtn {
+  width: 84px;
+  height: 56px;
+  min-height: 56px;
+  padding: 6px 11px;
+  justify-content: center;
+  background: var(--ifg-skin-building) center / contain no-repeat;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.48));
+}
+
+.ifg-card__prodlist--buildings .ifg-buildbtn {
+  width: 108px;
+  height: 76px;
+  min-height: 76px;
+  padding: 8px 13px;
+}
+
+.ifg-buildbtn:not(:disabled):hover {
+  filter: brightness(1.15) drop-shadow(0 6px 9px rgba(0, 0, 0, 0.55));
+}
+
+.ifg-buildbtn__thumb,
+.ifg-buildbtn__thumb.ifg-icon {
+  width: 60px;
+  height: 42px;
+  background: transparent;
+}
+
+.ifg-card__prodlist--buildings .ifg-buildbtn__thumb,
+.ifg-card__prodlist--buildings .ifg-buildbtn__thumb.ifg-icon {
+  width: 82px;
+  height: 58px;
+}
+
+.ifg-buildbtn__thumb.ifg-icon img,
+.ifg-buildbtn__thumb.ifg-icon svg,
+.ifg-card__prodlist--buildings .ifg-buildbtn__thumb.ifg-icon img,
+.ifg-card__prodlist--buildings .ifg-buildbtn__thumb.ifg-icon svg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.ifg-buildbtn__thumb {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.ifg-queue__item.is-active {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ifg-queue__portrait,
+.ifg-queue--construction .ifg-queue__item.is-active .ifg-queue__portrait,
+.ifg-queue--construction .ifg-queue__item.is-queued .ifg-queue__portrait {
+  width: 56px;
+  height: 42px;
+  overflow: visible;
+  background: var(--ifg-skin-queue) center / contain no-repeat;
+  border: 0;
+  border-radius: 0;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.46));
+}
+
+.ifg-queue--construction .ifg-queue__item.is-active .ifg-queue__portrait {
+  width: 92px;
+  height: 69px;
+}
+
+.ifg-queue--construction .ifg-queue__item.is-queued .ifg-queue__portrait {
+  width: 64px;
+  height: 48px;
+}
+
+.ifg-queue__thumb,
+.ifg-queue__thumb.ifg-icon {
+  position: absolute;
+  inset: 13% 11% 18%;
+  width: auto;
+  height: auto;
+  background: transparent;
+}
+
+.ifg-queue__thumb img,
+.ifg-queue__thumb svg,
+.ifg-queue__thumb.ifg-icon img,
+.ifg-queue__thumb.ifg-icon svg {
+  padding: 0;
+  background: transparent;
+  object-fit: contain;
+}
+
+.ifg-queue__progress-mask {
+  inset: 13% 11% 18%;
+  border-top-width: 1px;
+}
+
+.ifg-queue__count {
+  right: 5%;
+  top: 6%;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  text-shadow: 0 1px 2px #000, 0 0 4px #000;
+}
+
+.ifg-queue--production .ifg-queue__meta {
+  min-width: 56px;
+  width: 56px;
+}
+
+.ifg-queue--construction .ifg-queue__item.is-active {
+  grid-template-columns: 94px minmax(110px, 1fr);
+}
+
+.ifg-army-panel__units {
+  grid-template-columns: repeat(auto-fill, minmax(116px, 148px));
+  gap: 10px;
+}
+
+.ifg-army-unit,
+.ifg-army-panel__units.is-dense .ifg-army-unit {
+  aspect-ratio: 3 / 4;
+  grid-template-rows: minmax(0, 1fr) 21px 5px;
+  overflow: hidden;
+  background: #10120e;
+  border: 0;
+  border-radius: 0;
+  -webkit-mask-image: var(--ifg-skin-unit-mask);
+  mask-image: var(--ifg-skin-unit-mask);
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  filter: drop-shadow(0 7px 8px rgba(0, 0, 0, 0.48));
+}
+
+.ifg-army-unit::before {
+  z-index: 4;
+  inset: 0;
+  background: var(--ifg-skin-unit-frame) center / 100% 100% no-repeat;
+  pointer-events: none;
+}
+
+.ifg-army-unit__visual,
+.ifg-army-panel__units.is-dense .ifg-army-unit__visual {
+  height: auto;
+  margin: 8% 8% 0;
+}
+
+.ifg-army-unit__portrait img {
+  padding: 4px 4px 0;
+  background: #12150f;
+}
+
+.ifg-army-unit__count {
+  right: 13px;
+  bottom: 10px;
+  z-index: 5;
+  padding: 0;
+  color: var(--ifg-brass-lit);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  text-shadow: 0 1px 2px #000;
+}
+
+.ifg-army-unit__details {
+  z-index: 2;
+  justify-content: flex-start;
+  padding: 2px 34px 2px 16px;
+  background: transparent;
+  border: 0;
+}
+
+.ifg-army-unit__details strong {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.ifg-army-unit:hover .ifg-army-unit__details strong { opacity: 1; }
+.ifg-army-unit__condition { z-index: 5; margin: 0 14px 7px; }
+
+.ifg-counter {
+  width: 60px;
+  height: 45px;
+  background: var(--ifg-skin-counter) center / contain no-repeat;
+  border: 0;
+  box-shadow: none;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.52));
+}
+.ifg-counter__corner { display: none; }
+.ifg-counter.is-selected {
+  border: 0;
+  box-shadow: none;
+  filter: brightness(1.15) drop-shadow(0 0 7px rgba(232, 201, 136, 0.58));
+}
+.ifg-counter__bar { width: 62%; height: 3px; }

@@ -279,15 +279,16 @@
 }
 .ifm__file::before, .ifm__file::after {
   content: ""; position: absolute; left: 22px; right: 22px; height: 9px;
-  background: url('/menu/kit/edge-strip.png') center/100% 100% no-repeat;
-  mix-blend-mode: screen; opacity: .7; pointer-events: none;
+  box-sizing: border-box; background: none; border: 4px solid transparent;
+  border-image: url('/menu/kit/edge-strip.png') 20 64 fill / 4px 16px stretch;
+  opacity: .9; pointer-events: none;
 }
 .ifm__file::before { top: -5px; }
 .ifm__file::after { bottom: -5px; }
 .ifm__file-corner {
   position: absolute; width: 26px; height: 26px; z-index: 1;
   background: url('/menu/kit/corner-fastener.png') center/contain no-repeat;
-  mix-blend-mode: screen; opacity: .85; pointer-events: none;
+  opacity: .95; pointer-events: none;
 }
 .ifm__file-corner--tl { top: -9px; left: -9px; }
 .ifm__file-corner--tr { top: -9px; right: -9px; transform: scaleX(-1); }
@@ -327,21 +328,22 @@
 .ifm__body--wide { grid-template-columns: 1fr 18em; }
 .ifm__map-frame { position: relative; padding: 9px; }
 .ifm__map-frame::before {
-  content: ""; position: absolute; inset: 0;
-  background: url('/menu/kit/torn-paper-frame.png') center/100% 100% no-repeat;
-  mix-blend-mode: screen; opacity: .85;
+  content: ""; position: absolute; inset: 0; box-sizing: border-box;
+  background: none; border: 20px solid transparent;
+  border-image: url('/menu/kit/torn-paper-frame.png') 96 / 20px stretch;
+  opacity: .96;
 }
 .ifm__map-photo { position: relative; overflow: hidden; min-height: 12em; height: 100%; border: 1px solid var(--hud-line); background: linear-gradient(rgba(6,8,7,.3), rgba(6,8,7,.55)), url('/menu/europe-map.jpg') center/cover; filter: grayscale(.3); }
 .ifm__map-photo span { position: absolute; left: 1em; bottom: .8em; color: var(--hud-gold-bright); font: 700 .78em/1 var(--ifm-sans); letter-spacing: .12em; text-transform: uppercase; z-index: 1; }
 .ifm__map-photo::after {
   content: ""; position: absolute; inset: 0;
-  background: url('/menu/kit/map-grid.png') center/cover no-repeat;
-  mix-blend-mode: screen; opacity: .16; pointer-events: none;
+  background: url('/menu/kit/map-grid.png') center/256px 256px repeat;
+  opacity: .11; pointer-events: none;
 }
 .ifm__map-compass {
   position: absolute; right: .7em; bottom: .7em; z-index: 1; width: 34px; height: 34px;
   background: url('/menu/kit/compass-marker.png') center/contain no-repeat;
-  mix-blend-mode: screen; opacity: .8; pointer-events: none;
+  opacity: .92; pointer-events: none;
 }
 .ifm__list { display: flex; flex-direction: column; gap: .6em; min-height: 0; }
 .ifm__row {

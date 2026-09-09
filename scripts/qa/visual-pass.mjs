@@ -50,9 +50,16 @@ try {
     return !!c && !c.disabled && !c.classList.contains('is-disabled');
   });
   if (!hasSeat) {
-    log('no qa-combat seat yet — run combat-check.mjs once first; aborting');
+    log('no qa-combat seat in the active game save — verify GAME_DATA_PATH and aborting safely');
     process.exitCode = 1;
   } else {
+    await page.screenshot(shot('qa-menu-home.png'));
+    await page.click('#ifm-new-campaign');
+    await page.waitForTimeout(800);
+    await page.screenshot(shot('qa-menu-dossier.png'));
+    await page.click('#ifm-campaign .ifm__back');
+    await page.waitForTimeout(750);
+
     await page.evaluate(() => document.getElementById('ifm-continue')?.click());
     await page.waitForFunction(
       () => !!window.__ironfrontsSession && document.getElementById('loading')?.hasAttribute('hidden'),
@@ -123,7 +130,11 @@ try {
     }
 
     // ---- army HUD + tooltip --------------------------------------------
-    await page.evaluate(() => window.__ironfrontsRenderer.setQuality('high'));
+    await page.evaluate(() => {
+      window.__ironfrontsRenderer.setQuality('high');
+      const diagnostics = document.getElementById('diagnostics');
+      if (diagnostics) diagnostics.hidden = true;
+    });
     const own = await page.evaluate(() => {
       const s = window.__ironfrontsSession;
       const a = Object.values(s.state.armies).find((x) => x.own);
@@ -142,12 +153,36 @@ try {
         await page.waitForTimeout(400);
         const tip = await page.evaluate(() => {
           const t = document.querySelector('.ifg-tip');
-          return t ? t.textContent?.replace(/\s+/g, ' ').trim() : null;
+          if (!t) return null;
+          const style = getComputedStyle(t);
+          return {
+            text: t.textContent?.replace(/\s+/g, ' ').trim(),
+            skin: style.borderImageSource,
+          };
         });
         log('command tooltip:', JSON.stringify(tip));
         await page.screenshot(shot('qa-ui-tooltip-command.png'));
       }
     }
+
+    // ---- province production/build art --------------------------------
+    await page.evaluate(() => {
+      window.__ironfrontsRenderer.onProvinceSelected?.({
+        id: 6,
+        name: 'Oulu',
+        terrain: 'Urban',
+        country: 'Finland',
+        countryColor: '#a9aa84',
+      });
+    });
+    await page.waitForTimeout(500);
+    await page.screenshot(shot('qa-ui-province-build.png'));
+
+    // ---- diplomacy side drawer ----------------------------------------
+    await page.click('.ifg-dock__expand');
+    await page.click('[data-nav="diplomacy"]');
+    await page.waitForTimeout(500);
+    await page.screenshot(shot('qa-ui-diplomacy.png'));
     log('console errors:', errors.length ? errors.join(' | ') : 'none');
   }
 } catch (err) {

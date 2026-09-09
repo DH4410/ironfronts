@@ -44,7 +44,8 @@ import { loadWorldAssetBuffers, worldAssetUrl } from './world-assets';
 import { getVisibleInstanceView, updateVisibleInstanceView } from './visible-instance-cache';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
-const ARMY_MARKER_PLATE_URL = new URL('./ui/assets/army-marker-plate.png', import.meta.url).href;
+const ARMY_MARKER_PLATE_URL = new URL('./ui/assets/skins/army-counter-cartouche.png', import.meta.url).href;
+const ARMY_ROSTER_PLATE_URL = new URL('./ui/assets/skins/army-roster-plaque.png', import.meta.url).href;
 const ARMY_UNIT_SILHOUETTES_URL = new URL('./ui/assets/army-unit-silhouettes.png', import.meta.url).href;
 
 /** Player-start camera: north-up, near top-down (~83°; a true 90° breaks picking). */
@@ -142,6 +143,7 @@ export class WorldRenderer {
   private provincePoliticalColorTexture!: GPUTexture;
   private diplomacyColorTexture!: GPUTexture;
   private armyMarkerPlateTexture!: GPUTexture;
+  private armyRosterPlateTexture!: GPUTexture;
   private armyUnitSilhouettesTexture!: GPUTexture;
   private politicalCache!: PoliticalCache;
   private countryColors!: Float32Array;
@@ -527,11 +529,13 @@ export class WorldRenderer {
     report('Preparing terrain and tree materials', 0.49);
     [
       this.materialTexture, this.treeMaterialTexture,
-      this.armyMarkerPlateTexture, this.armyUnitSilhouettesTexture,
+      this.armyMarkerPlateTexture, this.armyRosterPlateTexture,
+      this.armyUnitSilhouettesTexture,
     ] = await Promise.all([
       createMaterialTexture(this.device),
       createTreeMaterialTexture(this.device),
       this.loadArmyMarkerPlateTexture(),
+      this.loadArmyRosterPlateTexture(),
       this.loadArmyUnitSilhouettesTexture(),
     ]);
     this.uniformBuffer = this.device.createBuffer({
@@ -567,6 +571,7 @@ export class WorldRenderer {
           magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear',
         }) },
         { binding: 16, resource: this.armyUnitSilhouettesTexture.createView() },
+        { binding: 17, resource: this.armyRosterPlateTexture.createView() },
       ],
     });
 
@@ -1107,6 +1112,38 @@ export class WorldRenderer {
       });
       this.device.queue.writeTexture(
         { texture }, new Uint8Array([246, 241, 218, 255]),
+        { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1],
+      );
+      return texture;
+    }
+  }
+
+  private async loadArmyRosterPlateTexture(): Promise<GPUTexture> {
+    try {
+      const response = await fetch(ARMY_ROSTER_PLATE_URL);
+      if (!response.ok) throw new Error(`Army roster plate request failed: ${response.status}`);
+      const bitmap = await createImageBitmap(await response.blob());
+      const texture = this.device.createTexture({
+        label: 'painted army roster plaque',
+        size: [bitmap.width, bitmap.height],
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      this.device.queue.copyExternalImageToTexture(
+        { source: bitmap }, { texture }, [bitmap.width, bitmap.height],
+      );
+      bitmap.close();
+      return texture;
+    } catch (error) {
+      console.warn('Could not load the painted army roster plaque; using a flat fallback.', error);
+      const texture = this.device.createTexture({
+        label: 'flat army roster fallback',
+        size: [1, 1],
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      this.device.queue.writeTexture(
+        { texture }, new Uint8Array([38, 45, 36, 255]),
         { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1],
       );
       return texture;

@@ -3,7 +3,9 @@
 Prioritised list of visual assets the game is currently missing or making do
 with. Style reference: the existing painted / stamped-dossier look — muted
 field-grey, aged brass, cream type, painterly not flat-vector. Match
-`src/ui/assets/units/*.png` (unit portraits) and `src/ui/assets/army-marker-plate.png`.
+`src/ui/assets/units/*.png` (unit portraits) and the irregular generated skins
+under `src/ui/assets/skins/`. The old `army-marker-plate.png` is retained only
+as a historical reference and must not be used as the current shape template.
 
 Deliver PNGs alpha-trimmed + Lanczos-downscaled (portraits ~384px, icons
 ~256px, marker/HUD sprites at their used size). Register each new icon in
@@ -15,7 +17,6 @@ Deliver PNGs alpha-trimmed + Lanczos-downscaled (portraits ~384px, icons
 |---|---|---|
 | Unit portraits: `militia`, `motorised`, `mechanised`, `paratrooper` | `src/ui/assets/units/<id>.png`, army composition cards | The 6 core roster ids have painted portraits; these four fall back to the generic SVG. Add them if/when the roster can build them. |
 | City / settlement icon (`structure-city`) | province card, `structure-city` IconName is registered but has no slot in the UI | Painted walled-town emblem; a `settlement.png` already exists in `assets/icons/ironfronts/` but nothing shows it. Wire a slot + supply final art. |
-| Command-strip icons legibility | the floating Move / Attack / Split / Stop / Extract cluster over the map | Current painted icons blend into terrain. Either repaint on a small dark rounded plate, or supply a version with a baked 1px dark casing + drop shadow so they read on green *and* desert *and* snow. |
 | Diplomacy panel identity art | `.ifg-dip__header` watermark, empty-state | The cable watermark is generic; a painted foreign-office / telegraph motif would lift it. Optional. |
 
 ## P2 — needed if the matching feature lands (see `docs/FEATURE-IDEAS.md`)
@@ -35,3 +36,16 @@ Deliver PNGs alpha-trimmed + Lanczos-downscaled (portraits ~384px, icons
   visuals exist (`src/shaders/combat-effects.ts`), the audio does not.
 - Weather: rain already renders; a snow particle + a fog-bank sprite for polar
   provinces.
+
+## Completed 2026-09-09
+
+- Army counters now compose six separate realistic silhouettes and live counts
+  over an irregular cartouche; the full tapered roster opens only for a selected
+  close-range formation, preventing strategic-map clutter.
+- Move / Attack / Retreat / Split / Stop / Extract use painted icons on a wide
+  generated command medallion with hover-only text.
+- Building/production buttons and queue portraits have dedicated non-square
+  generated plaques; building art is larger than unit-production art.
+- The low-resolution menu edge, torn map frame, corner, compass, and grid crops
+  were replaced with high-resolution, true-alpha generated assets and are no
+  longer stretched as whole images.

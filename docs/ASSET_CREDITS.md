@@ -231,7 +231,7 @@ owner colour, condition, selection, engagement, and fog-of-war state.
 
 | Runtime file | Slot |
 |---|---|
-| `src/ui/assets/army-marker-plate.png` | Reusable painted counter backplate |
+| `src/ui/assets/army-marker-plate.png` | Original counter reference; superseded in runtime by the irregular cartouche |
 | `src/ui/assets/army-unit-silhouettes.png` | Six-cell WebGPU silhouette atlas |
 | `src/ui/assets/icons/ironfronts/marker-infantry.png` | Infantry counter silhouette |
 | `src/ui/assets/icons/ironfronts/marker-engineer.png` | Engineer counter silhouette |
@@ -239,6 +239,91 @@ owner colour, condition, selection, engagement, and fog-of-war state.
 | `src/ui/assets/icons/ironfronts/marker-light-tank.png` | Light-tank counter silhouette |
 | `src/ui/assets/icons/ironfronts/marker-medium-tank.png` | Medium-tank counter silhouette |
 | `src/ui/assets/icons/ironfronts/marker-artillery.png` | Artillery counter silhouette |
+
+### Irregular field-command UI skins
+
+**Source:** Original Ironfronts assets generated with OpenAI's built-in image
+generator on 2026-09-09. The existing Ironfronts counter plate was supplied as
+a material/palette reference only. No 0 A.D. or Call of War artwork was copied.
+
+**Direction:** replace generic square UI fills with readable, genuinely
+transparent, hand-painted field-command objects: a winged army cartouche, a
+vertical composition shield, an arched unit-card frame, a scalable stitched
+panel surround, a wide control medallion, a dedicated building plaque, a
+production-queue slot, and a low action ribbon. All use
+soot iron, chipped field-green enamel or leather, oxidised brass, bone edge
+wear, realistic 1930s-1940s proportions, and restrained historical-RTS craft.
+Every prompt explicitly excluded text, numbers, icons, flags, insignia, logos,
+watermarks, scenery, square corners, glossy mobile-game rendering, and fantasy
+ornament.
+
+**Generated sources:**
+
+- `exec-52885de1-2ef3-4dec-8ec5-352c5806fb20.png` - army cartouche
+- `exec-9f73864b-dfa3-4fd8-97ad-51137d79d9aa.png` - composition shield
+- `exec-d6f164ac-4bdf-470e-bb5e-de7f1250c41e.png` - unit-card arch
+- `exec-01b68991-c78b-4387-a7b0-23590d4453e9.png` - campaign panel surround
+- `exec-8bfa0afb-bffe-4498-a978-406d6b26174f.png` - control medallion
+- `exec-f815f73e-a9ed-4b8a-9ea7-eec9234696ea.png` - action ribbon
+- `exec-4bad58e0-37f9-40e3-aee6-447bdcb04917.png` - wide command medallion, replacing the first near-square version
+- `exec-fef80e54-e8a7-4ee8-bfb8-167274894fce.png` - tapered roster shield, replacing the first boxier version
+- `exec-b3c75fed-08ad-4d6b-a92a-04304568dce4.png` - building / production plaque
+- `exec-8c7fd6cd-6815-4ffe-b0f1-84bc992e05c8.png` - production-queue portrait slot
+
+Sources are retained under
+`C:\Users\dimah\.codex\generated_images\01a07cbe-934b-7b62-bd93-3bfc096b5146`.
+`scripts/prepare-generated-ui-skins.mjs` alpha-trims and premultiplied-alpha
+Lanczos-downscales them without changing their aspect. It also derives the
+enclosed alpha mask used by the arched unit cards.
+
+| Runtime file | Use |
+|---|---|
+| `src/ui/assets/skins/army-counter-cartouche.png` | WebGPU strategic army counter and DOM fallback |
+| `src/ui/assets/skins/army-roster-plaque.png` | WebGPU close-zoom six-type composition roster |
+| `src/ui/assets/skins/army-unit-card-frame.png` | Arched army-detail portrait surround |
+| `src/ui/assets/skins/army-unit-card-mask.png` | Generated outer silhouette for portrait-card clipping |
+| `src/ui/assets/skins/hud-panel-frame.png` | Nine-slice top bar, panels, notices, and dialogs |
+| `src/ui/assets/skins/hud-control-plate.png` | Wide fixed-aspect command and icon controls |
+| `src/ui/assets/skins/hud-building-plaque.png` | Larger facility and unit-production controls |
+| `src/ui/assets/skins/hud-queue-slot.png` | Unit and construction queue portraits with a progress groove |
+| `src/ui/assets/skins/hud-action-ribbon.png` | Nine-slice text actions, status rows, and tooltips |
+
+### War-room menu repair kit
+
+**Source:** Original Ironfronts assets generated with OpenAI's built-in image
+generator on 2026-09-09. They replace low-resolution source-sheet crops that
+were stretched or screen-blended at runtime. No third-party game artwork was
+used.
+
+**Direction:** clean transparent 1930s-1940s dossier hardware with the same
+blackened iron, worn field green, old brass, and restrained paper wear as the
+in-game command surfaces. The set contains a scalable equipment rail, a torn
+cloth-and-paper map surround with an open centre, one corner fastener, a brass
+compass rose, and a faint repeatable plotting grid. Prompts excluded text,
+labels, scenery, black crop backgrounds, checkerboards, glossy rendering, and
+fantasy ornament.
+
+**Generated sources:**
+
+- `exec-b9bd8f77-f09d-4434-bb94-28ed4cc8d921.png` - dossier edge rail
+- `exec-5b9107af-4efb-49db-a1b7-78aa34a69e18.png` - torn map surround
+- `exec-49302bf2-c5ff-416c-8900-b86b1437926a.png` - corner fastener
+- `exec-164b274e-bc51-44a7-a308-681b5e63f146.png` - compass rose
+- `exec-3d0195c7-cefd-4718-ac3e-6ed4aeaf8e5b.png` - plotting grid
+
+`scripts/prepare-generated-ui-skins.mjs` alpha-trims and premultiplied-alpha
+resizes this set into `public/menu/kit`. Its `--despill-red-edges` mode removes
+the generator's semi-transparent red edge matte without changing opaque brass
+or paper. CSS uses nine-slice framing and repeatable overlays rather than
+stretching the whole source image.
+
+| Runtime file | Use |
+|---|---|
+| `public/menu/kit/edge-strip.png` | Nine-sliced dossier top/bottom equipment rail |
+| `public/menu/kit/torn-paper-frame.png` | Nine-sliced campaign-map surround |
+| `public/menu/kit/corner-fastener.png` | Dossier corner hardware |
+| `public/menu/kit/compass-marker.png` | Campaign-map compass overlay |
+| `public/menu/kit/map-grid.png` | Repeating transparent plotting grid |
 
 ### `public/ui/diplomatic-cable-watermark.png`
 

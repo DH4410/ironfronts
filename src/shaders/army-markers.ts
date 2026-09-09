@@ -22,8 +22,8 @@ import { commonWgsl } from './common';
  *
  * The counter shows a painted strategic plaque with the two largest exact unit
  * categories and their counts, or a "?" for an unidentified contact, plus its
- * condition and selection state. At close zoom a two-column field roster
- * expands the summary to all six exact icon-and-amount entries.
+ * condition and selection state. Selecting a close-zoom stack opens a
+ * two-column field roster with all six exact icon-and-amount entries.
  */
 export const armyMarkerShader = commonWgsl + /* wgsl */ `
 struct ArmyMarker {
@@ -41,6 +41,7 @@ struct ArmyParams { count: u32, mode: u32, pad0: u32, pad1: u32 };
 @group(0) @binding(14) var armyMarkerPlate: texture_2d<f32>;
 @group(0) @binding(15) var armyMarkerPlateSampler: sampler;
 @group(0) @binding(16) var armyUnitSilhouettes: texture_2d<f32>;
+@group(0) @binding(17) var armyRosterPlate: texture_2d<f32>;
 
 struct ArmyOut {
   @builtin(position) position: vec4f,
@@ -57,6 +58,7 @@ struct ArmyOut {
   @location(10) @interpolate(flat) countsB: vec4f,
   @location(11) @interpolate(flat) kindsA: vec4f,
   @location(12) @interpolate(flat) kindsB: vec4f,
+  @location(13) @interpolate(flat) panelHalf: vec2f,
 };
 
 fn unpackRgb(packed: f32) -> vec3f {
@@ -109,10 +111,11 @@ fn armyMarkerVertex(
   let closeFade = select(smoothstep(1400.0, 1800.0, zoom), 1.0, contact);
   let rangeFade = closeFade * (1.0 - smoothstep(4400.0, 5000.0, zoom));
   let zoomScale = mix(0.8, 1.25, smoothstep(4600.0, 900.0, zoom));
-  // Large enough to read as a two-compartment military counter at map zoom.
+  // Fixed 4:3 proportions match the generated cartouche so neither its
+  // painted surface nor its live silhouettes are stretched.
   // viewport.z (render-scale) keeps the on-screen size constant across
   // graphics presets so it never balloons at low quality.
-  let half = vec2f(34.0, 20.0) * zoomScale * uniforms.viewport.z;
+  let half = vec2f(33.0, 24.75) * zoomScale * uniforms.viewport.z;
 
   var output: ArmyOut;
   output.uv = corner;
@@ -128,6 +131,7 @@ fn armyMarkerVertex(
   output.countsB = marker.countsB;
   output.kindsA = marker.kindsA;
   output.kindsB = marker.kindsB;
+  output.panelHalf = half;
   output.alpha = rangeFade * (1.0 - horizontalWorldFog(worldPos.x));
   if (clip.w <= 0.0001) {
     output.position = vec4f(0.0, 0.0, -10.0, 1.0);
@@ -162,17 +166,41 @@ fn glyphBit(glyph: i32, col: i32, row: i32) -> f32 {
 }
 
 // Coverage of one glyph rendered into the box spanning [-w,w] x [-h,h] in uv.
-fn glyphCoverage(glyph: i32, p: vec2f, boxW: f32, boxH: f32, offsetX: f32) -> f32 {
-  let local = vec2f((p.x - offsetX) / boxW, p.y / boxH); // -1..1
+fn glyphCoveragePx(
+  glyph: i32,
+  p: vec2f,
+  center: vec2f,
+  panelHalf: vec2f,
+  cellSize: f32,
+) -> f32 {
+  // A 3x5 stencil uses square pixel cells in framebuffer space. This avoids
+  // the wide, stretched numerals caused by measuring the glyph in panel UVs.
+  let pixel = (p - center) * panelHalf;
+  let local = vec2f(pixel.x / (cellSize * 1.5), pixel.y / (cellSize * 2.5));
   if (abs(local.x) > 1.0 || abs(local.y) > 1.0) { return 0.0; }
   let col = i32(floor((local.x * 0.5 + 0.5) * 3.0));
   let row = i32(floor((0.5 - local.y * 0.5) * 5.0));
   return glyphBit(glyph, col, row);
 }
 
-fn roundedBox(p: vec2f, b: vec2f, r: f32) -> f32 {
-  let q = abs(p) - b + vec2f(r);
-  return length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0) - r;
+fn amountCoverage(value: i32, p: vec2f, center: vec2f, panelHalf: vec2f, cellSize: f32) -> f32 {
+  let amount = clamp(value, 0, 999);
+  if (amount < 10) {
+    return glyphCoveragePx(amount, p, center, panelHalf, cellSize);
+  }
+  if (amount < 100) {
+    let offset = 2.0 * cellSize / panelHalf.x;
+    return glyphCoveragePx(amount / 10, p, center - vec2f(offset, 0.0), panelHalf, cellSize)
+      + glyphCoveragePx(amount % 10, p, center + vec2f(offset, 0.0), panelHalf, cellSize);
+  }
+  let offset = 4.0 * cellSize / panelHalf.x;
+  return glyphCoveragePx(amount / 100, p, center - vec2f(offset, 0.0), panelHalf, cellSize)
+    + glyphCoveragePx((amount / 10) % 10, p, center, panelHalf, cellSize)
+    + glyphCoveragePx(amount % 10, p, center + vec2f(offset, 0.0), panelHalf, cellSize);
+}
+
+fn squareLocal(p: vec2f, center: vec2f, panelHalf: vec2f, radiusPx: f32) -> vec2f {
+  return (p - center) * panelHalf / vec2f(radiusPx);
 }
 
 fn unitKindIcon(kind: i32, q: vec2f) -> f32 {
@@ -198,6 +226,7 @@ struct CompositionOut {
   @location(6) @interpolate(flat) health: f32,
   @location(7) @interpolate(flat) selected: f32,
   @location(8) alpha: f32,
+  @location(9) @interpolate(flat) panelHalf: vec2f,
 };
 
 fn compositionRowCount(countsA: vec4f, countsB: vec4f) -> f32 {
@@ -229,9 +258,10 @@ fn armyCompositionVertex(
   let worldPos = vec3f(worldXZ.x, heightAt(markerXZ / uniforms.map.xy) + 17.0, worldXZ.y);
   let clip = uniforms.viewProjection * vec4f(worldPos, 1.0);
   let rows = compositionRowCount(marker.countsA, marker.countsB);
-  let gridRows = ceil(rows * 0.5);
-  let half = vec2f(42.0, 8.0 + gridRows * 10.0) * uniforms.viewport.z;
-  let pixelCenter = vec2f(51.0, 2.0) * uniforms.viewport.z;
+  // This generated shield has one fixed 4:5 aspect. A fixed pixel frame also
+  // means a six-row roster never distorts when the composition count changes.
+  let half = vec2f(38.4, 48.0) * uniforms.viewport.z;
+  let pixelCenter = vec2f(58.0, -2.0) * uniforms.viewport.z;
 
   var output: CompositionOut;
   output.uv = corner;
@@ -242,8 +272,15 @@ fn armyCompositionVertex(
   output.kindsB = marker.kindsB;
   output.health = clamp(marker.b.y, 0.0, 1.0);
   output.selected = f32(u32(marker.b.z + 0.5) & 1u);
+  output.panelHalf = half;
   let identified = marker.a.w < 1.5;
-  output.alpha = select(0.0, 1.0 - smoothstep(1400.0, 1800.0, uniforms.interaction.y), identified)
+  let needsManifest = rows > 2.0;
+  let selected = output.selected > 0.5;
+  output.alpha = select(
+    0.0,
+    1.0 - smoothstep(1400.0, 1800.0, uniforms.interaction.y),
+    identified && needsManifest && selected,
+  )
     * (1.0 - horizontalWorldFog(worldPos.x));
   if (clip.w <= 0.0001) {
     output.position = vec4f(0.0, 0.0, -10.0, 1.0);
@@ -259,65 +296,51 @@ fn armyCompositionVertex(
 fn armyCompositionFragment(input: CompositionOut) -> @location(0) vec4f {
   if (input.alpha < 0.01) { discard; }
   let uv = input.uv;
-  let sd = roundedBox(uv, vec2f(0.90, 0.90), 0.18);
-  let inside = 1.0 - smoothstep(-0.025, 0.025, sd);
-  let outline = (1.0 - smoothstep(-0.025, 0.025, sd - 0.16)) - inside;
-  if (inside + outline < 0.02 && input.selected < 0.5) { discard; }
+  let plateUv = vec2f(uv.x * 0.5 + 0.5, 0.5 - uv.y * 0.5);
+  let plaque = textureSampleLevel(armyRosterPlate, armyMarkerPlateSampler, plateUv, 0.0);
+  let expandedUv = vec2f(uv.x * 0.46 + 0.5, 0.5 - uv.y * 0.46);
+  let expandedAlpha = textureSampleLevel(armyRosterPlate, armyMarkerPlateSampler, expandedUv, 0.0).a;
+  let selectedRing = max(0.0, expandedAlpha - plaque.a) * input.selected;
+  let plateCoverage = plaque.a;
+  if (plateCoverage + selectedRing < 0.02) { discard; }
 
-  let ink = vec3f(0.055, 0.065, 0.05);
-  let centreDist = length(uv * vec2f(0.82, 1.0));
-  let core = mix(input.rgb * 0.30, input.rgb * 0.88, smoothstep(0.12, 1.0, centreDist));
-  var rgb = mix(core, ink, clamp(outline * 1.35, 0.0, 1.0));
-  rgb *= mix(1.08, 0.84, uv.y * 0.5 + 0.5);
+  // The generated leather shield is the complete surface. Country colour is
+  // only a quiet wash, never another flat rectangle drawn over it.
+  var rgb = mix(plaque.rgb * 0.90, plaque.rgb * 0.74 + input.rgb * 0.26, plateCoverage * 0.22);
 
   let entries = u32(compositionRowCount(input.countsA, input.countsB));
   let rows = (entries + 1u) / 2u;
-  let rowSpan = 1.26 / f32(rows);
+  let startY = f32(rows - 1u) * 0.22;
   for (var index = 0u; index < 6u; index += 1u) {
     if (index >= entries) { break; }
     let amount = i32(clamp(compositionValue(input.countsA, input.countsB, index) + 0.5, 1.0, 999.0));
     let kind = i32(compositionValue(input.kindsA, input.kindsB, index) + 0.5);
     let column = index % 2u;
     let row = index / 2u;
-    let centerX = select(-0.45, 0.45, column == 1u);
-    let centerY = 0.68 - (f32(row) + 0.5) * rowSpan;
-    let cellUv = vec2f((uv.x - centerX) / 0.43, (uv.y - centerY) / (rowSpan * 0.44));
-    let icon = unitKindIcon(kind, vec2f((cellUv.x + 0.52) / 0.27, cellUv.y / 0.78));
-    var digits = 0.0;
-    if (amount < 10) {
-      digits = glyphCoverage(amount, cellUv, 0.13, 0.58, 0.46);
-    } else if (amount < 100) {
-      digits = glyphCoverage(amount / 10, cellUv, 0.11, 0.56, 0.30)
-        + glyphCoverage(amount % 10, cellUv, 0.11, 0.56, 0.64);
-    } else {
-      digits = glyphCoverage(amount / 100, cellUv, 0.085, 0.52, 0.18)
-        + glyphCoverage((amount / 10) % 10, cellUv, 0.085, 0.52, 0.46)
-        + glyphCoverage(amount % 10, cellUv, 0.085, 0.52, 0.74);
-    }
-    rgb = mix(rgb, vec3f(0.94, 0.92, 0.82), clamp(icon, 0.0, 1.0) * inside);
-    rgb = mix(rgb, vec3f(0.99, 0.98, 0.93), clamp(digits, 0.0, 1.0) * inside);
-    if (column == 0u && row + 1u < rows) {
-      let separatorY = centerY - rowSpan * 0.5;
-      let separator = step(abs(uv.y - separatorY), 0.012) * step(abs(uv.x), 0.78) * inside;
-      rgb = mix(rgb, ink, separator * 0.46);
-    }
+    var centerX = select(-0.34, 0.34, column == 1u);
+    if (entries % 2u == 1u && index + 1u == entries) { centerX = 0.0; }
+    let centerY = startY - f32(row) * 0.44;
+    let icon = unitKindIcon(kind, squareLocal(
+      uv, vec2f(centerX - 0.12, centerY + 0.015), input.panelHalf,
+      6.8 * uniforms.viewport.z,
+    ));
+    let digits = amountCoverage(
+      amount, uv, vec2f(centerX + 0.14, centerY), input.panelHalf,
+      1.22 * uniforms.viewport.z,
+    );
+    rgb = mix(rgb, vec3f(0.94, 0.92, 0.82), clamp(icon, 0.0, 1.0) * plateCoverage);
+    rgb = mix(rgb, vec3f(0.99, 0.98, 0.93), clamp(digits, 0.0, 1.0) * plateCoverage);
   }
-  let columnRule = step(abs(uv.x), 0.012) * step(-0.58, uv.y) * step(uv.y, 0.70) * inside;
-  rgb = mix(rgb, ink, columnRule * 0.46);
 
-  let barY = -0.76;
-  let inBarBand = step(abs(uv.y - barY), 0.055) * step(abs(uv.x), 0.72) * inside;
-  let filled = step(uv.x, -0.72 + 1.44 * input.health);
+  let barY = -0.79;
+  let inBarBand = step(abs(uv.y - barY), 0.045) * step(abs(uv.x), 0.66) * plateCoverage;
+  let filled = step(uv.x, -0.66 + 1.32 * input.health);
   let barCol = mix(vec3f(0.86, 0.24, 0.16), vec3f(0.42, 0.78, 0.34), input.health);
   rgb = mix(rgb, vec3f(0.05), inBarBand * (1.0 - filled) * 0.82);
   rgb = mix(rgb, barCol, inBarBand * filled);
 
-  var coverage = clamp(inside + outline, 0.0, 1.0);
-  if (input.selected > 0.5) {
-    let ring = 1.0 - smoothstep(0.0, 0.045, abs(sd + 0.055));
-    rgb = mix(rgb, vec3f(1.0, 0.92, 0.55), ring);
-    coverage = max(coverage, ring);
-  }
+  rgb = mix(rgb, vec3f(1.0, 0.92, 0.55), selectedRing);
+  let coverage = max(plateCoverage, selectedRing);
   return vec4f(rgb, coverage * 0.98 * input.alpha);
 }
 
@@ -341,55 +364,43 @@ fn armyMarkerFragment(input: ArmyOut) -> @location(0) vec4f {
   // conditional discards/returns above, so implicit-derivative sampling is not
   // in uniform control flow. The plate is a fixed-size HUD sprite — LOD 0 is fine.
   let plate = textureSampleLevel(armyMarkerPlate, armyMarkerPlateSampler, plateUv, 0.0);
-  let plateSd = roundedBox(uv, vec2f(0.96, 0.90), 0.18);
-  let plateShape = 1.0 - smoothstep(-0.025, 0.025, plateSd);
-  let plateCoverage = plate.a * plateShape;
-  if (plateCoverage < 0.02 && input.selected < 0.5) { discard; }
+  let expandedUv = vec2f(uv.x * 0.46 + 0.5, 0.5 - uv.y * 0.46);
+  let expandedAlpha = textureSampleLevel(armyMarkerPlate, armyMarkerPlateSampler, expandedUv, 0.0).a;
+  let selectedRing = max(0.0, expandedAlpha - plate.a) * input.selected;
+  let plateCoverage = plate.a;
+  if (plateCoverage + selectedRing < 0.02) { discard; }
 
   // The painted texture provides the physical counter. Country colour is an
   // inset signal rather than the entire background, so pale flags cannot wash
   // out the live white silhouette and count.
-  var rgb = plate.rgb * 0.86;
-  let iconBay = step(uv.x, -0.12) * step(-0.57, uv.y) * step(uv.y, 0.65) * plateCoverage;
-  rgb = mix(rgb, mix(rgb, bodyCol * 0.82, 0.52), iconBay * 0.72);
-  let ownerEdge = step(uv.x, -0.86) * step(abs(uv.y), 0.68) * plateCoverage;
-  rgb = mix(rgb, bodyCol * 1.22, ownerEdge * 0.88);
+  var rgb = mix(plate.rgb * 0.88, plate.rgb * 0.72 + bodyCol * 0.28, plateCoverage * 0.25);
   if (contact) {
     let gray = dot(rgb, vec3f(0.299, 0.587, 0.114));
     rgb = mix(rgb, vec3f(gray), 0.78);
   }
 
   // Like Call of War's compact counters, the main plaque combines the two
-  // largest unit types with their own amounts. At close range the companion
-  // manifest expands this to all six exact categories.
+  // largest unit types with their own amounts. Selecting it at close range
+  // opens the companion manifest with all six exact categories.
   var liveMarks = 0.0;
   if (contact) {
-    liveMarks = glyphCoverage(10, uv - vec2f(0.0, 0.12), 0.22, 0.49, 0.30);
+    liveMarks = glyphCoveragePx(
+      10, uv, vec2f(0.0, 0.05), input.panelHalf, 2.05 * uniforms.viewport.z,
+    );
   } else {
     let shownRows = min(2u, u32(input.rows + 0.5));
     for (var index = 0u; index < 2u; index += 1u) {
       if (index >= shownRows) { break; }
-      let centerY = select(0.10, 0.36 - f32(index) * 0.52, shownRows > 1u);
-      let rowUv = vec2f(uv.x, (uv.y - centerY) / 0.25);
+      let centerX = select(0.0, -0.30 + f32(index) * 0.60, shownRows > 1u);
       let amount = i32(clamp(compositionValue(input.countsA, input.countsB, index) + 0.5, 1.0, 999.0));
       let kind = i32(compositionValue(input.kindsA, input.kindsB, index) + 0.5);
-      let icon = unitKindIcon(kind, vec2f((rowUv.x + 0.53) / 0.25, rowUv.y / 0.82));
-      var digits = 0.0;
-      if (amount < 10) {
-        digits = glyphCoverage(amount, rowUv, 0.14, 0.64, 0.40);
-      } else if (amount < 100) {
-        digits = glyphCoverage(amount / 10, rowUv, 0.11, 0.62, 0.25)
-          + glyphCoverage(amount % 10, rowUv, 0.11, 0.62, 0.58);
-      } else {
-        digits = glyphCoverage(amount / 100, rowUv, 0.085, 0.58, 0.16)
-          + glyphCoverage((amount / 10) % 10, rowUv, 0.085, 0.58, 0.40)
-          + glyphCoverage(amount % 10, rowUv, 0.085, 0.58, 0.64);
-      }
+      let icon = unitKindIcon(kind, squareLocal(
+        uv, vec2f(centerX, 0.19), input.panelHalf, 6.4 * uniforms.viewport.z,
+      ));
+      let digits = amountCoverage(
+        amount, uv, vec2f(centerX, -0.13), input.panelHalf, 1.22 * uniforms.viewport.z,
+      );
       liveMarks = max(liveMarks, clamp(icon + digits, 0.0, 1.0));
-    }
-    if (shownRows > 1u) {
-      let separator = step(abs(uv.y - 0.10), 0.015) * step(abs(uv.x), 0.70) * plateCoverage;
-      rgb = mix(rgb, vec3f(0.035), separator * 0.48);
     }
   }
   let liveInk = vec3f(0.98, 0.97, 0.89);
@@ -398,26 +409,23 @@ fn armyMarkerFragment(input: ArmyOut) -> @location(0) vec4f {
 
   // A thick, threshold-coloured condition strip fills the plate's recessed
   // channel. Unknown contacts keep a neutral channel instead of implying 0 HP.
-  let barY = -0.69;
-  let inBarBand = step(abs(uv.y - barY), 0.095) * step(abs(uv.x), 0.72) * plateCoverage;
-  let filled = step(uv.x, -0.72 + 1.44 * input.health);
+  let barY = -0.61;
+  let inBarBand = step(abs(uv.y - barY), 0.065) * step(abs(uv.x), 0.56) * plateCoverage;
+  let filled = step(uv.x, -0.56 + 1.12 * input.health);
   var barCol = mix(vec3f(0.73, 0.19, 0.14), vec3f(0.76, 0.49, 0.16), step(0.34, input.health));
   barCol = mix(barCol, vec3f(0.37, 0.68, 0.28), step(0.67, input.health));
   rgb = mix(rgb, vec3f(0.025), inBarBand * 0.90);
   rgb = mix(rgb, barCol, inBarBand * filled * select(1.0, 0.0, contact));
   rgb = mix(rgb, vec3f(0.34), inBarBand * select(0.0, 0.72, contact));
 
-  // Engaged stacks carry a static red command tab: unmistakable without
-  // adding another animated effect to an already active battle.
-  let engagedTab = step(0.67, uv.x) * step(0.52, uv.y) * plateCoverage * input.engaged;
-  rgb = mix(rgb, vec3f(0.76, 0.18, 0.12), engagedTab * 0.92);
+  // An engaged formation gets a compact command jewel instead of another
+  // rectangular tab layered over the painted cartouche.
+  let engagedPixel = (uv - vec2f(0.72, 0.50)) * input.panelHalf;
+  let engagedJewel = (1.0 - smoothstep(2.8, 4.0, length(engagedPixel))) * input.engaged * plateCoverage;
+  rgb = mix(rgb, vec3f(0.76, 0.18, 0.12), engagedJewel * 0.92);
 
-  var coverage = plateCoverage;
-  if (input.selected > 0.5) {
-    let ring = 1.0 - smoothstep(0.0, 0.045, abs(plateSd + 0.045));
-    rgb = mix(rgb, vec3f(1.0, 0.92, 0.55), ring);
-    coverage = max(coverage, ring);
-  }
+  rgb = mix(rgb, vec3f(1.0, 0.92, 0.55), selectedRing);
+  let coverage = max(plateCoverage, selectedRing);
 
   return vec4f(rgb, coverage * 0.98 * input.alpha);
 }
