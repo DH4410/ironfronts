@@ -18,12 +18,12 @@ describe('diplomacy helpers', () => {
     const relations = new Map<number, DiplomaticRelation>([[2, 'war'], [41, 'allied']]);
     const colors = buildDiplomacyColorData(countries, relations, 24);
     expect(colors.length).toBe((41 + 1) * 4);
-    expect([...colors.slice(2 * 4, 2 * 4 + 3)]).toEqual([168, 61, 54]);
-    expect([...colors.slice(41 * 4, 41 * 4 + 3)]).toEqual([61, 110, 166]);
+    expect([...colors.slice(2 * 4, 2 * 4 + 3)]).toEqual([199, 33, 28]);
+    expect([...colors.slice(41 * 4, 41 * 4 + 3)]).toEqual([51, 128, 209]);
     const neutralColors = buildDiplomacyColorData(countries, new Map(), 2);
     const neutralSpain = [...neutralColors.slice(24 * 4, 24 * 4 + 3)];
     expect(Math.max(...neutralSpain) - Math.min(...neutralSpain)).toBeLessThanOrEqual(4);
-    expect([...colors.slice(24 * 4, 24 * 4 + 3)]).toEqual([219, 179, 71]);
+    expect([...colors.slice(24 * 4, 24 * 4 + 3)]).toEqual([235, 186, 51]);
     expect(colors[24 * 4 + 3]).toBe(128);
     expect(colors[2 * 4 + 3]).toBe(255);
   });

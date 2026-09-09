@@ -87,12 +87,20 @@ fn combatEffectVertex(
 
   let zoom = uniforms.interaction.y;
   let zoomScale = mix(0.7, 1.35, smoothstep(4600.0, 700.0, zoom));
-  let half = effectPixelSize(kind) * max(0.15, effect.b.y) * sizeAge * zoomScale * uniforms.viewport.z;
+  // The battle marker is a strategic-awareness pin: it must not shrink away as
+  // the player pulls back to survey the front. Hold it near full size up close
+  // and let it grow as the camera climbs so clustered fights stay readable on
+  // the strategic map.
+  let markerZoomScale = mix(1.0, 1.7, smoothstep(1500.0, 9000.0, zoom));
+  let effZoomScale = select(zoomScale, markerZoomScale, kind == 8);
+  let half = effectPixelSize(kind) * max(0.15, effect.b.y) * sizeAge * effZoomScale * uniforms.viewport.z;
 
   // Fade: transients fade over their life; the battle marker holds (its pulse
-  // is size + fragment glow). Everything fades out past strategic zoom.
+  // is size + fragment glow) and — unlike every transient — stays at full
+  // opacity all the way out to max zoom, since that is exactly when the player
+  // needs to see where the fighting is.
   let lifeFade = select(1.0 - smoothstep(0.55, 1.0, age), 0.85 + 0.15 * sin(effect.a.w * 6.2831853), kind == 8);
-  let zoomFade = 1.0 - smoothstep(4400.0, 5000.0, zoom);
+  let zoomFade = select(1.0 - smoothstep(4400.0, 5000.0, zoom), 1.0, kind == 8);
 
   var output: EffectOut;
   output.uv = corner;

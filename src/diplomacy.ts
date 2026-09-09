@@ -1,7 +1,9 @@
 import type { CountryRecord, DiplomaticRelation } from './types';
 
-const NEUTRAL_GREY_MIN = 0.38;
-const NEUTRAL_GREY_RANGE = 0.09;
+// Neutral land sits well above the ~0.34 luminance of hostile red so "nobody
+// you're fighting" reads as inert pale stone, never as a dim enemy province.
+const NEUTRAL_GREY_MIN = 0.55;
+const NEUTRAL_GREY_RANGE = 0.08;
 
 export function findCountryByName(countries: readonly CountryRecord[], input: string): CountryRecord | undefined {
   const normalized = input.trim().toLocaleLowerCase();
@@ -21,13 +23,15 @@ export function buildDiplomacyColorData(
     const relation = relations.get(country.id) ?? 'neutral';
     let color: readonly [number, number, number];
     const isPlayer = country.id === playerCountryId;
-    if (isPlayer) color = [0.86, 0.70, 0.28];
-    else if (relation === 'war') color = [0.66, 0.24, 0.21];
-    else if (relation === 'allied') color = [0.24, 0.43, 0.65];
+    // Four maximally separable hues: your land = bright gold, enemies = deep
+    // saturated crimson, allies = clear royal blue, neutrals = pale stone.
+    if (isPlayer) color = [0.92, 0.73, 0.20];
+    else if (relation === 'war') color = [0.78, 0.13, 0.11];
+    else if (relation === 'allied') color = [0.20, 0.50, 0.82];
     else {
       const variation = ((country.id * 47) % 101) / 100;
       const grey = NEUTRAL_GREY_MIN + variation * NEUTRAL_GREY_RANGE;
-      color = [grey * 0.97, grey, grey * 0.99];
+      color = [grey * 0.985, grey, grey * 0.995];
     }
     data[offset] = Math.round(color[0] * 255);
     data[offset + 1] = Math.round(color[1] * 255);
