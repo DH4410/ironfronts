@@ -19,10 +19,24 @@ const MAX_WARHEADS = 3;
  * from its centre while bounding the handful of very large provinces.
  */
 const BLAST_RADIUS = 95;
+/**
+ * Game-hours a struck province stays devastated. During this window its
+ * administration is too shattered to contest a capture, so a weak city really
+ * does fall the moment a stack walks in after the strike. ~6 game-days.
+ */
+const DEVASTATION_HOURS = 6 * 24;
 
 /** Passive warhead accrual — one slow pass per tick, driven by Ordnance Workshops. */
 export function stepWarheads(ctx: SimContext, dtHours: number): void {
   if (dtHours <= 0) return;
+  // Drop devastation entries whose window has passed so the save stays sparse.
+  const devastation = ctx.state.provinceDevastation;
+  if (devastation) {
+    const nowHours = ctx.state.clock.gameTimeHours;
+    for (const key of Object.keys(devastation)) {
+      if (devastation[Number(key)] <= nowHours) delete devastation[Number(key)];
+    }
+  }
   const levelsByCountry = new Map<number, number>();
   for (const [provinceIdRaw, buildings] of Object.entries(ctx.state.provinceBuildings)) {
     if (!buildings.ordnance) continue;
@@ -75,6 +89,10 @@ export function issueStrike(ctx: SimContext, command: StrikeCommand): CommandRes
   }
   delete ctx.state.constructionQueues[provinceId];
   delete ctx.state.productionQueues[provinceId];
+
+  // Shatter the province's ability to resist for a while — see stepCapture.
+  (ctx.state.provinceDevastation ??= {})[provinceId] =
+    ctx.state.clock.gameTimeHours + DEVASTATION_HOURS;
 
   return { ok: true, strike: { attacker: countryId, defender: owner, provinceId, x, z } };
 }

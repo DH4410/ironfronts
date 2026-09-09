@@ -195,6 +195,14 @@ export interface GameState {
   /** Undirected-pair relation key "a:b" with a < b (absent = peace). */
   relations: Record<string, Relation>;
 
+  /**
+   * Sparse: province id -> game-hour at which strike devastation lifts. While a
+   * province is devastated its shattered administration cannot rally a scratch
+   * defence, so an attacking stack walks in and takes it. Additive optional
+   * field — pre-strike v2 saves default it to `{}` on load, no GAME_VERSION bump.
+   */
+  provinceDevastation?: Record<number, number>;
+
   /** Optional for compatibility with v2 snapshots created before diplomacy. */
   diplomacyMessages?: Record<string, DiplomacyMessage>;
   /** Optional for compatibility with v2 snapshots created before diplomacy. */
