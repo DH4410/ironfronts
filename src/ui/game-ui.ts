@@ -754,9 +754,12 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       pvFieldValue.get('Deposits')!.textContent = depositKinds.length
         ? depositKinds.map((k) => k[0].toUpperCase() + k.slice(1)).join(' · ')
         : province.isOwn === false ? 'Unknown' : 'None';
+      // Plain-language: either an engineer is mining, or the action the player
+      // needs to take is to send one. "Controlled / Uncontrolled" read as jargon.
       pvFieldValue.get('Extraction')!.textContent = !depositKinds.length ? '—'
-        : province.deposits?.extracting ? 'Under way'
-        : province.deposits?.controlled ? 'Controlled' : 'Uncontrolled';
+        : province.deposits?.extracting ? 'Engineer working it'
+        : province.isOwn === false ? '—'
+        : 'Idle — move an engineer here';
 
       // Facilities row — own provinces only, shown when at least one stands.
       const b = province.buildings;
