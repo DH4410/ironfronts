@@ -41,6 +41,8 @@ export type IconName =
   | 'cmd-move' | 'cmd-attack' | 'cmd-retreat' | 'cmd-split' | 'cmd-stop' | 'cmd-extract'
   | 'cmd-patrol' | 'cmd-garrison'
   | 'unit-engineer' | 'unit-armored-car' | 'unit-light-tank' | 'unit-medium-tank'
+  | 'marker-infantry' | 'marker-engineer' | 'marker-armored-car'
+  | 'marker-light-tank' | 'marker-medium-tank' | 'marker-artillery'
   | 'stat-health' | 'stat-attack' | 'stat-defence' | 'stat-speed' | 'stat-troops'
   | 'structure-barracks' | 'structure-plant' | 'structure-ordnance'
   | 'structure-fortress' | 'structure-city'
@@ -96,6 +98,12 @@ const ICONS: Record<IconName, IconDef> = {
   'unit-armored-car': { kind: 'img', value: ironfrontsPng('unit-armored-car-icon') },
   'unit-light-tank': { kind: 'img', value: ironfrontsPng('unit-light-tank-icon') },
   'unit-medium-tank': { kind: 'img', value: ironfrontsPng('unit-medium-tank-icon') },
+  'marker-infantry': { kind: 'img', value: ironfrontsPng('marker-infantry') },
+  'marker-engineer': { kind: 'img', value: ironfrontsPng('marker-engineer') },
+  'marker-armored-car': { kind: 'img', value: ironfrontsPng('marker-armored-car') },
+  'marker-light-tank': { kind: 'img', value: ironfrontsPng('marker-light-tank') },
+  'marker-medium-tank': { kind: 'img', value: ironfrontsPng('marker-medium-tank') },
+  'marker-artillery': { kind: 'img', value: ironfrontsPng('marker-artillery') },
   'stat-health': { kind: 'img', value: png('heal') },
   'stat-attack': { kind: 'svg', value: svg('crossed-blades') },
   'stat-defence': { kind: 'svg', value: svg('shield') },

@@ -45,6 +45,7 @@ import { getVisibleInstanceView, updateVisibleInstanceView } from './visible-ins
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
 const ARMY_MARKER_PLATE_URL = new URL('./ui/assets/army-marker-plate.png', import.meta.url).href;
+const ARMY_UNIT_SILHOUETTES_URL = new URL('./ui/assets/army-unit-silhouettes.png', import.meta.url).href;
 
 /** Player-start camera: north-up, near top-down (~83°; a true 90° breaks picking). */
 const PLAYER_START_YAW = 0;
@@ -141,6 +142,7 @@ export class WorldRenderer {
   private provincePoliticalColorTexture!: GPUTexture;
   private diplomacyColorTexture!: GPUTexture;
   private armyMarkerPlateTexture!: GPUTexture;
+  private armyUnitSilhouettesTexture!: GPUTexture;
   private politicalCache!: PoliticalCache;
   private countryColors!: Float32Array;
   private visibleTerrainBuffer!: GPUBuffer;
@@ -523,10 +525,14 @@ export class WorldRenderer {
     );
 
     report('Preparing terrain and tree materials', 0.49);
-    [this.materialTexture, this.treeMaterialTexture, this.armyMarkerPlateTexture] = await Promise.all([
+    [
+      this.materialTexture, this.treeMaterialTexture,
+      this.armyMarkerPlateTexture, this.armyUnitSilhouettesTexture,
+    ] = await Promise.all([
       createMaterialTexture(this.device),
       createTreeMaterialTexture(this.device),
       this.loadArmyMarkerPlateTexture(),
+      this.loadArmyUnitSilhouettesTexture(),
     ]);
     this.uniformBuffer = this.device.createBuffer({
       label: 'frame uniforms',
@@ -560,6 +566,7 @@ export class WorldRenderer {
         { binding: 15, resource: this.device.createSampler({
           magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear',
         }) },
+        { binding: 16, resource: this.armyUnitSilhouettesTexture.createView() },
       ],
     });
 
@@ -1012,10 +1019,10 @@ export class WorldRenderer {
     );
   }
 
-  /** Allocate the fixed-capacity army-marker instance buffer (5 vec4f per
+  /** Allocate the fixed-capacity army-marker instance buffer (7 vec4f per
    *  stack). `setArmyMarkers` fills only the used prefix each update. */
   private createArmyMarkerLayer(): void {
-    const zero = new Float32Array(WorldRenderer.ARMY_MARKER_CAPACITY * 20);
+    const zero = new Float32Array(WorldRenderer.ARMY_MARKER_CAPACITY * 28);
     this.armyMarkers = this.createInstanceLayer(
       'army stack markers', zero.buffer as ArrayBuffer, 0, 0, this.lineLayout,
     );
@@ -1068,6 +1075,38 @@ export class WorldRenderer {
       });
       this.device.queue.writeTexture(
         { texture }, new Uint8Array([48, 58, 48, 255]),
+        { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1],
+      );
+      return texture;
+    }
+  }
+
+  private async loadArmyUnitSilhouettesTexture(): Promise<GPUTexture> {
+    try {
+      const response = await fetch(ARMY_UNIT_SILHOUETTES_URL);
+      if (!response.ok) throw new Error(`Army silhouette request failed: ${response.status}`);
+      const bitmap = await createImageBitmap(await response.blob());
+      const texture = this.device.createTexture({
+        label: 'army marker unit silhouette atlas',
+        size: [bitmap.width, bitmap.height],
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      this.device.queue.copyExternalImageToTexture(
+        { source: bitmap }, { texture }, [bitmap.width, bitmap.height],
+      );
+      bitmap.close();
+      return texture;
+    } catch (error) {
+      console.warn('Could not load army silhouettes; using an opaque fallback.', error);
+      const texture = this.device.createTexture({
+        label: 'army silhouette fallback',
+        size: [1, 1],
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      this.device.queue.writeTexture(
+        { texture }, new Uint8Array([246, 241, 218, 255]),
         { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1],
       );
       return texture;
@@ -1137,7 +1176,7 @@ export class WorldRenderer {
   }
 
   /**
-   * Replace the drawn army markers. `records` is 20 floats per stack; see
+   * Replace the drawn army markers. `records` is 28 floats per stack; see
    * `armyMarkerShader`. `count` stacks are drawn; the rest of the capacity is
    * ignored. Cheap: one buffer write, no pipeline or bind-group churn.
    */
@@ -1149,10 +1188,10 @@ export class WorldRenderer {
     if (!this.armyMarkers) return;
     const capped = Math.min(count, WorldRenderer.ARMY_MARKER_CAPACITY);
     if (capped > 0) {
-      for (let index = 0; index < capped; index += 1) records[index * 20 + 19] = this.elapsed;
+      for (let index = 0; index < capped; index += 1) records[index * 28 + 27] = this.elapsed;
       this.device.queue.writeBuffer(
         this.armyMarkers.buffer, 0,
-        records.buffer as ArrayBuffer, records.byteOffset, capped * 20 * 4,
+        records.buffer as ArrayBuffer, records.byteOffset, capped * 28 * 4,
       );
     }
     this.device.queue.writeBuffer(

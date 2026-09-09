@@ -28,7 +28,7 @@ import { RemoteGameSession } from './client/remote-session';
 import { configureWorldAssetBase } from './world-assets';
 import { CombatEffectPool, EFFECT_KIND, effectDensityForDistance } from './combat-effects';
 import type { SessionResponse } from '@ironfronts/protocol';
-import { buildArmyCompositionRows, buildArmyFormation, dominantVisualKind } from './army-map-presentation';
+import { buildArmyCompositionRows, buildArmyFormation } from './army-map-presentation';
 import { ArmyMotionInterpolator } from './army-motion';
 
 type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
@@ -1079,7 +1079,7 @@ async function bootstrapGameSession(
   );
 }
 
-const armyMarkerScratch = new Float32Array(20 * 1_024);
+const armyMarkerScratch = new Float32Array(28 * 1_024);
 const armyModelScratch = new Float32Array(16 * 4_096);
 const armyMotionInterpolator = new ArmyMotionInterpolator();
 /** LineRecord (8 f32) per own-army route segment — see renderer.setOrderRoutes. */
@@ -1237,6 +1237,7 @@ function syncArmyMarkers(
 
     const formation = identified ? buildArmyFormation(army.composition?.groups ?? []) : [];
     const compositionRows = identified ? buildArmyCompositionRows(army.composition?.groups ?? []) : [];
+    armyMarkerScratch.fill(0, cursor, cursor + 28);
     armyMarkerScratch[cursor] = armyMotion.x;
     armyMarkerScratch[cursor + 1] = armyMotion.z;
     armyMarkerScratch[cursor + 2] = packRgb(army.ownerColor);
@@ -1247,20 +1248,24 @@ function syncArmyMarkers(
     // Marker flags: bit 0 selected, bit 1 engaged / under fire.
     armyMarkerScratch[cursor + 6] = (army.id === selectedArmyId ? 1 : 0)
       | (army.status === 'engaged' ? 2 : 0);
-    armyMarkerScratch[cursor + 7] = identified ? dominantVisualKind(formation) : 4;
-    for (let row = 0; row < 4; row += 1) {
-      armyMarkerScratch[cursor + 8 + row] = compositionRows[row]?.count ?? 0;
-      armyMarkerScratch[cursor + 12 + row] = compositionRows[row]?.kind ?? 4;
+    armyMarkerScratch[cursor + 7] = compositionRows.length;
+    for (let row = 0; row < 6; row += 1) {
+      const lane = row < 4 ? row : row - 4;
+      const countBase = row < 4 ? cursor + 8 : cursor + 12;
+      const kindBase = row < 4 ? cursor + 16 : cursor + 20;
+      armyMarkerScratch[countBase + lane] = compositionRows[row]?.count ?? 0;
+      armyMarkerScratch[kindBase + lane] = compositionRows[row]?.kind ?? 6;
     }
-    armyMarkerScratch[cursor + 16] = armyMotion.targetX;
-    armyMarkerScratch[cursor + 17] = armyMotion.targetZ;
-    armyMarkerScratch[cursor + 18] = armyMotion.remainingMs / 1_000;
-    armyMarkerScratch[cursor + 19] = 0;
-    cursor += 20;
+    armyMarkerScratch[cursor + 24] = armyMotion.targetX;
+    armyMarkerScratch[cursor + 25] = armyMotion.targetZ;
+    armyMarkerScratch[cursor + 26] = armyMotion.remainingMs / 1_000;
+    armyMarkerScratch[cursor + 27] = 0;
+    cursor += 28;
     count += 1;
     armyPickScratch.push({ id: army.id, x: armyMotion.x, z: armyMotion.z });
 
     if (identified && army.id === selectedArmyId && army.artillery && count < 1_024) {
+      armyMarkerScratch.fill(0, cursor, cursor + 28);
       armyMarkerScratch[cursor] = armyMotion.x;
       armyMarkerScratch[cursor + 1] = armyMotion.z;
       armyMarkerScratch[cursor + 2] = packRgb(army.ownerColor);
@@ -1269,8 +1274,7 @@ function syncArmyMarkers(
       armyMarkerScratch[cursor + 5] = 0;
       armyMarkerScratch[cursor + 6] = 0;
       armyMarkerScratch[cursor + 7] = 0;
-      armyMarkerScratch.fill(0, cursor + 8, cursor + 20);
-      cursor += 20;
+      cursor += 28;
       count += 1;
     }
     if (identified && formation.length) {

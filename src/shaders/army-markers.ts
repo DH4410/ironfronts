@@ -13,25 +13,34 @@ import { commonWgsl } from './common';
  *   packedRGB: country colour, r*65536 + g*256 + b (0..255 each)
  *   state: 1 = visible (full), 2 = contact (enemy seen, composition unknown)
  *          hidden stacks are simply not emitted (fog is resolved CPU-side)
- * ArmyMarker.b = (unitCount, health01, flags, dominantKind)
+ * ArmyMarker.b = (unitCount, health01, flags, compositionRowCount)
  *   flags: bit 0 selected, bit 1 engaged / under fire
- * ArmyMarker.c = counts for up to four close-range composition rows
- * ArmyMarker.d = visual kinds for those rows (0 infantry, 1 light armor,
- *                2 medium armor, 3 artillery; 4 means unused)
- * ArmyMarker.e = (nextWaypointX, nextWaypointZ, remainingSeconds, sampleTime)
+ * ArmyMarker.countsA/countsB = counts for up to six exact composition rows
+ * ArmyMarker.kindsA/kindsB = kinds for those rows (0 infantry, 1 engineer,
+ *   2 armoured car, 3 light tank, 4 medium tank, 5 artillery; 6 unused)
+ * ArmyMarker.motion = (nextWaypointX, nextWaypointZ, remainingSeconds, sampleTime)
  *
- * The counter shows a strategic army symbol: a rounded plaque in the owner's
- * colour, the unit count (1–2 digits) or a "?" for an unidentified contact, a
- * condition bar, and a selection ring. At close zoom a second plaque replaces
- * that summary with up to four icon-and-amount rows.
+ * The counter shows a painted strategic plaque with the two largest exact unit
+ * categories and their counts, or a "?" for an unidentified contact, plus its
+ * condition and selection state. At close zoom a two-column field roster
+ * expands the summary to all six exact icon-and-amount entries.
  */
 export const armyMarkerShader = commonWgsl + /* wgsl */ `
-struct ArmyMarker { a: vec4f, b: vec4f, c: vec4f, d: vec4f, e: vec4f };
+struct ArmyMarker {
+  a: vec4f,
+  b: vec4f,
+  countsA: vec4f,
+  countsB: vec4f,
+  kindsA: vec4f,
+  kindsB: vec4f,
+  motion: vec4f,
+};
 struct ArmyParams { count: u32, mode: u32, pad0: u32, pad1: u32 };
 @group(1) @binding(0) var<storage, read> armyMarkers: array<ArmyMarker>;
 @group(1) @binding(1) var<uniform> armyParams: ArmyParams;
 @group(0) @binding(14) var armyMarkerPlate: texture_2d<f32>;
 @group(0) @binding(15) var armyMarkerPlateSampler: sampler;
+@group(0) @binding(16) var armyUnitSilhouettes: texture_2d<f32>;
 
 struct ArmyOut {
   @builtin(position) position: vec4f,
@@ -42,8 +51,12 @@ struct ArmyOut {
   @location(4) @interpolate(flat) health: f32,
   @location(5) @interpolate(flat) selected: f32,
   @location(6) alpha: f32,
-  @location(7) @interpolate(flat) kind: f32,
+  @location(7) @interpolate(flat) rows: f32,
   @location(8) @interpolate(flat) engaged: f32,
+  @location(9) @interpolate(flat) countsA: vec4f,
+  @location(10) @interpolate(flat) countsB: vec4f,
+  @location(11) @interpolate(flat) kindsA: vec4f,
+  @location(12) @interpolate(flat) kindsB: vec4f,
 };
 
 fn unpackRgb(packed: f32) -> vec3f {
@@ -57,10 +70,10 @@ fn unpackRgb(packed: f32) -> vec3f {
 fn markerWorldPosition(marker: ArmyMarker) -> vec2f {
   let travel = select(
     0.0,
-    clamp((uniforms.sunTime.w - marker.e.w) / max(marker.e.z, 0.0001), 0.0, 1.0),
-    marker.e.z > 0.0,
+    clamp((uniforms.sunTime.w - marker.motion.w) / max(marker.motion.z, 0.0001), 0.0, 1.0),
+    marker.motion.z > 0.0,
   );
-  return mix(marker.a.xy, marker.e.xy, travel);
+  return mix(marker.a.xy, marker.motion.xy, travel);
 }
 
 @vertex
@@ -110,7 +123,11 @@ fn armyMarkerVertex(
   let markerFlags = u32(marker.b.z + 0.5);
   output.selected = f32(markerFlags & 1u);
   output.engaged = f32((markerFlags >> 1u) & 1u);
-  output.kind = marker.b.w;
+  output.rows = marker.b.w;
+  output.countsA = marker.countsA;
+  output.countsB = marker.countsB;
+  output.kindsA = marker.kindsA;
+  output.kindsB = marker.kindsB;
   output.alpha = rangeFade * (1.0 - horizontalWorldFog(worldPos.x));
   if (clip.w <= 0.0001) {
     output.position = vec4f(0.0, 0.0, -10.0, 1.0);
@@ -158,59 +175,40 @@ fn roundedBox(p: vec2f, b: vec2f, r: f32) -> f32 {
   return length(max(q, vec2f(0.0))) + min(max(q.x, q.y), 0.0) - r;
 }
 
-fn markerSegmentDistance(p: vec2f, a: vec2f, b: vec2f) -> f32 {
-  let pa = p - a;
-  let ba = b - a;
-  let h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
-  return length(pa - ba * h);
-}
-
 fn unitKindIcon(kind: i32, q: vec2f) -> f32 {
-  if (kind == 0) {
-    let head = 1.0 - smoothstep(0.20, 0.26, length(q - vec2f(0.0, 0.52)));
-    let body = 1.0 - smoothstep(0.09, 0.15, markerSegmentDistance(q, vec2f(0.0, 0.30), vec2f(0.0, -0.35)));
-    let limbs = 1.0 - smoothstep(0.08, 0.14, min(
-      markerSegmentDistance(q, vec2f(0.0, 0.10), vec2f(-0.42, -0.05)),
-      markerSegmentDistance(q, vec2f(0.0, -0.30), vec2f(0.35, -0.82)),
-    ));
-    return max(head, max(body, limbs));
-  }
-  if (kind == 1) {
-    let hull = step(abs(q.x), 0.78) * step(abs(q.y + 0.18), 0.30);
-    let turret = step(abs(q.x), 0.42) * step(abs(q.y - 0.30), 0.26);
-    let barrel = step(abs(q.x), 0.10) * step(q.y, 0.95) * step(0.48, q.y);
-    return max(hull, max(turret, barrel));
-  }
-  if (kind == 2) {
-    let hull = step(abs(q.x), 0.90) * step(abs(q.y + 0.20), 0.38);
-    let turret = step(abs(q.x), 0.50) * step(abs(q.y - 0.30), 0.28);
-    let barrel = step(abs(q.x), 0.11) * step(q.y, 1.0) * step(0.48, q.y);
-    let tracks = step(abs(q.x), 0.98) * step(abs(q.y + 0.58), 0.10);
-    return max(max(hull, tracks), max(turret, barrel));
-  }
-  let cannon = 1.0 - smoothstep(0.09, 0.15, markerSegmentDistance(q, vec2f(-0.52, -0.55), vec2f(0.55, 0.62)));
-  let wheel = 1.0 - smoothstep(0.27, 0.34, length(q - vec2f(-0.30, -0.48)));
-  return max(cannon, wheel);
-}
-
-fn dominantIcon(kind: i32, p: vec2f) -> f32 {
-  return unitKindIcon(kind, (p - vec2f(-0.52, 0.12)) / vec2f(0.28, 0.47));
+  if (kind < 0 || kind > 5 || abs(q.x) > 1.0 || abs(q.y) > 1.0) { return 0.0; }
+  // Stay half a source texel inside each 96 px cell so linear filtering never
+  // leaks a neighbouring unit into the current silhouette.
+  let cellUv = clamp(q * vec2f(0.5, -0.5) + vec2f(0.5), vec2f(0.5 / 96.0), vec2f(95.5 / 96.0));
+  let atlasUv = vec2f(
+    (f32(kind) + cellUv.x) / 6.0,
+    cellUv.y,
+  );
+  return textureSampleLevel(armyUnitSilhouettes, armyMarkerPlateSampler, atlasUv, 0.0).a;
 }
 
 struct CompositionOut {
   @builtin(position) position: vec4f,
   @location(0) uv: vec2f,
   @location(1) @interpolate(flat) rgb: vec3f,
-  @location(2) @interpolate(flat) counts: vec4f,
-  @location(3) @interpolate(flat) kinds: vec4f,
-  @location(4) @interpolate(flat) health: f32,
-  @location(5) @interpolate(flat) selected: f32,
-  @location(6) alpha: f32,
+  @location(2) @interpolate(flat) countsA: vec4f,
+  @location(3) @interpolate(flat) countsB: vec4f,
+  @location(4) @interpolate(flat) kindsA: vec4f,
+  @location(5) @interpolate(flat) kindsB: vec4f,
+  @location(6) @interpolate(flat) health: f32,
+  @location(7) @interpolate(flat) selected: f32,
+  @location(8) alpha: f32,
 };
 
-fn compositionRowCount(counts: vec4f) -> f32 {
+fn compositionRowCount(countsA: vec4f, countsB: vec4f) -> f32 {
   return max(1.0,
-    step(0.5, counts.x) + step(0.5, counts.y) + step(0.5, counts.z) + step(0.5, counts.w));
+    step(0.5, countsA.x) + step(0.5, countsA.y) + step(0.5, countsA.z) + step(0.5, countsA.w)
+    + step(0.5, countsB.x) + step(0.5, countsB.y));
+}
+
+fn compositionValue(first: vec4f, second: vec4f, index: u32) -> f32 {
+  if (index < 4u) { return first[index]; }
+  return second[index - 4u];
 }
 
 @vertex
@@ -230,15 +228,18 @@ fn armyCompositionVertex(
   let worldXZ = vec2f(markerXZ.x + copyOffset, markerXZ.y);
   let worldPos = vec3f(worldXZ.x, heightAt(markerXZ / uniforms.map.xy) + 17.0, worldXZ.y);
   let clip = uniforms.viewProjection * vec4f(worldPos, 1.0);
-  let rows = compositionRowCount(marker.c);
-  let half = vec2f(29.0, 6.0 + rows * 7.5) * uniforms.viewport.z;
-  let pixelCenter = vec2f(38.0, 2.0) * uniforms.viewport.z;
+  let rows = compositionRowCount(marker.countsA, marker.countsB);
+  let gridRows = ceil(rows * 0.5);
+  let half = vec2f(42.0, 8.0 + gridRows * 10.0) * uniforms.viewport.z;
+  let pixelCenter = vec2f(51.0, 2.0) * uniforms.viewport.z;
 
   var output: CompositionOut;
   output.uv = corner;
   output.rgb = unpackRgb(marker.a.z);
-  output.counts = marker.c;
-  output.kinds = marker.d;
+  output.countsA = marker.countsA;
+  output.countsB = marker.countsB;
+  output.kindsA = marker.kindsA;
+  output.kindsB = marker.kindsB;
   output.health = clamp(marker.b.y, 0.0, 1.0);
   output.selected = f32(u32(marker.b.z + 0.5) & 1u);
   let identified = marker.a.w < 1.5;
@@ -269,34 +270,40 @@ fn armyCompositionFragment(input: CompositionOut) -> @location(0) vec4f {
   var rgb = mix(core, ink, clamp(outline * 1.35, 0.0, 1.0));
   rgb *= mix(1.08, 0.84, uv.y * 0.5 + 0.5);
 
-  let rows = i32(compositionRowCount(input.counts));
-  let rowSpan = 1.40 / f32(rows);
-  for (var index = 0; index < 4; index += 1) {
-    if (index >= rows) { break; }
-    let amount = i32(clamp(input.counts[index] + 0.5, 1.0, 999.0));
-    let kind = i32(input.kinds[index] + 0.5);
-    let centerY = 0.70 - (f32(index) + 0.5) * rowSpan;
-    let rowUv = vec2f(uv.x, (uv.y - centerY) / (rowSpan * 0.44));
-    let icon = unitKindIcon(kind, vec2f((rowUv.x + 0.48) / 0.27, rowUv.y / 0.78));
+  let entries = u32(compositionRowCount(input.countsA, input.countsB));
+  let rows = (entries + 1u) / 2u;
+  let rowSpan = 1.26 / f32(rows);
+  for (var index = 0u; index < 6u; index += 1u) {
+    if (index >= entries) { break; }
+    let amount = i32(clamp(compositionValue(input.countsA, input.countsB, index) + 0.5, 1.0, 999.0));
+    let kind = i32(compositionValue(input.kindsA, input.kindsB, index) + 0.5);
+    let column = index % 2u;
+    let row = index / 2u;
+    let centerX = select(-0.45, 0.45, column == 1u);
+    let centerY = 0.68 - (f32(row) + 0.5) * rowSpan;
+    let cellUv = vec2f((uv.x - centerX) / 0.43, (uv.y - centerY) / (rowSpan * 0.44));
+    let icon = unitKindIcon(kind, vec2f((cellUv.x + 0.52) / 0.27, cellUv.y / 0.78));
     var digits = 0.0;
     if (amount < 10) {
-      digits = glyphCoverage(amount, rowUv, 0.13, 0.58, 0.48);
+      digits = glyphCoverage(amount, cellUv, 0.13, 0.58, 0.46);
     } else if (amount < 100) {
-      digits = glyphCoverage(amount / 10, rowUv, 0.12, 0.56, 0.34)
-        + glyphCoverage(amount % 10, rowUv, 0.12, 0.56, 0.65);
+      digits = glyphCoverage(amount / 10, cellUv, 0.11, 0.56, 0.30)
+        + glyphCoverage(amount % 10, cellUv, 0.11, 0.56, 0.64);
     } else {
-      digits = glyphCoverage(amount / 100, rowUv, 0.10, 0.54, 0.20)
-        + glyphCoverage((amount / 10) % 10, rowUv, 0.10, 0.54, 0.48)
-        + glyphCoverage(amount % 10, rowUv, 0.10, 0.54, 0.76);
+      digits = glyphCoverage(amount / 100, cellUv, 0.085, 0.52, 0.18)
+        + glyphCoverage((amount / 10) % 10, cellUv, 0.085, 0.52, 0.46)
+        + glyphCoverage(amount % 10, cellUv, 0.085, 0.52, 0.74);
     }
     rgb = mix(rgb, vec3f(0.94, 0.92, 0.82), clamp(icon, 0.0, 1.0) * inside);
     rgb = mix(rgb, vec3f(0.99, 0.98, 0.93), clamp(digits, 0.0, 1.0) * inside);
-    if (index + 1 < rows) {
+    if (column == 0u && row + 1u < rows) {
       let separatorY = centerY - rowSpan * 0.5;
-      let separator = step(abs(uv.y - separatorY), 0.012) * step(abs(uv.x), 0.72) * inside;
+      let separator = step(abs(uv.y - separatorY), 0.012) * step(abs(uv.x), 0.78) * inside;
       rgb = mix(rgb, ink, separator * 0.46);
     }
   }
+  let columnRule = step(abs(uv.x), 0.012) * step(-0.58, uv.y) * step(uv.y, 0.70) * inside;
+  rgb = mix(rgb, ink, columnRule * 0.46);
 
   let barY = -0.76;
   let inBarBand = step(abs(uv.y - barY), 0.055) * step(abs(uv.x), 0.72) * inside;
@@ -352,29 +359,42 @@ fn armyMarkerFragment(input: ArmyOut) -> @location(0) vec4f {
     rgb = mix(rgb, vec3f(gray), 0.78);
   }
 
-  // The number owns the right bay. Three-digit stacks remain readable instead
-  // of silently clamping to 99.
-  var glyphC = 0.0;
-  let glyphUv = uv - vec2f(0.0, 0.12);
+  // Like Call of War's compact counters, the main plaque combines the two
+  // largest unit types with their own amounts. At close range the companion
+  // manifest expands this to all six exact categories.
+  var liveMarks = 0.0;
   if (contact) {
-    glyphC = glyphCoverage(10, glyphUv, 0.22, 0.49, 0.36);
+    liveMarks = glyphCoverage(10, uv - vec2f(0.0, 0.12), 0.22, 0.49, 0.30);
   } else {
-    let n = i32(clamp(input.count + 0.5, 1.0, 999.0));
-    if (n < 10) {
-      glyphC = glyphCoverage(n, glyphUv, 0.22, 0.49, 0.36);
-    } else if (n < 100) {
-      glyphC = glyphCoverage(n / 10, glyphUv, 0.17, 0.47, 0.13)
-        + glyphCoverage(n % 10, glyphUv, 0.17, 0.47, 0.58);
-    } else {
-      glyphC = glyphCoverage(n / 100, glyphUv, 0.13, 0.44, 0.02)
-        + glyphCoverage((n / 10) % 10, glyphUv, 0.13, 0.44, 0.36)
-        + glyphCoverage(n % 10, glyphUv, 0.13, 0.44, 0.70);
+    let shownRows = min(2u, u32(input.rows + 0.5));
+    for (var index = 0u; index < 2u; index += 1u) {
+      if (index >= shownRows) { break; }
+      let centerY = select(0.10, 0.36 - f32(index) * 0.52, shownRows > 1u);
+      let rowUv = vec2f(uv.x, (uv.y - centerY) / 0.25);
+      let amount = i32(clamp(compositionValue(input.countsA, input.countsB, index) + 0.5, 1.0, 999.0));
+      let kind = i32(compositionValue(input.kindsA, input.kindsB, index) + 0.5);
+      let icon = unitKindIcon(kind, vec2f((rowUv.x + 0.53) / 0.25, rowUv.y / 0.82));
+      var digits = 0.0;
+      if (amount < 10) {
+        digits = glyphCoverage(amount, rowUv, 0.14, 0.64, 0.40);
+      } else if (amount < 100) {
+        digits = glyphCoverage(amount / 10, rowUv, 0.11, 0.62, 0.25)
+          + glyphCoverage(amount % 10, rowUv, 0.11, 0.62, 0.58);
+      } else {
+        digits = glyphCoverage(amount / 100, rowUv, 0.085, 0.58, 0.16)
+          + glyphCoverage((amount / 10) % 10, rowUv, 0.085, 0.58, 0.40)
+          + glyphCoverage(amount % 10, rowUv, 0.085, 0.58, 0.64);
+      }
+      liveMarks = max(liveMarks, clamp(icon + digits, 0.0, 1.0));
+    }
+    if (shownRows > 1u) {
+      let separator = step(abs(uv.y - 0.10), 0.015) * step(abs(uv.x), 0.70) * plateCoverage;
+      rgb = mix(rgb, vec3f(0.035), separator * 0.48);
     }
   }
-  let iconC = select(dominantIcon(i32(input.kind + 0.5), uv), 0.0, contact);
   let liveInk = vec3f(0.98, 0.97, 0.89);
-  rgb = mix(rgb, vec3f(0.025), clamp(iconC + glyphC, 0.0, 1.0) * plateCoverage * 0.58);
-  rgb = mix(rgb, liveInk, clamp(iconC + glyphC, 0.0, 1.0) * plateCoverage);
+  rgb = mix(rgb, vec3f(0.025), liveMarks * plateCoverage * 0.58);
+  rgb = mix(rgb, liveInk, liveMarks * plateCoverage);
 
   // A thick, threshold-coloured condition strip fills the plate's recessed
   // channel. Unknown contacts keep a neutral channel instead of implying 0 HP.

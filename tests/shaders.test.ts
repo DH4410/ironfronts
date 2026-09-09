@@ -11,7 +11,9 @@ describe('WGSL programs', () => {
     expect(armyModelShader).toContain('smoothstep(1500.0, 1900.0, uniforms.interaction.y)');
     expect(armyModelShader).toContain('fn armyKindCountVertex');
     expect(armyModelShader).toContain('mix(model.a.xy, model.d.xy, travel)');
-    expect(armyMarkerShader).toContain('fn dominantIcon');
+    expect(armyMarkerShader).toContain('fn unitKindIcon');
+    expect(armyMarkerShader).toContain('armyUnitSilhouettes');
+    expect(armyMarkerShader).toContain('for (var index = 0u; index < 6u');
     expect(armyMarkerShader).toContain('fn armyCompositionVertex');
     expect(armyMarkerShader).toContain('fn armyCompositionFragment');
     expect(armyMarkerShader).toContain('smoothstep(4400.0, 5000.0, zoom)');
@@ -272,6 +274,7 @@ describe('WGSL programs', () => {
       { binding: 13, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 14, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 15, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      { binding: 16, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ] });
     const layer = device.createBindGroupLayout({ entries: [
       { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },

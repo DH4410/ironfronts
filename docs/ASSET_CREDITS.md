@@ -201,6 +201,45 @@ centered on 256x256 transparent RGBA canvases for runtime use.
 | `src/ui/assets/icons/ironfronts/command-stop.png` | Stop command |
 | `src/ui/assets/icons/ironfronts/command-extract.png` | Extract command |
 
+### Strategic army-counter art
+
+**Source:** Original Ironfronts assets generated with OpenAI's built-in image
+generator on 2026-09-08 and prepared for this project. They are not copied from
+0 A.D., Call of War, or any other third party and carry the same licence as the
+Ironfronts repository.
+
+**Backplate prompt direction:** a compact front-facing WW2 military map counter
+made from worn gunmetal and field-green enamel, aged brass rim, a recessed
+condition channel, restrained hand-painted texture, no unit symbol, no number,
+no text, no insignia, no glossy mobile-game rendering, and a genuinely
+transparent exterior.
+
+**Silhouette prompt direction:** one historically plausible WW2 unit per image,
+side/profile view with realistic proportions and a strong field-manual stencil
+outline. The six subjects were an infantry rifleman, combat engineer with
+entrenching tool, armoured reconnaissance car, light tank, medium tank, and
+towed field gun. Bone paint and charcoal line work only; no badges, labels,
+frames, scenery, modern equipment, exaggerated cartoon shapes, or watermark.
+
+**Modification:** four generator outputs contained a rendered transparency
+checker. `scripts/prepare-army-marker-silhouettes.mjs` separates warm bone paint
+and charcoal line work from that neutral checker, retains the connected subject,
+and Lanczos-downscales each result to a true-alpha 96x96 stencil. The six
+individual sprites are packed into a 576x96 runtime atlas in exact shader order.
+The painted surface stays separate from live silhouettes, per-type amounts,
+owner colour, condition, selection, engagement, and fog-of-war state.
+
+| Runtime file | Slot |
+|---|---|
+| `src/ui/assets/army-marker-plate.png` | Reusable painted counter backplate |
+| `src/ui/assets/army-unit-silhouettes.png` | Six-cell WebGPU silhouette atlas |
+| `src/ui/assets/icons/ironfronts/marker-infantry.png` | Infantry counter silhouette |
+| `src/ui/assets/icons/ironfronts/marker-engineer.png` | Engineer counter silhouette |
+| `src/ui/assets/icons/ironfronts/marker-armored-car.png` | Armoured-car counter silhouette |
+| `src/ui/assets/icons/ironfronts/marker-light-tank.png` | Light-tank counter silhouette |
+| `src/ui/assets/icons/ironfronts/marker-medium-tank.png` | Medium-tank counter silhouette |
+| `src/ui/assets/icons/ironfronts/marker-artillery.png` | Artillery counter silhouette |
+
 ### `public/ui/diplomatic-cable-watermark.png`
 
 Original Ironfronts project artwork generated with OpenAI's built-in image
