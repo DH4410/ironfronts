@@ -12,8 +12,8 @@ export const LABEL_TERRAIN_HEIGHT_OFFSET = 0.6;
  * readable without letting the name become the dominant element on screen; the
  * territory-fitting shrink loop still applies on top of the cap.
  */
-export const MAX_LABEL_WORLD_HEIGHT = 300;
-export const MAX_LABEL_WORLD_WIDTH = 2800;
+export const MAX_LABEL_WORLD_HEIGHT = 175;
+export const MAX_LABEL_WORLD_WIDTH = 1700;
 
 export interface CountryLabelMetrics {
   readonly lineHeightAtMeasurementSize: number;
