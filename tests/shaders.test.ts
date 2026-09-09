@@ -20,7 +20,7 @@ describe('WGSL programs', () => {
     expect(armyMarkerShader).toContain('fn armyCompositionVertex');
     expect(armyMarkerShader).toContain('fn armyCompositionFragment');
     expect(armyMarkerShader).toContain('identified && needsManifest && selected');
-    expect(armyMarkerShader).toContain('smoothstep(4400.0, 5000.0, zoom)');
+    expect(armyMarkerShader).toContain('smoothstep(7600.0, 9200.0, zoom)');
   });
 
   it('keeps strategic troop models small relative to roads and towns', () => {

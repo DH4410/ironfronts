@@ -108,9 +108,12 @@ fn armyMarkerVertex(
 
   let zoom = uniforms.interaction.y;
   let contact = marker.a.w > 1.5;
-  let closeFade = select(smoothstep(1400.0, 1800.0, zoom), 1.0, contact);
-  let rangeFade = closeFade * (1.0 - smoothstep(4400.0, 5000.0, zoom));
-  let zoomScale = mix(0.8, 1.25, smoothstep(4600.0, 900.0, zoom));
+  // Close in, the badge never vanishes — it thins to a floating ID tag over
+  // the 3D models instead of disappearing. Far out, it holds much longer so
+  // the strategic overview still shows where every stack is.
+  let closeFade = select(mix(0.5, 1.0, smoothstep(650.0, 1300.0, zoom)), 1.0, contact);
+  let rangeFade = closeFade * (1.0 - smoothstep(7600.0, 9200.0, zoom));
+  let zoomScale = mix(1.0, 1.28, smoothstep(4600.0, 900.0, zoom));
   // Fixed 4:3 proportions match the generated cartouche so neither its
   // painted surface nor its live silhouettes are stretched.
   // viewport.z (render-scale) keeps the on-screen size constant across
