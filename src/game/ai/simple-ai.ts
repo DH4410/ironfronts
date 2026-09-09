@@ -299,7 +299,6 @@ function mobilise(session: SimContext, memory: AiMemory, situation: Assessment):
   if (!staging) return;
   const stagingNode = provinceNode(session, memory, staging);
   for (const city of situation.cities) {
-    if (city.node === stagingNode) continue; // the fist already forms here
     let held = 0;
     for (const army of city.garrison) held += combatStrength(army);
     const spare = held - requiredGarrison(city);
@@ -308,11 +307,20 @@ function mobilise(session: SimContext, memory: AiMemory, situation: Assessment):
     const parent = city.garrison.find((army) => !army.order && army.status === 'idle'
       && army.extractingNodeId === null && combatStrength(army) > spare);
     if (!parent) continue;
+    // A city that IS the staging point cannot march a detachment to itself, so
+    // aim that one at the front — but only when the detachment on its own
+    // beats everything in the way, which is the same gate `assault` applies.
+    const marchOut = city.node === stagingNode;
+    const destination = marchOut ? situation.frontTarget : staging;
+    if (!destination) continue;
+    if (marchOut && spare < oppositionTo(
+      situation, parent, destination, session.world.width,
+    ) * COMMIT_RATIO) continue;
     const groups = detachment(parent, spare);
     if (groups.length === 0) continue;
     const done = applyCommand(session, {
       type: 'splitArmy', countryId: situation.countryId, armyId: parent.id,
-      groups, x: staging.center[0], z: staging.center[1],
+      groups, x: destination.center[0], z: destination.center[1],
     }).ok;
     if (done) return;
   }

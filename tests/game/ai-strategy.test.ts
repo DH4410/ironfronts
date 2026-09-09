@@ -142,6 +142,25 @@ describe('strategic AI: concentration', () => {
     expect(ordered.every((army) => army.order!.intent === 'move')).toBe(true);
   });
 
+  it('splits a field army out of a capital that is itself the staging point', () => {
+    // A one-province nation: its only city, its capital and its staging point
+    // are all the same node, so nothing can ever simply march away. It must
+    // detach a column and keep the covering garrison.
+    const whole = stack('ai-all', 1, 0, 20);
+    const c = makeCtx([whole, stack('en-far', 2, 3, 2)]);
+    for (const id of [11, 12]) c.state.provinceOwners[id] = 2;
+
+    stepAi(c, 2);
+
+    const detached = Object.values(c.state.armies)
+      .filter((army) => army.ownerCountryId === 1 && army.id !== 'ai-all');
+    expect(detached).toHaveLength(1);
+    expect(detached[0].order).not.toBeNull();
+    // The capital keeps its token garrison rather than emptying out.
+    expect(whole.units[0].count).toBe(3);
+    expect(whole.graphNodeId).toBe(0);
+  });
+
   it('rallies rear-city production to the same staging point', () => {
     const c = makeCtx([stack('ai-a', 1, 2, 5), stack('en-big', 2, 3, 40)]);
 
