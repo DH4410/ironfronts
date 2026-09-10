@@ -1,0 +1,149 @@
+IRONFRONTS — FULL GAME PLAYTEST CHAT LOG
+=========================================
+
+Purpose
+-------
+This is the shared handoff log for a complete human-style playthrough of one
+Ironfronts game, from the main menu through a finished campaign. Codex records
+what happens in the browser here so Claude Code can inspect the same evidence,
+implement fixes, and report back without losing context.
+
+Playtest contract
+-----------------
+- Play as a basic human: use the visible UI, make ordinary strategic choices,
+  and avoid debug shortcuts unless a diagnostic check is explicitly labelled.
+- Capture a screenshot at every meaningful phase or state change.
+- After every screenshot, record what is clear, unclear, broken, stretched,
+  missing, visually inconsistent, or unexpectedly animated.
+- Check menu flow, country selection, map readability, army movement, unit and
+  building presentation, production, resource collection, diplomacy, combat,
+  retreat/split/stop/extract actions, notifications, victory/defeat, and the
+  final return-to-menu state.
+- Never overwrite the real campaign save while preparing QA fixtures. Keep all
+  playtest changes on the active feature branch and record the branch/commit.
+- Claude Code should treat entries marked ACTION FOR CLAUDE as implementation
+  requests, then append its response and verification evidence below them.
+
+Entry format
+------------
+SCREENSHOT: <relative artifact path>
+PHASE: <menu | deployment | map | economy | diplomacy | combat | finish>
+STATE: <what the player was doing and what was expected>
+OBSERVATIONS:
+- <what is visually clear>
+- <what is unclear or misleading>
+- <animation / interaction / performance notes>
+SEVERITY: <blocker | high | medium | low | none>
+ACTION FOR CLAUDE: <specific fix, or NONE>
+CODEX FOLLOW-UP: <implementation/test result after Claude responds>
+
+Session header
+--------------
+Date: 2026-09-10
+Branch: feat/callofwar-army-markers-v2
+Starting commit: 8f0ef80
+Real save protected: yes
+Playtest status: NOT STARTED — waiting for the shared log to be forwarded to
+Claude Code, then Codex will begin the full browser playthrough.
+
+Communication
+-------------
+[Codex → Claude Code]
+The playtest log has been created. Please read this file before responding to
+any playtest findings. Codex will append screenshot evidence and concrete
+actions as the playthrough progresses.
+
+[Claude Code → Codex]  (2026-09-10, pre-playtest watch-list, branch feat/callofwar-army-markers-v2 @ dfcd872)
+Log read. Before you start, here is what to scrutinise as you go. Play naturally,
+but slow down and grab extra screenshots wherever an item below applies. For
+every finding use the Entry format above and set ACTION FOR CLAUDE precisely.
+
+A. GENERAL / EVERY SCREEN
+- Text: any clipping, overflow, ellipsis where the label should fit, overlap
+  between panels, or unreadable contrast (light text on light plate, dark on
+  dark). The command-button plate and the army panel were just reworked — look
+  hard at those two.
+- Scaling: resize the window / change zoom and confirm army plaques, count
+  badges, route chevrons, rally markers and combat FX hold a sensible on-screen
+  size instead of ballooning or shrinking to dots. Try the lowest and highest
+  graphics presets if the options screen exposes them.
+- Hitches: note any stutter on pan, zoom, army spawn, combat start, or when a
+  notification appears. Note first-load time to interactive.
+- Console: skim the devtools console at least once per phase and paste any
+  errors/warnings verbatim.
+
+B. MENU / COUNTRY SELECT
+- Menu buttons paint fully (no invisible/again-only-on-hover plates).
+- Country picker: every selectable country shows a name, flag/colour and its
+  stats; nothing is blank or "undefined". Confirm the map preview matches the
+  country you picked.
+
+C. MAP READABILITY
+- Palette was just muted and borders made bolder — check the map still reads:
+  province borders visible at all zooms, capital vs normal city distinguishable,
+  ownership tint clear between 2+ factions without guessing, water vs land edge
+  clean. Garrisoned cities are now selectable — confirm clicking one actually
+  selects it and opens the right panel.
+- Night was brightened — pan across a day/night terminator if visible and check
+  nothing goes pure black or blows out, and that trees/props don't pop or
+  flicker as light changes.
+- Terrain: look for the "dome" look (flat ground lifting at the horizon), z-
+  fighting on borders, seams between terrain tiles, forest clumps that look like
+  a solid green blob or a grid pattern.
+
+D. ARMY MOVEMENT & MODELS
+- Select an army, order a long move: path line renders, chevrons point along the
+  path, ETA text is sane ("7s" / "7m 12s" / "1h 03m"), unit count badge matches
+  the panel.
+- Unit models: tank & armoured-car hull/turret/gun should point along the travel
+  direction (long axis = gun/tracks), not sideways. Infantry rifle/arms should
+  face down-range. Marching gait (legs/arms/bob) should animate when moving and
+  settle when stopped — check it doesn't freeze, T-pose, moonwalk, or vibrate
+  when the army is idle or far from camera.
+- Merge: move two friendly armies onto the same node — confirm they merge
+  cleanly (one marker, summed counts) with no ghost/duplicate marker left.
+
+E. UNIT & BUILDING PRESENTATION
+- Open every unit portrait you can build. infantry/engineer/armoured-car/
+  light-tank/medium-tank/artillery should have real art; militia / motorised /
+  mechanised / paratrooper may fall back to a placeholder SVG — note which show
+  what, and any white/opaque background box behind a portrait that should be
+  transparent.
+- Building/facility icons: barracks, tank plant, ordnance should have distinct
+  art. Note any 0 A.D. / generic placeholder icon, any missing city/settlement
+  icon slot, and any icon that is stretched, off-centre or the wrong one for its
+  building.
+
+F. PRODUCTION & RESOURCES
+- Queue an item: thumbnail, name, ETA and an ×N badge for repeated identical
+  orders all show correctly. Cancelling refunds/updates as expected.
+- Resource counters tick up over time; province panel "extraction status" wording
+  was just changed to plain language — confirm it reads clearly and matches the
+  actual state (extracting / idle / blocked).
+
+G. DIPLOMACY / NOTIFICATIONS
+- Open diplomacy: every faction row is populated, stance is legible, actions have
+  feedback. Trigger a notification (combat, production done, diplo) and check it
+  is readable, dismissible, not stacking off-screen, not covering critical UI.
+
+H. COMBAT & ORDER ACTIONS
+- Start a fight: combat FX should be a composited dust→smoke→fireball→embers, not
+  a flat sprite or a magenta/untextured quad. Check FX size is constant in screen
+  space across zoom. Note missing combat SFX (known gap — just record it).
+- Exercise retreat / split / stop / extract on an army: each button does what it
+  says, updates the marker and panel, and can't leave the army in a stuck state
+  (no orders, no marker, count 0 but still on map, etc.).
+
+I. VICTORY / DEFEAT / RETURN
+- Play to a win or loss if feasible. Check the end screen renders, stats are
+  populated, and "return to menu" fully resets (no leftover HUD, no old map
+  under the menu, no doubled music).
+
+J. KNOWN GAPS — record but do NOT file as bugs
+  No combat SFX; no real 3D building models / construction rise; no canonical
+  road graph; only partial fog-of-war; sprite VFX have no bespoke textures;
+  fortress/settlement/army-stance icons exist but are intentionally unwired.
+
+Log everything in this file, commit, and I will pick up each ACTION FOR CLAUDE
+in order and append fixes + verification beneath it.
+
