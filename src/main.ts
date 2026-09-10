@@ -1486,18 +1486,24 @@ function syncArmyMarkers(
       const rx = tdx / tl;
       const rz = tdz / tl;
       // A distinct diamond marks the rally point itself so it reads at a glance
-      // instead of a faint chevron lost in the terrain (F15). A small chevron
-      // just short of it keeps the direction of the incoming route.
-      const R = 34;
-      emitRally(tip.x, tip.z - R, tip.x + R, tip.z, 1);
-      emitRally(tip.x + R, tip.z, tip.x, tip.z + R, 1);
-      emitRally(tip.x, tip.z + R, tip.x - R, tip.z, 1);
-      emitRally(tip.x - R, tip.z, tip.x, tip.z - R, 1);
+      // instead of a faint chevron lost in the terrain (F15). The world radius
+      // grows with camera distance so the marker keeps a roughly constant
+      // on-screen size and stays legible at strategic zoom (F15 round 2). A
+      // small chevron just short of it keeps the incoming route direction.
+      const R = Math.min(150, 30 + renderer.camera.distance * 0.014);
+      // Double outline for weight against busy terrain.
+      for (const scale of [1, 0.6]) {
+        const r = R * scale;
+        emitRally(tip.x, tip.z - r, tip.x + r, tip.z, 1);
+        emitRally(tip.x + r, tip.z, tip.x, tip.z + r, 1);
+        emitRally(tip.x, tip.z + r, tip.x - r, tip.z, 1);
+        emitRally(tip.x - r, tip.z, tip.x, tip.z - r, 1);
+      }
       const C = Math.cos(2.5);
       const S = Math.sin(2.5);
-      const cbx = tip.x - rx * (R + 10);
-      const cbz = tip.z - rz * (R + 10);
-      const CW = 13;
+      const cbx = tip.x - rx * (R + 12);
+      const cbz = tip.z - rz * (R + 12);
+      const CW = Math.min(26, 11 + renderer.camera.distance * 0.0022);
       emitRally(cbx + CW * (rx * C - rz * S), cbz + CW * (rx * S + rz * C), cbx, cbz, 1);
       emitRally(cbx + CW * (rx * C + rz * S), cbz + CW * (-rx * S + rz * C), cbx, cbz, 1);
     }
