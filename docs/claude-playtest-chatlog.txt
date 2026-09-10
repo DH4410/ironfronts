@@ -291,7 +291,164 @@ ACTION FOR CLAUDE: Make the selected-army panel fit within the viewport (or add
   an intentional internal scroll/compact mode) so no combat stats or controls
   are clipped at common laptop heights.
 CODEX FOLLOW-UP: Panel reports 100% health/readiness, Speed 90, Troops 3, and
-  Holding position with no console errors.
+Holding position with no console errors.
+
+--- CODEX BATCH 3 ---
+
+PLAYTEST CONTEXT: Germany; 1920×889 viewport; graphics preset confirmed Ultra
+in the system menu (1.50× render scale); game clock advanced normally; console
+contained no warnings/errors beyond the known info connection line.
+
+SCREENSHOT: artifacts/playtest/12-long-move-animation.png
+PHASE: map
+STATE: Long move from the German interior toward Hannover.
+OBSERVATIONS:
+- A bright gold route line renders clearly across multiple provinces and the
+  army arrives without a ghost marker.
+- The route has no visible ETA text or directional chevrons in this frame; the
+  activity text in the DOM said Moving to destination, while the captured panel
+  had already visually returned to Holding position.
+SEVERITY: medium
+ACTION FOR CLAUDE: Add a persistent ETA/directional chevron treatment to active
+routes and keep the rendered activity label synchronized with the live order.
+CODEX FOLLOW-UP: The order completed and the army remained selectable.
+
+SCREENSHOT: artifacts/playtest/14-attack-approach.png
+PHASE: combat
+STATE: Germany declared war on Belgium and engaged the Belgian force.
+OBSERVATIONS:
+- The confirmation dialog clearly explains that declaration and order commit
+  together; after confirmation, Attack order issued and War aims notifications
+  appeared.
+- Province Captured and Contact banners are readable and stacked without being
+  clipped. Combat overview shows Offensive, 1 front, Your forces 290/290 HP,
+  Enemy forces 300/300 HP, and five retreat routes.
+- The map's huge country labels still compete with the combat panel.
+SEVERITY: none
+ACTION FOR CLAUDE: NONE
+CODEX FOLLOW-UP: Attack entered active combat; no console errors.
+
+SCREENSHOT: artifacts/playtest/16-combat-20s.png
+PHASE: combat
+STATE: Active combat after roughly 20 seconds of real time.
+OBSERVATIONS:
+- HP ticked from 290/290 vs 300/300 to 289/290 vs 299/300, confirming combat
+  simulation and resource counters continued to advance.
+- A brief yellow impact flash was visible near the Belgian contact in the prior
+  frame, but no sustained dust→smoke→fireball→embers sequence was observable at
+  this zoom; no combat SFX was heard (known gap).
+- Combat action buttons correctly became disabled while engaged, with Retreat
+  enabled.
+SEVERITY: low
+ACTION FOR CLAUDE: NONE (recording the known VFX/SFX gap for now).
+CODEX FOLLOW-UP: Combat remained stable through a second tick (shot 17).
+
+SCREENSHOT: artifacts/playtest/18-retreating.png
+PHASE: combat
+STATE: Retreat selected during combat and a friendly German destination chosen.
+OBSERVATIONS:
+- Retreat opens a clear “Choose retreat destination” instruction and renders a
+  distinct pink route back to friendly territory; the panel activity changes to
+  Moving to destination / Withdrawing.
+- The first retreat target did not immediately disengage; selecting Cologne as
+  valid friendly ground then produced a Battle ended notification and completed
+  the withdrawal.
+SEVERITY: medium
+ACTION FOR CLAUDE: NONE (retreat works after a valid friendly target; consider a
+clear invalid-target cue if the player clicks non-friendly ground).
+CODEX FOLLOW-UP: Surviving force reappeared in Cologne with 99% health and no
+stuck zero-count marker.
+
+SCREENSHOT: artifacts/playtest/20-post-retreat-army.png
+PHASE: map
+STATE: Post-retreat 1st Army selected in Cologne.
+OBSERVATIONS:
+- The composition correctly shows Infantry ×6, Engineers ×2, and Armored Car ×1
+  before splitting; portraits are transparent and legible.
+- Engineer art is visually close to the infantry portrait at this scale, making
+  the type distinction weaker than the DOM label.
+SEVERITY: low
+ACTION FOR CLAUDE: Consider a more distinct engineer silhouette/colour accent in
+  the portrait frame while keeping the realistic illustrated style.
+CODEX FOLLOW-UP: Split flow opened successfully.
+
+SCREENSHOT: artifacts/playtest/21-split-result.png
+PHASE: map
+STATE: Split 1st Army into a parent force and a 3-troop detachment.
+OBSERVATIONS:
+- Split dialog exposes bounded numeric controls for Infantry / 6, Engineers / 2,
+  and Armored Car / 1, with clear “Choose destination” progression.
+- Parent count updated from 9 to 6 and a second nearby marker appeared; selecting
+  it identified “1st Army Detachment” with Infantry ×2 and Engineers ×1.
+- No duplicate/ghost marker or count-zero state appeared.
+SEVERITY: none
+ACTION FOR CLAUDE: NONE
+CODEX FOLLOW-UP: Split verified end-to-end.
+
+SCREENSHOT: artifacts/playtest/22-detachment-stopped.png
+PHASE: map
+STATE: Detachment moved toward Leipzig and Stop was pressed.
+OBSERVATIONS:
+- Stop enabled only while moving and returned the activity to Holding position;
+  the marker remained selectable.
+- Hover tooltip is useful and says “Stop — No active order to cancel” when idle,
+  but the command medallions remain icon-only until hovered.
+SEVERITY: none
+ACTION FOR CLAUDE: NONE
+CODEX FOLLOW-UP: Stop verified without a stuck route.
+
+SCREENSHOT: artifacts/playtest/23-diplomacy-ledger.png
+PHASE: diplomacy
+STATE: Diplomacy panel open with Belgium selected after the declaration of war.
+OBSERVATIONS:
+- Side-panel “Diplomatic cables” layout is coherent: ledger counts show 0 Allied,
+  2 At war, 197 Neutral; country rows carry flags and stance badges; filtering and
+  selection work.
+- Belgium is correctly shown as At war, but it is an Unclaimed command. Offer
+  peace and the message field are disabled with an explicit “No player commands
+  this country” explanation, so player-to-player chat could not be exercised in
+  this single-seat run.
+- Political map mode changes the tint clearly, but the oversized country labels
+  remain visually dominant behind the panel.
+SEVERITY: medium
+ACTION FOR CLAUDE: NONE for this run; a second live player seat is required to
+verify send/receive diplomacy chat and alliance proposals.
+CODEX FOLLOW-UP: Search “France” filtered the long list correctly; after clicking
+the row, the detail header updated from Belgium to France (no stale selection).
+
+SCREENSHOT: artifacts/playtest/26-building-feedback.png
+PHASE: economy
+STATE: Barracks clicked on Dresden (Germany · Forest).
+OBSERVATIONS:
+- The build palette shows distinct illustrated Barracks, Tank Plant, Ordnance
+  Workshop, and Missile Site art with readable hover copy and costs.
+- The same click produced both “Barracks started — Construction is under way” and
+  “Order rejected — Only urban provinces can build.” This contradictory feedback
+  is misleading even though the forest province is correctly identified as an
+  invalid build location.
+- Province/build panel is clipped at the bottom of the 889px viewport; lower
+  controls are partially hidden.
+SEVERITY: high
+ACTION FOR CLAUDE: Resolve the optimistic build notification so invalid terrain
+  yields one rejection only, and make the province/build panel fit or scroll at
+  common laptop heights.
+CODEX FOLLOW-UP: Resource counters continued ticking; Stone/Metal/Oil remained
+  static at +0/h in this province.
+
+SCREENSHOT: artifacts/playtest/28-system-menu.png
+PHASE: finish
+STATE: System & Settings opened from the live map.
+OBSERVATIONS:
+- Return to Map and Ultra/High/Medium/Low quality controls are clear; Ultra is
+  visibly selected and reports Effective render scale 1.50×.
+- Save and Return to Main Menu are visibly disabled with no explanation. This
+  blocks a normal end-of-run return-to-menu check and makes the lifecycle feel
+  unfinished for a human player.
+SEVERITY: high
+ACTION FOR CLAUDE: Enable Save/Return to Main Menu when the live session is in a
+  valid state, or provide an inline explanation for why they are unavailable.
+CODEX FOLLOW-UP: No browser console errors observed; continued playtesting from
+  Return to Map.
 
 SCREENSHOT: artifacts/playtest/10-army-moving.png
 PHASE: map
