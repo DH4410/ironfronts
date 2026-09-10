@@ -1449,11 +1449,21 @@ function syncArmyMarkers(
       const tl = Math.hypot(tdx, tdz) || 1;
       const rx = tdx / tl;
       const rz = tdz / tl;
-      const W = 30;
+      // A distinct diamond marks the rally point itself so it reads at a glance
+      // instead of a faint chevron lost in the terrain (F15). A small chevron
+      // just short of it keeps the direction of the incoming route.
+      const R = 34;
+      emitRally(tip.x, tip.z - R, tip.x + R, tip.z, 1);
+      emitRally(tip.x + R, tip.z, tip.x, tip.z + R, 1);
+      emitRally(tip.x, tip.z + R, tip.x - R, tip.z, 1);
+      emitRally(tip.x - R, tip.z, tip.x, tip.z - R, 1);
       const C = Math.cos(2.5);
       const S = Math.sin(2.5);
-      emitRally(tip.x + W * (rx * C - rz * S), tip.z + W * (rx * S + rz * C), tip.x, tip.z, 1);
-      emitRally(tip.x + W * (rx * C + rz * S), tip.z + W * (-rx * S + rz * C), tip.x, tip.z, 1);
+      const cbx = tip.x - rx * (R + 10);
+      const cbz = tip.z - rz * (R + 10);
+      const CW = 13;
+      emitRally(cbx + CW * (rx * C - rz * S), cbz + CW * (rx * S + rz * C), cbx, cbz, 1);
+      emitRally(cbx + CW * (rx * C + rz * S), cbz + CW * (-rx * S + rz * C), cbx, cbz, 1);
     }
   }
   renderer.setArmyMarkers(armyMarkerScratch, count, armyPickScratch, armyModelScratch, modelCount);
