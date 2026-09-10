@@ -730,3 +730,67 @@ non-destructive:
    province, watch the FX and the notification.
 
 Stack still green (5173/3001/3002). Hold for Dima before anything destructive.
+
+--- CODEX BATCH 5 ---
+
+Screenshots remain under `artifacts/playtest/`; viewport 1920x889, DPR 1,
+Germany campaign, Ultra unless stated.
+
+- `39-rally-point-set.png` — Set rally point on Hamburg then click Bremen.
+  The action gives a clear `RALLY POINT SET` toast (“New units from here will
+  march to it.”), the selected province outline is visible, and the panel
+  changes to `Move rally` / `Clear rally`. The rally outline is subtle at
+  strategic zoom; there is no persistent text label or strongly differentiated
+  rally marker.
+- `40-rally-infantry-queue.png` — Infantry queued from Hamburg while rally is
+  active. Queue shows the illustrated Infantry thumbnail, 0%, 0:03 left, and a
+  status tooltip. This is a good production-state read.
+- `41-rally-infantry-completed.png` — after completion the queue row disappears.
+  The produced infantry appears to have merged into the existing stack at the
+  rally destination (selected `Infantry Detachment`, 4 Infantry; previously it
+  held 3 units). No separate completion toast was visible. Rally delivery
+  therefore works, but completion/merge feedback is implicit and easy to miss.
+- `42-mapmode-political.png`, `42-mapmode-diplomacy.png`,
+  `42-mapmode-terrain.png`, `42-mapmode-strategic.png` — cycled all four map
+  modes. Each toggles correctly and returned to Strategic without stuck panels.
+  No game console errors appeared; only Vite connection and the normal
+  `[game] Germany connected` log were present. Diplomacy mode is legible with
+  Germany highlighted gold and other countries grey, but the giant country
+  labels remain the main obstruction.
+- `43-mid-move-route.png` — first target click landed on the bottom panel and
+  left the army in `Awaiting destination`; this is an interaction hazard when
+  the panel covers much of the map.
+- `44-mid-route-correct.png` — after entering Move mode and clicking a map
+  point above the panel, the army correctly reports `Moving to destination`.
+  The route line and arrowhead are visible and the army marker is outlined.
+  There is still no persistent ETA or chevron sequence, and the lower panel is
+  severely clipped at 889px. Infantry/Engineer portraits are clear; no gait or
+  vehicle orientation animation was discernible at this zoom.
+- `45-mid-move-friendly.png` — confirms the same live order after 0.65s with
+  the route line drawn from the highlighted army toward friendly ground.
+
+Cancellation/refund check: a queued unit row exposes no Cancel button, context
+action, or keyboard affordance in the live DOM. Building queues likewise had no
+cancel control. I did not invent a destructive gesture; please add an explicit
+Cancel action (with refund policy) or document that queues are irreversible.
+
+Construction follow-up: Tank Plant spent the correct 300 funds/90 stone/120
+metal and showed a 0:48 progress queue, but after waiting roughly 45 seconds
+the queue vanished without a completion event and Hamburg still listed only
+Barracks under Facilities. This may simply be the game-time clock/production
+polling model, but it needs verification because the completed facility was not
+discoverable in the panel (`38-post-tankplant-state.png`).
+
+New action requests:
+- Add explicit queue cancellation/refund affordances or a clear irreversible
+  explanation.
+- Make rally markers persistent and legible at strategic zoom; emit a
+  completion/merge event when a rallied unit arrives.
+- Fix map-vs-panel hit priority/targeting affordance so a covered map click
+  cannot silently leave `Awaiting destination`.
+- Keep F0/F1/F2/F3/F4/F7/F8/F9/F10/F11 in the standing queue.
+
+I am stopping before a fresh war declaration or strategic strike because the
+remaining checks would be destructive in this single-player QA seat. Please
+acknowledge this batch, then I can continue with a safe merge attempt or wait
+for your implementation pass.
