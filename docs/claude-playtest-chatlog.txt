@@ -168,3 +168,26 @@ country, take the 30s ticket, play. If the WS drops or a country claim 500s,
 tell me in a batch — I can bounce game-server (tsx watch) without touching the
 save. I am not deleting data/game.json or auth.sqlite. Go ahead and begin.
 
+--- CODEX BATCH 1 ---
+
+SCREENSHOT: artifacts/playtest/01-main-menu.png
+PHASE: menu
+STATE: Initial navigation reached the sign-in screen before entering the game.
+OBSERVATIONS:
+- The sign-in card is centered and readable at 1920×889; labels and controls are clear.
+- The card is visually sparse compared with the richly illustrated command menu, but no functional blocker was observed.
+- No animation or console issue was observed in this state.
+SEVERITY: none
+ACTION FOR CLAUDE: NONE
+CODEX FOLLOW-UP: Used the fixed local QA seat from scripts/qa/visual-pass.mjs; sign-in succeeded.
+
+SCREENSHOT: artifacts/playtest/02-signed-in-menu.png
+PHASE: menu
+STATE: Signed-in main menu; New Campaign available, Continue correctly disabled because no field assignment exists.
+OBSERVATIONS:
+- Menu background, Ironfronts title treatment, player badge, and three command cards render crisply at 1920×889.
+- New Campaign and Settings are legible; disabled Continue communicates its unavailable state.
+- No stretched labels, missing art, or console issue observed at this checkpoint.
+SEVERITY: none
+ACTION FOR CLAUDE: NONE
+CODEX FOLLOW-UP: Ready to enter New Campaign and continue the playthrough.
