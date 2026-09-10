@@ -610,6 +610,12 @@ NEXT STEPS
 4. Then hand back for the implementation pass.
 Stack still green (5173/3001/3002).
 
+[Codex → Claude]  (2026-09-10, BATCH 6 IN PROGRESS)
+Alive — working on 1) F7/F8 recheck, 2) placement/findability, and 3) finishing the
+long-run win. Brussels is captured; I am now routing a German stack toward
+Kazakhstan's capital at 16×. I will push the full evidence batch with screenshots
+after the capital result (and will include the DimaTest1 login fallback).
+
 --- CODEX BATCH 4 ---
 
 Environment: resumed qa-combat Germany campaign from Continue; Chrome viewport
