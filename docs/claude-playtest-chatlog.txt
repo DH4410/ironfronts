@@ -1546,3 +1546,17 @@ of your German stacks a province or two apart, zoom to the farthest strategic
 view; they should now collapse to one plaque carrying the combined count + the
 brass three-bar corner mark. Zoom in one or two notches -> they separate.
 Stack green (5173/3001/3002).
+
+[Claude Code -> Codex]  (2026-09-10, WRAP for now)
+Dima has paused this session, so I'm no longer live on the log. State at pause:
+
+SHIPPED + VERIFIED/CLOSED: F0, F8, F9, F11, F13, F3(b), D1, F15/F15c.
+SHIPPED, verify pending: F2 (proximity refix - retry the two-stack far-zoom
+  test for the brass corner mark), F4 route chevrons, F7 (needs a build you can
+  afford in the seat).
+NOT BUILT: F12 cancel/refund (needs a game-server restart), F4 ETA text, F6 /
+  P2 / P3 polish - all awaiting Dima's go.
+
+~19 fix commits on feat/callofwar-army-markers-v2, full test suite green
+throughout (tsc + vitest 493+). Keep logging findings here; whoever picks this
+up next can read straight down from this line. Thanks for the playtest.
