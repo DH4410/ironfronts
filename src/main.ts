@@ -1485,25 +1485,24 @@ function syncArmyMarkers(
       const tl = Math.hypot(tdx, tdz) || 1;
       const rx = tdx / tl;
       const rz = tdz / tl;
-      // A distinct diamond marks the rally point itself so it reads at a glance
-      // instead of a faint chevron lost in the terrain (F15). The world radius
-      // grows with camera distance so the marker keeps a roughly constant
-      // on-screen size and stays legible at strategic zoom (F15 round 2). A
-      // small chevron just short of it keeps the incoming route direction.
-      const R = Math.min(150, 30 + renderer.camera.distance * 0.014);
-      // Double outline for weight against busy terrain.
-      for (const scale of [1, 0.6]) {
-        const r = R * scale;
-        emitRally(tip.x, tip.z - r, tip.x + r, tip.z, 1);
-        emitRally(tip.x + r, tip.z, tip.x, tip.z + r, 1);
-        emitRally(tip.x, tip.z + r, tip.x - r, tip.z, 1);
-        emitRally(tip.x - r, tip.z, tip.x, tip.z - r, 1);
+      // Rally point itself is a constant-px screen-space marker (army-marker
+      // layer, type 4) so it keeps size and contrast against terrain at full
+      // strategic zoom (F15c). A short world-space chevron just short of it
+      // keeps the incoming route direction.
+      if (count < 1_024) {
+        armyMarkerScratch.fill(0, cursor, cursor + 28);
+        armyMarkerScratch[cursor] = tip.x;
+        armyMarkerScratch[cursor + 1] = tip.z;
+        armyMarkerScratch[cursor + 2] = packRgb('#e9d3aa');
+        armyMarkerScratch[cursor + 3] = 4; // rally marker
+        cursor += 28;
+        count += 1;
       }
       const C = Math.cos(2.5);
       const S = Math.sin(2.5);
-      const cbx = tip.x - rx * (R + 12);
-      const cbz = tip.z - rz * (R + 12);
-      const CW = Math.min(26, 11 + renderer.camera.distance * 0.0022);
+      const cbx = tip.x - rx * 26;
+      const cbz = tip.z - rz * 26;
+      const CW = 14;
       emitRally(cbx + CW * (rx * C - rz * S), cbz + CW * (rx * S + rz * C), cbx, cbz, 1);
       emitRally(cbx + CW * (rx * C + rz * S), cbz + CW * (-rx * S + rz * C), cbx, cbz, 1);
     }

@@ -96,7 +96,10 @@ fn armyMarkerVertex(
   let worldXZ = markerWorldPosition(marker);
   let uv = worldXZ / uniforms.map.xy;
   let ground = heightAt(uv);
-  let rangeMarker = marker.a.w > 2.5;
+  // a.w: 1 visible, 2 contact, 3 artillery range ring (world geometry),
+  // 4 rally point (small constant-px billboard).
+  let rangeMarker = marker.a.w > 2.5 && marker.a.w < 3.5;
+  let rally = marker.a.w > 3.5;
   let rangeOffset = select(vec2f(0.0), corner * marker.b.x, rangeMarker);
   let rangeXZ = worldXZ + rangeOffset;
   let rangeUv = rangeXZ / uniforms.map.xy;
@@ -119,7 +122,11 @@ fn armyMarkerVertex(
   // painted surface nor its live silhouettes are stretched.
   // viewport.z (render-scale) keeps the on-screen size constant across
   // graphics presets so it never balloons at low quality.
-  let half = vec2f(33.0, 24.75) * zoomScale * uniforms.viewport.z;
+  let half = select(
+    vec2f(33.0, 24.75) * zoomScale * uniforms.viewport.z,
+    vec2f(15.0, 15.0) * uniforms.viewport.z,
+    rally,
+  );
 
   var output: ArmyOut;
   output.uv = corner;
@@ -137,7 +144,11 @@ fn armyMarkerVertex(
   output.kindsA = marker.kindsA;
   output.kindsB = marker.kindsB;
   output.panelHalf = half;
-  output.alpha = rangeFade * (1.0 - horizontalWorldFog(worldPos.x));
+  output.alpha = select(
+    rangeFade,
+    1.0 - smoothstep(7600.0, 9200.0, zoom),
+    rally,
+  ) * (1.0 - horizontalWorldFog(worldPos.x));
   if (clip.w <= 0.0001) {
     output.position = vec4f(0.0, 0.0, -10.0, 1.0);
     output.alpha = 0.0;
@@ -353,6 +364,17 @@ fn armyCompositionFragment(input: CompositionOut) -> @location(0) vec4f {
 fn armyMarkerFragment(input: ArmyOut) -> @location(0) vec4f {
   if (input.alpha < 0.01) { discard; }
   let uv = input.uv; // -1..1 across the plaque
+  if (input.state > 3.5) {
+    // Rally point: a filled brass diamond with a dark rim, constant on-screen
+    // size, so it holds contrast against terrain at full strategic zoom (F15c).
+    let d = abs(uv.x) + abs(uv.y);
+    let fill = 1.0 - smoothstep(0.74, 0.82, d);
+    let rim = smoothstep(0.80, 0.86, d) * (1.0 - smoothstep(0.94, 1.02, d));
+    let a = max(fill, rim);
+    if (a < 0.02) { discard; }
+    let col = mix(vec3f(0.05, 0.05, 0.04), vec3f(0.99, 0.83, 0.42), fill);
+    return vec4f(col, a * 0.95 * input.alpha);
+  }
   if (input.state > 2.5) {
     let radius = length(uv);
     let angle = atan2(uv.y, uv.x);
