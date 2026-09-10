@@ -308,7 +308,9 @@ export function mountMenu(handlers: MenuHandlers): void {
       button.dataset.countryId = String(country.id);
       button.dataset.name = country.name.toLowerCase();
       button.setAttribute('role', 'option');
-      button.disabled = !claimable || previewOnly;
+      // In preview mode a claimable row still selects (to preview on the map);
+      // deployment is blocked by the footer, not the list.
+      button.disabled = !claimable;
       const swatch = document.createElement('i');
       swatch.className = 'ifm__country-swatch';
       swatch.style.background = country.color;
