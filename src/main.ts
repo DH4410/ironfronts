@@ -1226,19 +1226,48 @@ function syncArmyMarkers(
       };
       const route = army.moveRoute;
       const legs = Math.max(1, route.length - 1);
+      const worldW = renderer.manifest?.world.width ?? 0;
+      const wrapDelta = (d: number): number => {
+        if (!worldW) return d;
+        if (d > worldW / 2) return d - worldW;
+        if (d < -worldW / 2) return d + worldW;
+        return d;
+      };
+      // Direction-of-travel chevrons marched along the route at a fixed world
+      // spacing, so a long path reads as "this way" without selecting the army
+      // (F4: the line alone had only a single arrowhead at the destination).
+      const CHEVRON_SPACING = 46;
+      const CHEV_WING = 6;
+      const CHEV_COS = Math.cos(2.5);
+      const CHEV_SIN = Math.sin(2.5);
+      let untilChevron = CHEVRON_SPACING * 0.5;
       for (let i = 0; i + 1 < route.length; i += 1) {
         emitSegment(route[i].x, route[i].z, route[i + 1].x, route[i + 1].z, 0, (i + 0.5) / legs);
+        const lx = wrapDelta(route[i + 1].x - route[i].x);
+        const lz = route[i + 1].z - route[i].z;
+        const legLen = Math.hypot(lx, lz) || 1;
+        const ex = lx / legLen;
+        const ez = lz / legLen;
+        for (let d = untilChevron; d < legLen; d += CHEVRON_SPACING) {
+          const cx = route[i].x + ex * d;
+          const cz = route[i].z + ez * d;
+          const frac = (i + d / legLen) / legs;
+          emitSegment(
+            cx + CHEV_WING * (ex * CHEV_COS - ez * CHEV_SIN),
+            cz + CHEV_WING * (ex * CHEV_SIN + ez * CHEV_COS), cx, cz, 1, frac,
+          );
+          emitSegment(
+            cx + CHEV_WING * (ex * CHEV_COS + ez * CHEV_SIN),
+            cz + CHEV_WING * (-ex * CHEV_SIN + ez * CHEV_COS), cx, cz, 1, frac,
+          );
+        }
+        untilChevron = ((untilChevron - legLen) % CHEVRON_SPACING + CHEVRON_SPACING) % CHEVRON_SPACING;
       }
       // Chevron at the destination, oriented by the final leg tangent, in the
       // route's own colour. Kept small so it never buries the end point.
       const tip = route[route.length - 1];
       const prev = route[route.length - 2];
-      const worldW = renderer.manifest?.world.width ?? 0;
-      let tx = tip.x - prev.x;
-      if (worldW) {
-        if (tx > worldW / 2) tx -= worldW;
-        else if (tx < -worldW / 2) tx += worldW;
-      }
+      const tx = wrapDelta(tip.x - prev.x);
       const tz = tip.z - prev.z;
       const tlen = Math.hypot(tx, tz) || 1;
       const ux = tx / tlen;
