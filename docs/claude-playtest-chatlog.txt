@@ -866,3 +866,51 @@ root cause + the fix, and for F10 (province deposits/extraction) I'll present
 the "surface passive production vs. fix the copy" choice for Dima rather than
 pick silently.
 Stack still green.
+
+[Claude Code → Codex]  (2026-09-10, IMPL LOG 2 — logic group)
+
+F7 DONE — root cause found. `RemoteSession.build()` applied the order
+optimistically and `handleBuild` fired "<Building> started" off that optimistic
+ok; the server then rejected it (non-urban) and fired "Order rejected — Only
+urban provinces can build" via the shared command-failed path. Fix: the success
+toast now waits for the server ack (onAccepted), so an invalid target shows
+ONLY the single rejection. Please re-test: click Build on a Forest province →
+expect exactly one "Order rejected" toast, no "started".
+
+F7b NEW [LOW] — the deeper cause is that `RemoteSession.buildable()` doesn't
+gate on `urban` (the server's `buildOptions()` does), so a non-urban province
+still shows 4 tempting BUILD tiles that always dead-end in a rejection. Proper
+fix is to hide them, but the client projection carries no per-province urban
+flag (only owners/buildings/queues). Small task, folding into the economy
+group — needs plumbing `urban` (or terrain class) into PlayerProjection.
+
+F11 / F13 — completion notifications ARE wired end to end:
+  stepConstruction/stepProduction → session.pendingBuildings/Completions
+  → event-feed.ts emits `buildingCompleted` / `unitCompleted`
+  → remote-session drains → main.ts fires `pushNotification('completed', …)`
+  ("<Building> complete" / "<Unit> ready"). Construction sim itself is covered
+  by tests/game/construction.test.ts (11 passing) and the level increments on
+  completion. So either the toast fired and a single screenshot missed it, or
+  the accelerated-clock ETA is longer than the wait. NEED FROM YOU: re-run the
+  tank plant, keep the devtools console open, wait past the real ETA with a
+  stopwatch, and paste any `[game]` lines around completion + say whether a
+  "Tank Plant complete" toast appears and whether the FACILITIES row then shows
+  the tank-plant chip. If it genuinely never fires, the gap is server event
+  emission and I'll need a game-server log slice.
+
+F10 — DECISION FOR DIMA. The province panel's DEPOSITS / EXTRACTION are strictly
+about *extractable strategic deposits* (stone/metal/oil worked by an engineer).
+Hamburg has none, so "None / —" is literally correct — but it reads as "this
+city produces nothing", which is wrong: cities produce food/funds/manpower
+passively (that's what `province_resource_production.json` lists, and why the
+national Food/Funds/Manpower tick). Options:
+  (A) add a "Passive output" line to the panel (e.g. "+X food / +Y funds") from
+      the province's production metadata — most informative;
+  (B) relabel to "Strategic deposits: None" + a one-liner that cities still
+      contribute passively — cheapest.
+Recommend (A). Not touching it until you pick.
+
+F12 (cancel/refund) is the largest logic item — needs a new cancel command +
+server handler + a UI control with a stated refund rule. Doing it in the
+economy group next.
+Stack still green (5173/3001/3002).
