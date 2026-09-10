@@ -65,14 +65,13 @@ describe('country label layout', () => {
   });
 
   it('leaves labels that already fit well within the cap untouched', () => {
-    // crossSpan chosen so the territory-derived height stays clear of the
-    // (playtest-lowered) size ceiling — this case exercises pure territory
-    // sizing, not the cap.
-    const before = layoutCountryLabel('ABC', anchor({ span: 900, crossSpan: 180 }), metrics);
+    // Small territory: the derived height stays well clear of the size ceiling,
+    // so this case exercises pure territory sizing, not the cap.
+    const before = layoutCountryLabel('ABC', anchor({ span: 400, crossSpan: 120 }), metrics);
     expect(before[5]).toBeLessThan(MAX_LABEL_WORLD_HEIGHT);
     // Territory sizing, not the cap, is what set this size.
     const scale = before[5] / glyph.heightAtMeasurementSize;
-    expect(scale).toBeCloseTo(Math.min((900 * 0.7) / (3 * 10), (180 * 0.5) / 20));
+    expect(scale).toBeCloseTo(Math.min((400 * 0.7) / (3 * 10), (120 * 0.5) / 20));
   });
 
   it('adds a gentle curve only when the country has spare cross-axis room', () => {
