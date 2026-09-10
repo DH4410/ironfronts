@@ -1022,7 +1022,9 @@
 .ifg-army-panel__report { display: block; }
 .ifg-army-panel__stats > .ifg-army-panel__eyebrow,
 .ifg-army-panel__activity > .ifg-army-panel__eyebrow { margin-bottom: 6px; }
-.ifg-army-panel__stats { padding: 9px 10px 10px; overflow: hidden; }
+/* Scroll rather than clip when the combat-profile table + Speed/Troops meta
+ * overrun the fixed row, matching __activity / __units (F0). */
+.ifg-army-panel__stats { padding: 9px 10px 10px; overflow-y: auto; overflow-x: hidden; }
 .ifg-army-panel__stat-table {
   width: 100%;
   margin-top: 5px;
