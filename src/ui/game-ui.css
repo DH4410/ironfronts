@@ -1502,6 +1502,7 @@
 .ifg-overlay__group { display: flex; flex-direction: column; gap: 7px; }
 .ifg-overlay__group small { font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ifg-dim); }
 .ifg-overlay__blurb { margin: 0; font-size: 11px; color: var(--ifg-dim); }
+.ifg-overlay__blurb--muted { margin-top: 4px; font-size: 9.5px; line-height: 1.35; opacity: 0.72; }
 .ifg-overlay__secondary { display: flex; flex-direction: column; }
 .ifg-overlay__link-row {
   display: flex;

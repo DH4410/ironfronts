@@ -549,7 +549,11 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     qualitySeg.append(button);
   }
   const qualityBlurb = el('p', 'ifg-overlay__blurb', '');
-  qualityGroup.append(qualitySeg, qualityBlurb);
+  const qualityScope = el('p', 'ifg-overlay__blurb ifg-overlay__blurb--muted',
+    'Affects world rendering — terrain detail, trees, buildings, render sharpness. '
+    + 'Most visible zoomed in. The HUD, army markers and country names stay the '
+    + 'same size at every setting.');
+  qualityGroup.append(qualitySeg, qualityBlurb, qualityScope);
 
   const secondary = el('div', 'ifg-overlay__secondary');
   for (const [label, reason] of [
