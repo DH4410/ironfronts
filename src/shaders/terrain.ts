@@ -307,6 +307,16 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     lit = mix(lit, readableCountryColor, nightMapCompensation * 0.52);
   }
 
+  // F3(b): close-zoom terrain read as too dark and soft against an overview
+  // that is fine. A mild gamma + gain lift that ramps in only below the
+  // close-zoom band and is fully gone by regional zoom, so the accepted
+  // pulled-back look is untouched.
+  let closeLift = 1.0 - smoothstep(1600.0, 2600.0, uniforms.interaction.y);
+  if (closeLift > 0.001) {
+    let lifted = pow(max(lit, vec3f(0.0)), vec3f(0.92)) * 1.10;
+    lit = mix(lit, lifted, closeLift * 0.7);
+  }
+
   let debugMode = u32(uniforms.map.w + 0.5);
   if (debugMode == 1u) {
     let h = elevation / max(1.0, uniforms.map.z);
