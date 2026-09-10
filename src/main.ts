@@ -1188,10 +1188,44 @@ function syncArmyMarkers(
   const activeArmyIds = new Set<string>();
   const activeModelKeys = new Set<string>();
   armyPickScratch.length = 0;
+
+  // F2: past a far-zoom threshold, friendly stacks packed into one region pile
+  // into an unreadable blob. Keep one representative marker per screen-sized
+  // cell and fold the rest of that cell's strength into its badge. Individual
+  // markers come back on zoom-in, or whenever the cell holds the selected army.
+  const clusterSuppressed = new Set<string>();
+  const clusterAggregate = new Map<string, number>();
+  const clusterDistance = renderer.camera.distance;
+  if (clusterDistance > 4_200) {
+    const cell = Math.max(160, clusterDistance * 0.09);
+    const bins = new Map<string, string[]>();
+    for (const a of Object.values(session.state.armies)) {
+      if (a.contact !== 'visible' || !a.own) continue;
+      const key = `${Math.floor(a.x / cell)}:${Math.floor(a.z / cell)}`;
+      const bucket = bins.get(key);
+      if (bucket) bucket.push(a.id);
+      else bins.set(key, [a.id]);
+    }
+    for (const ids of bins.values()) {
+      if (ids.length < 2 || (selectedArmyId !== null && ids.includes(selectedArmyId))) continue;
+      let repId = ids[0];
+      let repCount = -1;
+      let sum = 0;
+      for (const id of ids) {
+        const c = session.state.armies[id]?.composition?.unitCount ?? 0;
+        sum += c;
+        if (c > repCount) { repCount = c; repId = id; }
+      }
+      for (const id of ids) if (id !== repId) clusterSuppressed.add(id);
+      clusterAggregate.set(repId, sum);
+    }
+  }
+
   for (const army of Object.values(session.state.armies)) {
     if (count >= 1_024) break;
     const identified = army.contact === 'visible';
     activeArmyIds.add(army.id);
+    if (clusterSuppressed.has(army.id)) continue; // folded into a cluster marker
     const armyMotion = armyMotionInterpolator.sample(
       army.id,
       army.x,
@@ -1287,11 +1321,13 @@ function syncArmyMarkers(
     armyMarkerScratch[cursor + 2] = packRgb(army.ownerColor);
     armyMarkerScratch[cursor + 3] = identified ? 1 : 2;
     // Contact markers render as '?'; don't ship the real strength/health.
-    armyMarkerScratch[cursor + 4] = identified ? army.composition?.unitCount ?? 0 : 0;
+    const clusterSum = clusterAggregate.get(army.id);
+    armyMarkerScratch[cursor + 4] = clusterSum ?? (identified ? army.composition?.unitCount ?? 0 : 0);
     armyMarkerScratch[cursor + 5] = identified ? army.composition?.health ?? 0 : 0;
-    // Marker flags: bit 0 selected, bit 1 engaged / under fire.
+    // Marker flags: bit 0 selected, bit 1 engaged / under fire, bit 2 cluster.
     armyMarkerScratch[cursor + 6] = (army.id === selectedArmyId ? 1 : 0)
-      | (army.status === 'engaged' ? 2 : 0);
+      | (army.status === 'engaged' ? 2 : 0)
+      | (clusterSum !== undefined ? 4 : 0);
     armyMarkerScratch[cursor + 7] = compositionRows.length;
     for (let row = 0; row < 6; row += 1) {
       const lane = row < 4 ? row : row - 4;
