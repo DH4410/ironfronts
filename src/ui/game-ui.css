@@ -1501,15 +1501,27 @@
 .ifg-overlay__group small { font-size: 9.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ifg-dim); }
 .ifg-overlay__blurb { margin: 0; font-size: 11px; color: var(--ifg-dim); }
 .ifg-overlay__secondary { display: flex; flex-direction: column; }
+.ifg-overlay__link-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px 2px;
+  border-top: 1px solid var(--ifg-rule-soft);
+}
 .ifg-overlay__link {
   text-align: left;
-  padding: 8px 2px;
+  padding: 0;
   font-size: 12px;
   color: var(--ifg-text);
-  border-top: 1px solid var(--ifg-rule-soft);
 }
 .ifg-overlay__link:not(:disabled):hover { color: var(--ifg-brass-lit); }
 .ifg-overlay__link:disabled { opacity: 0.4; }
+.ifg-overlay__link-reason {
+  font-size: 9.5px;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+  color: var(--ifg-dim);
+}
 .ifg-overlay__diag { margin: 0; font-size: 10px; letter-spacing: 0.06em; color: var(--ifg-dim); font-variant-numeric: tabular-nums; }
 
 .ifg-seg { display: flex; gap: 1px; border: 1px solid var(--ifg-rule); }

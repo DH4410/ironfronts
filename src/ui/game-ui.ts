@@ -552,17 +552,19 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   qualityGroup.append(qualitySeg, qualityBlurb);
 
   const secondary = el('div', 'ifg-overlay__secondary');
-  for (const [label, title] of [
-    ['More settings (main menu)', 'Full settings live in the main menu for now'],
-    ['Save', 'Saving is not available yet'],
-    ['Return to Main Menu', 'Returning to the menu mid-operation is not available yet'],
+  for (const [label, reason] of [
+    ['More settings (main menu)', 'Full settings live in the main menu for now.'],
+    ['Save', 'The operation autosaves on the server — there is no manual save yet.'],
+    ['Return to Main Menu', 'Leaving mid-operation is not wired up yet; close this tab to end the session.'],
   ] as const) {
+    const row = el('div', 'ifg-overlay__link-row');
     const b = el('button', 'ifg-overlay__link', label);
     b.type = 'button';
     b.disabled = true;
-    b.title = title;
+    b.title = reason;
     if (label.startsWith('Return')) b.addEventListener('click', () => actions.returnToMenu());
-    secondary.append(b);
+    row.append(b, el('small', 'ifg-overlay__link-reason', reason));
+    secondary.append(row);
   }
   const diagLine = el('p', 'ifg-overlay__diag', '');
   overlayCard.append(resumeButton, qualityGroup, secondary, diagLine);
