@@ -1189,24 +1189,31 @@ function syncArmyMarkers(
   const activeModelKeys = new Set<string>();
   armyPickScratch.length = 0;
 
-  // F2: past a far-zoom threshold, friendly stacks packed into one region pile
-  // into an unreadable blob. Keep one representative marker per screen-sized
-  // cell and fold the rest of that cell's strength into its badge. Individual
-  // markers come back on zoom-in, or whenever the cell holds the selected army.
+  // F2: past a far-zoom threshold, friendly stacks whose markers visually
+  // overlap pile into an unreadable blob. Greedily merge any stack within one
+  // marker-width (in world units at this zoom) of an already-kept
+  // representative; the rest fold their strength into its badge. Individual
+  // markers return on zoom-in, or when the selected army is in the group.
   const clusterSuppressed = new Set<string>();
   const clusterAggregate = new Map<string, number>();
   const clusterDistance = renderer.camera.distance;
-  if (clusterDistance > 4_200) {
-    const cell = Math.max(160, clusterDistance * 0.09);
-    const bins = new Map<string, string[]>();
-    for (const a of Object.values(session.state.armies)) {
-      if (a.contact !== 'visible' || !a.own) continue;
-      const key = `${Math.floor(a.x / cell)}:${Math.floor(a.z / cell)}`;
-      const bucket = bins.get(key);
-      if (bucket) bucket.push(a.id);
-      else bins.set(key, [a.id]);
+  if (clusterDistance > 3_800) {
+    // ~ one on-screen marker width, in world units (camera px->world ~ dist*0.00145).
+    const mergeRadius = clusterDistance * 0.11;
+    const mergeRadiusSq = mergeRadius * mergeRadius;
+    const own = Object.values(session.state.armies)
+      .filter((a) => a.own && a.contact === 'visible');
+    const groups: string[][] = [];
+    for (const a of own) {
+      let joined: string[] | undefined;
+      for (const g of groups) {
+        const rep = session.state.armies[g[0]];
+        if (rep && (rep.x - a.x) ** 2 + (rep.z - a.z) ** 2 <= mergeRadiusSq) { joined = g; break; }
+      }
+      if (joined) joined.push(a.id);
+      else groups.push([a.id]);
     }
-    for (const ids of bins.values()) {
+    for (const ids of groups) {
       if (ids.length < 2 || (selectedArmyId !== null && ids.includes(selectedArmyId))) continue;
       let repId = ids[0];
       let repCount = -1;
