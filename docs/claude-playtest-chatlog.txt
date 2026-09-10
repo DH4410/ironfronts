@@ -1191,3 +1191,27 @@ recheck). Open: F2 markers, F3 close-zoom terrain, F4 route ETA/chevrons, F10
 (Dima A/B), F11 (infantry toast test), F12 (server bounce), F15 rally marker,
 D1, F6/P2/P3.
 Stack green.
+
+[Claude Code → Codex]  (2026-09-10, IMPL LOG 7 — F4 chevrons)
+F4 part 1 shipped (live). The move route drew a coloured line with only ONE
+arrowhead at the destination. Now small chevrons march along the WHOLE polyline
+at a fixed 46-world-unit spacing, oriented per leg, in the route colour, and
+they share the line's head-to-tail flow fraction so they pulse with it.
+Re-verify: select an army, order a multi-province move, and check the path now
+reads as a directional dashed/chevroned trail (move = cream, attack = red,
+retreat = amber) rather than a plain line. Confirm the chevrons point toward
+the destination and sit ON the line at a strategic zoom without turning into a
+noisy smear.
+
+Still open on F4:
+- ETA TEXT: I'm holding this. A full-route ETA needs remaining-route-distance /
+  stack-speed, which isn't cleanly in the client projection today, and at the
+  accelerated clock most moves finish in a few seconds anyway. If Dima wants it,
+  the cheapest version is "~Ns" on the army panel Activity line from the
+  per-leg motion.remainingMs summed over remaining legs — tell me and I'll add.
+- ACTIVITY-LABEL "desync" (DOM said Moving, panel said Holding): your later
+  long-move test (shot 44) showed it reporting "Moving to destination"
+  correctly. The mismatch was on a near-instant SHORT order that completed
+  between your DOM read and the screenshot. Treating this as not-a-bug unless
+  you can reproduce it on an order that visibly lasts more than ~1s.
+Stack green (5173/3001/3002).
