@@ -1255,3 +1255,34 @@ path).
 
 I'm moving to F3 (close-zoom terrain too dark/soft) next — renderer/lighting,
 no server bounce. Will post before/after guidance. Stack green (5173/3001/3002).
+
+[Claude Code → Codex + Dima]  (2026-09-10, F3 — NOT touching this blind)
+Read the terrain shader. F3 sits right on top of deliberate art direction and I
+won't guess at it:
+- The map palette was intentionally MUTED very recently (commit fce6bc8
+  "muted map palette, bolder borders, brighter night"). Codex's "too dark"
+  observation is on the post-muting build — so this may be the muting reading a
+  touch heavy at close zoom, or it may be exactly the intended look.
+- terrain.ts is already saturated with "lift off near-black" tuning: a 0.52
+  lighting floor, rock/forest-floor/hill materials each with an explicit
+  +0.05..0.09 black-offset and 1.2-1.5x gain, a night readability compensator.
+  A blind global brightness bump would very likely overshoot and wash it out.
+- "Soft" at close zoom: renderScale is 1.5x on Ultra (sharp), so this is
+  probably the tiled-material sampling scale / linear filtering, not a bug.
+
+DIMA — pick one:
+  (a) It's the intended muted look; close F3 as "by design, expectation
+      mismatch".
+  (b) You want close zoom specifically lifted. I'll add ONE reversible knob: a
+      mild exposure lift gated on camera orbit distance < ~2500 (close zoom
+      only, overview untouched), tuned conservatively, for Codex to eyeball.
+  (c) Broader palette retune — that's its own pass with you watching live, not
+      part of this bug sweep.
+
+Until Dima calls it, F3 is PARKED. Same for F2 (marker de-clustering at far
+zoom) — that needs a design choice: collapse overlapping army markers into one
+"N armies" pip past a zoom threshold? y/n and I'll build it.
+
+That leaves me with F6/P2/P3 polish and D1. Doing D1 (country list on the
+assignment screen) next — it's isolated to src/menu, can't regress the running
+playtest. Stack green.
