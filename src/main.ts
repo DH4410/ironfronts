@@ -80,13 +80,19 @@ function handleRally(provinceId: number, action: 'arm' | 'clear'): void {
 function handleBuild(provinceId: number, buildingId: string): void {
   const session = activeSession;
   if (!session) return;
-  const result = session.build(provinceId, buildingId as BuildingId);
+  // Wait for the server ack before announcing "started": an invalid target
+  // (e.g. a non-urban province) is refused server-side and surfaces its own
+  // "Order rejected" notification, so an eager optimistic toast here would
+  // contradict it.
+  const result = session.build(provinceId, buildingId as BuildingId, () => {
+    pushNotification('information', `${buildingLabel(buildingId as BuildingId)} started`,
+      'Construction is under way.');
+    if (selectedProvinceId === provinceId) refreshSelectedProvince(session);
+  });
   if (!result.ok) {
     pushNotification('warning', 'Construction', result.reason ?? 'Cannot build that here.');
     return;
   }
-  pushNotification('information', `${buildingLabel(buildingId as BuildingId)} started`,
-    'Construction is under way.');
   if (selectedProvinceId === provinceId) refreshSelectedProvince(session);
 }
 

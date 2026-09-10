@@ -255,13 +255,13 @@ export class RemoteGameSession extends EventTarget {
       this.deduct(state, this.unit(unitTypeId)?.cost);
     });
   }
-  build(provinceId: number, buildingId: BuildingId) {
+  build(provinceId: number, buildingId: BuildingId, onAccepted?: () => void) {
     if (!this.ownsProvince(provinceId)) return { ok: false, reason: 'Not your province.' } as const;
     const tempId = `optimistic-${Date.now()}`;
     return this.send({ type: 'build', provinceId, buildingId }, (state) => {
       ((state.constructionQueues[provinceId] ??= []) as QueueOrder[]).push({ id: tempId, unitTypeId: '', buildingId, progressHours: 0, totalHours: Number(this.building(buildingId)?.buildTimeHours ?? 1) / 4 });
       this.deduct(state, this.building(buildingId)?.cost);
-    });
+    }, onAccepted);
   }
   setRally(provinceId: number, x: number, z: number) {
     return this.send({ type: 'setRally', provinceId, target: { x, z } }, (state) => { state.rallyPoints[provinceId] = { x, z }; });
