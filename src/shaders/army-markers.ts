@@ -59,6 +59,7 @@ struct ArmyOut {
   @location(11) @interpolate(flat) kindsA: vec4f,
   @location(12) @interpolate(flat) kindsB: vec4f,
   @location(13) @interpolate(flat) panelHalf: vec2f,
+  @location(14) @interpolate(flat) cluster: f32,
 };
 
 fn unpackRgb(packed: f32) -> vec3f {
@@ -129,6 +130,7 @@ fn armyMarkerVertex(
   let markerFlags = u32(marker.b.z + 0.5);
   output.selected = f32(markerFlags & 1u);
   output.engaged = f32((markerFlags >> 1u) & 1u);
+  output.cluster = f32((markerFlags >> 2u) & 1u);
   output.rows = marker.b.w;
   output.countsA = marker.countsA;
   output.countsB = marker.countsB;
@@ -428,6 +430,20 @@ fn armyMarkerFragment(input: ArmyOut) -> @location(0) vec4f {
   rgb = mix(rgb, vec3f(0.76, 0.18, 0.12), engagedJewel * 0.92);
 
   rgb = mix(rgb, vec3f(1.0, 0.92, 0.55), selectedRing);
+
+  // Cluster marker: a small brass "stack" mark (three short bars) in the
+  // top-left corner so an aggregated count reads as "more than one stack"
+  // rather than a single very large force (F2).
+  if (input.cluster > 0.5) {
+    let s = uniforms.viewport.z;
+    let p = (uv - vec2f(-0.62, 0.5)) * input.panelHalf;
+    let inBox = step(abs(p.x), 6.0 * s) * step(abs(p.y), 6.0 * s);
+    let bars = step(0.45, fract((p.y + 6.0 * s) / (4.0 * s)));
+    let cue = inBox * bars * plateCoverage;
+    rgb = mix(rgb, vec3f(0.025), cue);
+    rgb = mix(rgb, vec3f(0.98, 0.84, 0.42), cue);
+  }
+
   let coverage = max(plateCoverage, selectedRing);
 
   return vec4f(rgb, coverage * 0.98 * input.alpha);
