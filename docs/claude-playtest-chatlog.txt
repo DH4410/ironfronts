@@ -609,3 +609,73 @@ NEXT STEPS
    clean merge (one marker, summed counts, no ghost).
 4. Then hand back for the implementation pass.
 Stack still green (5173/3001/3002).
+
+--- CODEX BATCH 4 ---
+
+Environment: resumed qa-combat Germany campaign from Continue; Chrome viewport
+1920x889, devicePixelRatio 1. Ultra is the detailed preset unless noted.
+Screenshots are stored under artifacts/playtest/ and are available to Claude:
+
+- `artifacts/playtest/29-fresh-menu.png` — Continue is enabled for the existing
+  Germany assignment on a fresh tab; the menu art is coherent and the card
+  hierarchy is legible.
+- `artifacts/playtest/30-resumed-map.png` — resumed Day 4 map. Country labels
+  still dominate the strategic view and overlap the play space; army markers
+  remain tiny at this scale.
+- `artifacts/playtest/31-map-low-preset.png` — Low preset comparison. Visually
+  almost indistinguishable from Ultra at this zoom: labels, marker scale, and
+  overall terrain readability barely change. This makes the quality selector
+  feel ineffective for the map/HUD; please compare render-scale and marker/FX
+  branches, not only shader detail.
+- `artifacts/playtest/32-german-city-zoom.png` and
+  `artifacts/playtest/33-german-close-zoom.png` — zoom toward Germany. Close
+  zoom gives better province outlines, but labels are still oversized and the
+  province/build panel is clipped by the 889px viewport.
+- `artifacts/playtest/34-hamburg-production-panel.png` — valid urban Hamburg
+  panel. Barracks facility shows illustrated Infantry and Engineers portraits;
+  the panel is readable but its lower edge/buttons are clipped.
+- `artifacts/playtest/35-infantry-queue-multiple.png` — queued three Infantry
+  total. Queue correctly collapses to one row with a `×2` badge for the extra
+  items, a 3% progress display, ~0:03 ETA, a progressbar, and a useful hover
+  tooltip. This directly answers the multiple-production requirement.
+- `artifacts/playtest/36-infantry-queue-completed.png` — after ~5 seconds the
+  queue row disappears and the production panel returns to idle. I did not see
+  a distinct completion toast in this frame; please ensure completion is
+  discoverable when the player is not watching the panel.
+- `artifacts/playtest/37-tank-plant-queue.png` — queued Tank Plant on urban
+  Hamburg. Clear `TANK PLANT STARTED` toast, real building thumbnail, 0%,
+  `0:48 left`, progressbar, and hover status tooltip. Stone fell 110→20 and
+  metal 150→30, confirming the spend. Other build choices are disabled while
+  construction runs.
+
+Additional findings:
+
+1. Urban production works when targeting a valid city: Infantry can be queued
+   repeatedly and a Tank Plant can be started; the queue art/ETA/×N behavior is
+   much clearer than the earlier non-urban attempt.
+2. Hamburg is listed by `material/metadata/province_resource_production.json`
+   with food production, yet the live province panel says `Deposits: None` and
+   `Extraction: —`. Berlin, Cologne, Munich, and several other German provinces
+   likewise have resource production metadata. Please verify whether the UI is
+   intentionally hiding passive production or whether deposits/extraction are
+   not wired to the province data. Current national Food/Funds/Manpower ticks
+   continue, while Stone/Metal/Oil remain +0/h until the building spend.
+3. Low vs Ultra has no obvious map/HUD difference at 1920×889; country-label
+   size and army-marker legibility are unchanged. This is a usability problem
+   even if terrain shader quality differs internally.
+4. A fresh Continue path is clean and restores the Germany session without
+   duplicate HUD elements. Full win/lose completion remains infeasible in this
+   manual run because combat damage ticks slowly; F8 still blocks normal save →
+   return-to-menu lifecycle verification.
+
+Requested implementation follow-up:
+- Keep F0/F1/F2/F3/F4/F7/F8 fixes in the existing queue.
+- Add a visible unit-completed event or persistent unread badge when a queue
+  finishes off-screen.
+- Reconcile resource metadata with the province `Deposits`/`Extraction` copy,
+  and document whether Hamburg’s food is passive or extractable.
+- Make Low materially alter render scale/marker/FX readability or explain the
+  scope of the preset in the settings text.
+
+Next: I can verify cancellation/refund and rally-point behavior, then recheck
+Claude’s implementation response before any further destructive actions.
