@@ -11,9 +11,15 @@ export const LABEL_TERRAIN_HEIGHT_OFFSET = 0.6;
  * and clipped the viewport at regional zoom. Capping here keeps big countries
  * readable without letting the name become the dominant element on screen; the
  * territory-fitting shrink loop still applies on top of the cap.
+ *
+ * Playtest BATCH 2/3 (F1): even at the previous 175/1700 ceiling, names like
+ * GERMANY / POLAND spanned most of the viewport at spawn and stayed huge when
+ * zoomed out, fighting the panels and province detail. Lowered ~40% so a large
+ * country reads as a label, not a banner; territory-bound smaller countries are
+ * unaffected (they never reach the cap).
  */
-export const MAX_LABEL_WORLD_HEIGHT = 175;
-export const MAX_LABEL_WORLD_WIDTH = 1700;
+export const MAX_LABEL_WORLD_HEIGHT = 105;
+export const MAX_LABEL_WORLD_WIDTH = 1040;
 
 export interface CountryLabelMetrics {
   readonly lineHeightAtMeasurementSize: number;
