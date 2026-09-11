@@ -195,6 +195,8 @@ export class WorldRenderer {
   private connectionGraph?: Float32Array;
   /** World-space centres of the more populous provinces (junction spacing). */
   private settlementCenters: Array<readonly [number, number]> = [];
+  /** World-space centre of every province, keyed by gameplay province id. */
+  private provinceCenterById = new Map<number, readonly [number, number]>();
   private waterwayMask!: Uint8Array;
   private provinceOwners!: Uint32Array;
   private provinceById = new Map<number, ProvinceRecord>();
@@ -459,7 +461,9 @@ export class WorldRenderer {
     try {
       const graph = await fetchBinary(worldAssetUrl(this.manifest.buffers.connections.url));
       this.connectionGraph = new Float32Array(graph);
-      const details = await fetchJson<{ provinces: Array<{ center: [number, number]; population: number }> }>(
+      const details = await fetchJson<{
+        provinces: Array<{ id: number; center: [number, number]; population: number }>;
+      }>(
         worldAssetUrl(this.manifest.sidecars.provinceDetails.url),
       );
       // The 250 most populous provinces stand in for "real cities" — junction
@@ -469,9 +473,13 @@ export class WorldRenderer {
         .sort((a, b) => b.population - a.population)
         .slice(0, 250)
         .map((province) => province.center);
+      for (const province of details.provinces) {
+        this.provinceCenterById.set(province.id, province.center);
+      }
     } catch {
       this.connectionGraph = undefined; // road-junction markers simply stay off
       this.settlementCenters = [];
+      this.provinceCenterById.clear();
     }
     this.waterwayMask = buildWaterwayMask(new Uint8Array(navigationBuffer), this.provinceData.length);
     this.provinceOwners = new Uint32Array(provinceOwnerData);
@@ -1322,6 +1330,12 @@ export class WorldRenderer {
    *  The province texture stores 0 for no province and real ids as id + 1. */
   provinceIdAt(clientX: number, clientY: number): number {
     return gameplayProvinceId(this.provinceAtScreenPoint(clientX, clientY));
+  }
+
+  /** World-space centre of a province by gameplay id, or null if unknown
+   *  (the province-details sidecar failed to load). */
+  provinceCenter(provinceId: number): readonly [number, number] | null {
+    return this.provinceCenterById.get(provinceId) ?? null;
   }
 
   /** Army stack marker under a screen coordinate (nearest within a

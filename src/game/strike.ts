@@ -31,7 +31,7 @@ const DEVASTATION_HOURS = 6 * 24;
  * the launcher where you want coverage" constraint. World width is ~13.5k, so
  * one well-placed site covers a large theatre without being global.
  */
-const MISSILE_RANGE = 3200;
+export const MISSILE_RANGE = 3200;
 
 /** Passive warhead accrual — one slow pass per tick, driven by Missile Sites
  *  and (at the same rate) legacy Ordnance Workshops. */

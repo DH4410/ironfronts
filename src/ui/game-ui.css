@@ -86,9 +86,8 @@
 /* ================= top strategic bar ================= */
 .ifg-topbar {
   position: absolute;
-  inset: 0 auto auto 0;
-  width: 50vw;
-  min-width: 860px;
+  inset: 0 0 auto 0;
+  width: auto;
   height: 46px;
   display: flex;
   align-items: center;
@@ -117,7 +116,11 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 1;
+  /* Natural width, not flex-grow: the bar now spans the full window, and
+     growing this to fill it would strand the clock/weather group far from
+     the resources they sit beside. The system button's auto margin (below)
+     is what absorbs the leftover space instead. */
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
 }
@@ -200,6 +203,10 @@
 .ifg-topbar__weather .ifg-icon { width: 19px; height: 19px; }
 .ifg-topbar__system {
   flex: none;
+  /* The bar now spans the full window width; pin settings to the far right
+     while the country/resources/clock/weather group stays together on the
+     left, instead of trailing them at whatever width the content reaches. */
+  margin-left: auto;
   width: 32px; height: 32px;
   display: inline-flex; align-items: center; justify-content: center;
   color: var(--ifg-dim);
@@ -689,8 +696,8 @@
   position: absolute;
   left: 50%;
   bottom: 18px;
-  width: min(720px, calc(100vw - 80px));
-  padding: 13px 18px 15px 20px;
+  width: min(480px, calc(100vw - 48px));
+  padding: 10px 14px 12px 14px;
   background-color: #171911;
   background-image: var(--ifg-panel);
   border: 1px solid var(--ifg-rule);
@@ -738,8 +745,8 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 4px 16px;
-  margin: 10px 0 10px;
-  padding: 9px 0;
+  margin: 7px 0;
+  padding: 6px 0;
   border-top: 1px solid var(--ifg-rule-soft);
   border-bottom: 1px solid var(--ifg-rule-soft);
 }
@@ -749,8 +756,8 @@
 .ifg-field b { font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ifg-field.is-pending b { color: var(--ifg-dim); font-weight: 500; }
 
-.ifg-card__facilities { margin-bottom: 10px; }
-.ifg-card__facchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.ifg-card__facilities { margin-bottom: 7px; }
+.ifg-card__facchips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .ifg-card__facchips .ifg-rchip__value { text-transform: none; letter-spacing: 0.02em; }
 
 .ifg-card__actions { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1267,11 +1274,9 @@
 .ifg-buildbtn__thumb.ifg-icon img,
 .ifg-buildbtn__thumb.ifg-icon svg { width: 48px; height: 48px; }
 .ifg-buildbtn__thumb svg { display: block; width: 100%; height: 100%; }
+/* Unit and building build buttons share one size so the production list
+   doesn't visibly jump in scale between the two groups. */
 .ifg-card__prodlist--buildings { gap: 8px; }
-.ifg-card__prodlist--buildings .ifg-buildbtn { width: 84px; min-height: 84px; }
-.ifg-card__prodlist--buildings .ifg-buildbtn__thumb { width: 72px; height: 72px; }
-.ifg-card__prodlist--buildings .ifg-buildbtn__thumb.ifg-icon img,
-.ifg-card__prodlist--buildings .ifg-buildbtn__thumb.ifg-icon svg { width: 64px; height: 64px; }
 .ifg-buildbtn:not(:disabled):hover {
   border-color: var(--ifg-brass);
   color: var(--ifg-brass-lit);
@@ -1431,13 +1436,13 @@
 
 /* ---- province card: deposit abundance (not production/day) ---- */
 .ifg-card__resources {
-  margin: 0 0 11px;
-  padding-top: 9px;
+  margin: 0 0 8px;
+  padding-top: 7px;
   border-top: 1px solid var(--ifg-rule-soft);
 }
 .ifg-card__restitle {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   font-size: 9px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -1458,7 +1463,7 @@
 .ifg-rchip--coastal .ifg-rchip__value { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ifg-dim); }
 .ifg-card__resstatus {
   display: block;
-  margin-top: 7px;
+  margin-top: 5px;
   font-size: 10px;
   letter-spacing: 0.04em;
   color: var(--ifg-dim);
@@ -1587,14 +1592,13 @@
   .ifg-dock { top: 50px; }
   .ifg-topbar__country-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .ifg-res__value { font-size: 12px; }
-  .ifg-card { width: min(640px, calc(100vw - 48px)); }
+  .ifg-card { width: min(420px, calc(100vw - 40px)); }
   .ifg-army-panel { width: min(930px, calc(100vw - 48px)); }
   .ifg-army-panel__body { grid-template-columns: 190px minmax(320px, 1fr) 280px; }
   .ifg-army-panel__composition,
   .ifg-army-panel__report { padding: 12px 13px; }
 }
 @media (max-width: 860px) {
-  .ifg-topbar { width: 100vw; min-width: 0; }
   .ifg-topbar__country-name { display: none; }
   .ifg-topbar__resources { gap: 7px; }
   .ifg-army-panel { width: calc(100vw - 24px); bottom: 12px; }
@@ -1809,13 +1813,6 @@
   filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.48));
 }
 
-.ifg-card__prodlist--buildings .ifg-buildbtn {
-  width: 108px;
-  height: 76px;
-  min-height: 76px;
-  padding: 8px 13px;
-}
-
 .ifg-buildbtn:not(:disabled):hover {
   filter: brightness(1.15) drop-shadow(0 6px 9px rgba(0, 0, 0, 0.55));
 }
@@ -1827,16 +1824,8 @@
   background: transparent;
 }
 
-.ifg-card__prodlist--buildings .ifg-buildbtn__thumb,
-.ifg-card__prodlist--buildings .ifg-buildbtn__thumb.ifg-icon {
-  width: 82px;
-  height: 58px;
-}
-
 .ifg-buildbtn__thumb.ifg-icon img,
-.ifg-buildbtn__thumb.ifg-icon svg,
-.ifg-card__prodlist--buildings .ifg-buildbtn__thumb.ifg-icon img,
-.ifg-card__prodlist--buildings .ifg-buildbtn__thumb.ifg-icon svg {
+.ifg-buildbtn__thumb.ifg-icon svg {
   width: 100%;
   height: 100%;
   object-fit: contain;
