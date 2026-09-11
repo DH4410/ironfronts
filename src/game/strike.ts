@@ -8,9 +8,9 @@ import type { CommandResult, StrikeCommand } from './commands/types';
 
 /**
  * Game-hours to accrue one warhead per Ordnance Workshop level a country holds.
- * ~18 game-days at level 1 — deliberately rare; two workshops halve the wait.
+ * ~30 game-days at level 1 — deliberately rare; two workshops halve the wait.
  */
-const HOURS_PER_WARHEAD = 18 * 24;
+export const HOURS_PER_WARHEAD = 30 * 24;
 /** Hard cap on stockpiled warheads so a runaway leader cannot hoard. */
 const MAX_WARHEADS = 3;
 /**
@@ -21,8 +21,8 @@ const MAX_WARHEADS = 3;
 const BLAST_RADIUS = 95;
 /**
  * Game-hours a struck province stays devastated. During this window its
- * administration is too shattered to contest a capture, so a weak city really
- * does fall the moment a stack walks in after the strike. ~6 game-days.
+ * defending stacks have sharply reduced combat output but still must be
+ * defeated before the city can be captured. ~6 game-days.
  */
 const DEVASTATION_HOURS = 6 * 24;
 /**
@@ -111,11 +111,12 @@ export function issueStrike(ctx: SimContext, command: StrikeCommand): CommandRes
     buildings.barracks = Math.max(0, buildings.barracks - 1);
     buildings.tankPlant = Math.max(0, buildings.tankPlant - 1);
     buildings.ordnance = Math.max(0, buildings.ordnance - 1);
+    buildings.missileSite = Math.max(0, buildings.missileSite - 1);
   }
   delete ctx.state.constructionQueues[provinceId];
   delete ctx.state.productionQueues[provinceId];
 
-  // Shatter the province's ability to resist for a while — see stepCapture.
+  // Shatter the province's defences for a while — see stepCombat.
   (ctx.state.provinceDevastation ??= {})[provinceId] =
     ctx.state.clock.gameTimeHours + DEVASTATION_HOURS;
 
