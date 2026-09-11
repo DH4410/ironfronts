@@ -1324,6 +1324,13 @@ export class WorldRenderer {
     return gameplayProvinceId(this.provinceAtScreenPoint(clientX, clientY));
   }
 
+  /** Gameplay province id under a world-space point, or -1 over water/void.
+   *  Lets client code (e.g. siege VFX) resolve "which province is this fight
+   *  in" from an army's world coordinates without a screen raycast. */
+  provinceIdAtWorld(worldX: number, worldZ: number): number {
+    return gameplayProvinceId(this.sampleProvince(worldX, worldZ));
+  }
+
   /** Army stack marker under a screen coordinate (nearest within a
    *  zoom-scaled world radius), or null. */
   pickArmyAt(clientX: number, clientY: number): string | null {

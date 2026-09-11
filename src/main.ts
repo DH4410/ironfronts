@@ -30,6 +30,7 @@ import { CombatEffectPool, EFFECT_KIND, effectDensityForDistance } from './comba
 import type { SessionResponse } from '@ironfronts/protocol';
 import { buildArmyCompositionRows, buildArmyFormation } from './army-map-presentation';
 import { ArmyMotionInterpolator } from './army-motion';
+import { battleClusterKey, combatHuddleOffset, type Point } from './combat-huddle';
 
 type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
 
@@ -1040,6 +1041,7 @@ async function bootstrapGameSession(
     uiStore.patch({ resources: playerResourceLines(session) });
     syncArmyMarkers(session, renderer);
     syncCombatMarkers(session);
+    spawnOngoingBattleFx(session, renderer);
     refreshSelectedArmy(session);
     refreshSelectedProvince(session); // keep production / construction % live
     drainSessionEvents(session);
@@ -1228,12 +1230,26 @@ function syncArmyMarkers(
     }
   }
 
+  // Combat huddle (visual only): every engaged stack in a ~70u grid cell
+  // shares one battle anchor (the same clustering + representative point
+  // syncCombatMarkers uses for the persistent crossed-swords marker), so the
+  // army badges, that marker, and the continuous fight FX below all converge
+  // on the exact same spot instead of drifting apart. session.state.armies is
+  // never written here — only the marker/model scratch buffers this function
+  // packs, and only x/z (not the route target) are nudged.
+  const battleAnchors = new Map<string, Point>();
+  for (const a of Object.values(session.state.armies)) {
+    if (a.status !== 'engaged') continue;
+    const key = battleClusterKey(a.x, a.z);
+    if (!battleAnchors.has(key)) battleAnchors.set(key, { x: a.x, z: a.z });
+  }
+
   for (const army of Object.values(session.state.armies)) {
     if (count >= 1_024) break;
     const identified = army.contact === 'visible';
     activeArmyIds.add(army.id);
     if (clusterSuppressed.has(army.id)) continue; // folded into a cluster marker
-    const armyMotion = armyMotionInterpolator.sample(
+    const armyMotionRaw = armyMotionInterpolator.sample(
       army.id,
       army.x,
       army.z,
@@ -1241,6 +1257,21 @@ function syncArmyMarkers(
       motionNow,
       renderer.manifest?.world.width ?? 0,
     );
+    const huddle = army.status === 'engaged'
+      ? combatHuddleOffset({ x: army.x, z: army.z }, battleAnchors.get(battleClusterKey(army.x, army.z))!)
+      : null;
+    // Nudge the displayed x/z (and the in-flight motion target, so a stack
+    // still easing toward a waypoint when combat starts doesn't un-huddle
+    // mid-ease) toward the shared battle anchor. remainingMs is untouched.
+    const armyMotion = huddle && (huddle.x !== 0 || huddle.z !== 0)
+      ? {
+          ...armyMotionRaw,
+          x: armyMotionRaw.x + huddle.x,
+          z: armyMotionRaw.z + huddle.z,
+          targetX: armyMotionRaw.targetX + huddle.x,
+          targetZ: armyMotionRaw.targetZ + huddle.z,
+        }
+      : armyMotionRaw;
 
     // Authoritative route polyline for the SELECTED own army only (move = cream,
     // attack = red, retreating = amber). Other armies' routes stay hidden so the
@@ -2059,7 +2090,7 @@ function syncCombatMarkers(session: RemoteGameSession): void {
   const engaged = Object.values(session.state.armies).filter((a) => a.status === 'engaged');
   const seen = new Map<string, { id: string; x: number; z: number; intensity: number; dir: number }>();
   for (const a of engaged) {
-    const key = `${Math.round(a.x / 70)}:${Math.round(a.z / 70)}`;
+    const key = battleClusterKey(a.x, a.z);
     if (seen.has(key)) continue;
     let dir = Number.NaN;
     let best = Number.POSITIVE_INFINITY;
@@ -2071,6 +2102,76 @@ function syncCombatMarkers(session: RemoteGameSession): void {
     seen.set(key, { id: key, x: a.x, z: a.z, intensity: 1, dir });
   }
   combatEffects.syncBattles([...seen.values()]);
+}
+
+/** Per-battle-cluster cooldowns for the continuous fight FX below, keyed the
+ *  same way as syncCombatMarkers' ~70u grid clusters. */
+const lastBattleGunfireAt = new Map<string, number>();
+const lastBattleSmokeAt = new Map<string, number>();
+/** Per-province cooldown for the "city under siege" fire/smoke overlay. */
+const lastCityFireAt = new Map<number, number>();
+
+/**
+ * While two hostile stacks trade fire, spawn continuous gunshot + smoke FX at
+ * their shared engagement point every HUD tick (called from the same 400ms
+ * timer as syncCombatMarkers), instead of the single one-shot spawnVolley()
+ * the 'engaged'/'combatPulse' server events already trigger. The smoke reuses
+ * the same EFFECT_KIND.smoke WGSL composition as the nuke's smoke stalk, just
+ * smaller and spawned continuously rather than one large mushroom.
+ *
+ * If the fight sits inside a province that has buildings, this also lays a
+ * couple of fire/smoke puffs near the fight to read as "the city is burning."
+ * It never touches provinceBuildings or any other game-state field — purely
+ * client-side VFX that stops the moment the battle cluster disappears.
+ */
+function spawnOngoingBattleFx(session: RemoteGameSession, renderer: WorldRenderer): void {
+  if (effectDensityForDistance(lastCombatCameraDistance) <= 0) return;
+  const now = Date.now();
+  const engaged = Object.values(session.state.armies).filter((a) => a.status === 'engaged');
+  const clusters = new Map<string, { x: number; z: number; owners: Set<number> }>();
+  for (const a of engaged) {
+    const key = battleClusterKey(a.x, a.z);
+    const cluster = clusters.get(key) ?? { x: a.x, z: a.z, owners: new Set<number>() };
+    cluster.owners.add(a.ownerCountryId);
+    clusters.set(key, cluster);
+  }
+  const activeProvinces = new Set<number>();
+  for (const [key, cluster] of clusters) {
+    if (cluster.owners.size < 2) continue; // a stray stack snapped alone, not a clash
+    const jitter = (spread: number): number => (Math.random() - 0.5) * spread;
+
+    if (now - (lastBattleGunfireAt.get(key) ?? 0) >= 420) {
+      lastBattleGunfireAt.set(key, now);
+      combatEffects.spawnVolley('infantry', cluster.x, cluster.z, Math.random() * Math.PI * 2, { now });
+    }
+    if (now - (lastBattleSmokeAt.get(key) ?? 0) >= 1_100) {
+      lastBattleSmokeAt.set(key, now);
+      combatEffects.spawn(EFFECT_KIND.smoke, cluster.x + jitter(26), cluster.z + jitter(26),
+        { now, scale: 0.9 + Math.random() * 0.4, lifetimeMs: 2_400 });
+    }
+
+    const provinceId = renderer.provinceIdAtWorld(cluster.x, cluster.z);
+    if (provinceId < 0) continue;
+    const buildings = session.state.provinceBuildings[provinceId];
+    const buildingCount = buildings
+      ? buildings.barracks + buildings.tankPlant + buildings.ordnance + buildings.missileSite
+      : 0;
+    if (buildingCount <= 0) continue;
+    activeProvinces.add(provinceId);
+    if (now - (lastCityFireAt.get(provinceId) ?? 0) < 1_600) continue;
+    lastCityFireAt.set(provinceId, now);
+    for (let i = 0; i < 2; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 30 + Math.random() * 90;
+      const bx = cluster.x + Math.cos(angle) * radius;
+      const bz = cluster.z + Math.sin(angle) * radius;
+      combatEffects.spawn(EFFECT_KIND.smoke, bx, bz, { now, scale: 1.1, lifetimeMs: 3_200 });
+      combatEffects.spawn(EFFECT_KIND.explosion, bx, bz, { now, scale: 0.55, lifetimeMs: 480 });
+    }
+  }
+  for (const key of [...lastBattleGunfireAt.keys()]) if (!clusters.has(key)) lastBattleGunfireAt.delete(key);
+  for (const key of [...lastBattleSmokeAt.keys()]) if (!clusters.has(key)) lastBattleSmokeAt.delete(key);
+  for (const id of [...lastCityFireAt.keys()]) if (!activeProvinces.has(id)) lastCityFireAt.delete(id);
 }
 
 let campaignOutcomeShown = false;

@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   CombatEffectPool, EFFECT_KIND, EFFECT_STRIDE, compassLabel, effectDensityForDistance,
 } from '../src/combat-effects';
+import {
+  battleClusterKey, combatHuddleOffset, HUDDLE_MAX_PULL, HUDDLE_TARGET_RADIUS, type Point,
+} from '../src/combat-huddle';
 
 const CAM = { x: 0, z: 0 };
 
@@ -100,5 +103,57 @@ describe('effect LOD + compass helpers', () => {
     expect(compassLabel(-10, 0)).toBe('W');
     expect(compassLabel(10, -10)).toBe('NE');
     expect(compassLabel(0, 0)).toBe('');
+  });
+});
+
+describe('combatHuddleOffset (render-only visual nudge)', () => {
+  it('pulls a far-apart stack in toward its shared battle anchor, closing the gap to the target radius', () => {
+    const self: Point = { x: 0, z: 0 };
+    const anchor: Point = { x: 100, z: 0 };
+    const offset = combatHuddleOffset(self, anchor);
+    expect(offset.x).toBeGreaterThan(0); // pulled toward +x, where the anchor is
+    expect(offset.z).toBeCloseTo(0);
+    // The whole point of the huddle is that the RESULT reads as close, not
+    // just that some offset was applied — assert the actual post-offset gap.
+    const resultingDist = Math.hypot((self.x + offset.x) - anchor.x, (self.z + offset.z) - anchor.z);
+    expect(resultingDist).toBeCloseTo(HUDDLE_TARGET_RADIUS, 5);
+  });
+
+  it('does not push an already-close stack away from its anchor', () => {
+    const self: Point = { x: 0, z: 0 };
+    const anchor: Point = { x: 10, z: 0 }; // well inside HUDDLE_TARGET_RADIUS
+    expect(combatHuddleOffset(self, anchor)).toEqual({ x: 0, z: 0 });
+  });
+
+  it('the anchor stack itself (self === anchor) gets no offset', () => {
+    const point: Point = { x: 42, z: -17 };
+    expect(combatHuddleOffset(point, point)).toEqual({ x: 0, z: 0 });
+  });
+
+  it('caps the pull distance so a very far anchor cannot teleport the marker', () => {
+    const self: Point = { x: 0, z: 0 };
+    const anchor: Point = { x: 100_000, z: 0 };
+    const offset = combatHuddleOffset(self, anchor);
+    expect(offset.x).toBeCloseTo(HUDDLE_MAX_PULL, 5);
+  });
+
+  it('is a pure function: never mutates the points it reads', () => {
+    const self: Point = { x: 0, z: 0 };
+    const anchor: Point = { x: 30, z: 40 };
+    const selfSnapshot = { ...self };
+    const anchorSnapshot = { ...anchor };
+    combatHuddleOffset(self, anchor);
+    expect(self).toEqual(selfSnapshot);
+    expect(anchor).toEqual(anchorSnapshot);
+  });
+});
+
+describe('battleClusterKey', () => {
+  it('groups nearby stacks (within the same ~70u cell) under one key', () => {
+    expect(battleClusterKey(140, 280)).toBe(battleClusterKey(150, 285));
+  });
+
+  it('separates stacks in different cells', () => {
+    expect(battleClusterKey(0, 0)).not.toBe(battleClusterKey(500, 0));
   });
 });
