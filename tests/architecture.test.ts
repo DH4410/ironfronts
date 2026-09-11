@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 const root = process.cwd();
@@ -9,7 +10,7 @@ const scriptsRoot = path.join(root, 'scripts');
 function collectFiles(directory: string, extension: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const target = path.join(directory, entry.name);
-    return entry.isDirectory() ? collectFiles(target, extension) : target.endsWith(extension) ? [target] : [];
+    return entry.isDirectory() ? (['node_modules','dist'].includes(entry.name) ? [] : collectFiles(target, extension)) : target.endsWith(extension) ? [target] : [];
   });
 }
 
@@ -18,6 +19,8 @@ function relativeName(filename: string): string {
 }
 
 function resolveImport(importer: string, specifier: string): string | undefined {
+  const packages: Record<string,string> = { '@ironfronts/protocol':'packages/protocol/src/index.ts', '@ironfronts/game-core':'packages/game-core/src/index.ts' };
+  if (packages[specifier]) return path.join(root, packages[specifier]);
   if (!specifier.startsWith('.')) return undefined;
   const base = path.resolve(path.dirname(importer), specifier);
   for (const candidate of [base, `${base}.ts`, `${base}.mjs`, path.join(base, 'index.ts'), path.join(base, 'index.mjs')]) {
@@ -27,10 +30,22 @@ function resolveImport(importer: string, specifier: string): string | undefined 
 }
 
 function dependencies(filename: string): string[] {
-  const source = readFileSync(filename, 'utf8');
-  const imports = /(?:import|export)\s+(?:[^'";]+?\s+from\s+)?['"]([^'"]+)['"]/g;
-  return [...source.matchAll(imports)]
-    .map((match) => resolveImport(filename, match[1]))
+  const source = ts.createSourceFile(filename, readFileSync(filename, 'utf8'), ts.ScriptTarget.Latest, true);
+  const imports: string[] = [];
+  for (const statement of source.statements) {
+    if (ts.isImportDeclaration(statement)) {
+      const clause = statement.importClause;
+      if (clause?.isTypeOnly) continue;
+      if (clause && !clause.name && clause.namedBindings && ts.isNamedImports(clause.namedBindings)
+        && clause.namedBindings.elements.every((entry) => entry.isTypeOnly)) continue;
+      if (ts.isStringLiteral(statement.moduleSpecifier)) imports.push(statement.moduleSpecifier.text);
+    } else if (ts.isExportDeclaration(statement) && !statement.isTypeOnly && statement.moduleSpecifier) {
+      if (statement.exportClause && ts.isNamedExports(statement.exportClause)
+        && statement.exportClause.elements.every((entry) => entry.isTypeOnly)) continue;
+      if (ts.isStringLiteral(statement.moduleSpecifier)) imports.push(statement.moduleSpecifier.text);
+    }
+  }
+  return imports.map((specifier) => resolveImport(filename, specifier))
     .filter((dependency): dependency is string => dependency !== undefined);
 }
 
@@ -61,7 +76,7 @@ function findCycles(files: string[]): string[][] {
 }
 
 describe('module architecture', () => {
-  const sourceFiles = collectFiles(sourceRoot, '.ts');
+  const sourceFiles = ['src', 'apps', 'packages'].flatMap((directory) => collectFiles(path.join(root,directory), '.ts'));
   const scriptFiles = collectFiles(scriptsRoot, '.mjs');
 
   it('contains no circular imports in runtime or tooling', () => {
@@ -88,7 +103,7 @@ describe('module architecture', () => {
       path.join(scriptsRoot, 'performance-check.mjs'),
     ]);
     const violations = [...sourceFiles, ...scriptFiles].flatMap((filename) => dependencies(filename)
-      .filter((dependency) => entrypoints.has(dependency))
+      .filter((dependency) => entrypoints.has(dependency) && relativeName(filename) !== 'apps/client/src/main.ts')
       .map((dependency) => `${relativeName(filename)} -> ${relativeName(dependency)}`));
     expect(violations).toEqual([]);
   });

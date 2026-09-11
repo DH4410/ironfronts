@@ -1,9 +1,13 @@
 import { fetchBinary } from './gpu-utils';
+import type { WorldDescriptor } from '@ironfronts/protocol';
 import type { WorldManifest } from './types';
 
 let assetBaseUrl = '/world';
+let expectedHashes: Record<string, string> = {};
+const verifiedBuffers = new Map<string, Promise<ArrayBuffer>>();
 
-export function configureWorldAssetBase(url: string): void {
+export function configureWorldAssetBase(url: string, hashes: Record<string, string> = {}): void {
+  expectedHashes = hashes; verifiedBuffers.clear();
   assetBaseUrl = url.replace(/\/$/, '');
 }
 
@@ -63,7 +67,34 @@ export async function loadWorldAssetBuffers(manifest: WorldManifest): Promise<Wo
   } satisfies Record<keyof WorldAssetBuffers, string>;
 
   const entries = await Promise.all(Object.entries(paths).map(async ([key, path]) => (
-    [key, await fetchBinary(worldAssetUrl(path))] as const
+    [key, await fetchWorldBinary(path)] as const
   )));
   return Object.fromEntries(entries) as unknown as WorldAssetBuffers;
+}
+
+function hex(buffer: ArrayBuffer): string { return [...new Uint8Array(buffer)].map((n) => n.toString(16).padStart(2, '0')).join(''); }
+export async function verifyWorldDescriptor(descriptor: WorldDescriptor): Promise<void> {
+  const required = ['world.json', 'province-details.json', 'province-owners.u32', 'province-ids.u16', 'surface.rgba8', 'height.f32', 'connections.f32'];
+  if (required.some((name) => !/^[a-f0-9]{64}$/.test(descriptor.artifactHashes[name] ?? ''))) {
+    throw new Error('Server did not identify every gameplay world artifact.');
+  }
+  const hashes = Object.fromEntries(Object.entries(descriptor.artifactHashes).sort(([a], [b]) => a.localeCompare(b)));
+  const hash = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(hashes))));
+  if (hash !== descriptor.hash) throw new Error('World package identity is inconsistent.');
+}
+export function fetchWorldBinary(name: string): Promise<ArrayBuffer> {
+  const key = name.replace(/^\//, '');
+  let pending = verifiedBuffers.get(key);
+  if (!pending) {
+    const expected = expectedHashes[key];
+    pending = fetchBinary(worldAssetUrl(name)).then(async (buffer) => {
+      if (expected && hex(await crypto.subtle.digest('SHA-256', buffer)) !== expected) throw new Error(`World artifact mismatch: ${key}`);
+      return buffer;
+    });
+    verifiedBuffers.set(key, pending);
+  }
+  return pending;
+}
+export async function fetchWorldJson<T>(name: string): Promise<T> {
+  return JSON.parse(new TextDecoder().decode(await fetchWorldBinary(name))) as T;
 }

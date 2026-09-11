@@ -7,7 +7,7 @@ function state(): PlayerProjection {
   return {
     simulationTick: 0, viewerCountryId: 1, startCamera: { x: 0, z: 0, distance: 900 },
     countries: { 1: { id: 1, name: 'A', color: '#fff', controller: 'player', alive: true } },
-    provinceOwners: { 1: 1 }, provinceBuildings: {}, productionQueues: {}, constructionQueues: {},
+    provinceOwners: { 1: 1 }, provinceBuildings: {}, provinceActions: {}, productionQueues: {}, constructionQueues: {},
     rallyPoints: {},
     armies: { a: { id: 'a', name: 'Army', ownerCountryId: 1, ownerName: 'A', ownerColor: '#fff', x: 0, z: 0, own: true, contact: 'visible', status: 'idle', composition: null, moveOrder: null } },
     resourceNodes: {}, ownCountry: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: { funds: 100, manpower: 100, food: 100, stone: 100, metal: 100, oil: 100 }, income: { funds: 0, manpower: 0, food: 0, stone: 0, metal: 0, oil: 0 }, industryCapacity: 1 }, relations: {},
@@ -16,10 +16,12 @@ function state(): PlayerProjection {
 
 class FakeConnection extends EventTarget {
   state = state();
+  revision = 0;
+  fresh = true;
   catalogs: PresentationCatalogs = { units: [], buildings: [] };
   commands: unknown[] = [];
-  settle: ((ok: boolean, reason?: string, requiredWarCountryIds?: readonly number[]) => void) | null = null;
-  command(command: unknown, callback: (ok: boolean, reason?: string, requiredWarCountryIds?: readonly number[]) => void): string {
+  settle: ((ok: boolean, reason?: string, requiredWarCountryIds?: readonly number[], appliedRevision?: number) => void) | null = null;
+  command(command: unknown, callback: (ok: boolean, reason?: string, requiredWarCountryIds?: readonly number[], appliedRevision?: number) => void): string {
     this.commands.push(command);
     this.settle = callback;
     return `command-${this.commands.length}`;
@@ -28,14 +30,17 @@ class FakeConnection extends EventTarget {
 
 afterEach(() => vi.useRealTimers());
 
-describe('optimistic command lifecycle', () => {
-  it('shows an order immediately, keeps it through ack, then reconciles on a delta', () => {
+describe('authoritative command lifecycle', () => {
+  it('keeps facts unchanged until the acknowledged revision arrives', () => {
     const connection = new FakeConnection();
     const session = new RemoteGameSession(connection as unknown as GameConnection, vi.fn());
     session.orderMove('a', 50, 70);
-    expect(session.army('a')?.moveOrder).toEqual({ x: 50, z: 70 });
-    connection.settle?.(true);
-    expect(session.army('a')?.moveOrder).toEqual({ x: 50, z: 70 });
+    expect(session.army('a')?.moveOrder).toBeNull();
+    expect(session.pendingForArmy('a')).toBe(true);
+    connection.settle?.(true, undefined, undefined, 1);
+    expect(session.pendingForArmy('a')).toBe(true);
+    expect(session.army('a')?.moveOrder).toBeNull();
+    connection.revision = 1;
     connection.state.armies.a.moveOrder = { x: 50, z: 70 };
     connection.dispatchEvent(new Event('state'));
     expect(session.army('a')?.moveOrder).toEqual({ x: 50, z: 70 });
@@ -71,7 +76,8 @@ describe('optimistic command lifecycle', () => {
     expect(connection.commands[1]).toMatchObject({
       type: 'moveArmy', armyId: 'a', x: 50, z: 70, confirmedWarCountryIds: [2],
     });
-    expect(session.army('a')?.moveOrder).toEqual({ x: 50, z: 70 });
+    expect(session.army('a')?.moveOrder).toBeNull();
+    expect(session.pendingForArmy('a')).toBe(true);
   });
 
   it('fails an unacknowledged command after five seconds', () => {
@@ -80,12 +86,27 @@ describe('optimistic command lifecycle', () => {
     vi.stubGlobal('WebSocket', { OPEN: 1 });
     const connection = new GameConnection();
     (connection as unknown as { socket: { readyState: number; send: (message: string) => void } }).socket = { readyState: 1, send: vi.fn() };
+    connection.status = 'ready';
+    Object.assign(connection, { lastMessageMs: performance.now() });
     const settled = vi.fn();
     connection.command({ type: 'stopArmy', armyId: 'a' }, settled);
     vi.advanceTimersByTime(4_999);
     expect(settled).not.toHaveBeenCalled();
     vi.advanceTimersByTime(1);
-    expect(settled).toHaveBeenCalledWith(false, 'Command timed out.');
+    expect(settled).toHaveBeenCalledWith(false, 'Command outcome unknown; synchronizing with the server.');
     vi.unstubAllGlobals();
+  });
+
+  it('retires intent when the authoritative delta wins the race with its acknowledgement', () => {
+    const connection = new FakeConnection();
+    const session = new RemoteGameSession(connection as unknown as GameConnection, vi.fn());
+    session.produce(1, 'infantry');
+    expect(session.pendingForProvince(1)).toBe(true);
+    connection.revision = 4;
+    connection.state.productionQueues[1] = [{ id: 'ord-1', ownerCountryId: 1, unitTypeId: 'infantry', progressHours: 0, totalHours: 1 }];
+    connection.dispatchEvent(new Event('state'));
+    connection.settle?.(true, undefined, undefined, 4);
+    expect(session.pendingForProvince(1)).toBe(false);
+    expect(session.state.productionQueues[1]).toHaveLength(1);
   });
 });

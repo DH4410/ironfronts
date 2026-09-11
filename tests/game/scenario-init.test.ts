@@ -105,8 +105,8 @@ describe('Spain "World at War" initialisation', () => {
     const selection = buildScenarioSelection('OP-1939-01', SPAIN_ID);
     const session = GameSession.create(selection, world);
     const before = session.state.countries[SPAIN_ID].stockpile.funds;
-    session.tick(6);
-    expect(session.gameTimeHours).toBeCloseTo(6, 5);
+    session.tick(6 / 1800);
+    expect(session.gameTimeHours).toBeCloseTo(6 / 1800, 5);
     expect(session.state.countries[SPAIN_ID].stockpile.funds).toBeGreaterThan(before);
     // stone/metal/oil are physical-only — no passive gain
     expect(session.state.countries[SPAIN_ID].income.metal).toBe(0);

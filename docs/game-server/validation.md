@@ -26,8 +26,12 @@ The root command runs workspace TypeScript checks, the root strict/no-unused Typ
 Server-focused coverage currently lives in:
 
 - `tests/server/game-runtime.test.ts`: seats, lobby, projections, delta behavior, snapshot save/restore.
-- `tests/server/ticket-protocol.test.ts`: ticket signing/verification, nonce replay, and v2 command schemas.
+- `tests/server/ticket-protocol.test.ts`: ticket signing/verification, nonce replay, and v3 command/event schemas.
+- `tests/server/publisher-delivery.test.ts` and `gateway-backpressure.test.ts`: event-only publication, retry identity, and overload handling.
+- `tests/game-connection-lifecycle.test.ts`: baseline timeout, malformed messages, reconnect, resync, and cleanup.
 - `tests/client/game-clock.test.ts`: shared server timing and clock constants.
+- `tests/game/timeline-balance.test.ts`: continuous fixed-step combat duration and timestep stability.
+- `tests/game/state-invariants.test.ts` and `tests/client/world-integrity.test.ts`: migration, corrupt references, and world artifact identity.
 - `tests/game/*`: authoritative state, commands, movement, visibility, combat, retreat, capture, production, construction, resources, and scenario initialization.
 - `tests/architecture.test.ts`: dependency and ownership boundaries.
 
@@ -72,7 +76,7 @@ Symptom: `incompatible_save_archived` warning followed by a fresh lobby/seat res
 
 Cause: version/game/world hash mismatch.
 
-Resolution: this is expected for an intentional v2/world reset. Otherwise stop the process, verify deployed artifacts and compatibility constants, then restore the archived file with its matching server/world version.
+Resolution: this is expected for an intentional incompatible ruleset/world reset. Otherwise stop the process, verify deployed artifacts and compatibility constants, then restore the archived file with its matching server/world version.
 
 ### Persisted country assignments are invalid
 
@@ -102,7 +106,7 @@ The connection did not authenticate within five seconds. Obtain a fresh ticket a
 
 ### Invalid ticket, expired ticket, or reused ticket
 
-Check shared secret, audience, protocol `2`, game ID, expiry in epoch milliseconds, nonce uniqueness, and whether the account still maps to the claimed authoritative seat. Tickets are intentionally single-use within a process.
+Check shared secret, audience, protocol `3`, game ID, expiry in epoch milliseconds, nonce uniqueness, and whether the account still maps to the claimed authoritative seat. Tickets are intentionally single-use within a process.
 
 ### Client replica revision gap
 
@@ -120,7 +124,7 @@ Useful read-only checks:
 - `GET /internal/v2/lobby?accountId=...` with service credentials for seat/liveness state.
 - A fresh authenticated baseline for the exact per-country authoritative projection.
 - Structured logs for save failures and incompatible archive paths.
-- File timestamps/sizes for `game.json`, `.tmp`, and adjacent `.v1-backup-*` files.
+- File timestamps/sizes for `game.json`, `.tmp`, and adjacent `.incompatible-backup-*` files.
 
 If simulation appears frozen while health responds, compare `simulationTick` across two baselines/deltas. The civil clock can continue to display interpolated wall time independently and is not proof that simulation ticks are executing.
 
@@ -132,7 +136,7 @@ If simulation appears frozen while health responds, compare `simulationTick` acr
 4. Add only ownership gating/dispatch to `src/game/commands.ts`.
 5. Adapt the protocol payload in `GameRuntime.command` without accepting client country identity.
 6. Project any required authoritative result without leaking unrelated state.
-7. Update [Protocol v2](protocol-v2.md), relevant simulation documentation, and focused coverage.
+7. Update [Protocol v3](protocol.md), relevant simulation documentation, and focused coverage.
 
 ## Adding a simulation system
 

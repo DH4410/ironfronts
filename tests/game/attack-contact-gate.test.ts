@@ -1,3 +1,4 @@
+import { buildLandGraph } from '../../src/game/movement/graph';
 import { describe, expect, it } from 'vitest';
 import { issueAttack } from '../../src/game/commands/attack';
 import { GAME_STATE_VERSION, emptyStockpile, type GameState } from '../../src/game/game-state';
@@ -33,7 +34,7 @@ const world: WorldData = {
   connections: new Float32Array(0), resourceNodes: [],
 };
 
-const ctx = (armies: ArmyStack[]): { state: GameState; world: WorldData } => ({ state: state(armies), world });
+const ctx = (armies: ArmyStack[]) => ({ state: state(armies), world, graph: buildLandGraph(new Float32Array([0,0,130,0,1,0,0,0]), world.width, world.height) });
 
 // infantry visionInner 90 (=> 'visible'), visionOuter 180 (=> 'contact').
 describe('direct army attack accepts any currently detected target', () => {

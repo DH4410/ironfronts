@@ -5,12 +5,15 @@ export { buildWorldData } from '../../../src/game/world-data-loader';
 export { projectArmyView, visibleResourceNodes } from '../../../src/game/player-view';
 export { computeArmyVisibility } from '../../../src/game/visibility';
 export { legalRetreatPaths } from '../../../src/game/combat';
+export type { CombatEvent } from '../../../src/game/combat';
 export { nearestNode } from '../../../src/game/movement/graph';
 export { findPath } from '../../../src/game/movement/pathfind';
 export { UNIT_TYPES, unitType } from '../../../src/game/units/unit-catalog';
 export { stackExtractionRate } from '../../../src/game/units/army';
 export { currentMovementLeg } from '../../../src/game/units/movement';
 export { BUILDINGS } from '../../../src/game/construction';
+export { buildOptions } from '../../../src/game/construction';
+export { producibleUnits } from '../../../src/game/production';
 export {
   declareWar, endAlliance, proposeDiplomacy, respondDiplomacy, sendDiplomaticMessage,
 } from '../../../src/game/diplomacy';
@@ -21,3 +24,8 @@ export type { GameCommand, CommandResult } from '../../../src/game/commands';
 export type { WorldData } from '../../../src/game/world-data';
 export type { LandGraph } from '../../../src/game/movement/graph';
 export type { PlayerArmyView } from '../../../src/game/player-view';
+
+export { FIXED_STEP_SECONDS, FIXED_STEP_HOURS, gameEpochMs, INITIAL_GAME_EPOCH_MS } from '../../../src/game/time';
+export { extractionEligibility } from '../../../src/game/extraction';
+export { movementEdgeAllowed } from '../../../src/game/units/movement';
+export { parseGameState } from '../../../src/game/state-schema';

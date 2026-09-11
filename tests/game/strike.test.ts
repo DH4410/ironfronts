@@ -6,6 +6,7 @@ import { BUILDINGS, queueBuilding } from '../../src/game/construction';
 import { buildScenarioSelection } from '../../src/game/scenario-catalog';
 import { CATALOG_COUNTRY_BY_NAME } from '../../src/game/data/countries.generated';
 import { loadWorld, type LoadedWorld } from './load-world';
+import { PROTOTYPE_HOURS_PER_HOUR } from '../../src/game/time';
 
 const SPAIN = CATALOG_COUNTRY_BY_NAME.get('spain')!.id;
 let world: LoadedWorld;
@@ -60,10 +61,12 @@ function strikeableForeignProvince(s: GameSession) {
 describe('strategic strike', () => {
   it('enforces the late-game strategic-infrastructure investment', () => {
     expect(BUILDINGS.ordnance).toEqual({
-      label: 'Ordnance Workshop', cost: { funds: 1_600, stone: 480, metal: 640 }, buildTimeHours: 480,
+      label: 'Ordnance Workshop', cost: { funds: 1_600, stone: 480, metal: 640 },
+      buildTimeHours: 480 / (4 * PROTOTYPE_HOURS_PER_HOUR),
     });
     expect(BUILDINGS.missileSite).toEqual({
-      label: 'Missile Site', cost: { funds: 2_400, stone: 720, metal: 960 }, buildTimeHours: 720,
+      label: 'Missile Site', cost: { funds: 2_400, stone: 720, metal: 960 },
+      buildTimeHours: 720 / (4 * PROTOTYPE_HOURS_PER_HOUR),
     });
 
     for (const buildingId of ['ordnance', 'missileSite'] as const) {
@@ -81,7 +84,7 @@ describe('strategic strike', () => {
       s.state.countries[SPAIN].stockpile = cost;
       expect(queueBuilding(s, province.id, buildingId, SPAIN)).toMatchObject({ ok: true });
       expect(s.state.constructionQueues[province.id][0].totalHours)
-        .toBe(BUILDINGS[buildingId].buildTimeHours / 4);
+        .toBe(BUILDINGS[buildingId].buildTimeHours);
     }
   });
 
@@ -145,12 +148,12 @@ describe('strategic strike', () => {
     for (const [pid, b] of Object.entries(s.state.provinceBuildings)) {
       if (s.state.provinceOwners[Number(pid)] === SPAIN) { b.ordnance = 0; b.missileSite = 0; }
     }
-    stepWarheads(s, HOURS_PER_WARHEAD + 10);
+    stepWarheads(s, HOURS_PER_WARHEAD + 1e-6);
     expect(s.state.countries[SPAIN].warheads).toBe(0);
 
     // With one, just over a warhead's worth of game-hours yields one.
     s.state.provinceBuildings[own.id] = { barracks: 1, tankPlant: 0, ordnance: 1, missileSite: 0 };
-    stepWarheads(s, HOURS_PER_WARHEAD + 10);
+    stepWarheads(s, HOURS_PER_WARHEAD + 1e-6);
     expect(Math.floor(s.state.countries[SPAIN].warheads ?? 0)).toBe(1);
   });
 
@@ -162,7 +165,7 @@ describe('strategic strike', () => {
       if (s.state.provinceOwners[Number(pid)] === SPAIN) { b.ordnance = 0; b.missileSite = 0; }
     }
     s.state.provinceBuildings[own.id] = { barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 1 };
-    stepWarheads(s, HOURS_PER_WARHEAD + 10);
+    stepWarheads(s, HOURS_PER_WARHEAD + 1e-6);
     expect(Math.floor(s.state.countries[SPAIN].warheads ?? 0)).toBe(1);
   });
 

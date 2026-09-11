@@ -93,7 +93,7 @@ Back up:
 - deployed world package associated with each recoverable game snapshot;
 - release configuration/secrets through a secure secret-management system.
 
-A game snapshot is compatible only with its game/save versions and the `world.json` hash. Keep the matching server build and whole world package for reliable rollback.
+A game snapshot is compatible only with its game/save versions and aggregate gameplay-artifact hash. Keep the matching server build and complete world package for reliable rollback.
 
 The game server saves every five seconds, after successful commands, after country claims, and at graceful shutdown. Command acknowledgement does not synchronously guarantee disk durability. The auth store commits directly through SQLite.
 

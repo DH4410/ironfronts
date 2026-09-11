@@ -1,52 +1,33 @@
 import { describe, expect, it } from 'vitest';
 import { InterpolatedGameClock } from '../../src/client/game-clock';
-import { AuthoritativeGameClock, GAME_UTC_OFFSET_MINUTES } from '../../apps/game-server/src/game-clock';
-import { CLOCK_SYNC_INTERVAL_MS, SIMULATION_INTERVAL_MS, SIMULATION_TICK_HOURS } from '../../apps/game-server/src/timing';
+import { AuthoritativeGameClock } from '../../apps/game-server/src/game-clock';
+import { fixture } from '../helpers/simulation';
 
-describe('authoritative civil clock', () => {
-  it('preserves the existing gameplay tick rate and simulation delta', () => {
-    expect(SIMULATION_INTERVAL_MS).toBe(100);
-    expect(SIMULATION_TICK_HOURS).toBe(0.05);
-    expect(CLOCK_SYNC_INTERVAL_MS).toBe(60_000);
+describe('one authoritative timeline', () => {
+  it('derives civil time from elapsed simulation and supports a debug reset', () => {
+    const c=fixture(); const clock=new AuthoritativeGameClock(() => c.state);
+    c.state.clock.gameTimeHours=2;
+    expect(clock.snapshot(123).gameEpochMs).toBe(c.state.clock.initialEpochMs!+7_200_000);
+    clock.setEpoch(Date.UTC(1940,0,1));
+    expect(clock.snapshot().gameEpochMs).toBe(Date.UTC(1940,0,1));
+    expect(c.state.clock.gameTimeHours).toBe(2);
+    expect(clock.snapshot().generation).toBe(1);
   });
-
-  it('publishes a fixed GMT+2 sample without coupling it to simulation time', () => {
-    const startedAt = Date.UTC(2026, 0, 1, 10, 0, 0);
-    const clock = new AuthoritativeGameClock(startedAt);
-    expect(clock.snapshot(startedAt + 60_000)).toEqual({
-      gameStartedAtEpochMs: startedAt,
-      serverEpochMs: startedAt + 60_000,
-      utcOffsetMinutes: GAME_UTC_OFFSET_MINUTES,
-    });
+  it('interpolates speed, pause, midnight and explicit time changes', () => {
+    let now=0; const clock=new InterpolatedGameClock(() => now);
+    const epoch=Date.UTC(1939,8,1,21,59,59);
+    const sync={gameStartedAtEpochMs:epoch,gameEpochMs:epoch,serverEpochMs:0,speed:1,generation:0,utcOffsetMinutes:120};
+    clock.synchronize(sync); now=1000;
+    expect(clock.read()).toMatchObject({day:2,hour:0,minute:0,second:0});
+    clock.synchronize({...sync,gameEpochMs:epoch+1000,speed:0}); now=2000;
+    expect(clock.read().second).toBe(0);
+    clock.synchronize({...sync,gameEpochMs:epoch+1000,speed:4,generation:1}); now=2250;
+    expect(clock.read().second).toBe(1);
   });
-
-  it('advances one game second per real second and rolls the campaign day at GMT+2 midnight', () => {
-    let monotonic = 0;
-    const clock = new InterpolatedGameClock(() => monotonic);
-    const startedAt = Date.UTC(2026, 0, 1, 21, 59, 59);
-    clock.synchronize({ gameStartedAtEpochMs: startedAt, serverEpochMs: startedAt, utcOffsetMinutes: 120 });
-    expect(clock.read()).toMatchObject({ day: 1, hour: 23, minute: 59, second: 59 });
-
-    monotonic = 2_000;
-    expect(clock.read()).toMatchObject({ day: 2, hour: 0, minute: 0, second: 1 });
-  });
-
-  it('recovers correction differences gradually instead of jumping the hands', () => {
-    let monotonic = 0;
-    const clock = new InterpolatedGameClock(() => monotonic);
-    const startedAt = Date.UTC(2026, 0, 1, 10, 0, 0);
-    clock.synchronize({ gameStartedAtEpochMs: startedAt, serverEpochMs: startedAt, utcOffsetMinutes: 120 });
-
-    monotonic = 10_000;
-    expect(clock.read().second).toBe(10);
-    clock.synchronize({
-      gameStartedAtEpochMs: startedAt,
-      serverEpochMs: startedAt + 12_000,
-      utcOffsetMinutes: 120,
-    });
-    expect(clock.read().second).toBe(10);
-
-    monotonic = 11_000;
-    expect(clock.read().second).toBeCloseTo(11.1, 5);
+  it('bounds prediction when updates stop and freezes on disconnect', () => {
+    let now=0; const clock=new InterpolatedGameClock(() => now);
+    clock.synchronize({gameStartedAtEpochMs:0,gameEpochMs:0,serverEpochMs:0,speed:1,generation:0,utcOffsetMinutes:120});
+    now=10000; expect(clock.readEpochMs()).toBe(1500);
+    clock.freeze(); now=20000; expect(clock.readEpochMs()).toBe(1500);
   });
 });

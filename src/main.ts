@@ -1,3 +1,4 @@
+import { installTimelineDebugControls } from './client/debug-timeline';
 import './styles.css';
 import '@fontsource/bitter/latin-ext-800.css';
 import '@fontsource/special-elite/latin-ext-400.css';
@@ -25,16 +26,16 @@ import { LOADING_QUOTES } from './loadingQuotes';
 import { getGame, getSession, joinGame, logout } from './client/auth-api';
 import { GameConnection } from './client/game-connection';
 import { RemoteGameSession } from './client/remote-session';
-import { configureWorldAssetBase } from './world-assets';
+import { configureWorldAssetBase, verifyWorldDescriptor } from './world-assets';
 import { CombatEffectPool, EFFECT_KIND, effectDensityForDistance } from './combat-effects';
 import type { SessionResponse } from '@ironfronts/protocol';
 import { buildArmyCompositionRows, buildArmyFormation } from './army-map-presentation';
-import { ArmyMotionInterpolator } from './army-motion';
+import { ArmyMotionInterpolator, type ArmyPickEntry } from './army-motion';
 import { buildBattleAnchors, combatHuddleOffset, groupEngagedByFront } from './combat-huddle';
 import { MISSILE_RANGE } from './game/strike';
 import { wrappedDistance, wrappedDeltaX } from './game/geometry';
 
-type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
+type BuildingId = 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite';
 
 const gameUnit = (typeId: string): Record<string, unknown> => activeSession?.unit(typeId) ?? { id: typeId, name: typeId, cost: {} };
 const gameUnitLabel = (typeId: string): string => String(gameUnit(typeId).name ?? typeId);
@@ -48,9 +49,10 @@ const orderPercent = (o: { progressHours: number; totalHours: number }): number 
 /** Simulation runs at a fixed 0.05 game-hour / 100ms tick — 0.5 game-hours
  *  per real second at normal (1x, production) speed. Dev-only sim speed-ups
  *  are server-side and invisible here, so this is a normal-play estimate. */
-const GAME_HOURS_PER_REAL_SECOND = 0.5;
+const GAME_HOURS_PER_REAL_SECOND = 1 / 3_600;
 const orderEtaSeconds = (o: { progressHours: number; totalHours: number }): number =>
-  Math.max(0, (o.totalHours - o.progressHours) / GAME_HOURS_PER_REAL_SECOND);
+  activeSession?.devSimSpeed === 0 ? Infinity
+    : Math.max(0, (o.totalHours - o.progressHours) / (GAME_HOURS_PER_REAL_SECOND * (activeSession?.devSimSpeed ?? 1)));
 
 /** Player queues a unit from the selected-province PRODUCE panel. */
 function handleProduce(provinceId: number, unitTypeId: string): void {
@@ -465,7 +467,8 @@ async function startGame(token: number): Promise<void> {
   );
   if (token !== launchToken) { connection.close(); return; }
   activeConnection = connection;
-  configureWorldAssetBase(connection.world.assetBaseUrl);
+  await verifyWorldDescriptor(connection.world);
+  configureWorldAssetBase(connection.world.assetBaseUrl, connection.world.artifactHashes);
   const session = new RemoteGameSession(connection, (reason) => {
     // Server rejected an order. Show a concise, specific headline derived from
     // the reason (not a flat "Command failed") with the full reason beneath.
@@ -940,6 +943,7 @@ function updateTimeControls(state: TimeOfDayState): void {
 }
 
 const simSpeedGroup = debugSimSpeedButtons[0]?.closest<HTMLElement>('.sim-speed-controls');
+const syncTimelineDebug = installTimelineDebugControls(simSpeedGroup, () => activeSession);
 /**
  * Dev-only simulation-speed control: server-authoritative, shared by every
  * connected player. Hidden (not just disabled) against a production server so
@@ -948,6 +952,7 @@ const simSpeedGroup = debugSimSpeedButtons[0]?.closest<HTMLElement>('.sim-speed-
  * HUD timer, which runs in a different function scope than these buttons.
  */
 function syncSimSpeedUi(): void {
+  syncTimelineDebug();
   const session = activeSession;
   if (simSpeedGroup) simSpeedGroup.hidden = !session || !session.devSimSpeedEnabled;
   if (!session) return;
@@ -1046,8 +1051,14 @@ async function bootstrapGameSession(
       `This order requires war with ${names.join(', ')}. Declaration and order will be committed together.`,
     ).then(detail.respond);
   });
+  let presentationGeneration = session.baselineGeneration;
   const syncDiplomaticRelations = (): void => {
     renderer.setDiplomaticRelations(session.state.relations);
+    renderer.setProvinceOwners(Object.entries(session.state.provinceOwners).map(([provinceId, countryId]) => ({ provinceId: Number(provinceId), countryId })));
+    if (presentationGeneration !== session.baselineGeneration) {
+      armyMotionInterpolator.clear(); combatEffects.clear(); presentationGeneration = session.baselineGeneration;
+    }
+    syncArmyMarkers(session, renderer);
   };
   session.addEventListener('change', syncDiplomaticRelations);
   const onDiplomacySessionChange = (): void => syncDiplomacyView(session);
@@ -1121,6 +1132,7 @@ async function bootstrapGameSession(
     window.clearInterval(civilClockTimer);
     armyMotionInterpolator.clear();
     clearAllNotificationTimers();
+    session.dispose();
     window.removeEventListener('keydown', onKey);
     session.removeEventListener('change', syncDiplomaticRelations);
     combatEffects.clear();
@@ -1168,7 +1180,7 @@ function hashUnit(key: string): number {
  * fog-gated: own stacks always shown; foreign stacks only when in
  * contact/vision; hidden stacks omitted entirely.
  */
-const armyPickScratch: Array<{ id: string; x: number; z: number }> = [];
+const armyPickScratch: ArmyPickEntry[] = [];
 const previousArmyModelPositions = new Map<string, { x: number; z: number }>();
 /** Last rendered facing per army, so the column turns a road corner over a
  *  second or so instead of snapping when the server shifts the leading node. */
@@ -1429,7 +1441,11 @@ function syncArmyMarkers(
     armyMarkerScratch[cursor + 27] = 0;
     cursor += 28;
     count += 1;
-    armyPickScratch.push({ id: army.id, x: armyMotion.x, z: armyMotion.z });
+    armyPickScratch.push({
+      id: army.id, x: armyMotion.x, z: armyMotion.z,
+      targetX: armyMotion.targetX, targetZ: armyMotion.targetZ,
+      remainingMs: armyMotion.remainingMs,
+    });
 
     if (identified && army.id === selectedArmyId && army.artillery && count < 1_024) {
       armyMarkerScratch.fill(0, cursor, cursor + 28);
@@ -1817,9 +1833,9 @@ function handleMapClick(
     }
     // Fired once the server accepts the order — which is *after* any "Declare
     // war?" confirmation but still before combat opens. Do not run it
-    // optimistically: a cancelled war declaration must not leave the player
+    // before acceptance: a cancelled war declaration must not leave the player
     // told their attack was "issued". Reticle on the target, an order cue and
-    // a toast; the optimistic status mutation already reads "advancing".
+    // a toast; pending intent already reports that the command is awaiting confirmation.
     const acknowledgeAttack = (): void => {
       flashAttackTarget(clientX, clientY);
       void audio.playUiCue('confirm');
@@ -2046,7 +2062,8 @@ function refreshSelectedArmy(
   const groups = comp?.groups.map((g) => ({
     typeId: g.typeId, label: gameUnitLabel(g.typeId), count: g.count, health: g.health,
   }));
-  const activity = armyActivityLabel(view.status, awaitingMoveTarget, view.own);
+  const activity = !session.fresh ? 'Reconnecting ? state may be stale'
+    : session.pendingForArmy(view.id) ? 'Order pending confirmation' : armyActivityLabel(view.status, awaitingMoveTarget, view.own);
   uiStore.patch({
     selectedArmy: {
       id: view.id,
@@ -2066,19 +2083,19 @@ function refreshSelectedArmy(
       defense: aggregateTroopStat(groups, 'defense', gameUnit),
       activity,
       own: view.own,
-      canExtract: view.own && !view.moveOrder && session.extractableNodeAt(view.id) !== null,
+      canExtract: session.fresh && view.own && !view.moveOrder && session.extractableNodeAt(view.id) !== null,
       awaitingMoveTarget: view.own && awaitingMoveTarget,
       // 'strike' is a nation-level order, not an army targeting mode — the army
       // card never reflects it.
       targetingMode: view.own && targetingMode !== 'strike' ? targetingMode : null,
-      canMove: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+      canMove: session.fresh && view.own && view.status !== 'engaged' && view.status !== 'retreating'
         && !NAVAL_TRANSIT_STATUSES.has(view.status),
-      canAttack: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+      canAttack: session.fresh && view.own && view.status !== 'engaged' && view.status !== 'retreating'
         && !NAVAL_TRANSIT_STATUSES.has(view.status),
-      canRetreat: view.own && view.status === 'engaged' && Boolean(view.legalRetreatExits?.length),
-      canSplit: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+      canRetreat: session.fresh && view.own && view.status === 'engaged' && Boolean(view.legalRetreatExits?.length),
+      canSplit: session.fresh && view.own && view.status !== 'engaged' && view.status !== 'retreating'
         && !NAVAL_TRANSIT_STATUSES.has(view.status),
-      canStop: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+      canStop: session.fresh && view.own && view.status !== 'engaged' && view.status !== 'retreating'
         && !NAVAL_TRANSIT_STATUSES.has(view.status)
         && (Boolean(view.moveOrder) || view.status === 'extracting' || targetingMode !== null),
       legalRetreatExits: view.legalRetreatExits,
@@ -2112,8 +2129,9 @@ function projectSelectedProvince(
       ? { controlled: summary.controlled, extracting: summary.extracting }
       : null,
     producible: summary.isOwn
-      ? session.producible(provinceId).map((id) => ({
-          id, name: gameUnitLabel(id), costLabel: unitCostLabel(id),
+      ? session.productionOptions(provinceId).filter((option) => option.available).map((option) => ({
+          id: option.unitTypeId, name: gameUnitLabel(option.unitTypeId), costLabel: unitCostLabel(option.unitTypeId),
+          affordable: option.affordable, reason: option.reason,
         }))
       : [],
     // Only the head order is being worked; it carries live progress/eta.
@@ -2135,6 +2153,8 @@ function projectSelectedProvince(
         }))
       : [],
     rally: summary.isOwn ? session.rallyPoint(provinceId) : null,
+    commandPending: session.pendingForProvince(provinceId),
+    canSetRally: summary.isOwn && session.canSetRally(provinceId),
     awaitingRallyTarget: summary.isOwn && awaitingRallyTarget && selectedProvinceId === provinceId,
   };
 }
@@ -2426,7 +2446,7 @@ function drainSessionEvents(session: RemoteGameSession): void {
     if (fxDensity > 0) {
       const atkSpot = battleSpotFor(ev.attacker, ev.attacker);
       const defSpot = battleSpotFor(ev.defender, ev.defender) ?? battleSpotFor(ev.attacker, ev.defender);
-      const spot = defSpot ?? atkSpot;
+      const spot = ev.x !== undefined && ev.z !== undefined ? { x: ev.x, z: ev.z } : defSpot ?? atkSpot;
       const dir = atkSpot && defSpot
         ? Math.atan2(defSpot.z - atkSpot.z, defSpot.x - atkSpot.x)
         : Number.NaN;
@@ -2486,15 +2506,6 @@ function drainSessionEvents(session: RemoteGameSession): void {
     }
   }
   for (const cap of session.pendingCaptures.splice(0)) {
-    // One-way projection: push the authoritative owner change onto the renderer
-    // (political colour, borders, labels, hover ownership) for EVERY capture,
-    // not just the player's, so the political map can't diverge from GameState
-    //. The renderer stays a presentation cache.
-    try {
-      activeRenderer?.setProvinceOwner(cap.provinceId, cap.toCountryId);
-    } catch (err) {
-      console.warn('[game] capture → renderer ownership projection failed', cap, err);
-    }
     if (selectedProvinceId === cap.provinceId) refreshSelectedProvince(session);
     // Only surface captures the player is involved in.
     if (cap.toCountryId !== player && cap.fromCountryId !== player) continue;

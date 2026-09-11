@@ -1,12 +1,7 @@
-/** Shared v2 combat tuning constants. */
+/** Directional combat tuning; damage is integrated continuously. */
 export const COMBAT_FRONTAGE = 10;
 export const COMBAT_SNAP = 26;
 /** A city's shattered defences retain only 40% of their normal combat output. */
 export const DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER = 0.4;
-/**
- * One legacy volley arrived every 18,000 base simulation ticks. At 0.05
- * game-hours per tick that represented 900 game-hours of damage. Catalog
- * profiles divide the old volley values by this duration so battle resolution
- * stays close to the original tuning while damage is integrated continuously.
- */
-export const LEGACY_VOLLEY_GAME_HOURS = 18_000 * 0.05;
+export const COMBAT_DAMAGE_SCALE = 9.6;
+export const MIN_COMBAT_EFFECTIVENESS = 0.25;

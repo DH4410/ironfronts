@@ -97,8 +97,8 @@ describe('strike devastation weakens defenders without bypassing capture', () =>
     const normal = ctx(undefined);
     const devastated = ctx(200);
 
-    stepCombat(normal, 900);
-    stepCombat(devastated, 900);
+    stepCombat(normal, 0.05);
+    stepCombat(devastated, 0.05);
 
     const normalAttackerLoss = 240 - normal.state.armies.atk.units[0].hp;
     const devastatedAttackerLoss = 240 - devastated.state.armies.atk.units[0].hp;

@@ -11,6 +11,9 @@
  * `tick` systems; their hooks are marked below.
  */
 
+import { parseGameState } from './state-schema';
+import { validateWorldState } from './state-invariants';
+import { FIXED_STEP_HOURS, PROTOTYPE_HOURS_PER_HOUR } from './time';
 import type { GameOutcome, GameState } from './game-state';
 import { cloneGameState, relationOf, serializeGameState, setRelation } from './game-state';
 import type { LandGraph } from './movement/graph';
@@ -21,8 +24,8 @@ import type { WorldData } from './world-data';
 import { applyIncome, recomputeIncome } from './economy';
 import { stepMovement } from './units/movement';
 import { stepExtraction } from './extraction';
-import { producibleUnits, stepProduction, type UnitCompletion } from './production';
-import { buildOptions, stepConstruction, type BuildingCompletion } from './construction';
+import { stepProduction, type UnitCompletion } from './production';
+import { stepConstruction, type BuildingCompletion } from './construction';
 import { stepCombat, stepCapture, type CaptureEvent, type CombatEvent } from './combat';
 import { stepWarheads } from './strike';
 import { stepVictory } from './victory';
@@ -32,13 +35,13 @@ import { guaranteeStrategicBaseline } from './resource-bootstrap';
 import { visibleResourceNodes } from './player-view';
 import { wrappedDistance } from './geometry';
 
-/** Longest game-time step a single `tick` will integrate; larger dt is clamped
+/** Longest game-time step a single `tick` will integrate; larger dt is accumulated
  *  so a stall can't teleport armies through provinces. */
-const MAX_TICK_HOURS = 1.5;
+const MAX_TICK_HOURS = FIXED_STEP_HOURS;
 /** Income is recomputed on this game-hour cadence, not every tick. */
-const INCOME_RECOMPUTE_INTERVAL = 1;
+const INCOME_RECOMPUTE_INTERVAL = 1 / PROTOTYPE_HOURS_PER_HOUR;
 /** AI re-plans on this game-hour cadence (cheap, not per tick). */
-const AI_INTERVAL = 2;
+const AI_INTERVAL = 2 / PROTOTYPE_HOURS_PER_HOUR;
 
 export class GameSession {
   readonly state: GameState;
@@ -46,8 +49,7 @@ export class GameSession {
   readonly world: WorldData;
   readonly diagnostics: InitResult['diagnostics'];
 
-  private incomeClock = 0;
-  private aiClock = 0;
+  movementSpeedMultiplier = 1;
 
   /** Drained by `main.ts` each frame for HUD notifications. */
   readonly pendingCompletions: UnitCompletion[] = [];
@@ -72,12 +74,7 @@ export class GameSession {
 
   /** Restore a validated plain-data snapshot while rebuilding world-derived graph caches. */
   static restore(state: GameState, world: WorldData): GameSession {
-    const restored = cloneGameState(state);
-    // Additive field: pre-strike v2 saves have no `warheads`. Default it here so
-    // the sim never reads `undefined` (GAME_VERSION intentionally unchanged).
-    for (const country of Object.values(restored.countries)) country.warheads ??= 0;
-    for (const buildings of Object.values(restored.provinceBuildings)) buildings.missileSite ??= 0;
-    restored.provinceDevastation ??= {};
+    const restored = parseGameState(state);
     const scenario = scenarioById(restored.scenarioId);
     const scaffold = initGameState({
       scenarioId: restored.scenarioId,
@@ -86,7 +83,9 @@ export class GameSession {
       playerCountryId: 0,
       sandbox: restored.mode === 'sandbox',
     }, scenario, world);
-    return new GameSession({ ...scaffold, state: restored }, world);
+    const session = new GameSession({ ...scaffold, state: restored }, world);
+    validateWorldState(session);
+    return session;
   }
 
   get gameTimeHours(): number {
@@ -94,14 +93,14 @@ export class GameSession {
   }
 
   /** Advance the simulation by `dtHours` of game time. Safe to call with
-   *  a large dt (e.g. after a stall) — it is clamped and sub-stepped. */
+   *  a large dt (e.g. after a stall) — it is accumulated and sub-stepped. */
   tick(dtHours: number): void {
+    if (!Number.isFinite(dtHours)) throw new Error('Simulation duration must be finite.');
     if (!(dtHours > 0)) return;
-    let remaining = dtHours;
-    while (remaining > 0) {
-      const step = Math.min(remaining, MAX_TICK_HOURS);
-      this.step(step);
-      remaining -= step;
+    this.state.clock.pendingHours = (this.state.clock.pendingHours ?? 0) + dtHours;
+    while (this.state.clock.pendingHours + 1e-12 >= MAX_TICK_HOURS) {
+      this.step(MAX_TICK_HOURS);
+      this.state.clock.pendingHours = Math.max(0, this.state.clock.pendingHours - MAX_TICK_HOURS);
     }
   }
 
@@ -114,10 +113,8 @@ export class GameSession {
 
     // --- economy -------------------------------------------------
     if (this.state.economyEnabled) {
-      this.incomeClock += dtHours;
-      if (this.incomeClock >= INCOME_RECOMPUTE_INTERVAL) {
+      if (this.state.simulationTick % Math.round(INCOME_RECOMPUTE_INTERVAL / FIXED_STEP_HOURS) === 0) {
         recomputeIncome(this.state, this.world);
-        this.incomeClock = 0;
       }
       applyIncome(this.state, dtHours);
     }
@@ -134,10 +131,8 @@ export class GameSession {
     if (outcome) this.pendingOutcome.push(outcome);
 
     // --- simple defensive AI (slow cadence) -----------------------
-    this.aiClock += dtHours;
-    if (this.aiClock >= AI_INTERVAL) {
-      stepAi(this, this.aiClock);
-      this.aiClock = 0;
+    if (this.state.simulationTick % Math.round(AI_INTERVAL / FIXED_STEP_HOURS) === 0) {
+      stepAi(this, AI_INTERVAL);
     }
   }
 
@@ -285,25 +280,6 @@ export class GameSession {
 
   rallyPoint(provinceId: number): { x: number; z: number } | null {
     return this.state.rallyPoints[provinceId] ?? null;
-  }
-
-  producible(countryId: number, provinceId: number): string[] {
-    return producibleUnits(this, provinceId, countryId);
-  }
-
-  buildable(countryId: number, provinceId: number) {
-    return buildOptions(this, provinceId, countryId);
-  }
-
-  /** Resource node whose access point the army is standing on (for the EXTRACT
-   *  affordance), or null. */
-  extractableNodeAt(armyId: string): number | null {
-    const army = this.state.armies[armyId];
-    if (!army) return null;
-    const node = Object.values(this.state.resourceNodes).find(
-      (n) => n.accessNodeId === army.graphNodeId && n.remaining > 0,
-    );
-    return node ? node.id : null;
   }
 
   /** Flip the foreign country geographically nearest the player's capital to

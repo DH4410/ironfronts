@@ -57,11 +57,11 @@ export function issueAttack(ctx: SimContext, command: AttackCommand): CommandRes
   if (!contact || contact === 'hidden') return { ok: false, reason: 'Target is no longer detected.' };
   const required = relationOf(ctx.state, army.ownerCountryId, target.ownerCountryId) === 'war'
     ? [] : [target.ownerCountryId];
+  if (artilleryOnly) {
   if (required.some((id) => !command.confirmedWarCountryIds?.includes(id))) {
     return { ok: false, reason: 'War declaration required.', requiredWarCountryIds: required };
   }
 
-  if (artilleryOnly) {
     if (army.status !== 'idle' && army.status !== 'extracting') {
       return { ok: false, reason: 'Artillery must be stationary.' };
     }

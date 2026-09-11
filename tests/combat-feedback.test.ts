@@ -43,7 +43,7 @@ describe('attack-order feedback', () => {
     expect(remote).toContain('onAccepted?: () => void');
     expect(remote).toContain('onAccepted?.();');
     // re-send after respond(true) keeps the same callback
-    expect(remote).toContain('this.send(confirmedCommand, mutation, onAccepted);');
+    expect(remote).toContain('this.send(confirmedCommand, onAccepted);');
   });
 
   it('rate-limits the under-attack alert so simultaneous battles cannot stack it', () => {

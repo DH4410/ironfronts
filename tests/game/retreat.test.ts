@@ -81,7 +81,7 @@ describe('retreat', () => {
     const c = ctx(true);
     let retreated = false;
     for (let i = 0; i < 8 && c.state.armies.weak; i += 1) {
-      const events = stepCombat(c, 900);
+      const events = stepCombat(c, 0.05);
       if (events.some((e) => e.kind === 'retreat' && e.defender === 2)) retreated = true;
       if (retreated) break;
     }
@@ -97,7 +97,7 @@ describe('retreat', () => {
   it('fights to the end when there is nowhere to retreat', () => {
     const c = ctx(false); // country 2 owns no province
     for (let i = 0; i < 20 && c.state.armies.weak; i += 1) {
-      stepCombat(c, 900);
+      stepCombat(c, 0.05);
     }
     // it died in place rather than retreating
     expect(c.state.armies.weak).toBeUndefined();

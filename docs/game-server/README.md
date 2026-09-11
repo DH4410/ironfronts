@@ -10,7 +10,7 @@ This documentation intentionally does not cover account/session management, brow
 
 - [Architecture](architecture.md): process boundaries, source layout, ownership, data flow, and extension points.
 - [Configuration and operations](operations.md): environment, startup, health, logs, deployment, shutdown, and recovery.
-- [Protocol v2](protocol-v2.md): internal HTTP API, gameplay WebSocket, commands, messages, revisions, and errors.
+- [Protocol v3](protocol.md): gameplay WebSocket, commands, messages, revisions, delivery, and errors.
 - [Authoritative simulation](simulation.md): tick order, movement, combat, retreat, artillery, economy, production, construction, extraction, capture, AI, and fog of war.
 - [State, world loading, and persistence](persistence.md): save format, atomic writes, compatibility checks, backups, seats, and restart behavior.
 - [Validation and troubleshooting](validation.md): checks, useful diagnostics, failure modes, and invariants.
@@ -29,12 +29,12 @@ The default process listens on `127.0.0.1:3002`, loads authoritative world data 
 
 ## Stable contracts
 
-- Protocol version: `2`
+- Protocol version: `3`
 - Game ID: `world-at-war-2`
-- Game version: `world-at-war@2`
+- Game version: `world-at-war@3`
 - Save format and runtime snapshot version: `2`
 - Authoritative simulation cadence: 10 ticks per real second while the process is running
 - Projection publish cadence: up to 4 updates per real second
-- Close-combat and artillery volley interval: 18,000 ticks, or 30 running-server minutes
+- Combat: continuous damage integrated in fixed 100 ms simulation steps
 
 Changing a wire shape belongs in `packages/protocol`. Changing authoritative rules belongs in `packages/game-core` / `src/game`. The server process should coordinate those modules rather than duplicate their rules.

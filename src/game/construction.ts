@@ -1,7 +1,7 @@
 /**
  * Building construction (BUILD).
  *
- * An owned URBAN province can queue one of three production buildings. Cost is
+ * An owned URBAN province can queue one of four production buildings. Cost is
  * paid up front from the country stockpile; the active order advances in game
  * time; on completion the building level goes up by one, which unlocks the
  * matching unit line in that province's PRODUCE panel.
@@ -10,16 +10,15 @@
  * paid for it. If the province is captured mid-build the order is void and the
  * cost is forfeit — the new owner does not inherit a half-built factory.
  *
- * v1 deliberately small: three buildings, one level each. No upgrades, no
+ * Each building has one level. No upgrades, no
  * infrastructure, no defensive works.
  */
 
+import { PROTOTYPE_HOURS_PER_HOUR } from './time';
 import type { SimContext } from './sim-context';
 import type { ConstructionOrder, ProvinceBuildings, Stockpile } from './game-state';
 import type { BuildingId } from './units/unit-types';
 
-/** Accelerated prototype clock, matching unit production. */
-const BUILD_TIME_SCALE = 4;
 
 interface BuildingDef {
   readonly label: string;
@@ -29,10 +28,10 @@ interface BuildingDef {
 }
 
 export const BUILDINGS: Record<BuildingId, BuildingDef> = {
-  barracks: { label: 'Barracks', cost: { funds: 120, stone: 60 }, buildTimeHours: 48 },
-  ordnance: { label: 'Ordnance Workshop', cost: { funds: 1_600, stone: 480, metal: 640 }, buildTimeHours: 480 },
-  tankPlant: { label: 'Tank Plant', cost: { funds: 300, stone: 90, metal: 120 }, buildTimeHours: 96 },
-  missileSite: { label: 'Missile Site', cost: { funds: 2_400, stone: 720, metal: 960 }, buildTimeHours: 720 },
+  barracks: { label: 'Barracks', cost: { funds: 120, stone: 60 }, buildTimeHours: 48 / (4 * PROTOTYPE_HOURS_PER_HOUR) },
+  ordnance: { label: 'Ordnance Workshop', cost: { funds: 1_600, stone: 480, metal: 640 }, buildTimeHours: 480 / (4 * PROTOTYPE_HOURS_PER_HOUR) },
+  tankPlant: { label: 'Tank Plant', cost: { funds: 300, stone: 90, metal: 120 }, buildTimeHours: 96 / (4 * PROTOTYPE_HOURS_PER_HOUR) },
+  missileSite: { label: 'Missile Site', cost: { funds: 2_400, stone: 720, metal: 960 }, buildTimeHours: 720 / (4 * PROTOTYPE_HOURS_PER_HOUR) },
 };
 
 const EMPTY_BUILDINGS: ProvinceBuildings = { barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 0 };
@@ -128,7 +127,7 @@ export function queueBuilding(
     buildingId,
     ownerCountryId: countryId,
     progressHours: 0,
-    totalHours: BUILDINGS[buildingId].buildTimeHours / BUILD_TIME_SCALE,
+    totalHours: BUILDINGS[buildingId].buildTimeHours,
   };
   ctx.state.nextOrderId += 1;
   (ctx.state.constructionQueues[provinceId] ??= []).push(order);
@@ -136,6 +135,7 @@ export function queueBuilding(
 }
 
 export interface BuildingCompletion {
+  readonly ownerCountryId: number;
   readonly provinceId: number;
   readonly buildingId: BuildingId;
 }
@@ -150,13 +150,18 @@ export function stepConstruction(ctx: SimContext, dtHours: number): BuildingComp
       queue.shift();
     }
     if (queue.length === 0) continue;
+    let remaining = dtHours;
+    while (queue.length && remaining > 1e-12) {
     const active = queue[0];
-    active.progressHours += dtHours;
-    if (active.progressHours < active.totalHours) continue;
+    if (active.ownerCountryId !== ctx.state.provinceOwners[provinceId]) { queue.shift(); continue; }
+    const used = Math.min(remaining, Math.max(0, active.totalHours - active.progressHours));
+    active.progressHours += used; remaining -= used;
+    if (active.progressHours + 1e-12 < active.totalHours) break;
     queue.shift();
     const buildings = (ctx.state.provinceBuildings[provinceId] ??= { ...EMPTY_BUILDINGS });
     buildings[active.buildingId] += 1;
-    done.push({ provinceId, buildingId: active.buildingId });
+    done.push({ provinceId, buildingId: active.buildingId, ownerCountryId: active.ownerCountryId });
+    }
   }
   for (const [pid, queue] of Object.entries(ctx.state.constructionQueues)) {
     if (queue.length === 0) delete ctx.state.constructionQueues[Number(pid)];

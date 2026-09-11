@@ -65,7 +65,7 @@ It exposes session, login, register, logout, lobby, join, and game-connect opera
 `GameConnection` owns the WebSocket and exact authoritative replica.
 
 - Obtains a fresh connection descriptor/ticket from the auth server.
-- Requires protocol version 2.
+- Requires protocol version 3.
 - Opens the socket and authenticates immediately.
 - Times initial connection out after 10 seconds.
 - Runtime-validates every server message.
@@ -79,21 +79,15 @@ It exposes session, login, register, logout, lobby, join, and game-connect opera
 
 Reconnection obtains a new single-use ticket and receives a current baseline. Client command IDs combine current time and a per-instance sequence; the server provides process-local deduplication.
 
-## Replica and optimistic UI
+## Replica and pending commands
 
 `replica-store.ts` applies projection deltas by cloning the previous projection, replacing top-level changed fields, upserting collection records, and deleting removals.
 
-`RemoteGameSession` gives legacy UI code a session-shaped adapter over that replica. It provides ownership/province helpers, catalogs, command methods, current clock, selection summaries, and event queues.
+`RemoteGameSession` gives the UI a session-shaped adapter over that replica. It provides ownership/province helpers, authoritative capabilities, catalogs, command methods, current clock, selection summaries, and event queues.
 
-For responsive feedback, selected commands install local optimistic mutations:
+Commands create pending intent without changing authoritative orders, queues, status or resources. Acknowledgements identify the applied revision; pending intent clears when that revision is installed. Rejections remove intent and show the server reason. Timeouts trigger resynchronization because the outcome may be unknown.
 
-- Move/stop/extract/retreat update visible status/order fields.
-- Production/construction add temporary queue entries and deduct projected stockpile.
-- Commands without a safe local prediction still send without inventing state.
-
-Optimistic mutations never modify the connection's authoritative projection. A failed acknowledgement removes and rebuilds them. A successful acknowledgement marks the mutation for removal when the next authoritative state message arrives.
-
-When an order returns `requiredWarCountryIds`, the optimistic mutation is removed and the adapter emits `war-confirmation`. The UI shows an in-game confirmation dialog and resubmits with the listed countries only after approval.
+War confirmation preserves the union of previously approved countries when another transit country requires consent.
 
 ## UI architecture
 
@@ -126,7 +120,7 @@ An army formation uses at most four 3D model slots. Visual categories are infant
 
 ## Clock and environment
 
-The civil clock is distinct from simulation time. `InterpolatedGameClock` advances sparse server epoch samples locally at real-time speed. New samples correct drift gradually at at most 10% faster/slower display speed, avoiding hand jumps. The fixed server UTC offset is used for day/hour/minute display.
+The civil clock derives from the persisted simulation timeline. `InterpolatedGameClock` interpolates server samples at the announced simulation speed and freezes stale prediction. Debug epoch changes snap by generation. New samples correct drift gradually at at most 10% faster/slower display speed, avoiding hand jumps. The fixed server UTC offset is used for day/hour/minute display.
 
 The client freezes the renderer's independent demo time cycle and drives lighting from the interpolated server clock. Rain is currently a presentation/debug control rather than an authoritative gameplay system.
 
@@ -181,4 +175,4 @@ On non-bfcache `pagehide`, the client stops music/audio, destroys UI, clears pre
 - Optimistic queue entries use client timestamps only as temporary display IDs.
 - There is no offline mode; authentication, lobby, and game connection are required.
 
-See [Rendering](rendering.md) for GPU/world details and [Game-server protocol](../game-server/protocol-v2.md) for the authoritative wire contract.
+See [Rendering](rendering.md) for GPU/world details and [Game-server protocol](../game-server/protocol.md) for the authoritative wire contract.

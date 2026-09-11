@@ -13,7 +13,7 @@ The game server is the sole writer of authoritative game state. Its major bounda
 | Projection | Per-country fog filtering and change-only deltas | `apps/game-server/src/projection.ts` |
 | Event delivery | Drain domain event queues and filter them by country | `apps/game-server/src/event-feed.ts` |
 | Persistence | Serialized atomic JSON snapshots and incompatible-save archive | `apps/game-server/src/persistence.ts` |
-| World input | Load authoritative generated artifacts and calculate manifest hash | `apps/game-server/src/world-loader.ts` |
+| World input | Load authoritative generated artifacts and calculate their aggregate identity | `apps/game-server/src/world-loader.ts` |
 | Shared protocol | Runtime-validated client input and TypeScript wire contracts | `packages/protocol/src` |
 | Game rules | Plain state, commands, movement, combat, economy and AI | `packages/game-core` and `src/game` |
 
@@ -23,9 +23,9 @@ Account credentials, login sessions, ticket issuance, and public lobby endpoints
 
 1. Resolve configuration from environment variables.
 2. Load the world manifest, sidecar metadata, and required binary fields.
-3. Build the authoritative `WorldData`, movement graph inputs, and generated resource-node inputs; compute the SHA-256 hash of `world.json`.
+3. Build the authoritative `WorldData`, movement graph inputs, and generated resource-node inputs; hash every gameplay artifact and their sorted aggregate.
 4. Read `GAME_DATA_PATH` if it exists.
-5. Reject and archive the save when its format, runtime version, game ID, game version, or world hash differs.
+5. Reject and archive the save when its format, runtime version, game ID, game version, or aggregate world identity differs.
 6. Restore `GameRuntime`, or initialize scenario `OP-1939-01` in campaign mode.
 7. Restore the civil clock's original start epoch when a compatible save exists.
 8. Write an initial snapshot for a fresh game.
@@ -57,11 +57,11 @@ Every connected country receives its own projection. A projection contains publi
 
 At 250 ms intervals, the process:
 
-1. Drains queued domain events once.
+1. Drains queued domain events once into bounded per-country backlogs.
 2. Builds at most one current projection per connected country.
-3. Diffs it against each connection's last projection.
-4. Advances the process-local revision if any connection changed.
-5. Sends each changed connection a delta with events filtered for its country.
+3. Diffs it against each connection's last successfully delivered projection.
+4. Sends state changes and event-only deltas with events filtered for that country.
+5. Advances connection and process revisions only after socket delivery accepts the message.
 
 The revision is a transport sequence, not a simulation tick and not persisted. A reconnect always establishes a new baseline at the current process revision.
 
@@ -71,7 +71,9 @@ Public facades remain deliberately small:
 
 - `src/game/commands.ts` is the command ownership gate and dispatcher. Complex command workflows live under `src/game/commands/`.
 - `src/game/combat.ts` coordinates battles, retreat, and artillery. Pure damage/frontage math and province capture live under `src/game/combat/`.
-- `apps/game-server/src/main.ts` composes the process. HTTP, gameplay sockets, and event filtering are separate modules.
+- `src/game/units/movement.ts` coordinates fixed-step movement. Orders, position, contact, pursuit, policy, retreat, speed, heap routing, and spatial indexing have focused modules.
+- `src/main.ts` composes browser state; army interpolation/upload and picking live under `src/client/`, queue rendering under `src/ui/`, and road-junction generation under `src/graphics/`.
+- `apps/game-server/src/main.ts` composes the process. Scheduling, publication, HTTP, gameplay sockets, event filtering, persistence, and world loading are separate modules.
 
 When adding behavior, put validation and mutation with the owning domain. Avoid adding game rules to the WebSocket handler, transport concepts to `GameState`, or fog decisions to client code. A useful rule is: the entrypoint schedules, the runtime adapts, the domain decides, and projection redacts.
 
@@ -83,4 +85,4 @@ When adding behavior, put validation and mutation with the owning domain. Avoid 
 - Combat events go only to the attacker and defender countries named by the event.
 - Capture events are public.
 
-These event notifications are transient presentation aids. They are not persisted, are not replayed after reconnect/restart, and can be drained while no player is connected. Authoritative consequences are always represented in the next baseline or delta.
+These event notifications are transient presentation aids. They are not persisted across process restart. The publisher holds up to 512 filtered events per country while no recipient is connected or a socket is under backpressure, and removes a batch only after every current recipient accepts it. Reconnect baselines remain the durable reconciliation source, and clients deduplicate event IDs.

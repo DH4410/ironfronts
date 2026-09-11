@@ -28,7 +28,7 @@ describe('gameplay vertical slice', () => {
     expect(army.order).not.toBeNull();
 
     const startX = army.x;
-    s.tick(4);
+    s.tick(4 / 1800);
     expect(army.x !== startX || army.z !== 0).toBe(true); // it moved
     s.orderStop(SPAIN, army.id);
     expect(army.order).toBeNull();
@@ -58,7 +58,7 @@ describe('gameplay vertical slice', () => {
     const remainingBefore = node!.remaining;
     const start = s.orderExtract(SPAIN, 'test-eng');
     expect(start.ok).toBe(true);
-    s.tick(6);
+    s.tick(6 / 1800);
     expect(s.state.countries[SPAIN].stockpile[node!.kind]).toBeGreaterThan(before);
     expect(node!.remaining).toBeLessThan(remainingBefore);
   });
@@ -81,7 +81,7 @@ describe('gameplay vertical slice', () => {
     expect(s.state.countries[SPAIN].stockpile.funds).toBeLessThan(fundsBefore);
 
     // light-tank buildTime 12h / scale 4 = 3 game-hours.
-    s.tick(5);
+    s.tick(5 / 1800);
     const armiesAfter = Object.values(s.state.armies).filter((a) => a.ownerCountryId === SPAIN);
     const hasLightTank = armiesAfter.some((a) => a.units.some((g) => g.typeId === 'light-tank'));
     expect(hasLightTank).toBe(true);
@@ -133,6 +133,9 @@ describe('gameplay vertical slice', () => {
       : 0;
     const at = { x: s.graph.nodeX[node], z: s.graph.nodeZ[node], graphNodeId: node };
 
+    // Isolate this encounter from scenario garrisons and AI reinforcements.
+    s.state.armies = {};
+    for (const country of Object.values(s.state.countries)) country.controller = 'player';
     s.state.armies['sp-strike'] = {
       id: 'sp-strike', ownerCountryId: SPAIN, name: 'Strike', ...at,
       units: [{ typeId: 'medium-tank', count: 4, hp: 760, experience: 0 },
@@ -145,8 +148,8 @@ describe('gameplay vertical slice', () => {
       status: 'idle', order: null, extractingNodeId: null,
     };
 
-    for (let interval = 0; interval < 4 && s.state.armies['en-weak']; interval += 1) {
-      stepCombat(s, 900);
+    for (let interval = 0; interval < 50_000 && s.state.armies['en-weak'] && s.state.armies['en-weak'].status !== 'retreating'; interval += 1) {
+      stepCombat(s, 1 / 3600);
     }
     // A full-strength militia this outmatched is wiped out before it ever drops
     // below the retreat threshold while still alive — it does not get to run.
@@ -154,7 +157,7 @@ describe('gameplay vertical slice', () => {
       !s.state.armies['en-weak'] || s.state.armies['en-weak'].status === 'retreating',
     ).toBe(true);
     // give capture a tick with no defender
-    s.tick(2);
+    for (let second=0; second<30 && s.state.provinceOwners[enemyProvince.id] !== SPAIN; second++) s.tick(1 / 3600);
     expect(s.state.provinceOwners[enemyProvince.id]).toBe(SPAIN);
     expect(s.isAtWar(SPAIN, enemyId!)).toBe(true);
   });

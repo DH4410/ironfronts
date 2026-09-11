@@ -111,6 +111,8 @@ export interface SelectedProvince {
     readonly id: string;
     readonly name: string;
     readonly costLabel: string;
+    readonly affordable: boolean;
+    readonly reason?: string;
   }[];
   /** Current production queue, own provinces only. Only the head order (index
    *  0) is actively being worked and carries live progress/eta. */
@@ -130,6 +132,8 @@ export interface SelectedProvince {
   readonly rally?: { readonly x: number; readonly z: number } | null;
   /** UI is waiting for a map click to place this province's rally point. */
   readonly awaitingRallyTarget?: boolean;
+  readonly commandPending?: boolean;
+  readonly canSetRally?: boolean;
 }
 
 export type NavId =

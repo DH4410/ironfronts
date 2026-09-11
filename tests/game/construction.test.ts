@@ -89,11 +89,11 @@ describe('stepConstruction', () => {
     queueBuilding(c, 10, 'barracks', 1);
     expect(producibleUnits(c, 10, 1)).not.toContain('infantry'); // no barracks yet
 
-    const total = BUILDINGS.barracks.buildTimeHours / 4;
-    stepConstruction(c, total - 0.5);
+    const total = BUILDINGS.barracks.buildTimeHours;
+    stepConstruction(c, total * 0.5);
     expect(s.provinceBuildings[10]?.barracks ?? 0).toBe(0); // not done
-    const done = stepConstruction(c, 1);
-    expect(done).toEqual([{ provinceId: 10, buildingId: 'barracks' }]);
+    const done = stepConstruction(c, total * 0.5);
+    expect(done).toEqual([{ provinceId: 10, buildingId: 'barracks', ownerCountryId: 1 }]);
     expect(s.provinceBuildings[10].barracks).toBe(1);
     expect(s.constructionQueues[10]).toBeUndefined();
     expect(producibleUnits(c, 10, 1)).toContain('infantry'); // unlocked

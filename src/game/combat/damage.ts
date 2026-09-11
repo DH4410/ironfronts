@@ -4,7 +4,7 @@ import type { BattleRole } from '../game-state';
 import type { ArmyStack, UnitGroup } from '../units/army';
 import { unitType } from '../units/unit-catalog';
 import type { ArmorClass, DamageProfile } from '../units/unit-types';
-import { COMBAT_FRONTAGE } from './constants';
+import { COMBAT_FRONTAGE, MIN_COMBAT_EFFECTIVENESS } from './constants';
 
 export interface GroupRef {
   readonly army: ArmyStack;
@@ -64,12 +64,12 @@ export function calculateDamage(
   for (const army of attackers) {
     for (const group of army.units) {
       const pool = pooledByType.get(group.typeId)!;
-      const health = pool.maxHp > 0 ? Math.max(0, Math.min(1, pool.hp / pool.maxHp)) : 0;
+      const health = pool.maxHp > 0 ? Math.max(MIN_COMBAT_EFFECTIVENESS, Math.min(1, pool.hp / pool.maxHp)) : 0;
       const profile = profileFor(role, group);
       const score = health * (
         profile.soft * ratio.soft + profile.light * ratio.light + profile.heavy * ratio.heavy
       );
-      for (let ordinal = 0; ordinal < group.count; ordinal += 1) {
+      for (let ordinal = 0; ordinal < Math.min(group.count, COMBAT_FRONTAGE); ordinal += 1) {
         candidates.push({ profile, health, typeId: group.typeId, armyId: army.id, ordinal, score });
       }
     }
@@ -85,9 +85,11 @@ export function calculateDamage(
     fire.heavy += unit.profile.heavy * unit.health;
   }
 
+  // A ten-unit frontage adds firepower sublinearly; equal large forces take longer.
+  const coordination = 1 / Math.sqrt(Math.max(1, selected.length));
   const result: Array<{ ref: GroupRef; amount: number }> = [];
   for (const armor of ['soft', 'light', 'heavy'] as const) {
-    const classDamage = fire[armor] * ratio[armor] * Math.max(0, dtHours);
+    const classDamage = fire[armor] * coordination * ratio[armor] * Math.max(0, dtHours);
     if (classDamage <= 0 || hp[armor] <= 0) continue;
     for (const army of defenders) {
       for (const group of army.units) {

@@ -6,7 +6,7 @@ Ironfronts is an npm-workspace monorepo containing a WebGPU client, two Node.js 
 
 | Component | Default endpoint | Owns |
 |---|---|---|
-| Browser client | `http://127.0.0.1:5173` | Input, UI, WebGPU presentation, local replica, optimistic feedback |
+| Browser client | `http://127.0.0.1:5173` | Input, UI, WebGPU presentation, local replica, pending command feedback |
 | Auth server | `http://127.0.0.1:3001` | Accounts, passwords, browser sessions, public lobby facade, short-lived game tickets |
 | Game server | `http://127.0.0.1:3002` | Country seats, simulation, commands, fog projections, game persistence |
 | Static world host | `/world` below the client/CDN origin | Immutable generated world manifest, fields, meshes, instances, and sidecars |
@@ -30,7 +30,7 @@ The browser never receives the game server's full state. The auth service never 
 | `apps/auth-server` | Node HTTP authentication and lobby gateway |
 | `apps/game-server` | Authoritative simulation host and gameplay WebSocket |
 | `apps/client` | Stable Vite browser entrypoints |
-| `packages/protocol` | Shared v2 wire schemas, types, and ticket signing |
+| `packages/protocol` | Shared v3 gameplay wire schemas, types, and ticket signing |
 | `packages/game-core` | Browser-free exports for authoritative game rules |
 | `src/game` | Plain game state and domain systems used by game-core |
 | `src/client` | Browser auth API, connection, replica, clock, and remote-session adapter |

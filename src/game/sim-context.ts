@@ -13,6 +13,7 @@ import type { LandGraph } from './movement/graph';
 import type { WorldData } from './world-data';
 
 export interface SimContext {
+  readonly movementSpeedMultiplier?: number;
   readonly state: GameState;
   readonly graph: LandGraph;
   readonly world: WorldData;

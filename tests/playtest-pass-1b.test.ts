@@ -8,7 +8,7 @@ const root = process.cwd();
 
 function lobby(countries: Partial<LobbyCountry>[]): GameLobby {
   return {
-    gameId: 'g', name: 'n', gameVersion: 'v', protocolVersion: 2, assignedCountryId: null,
+    gameId: 'g', name: 'n', gameVersion: 'v', protocolVersion: 3, assignedCountryId: null,
     countries: countries.map((c, i) => ({
       id: i + 1, name: 'X', color: '#fff', startingCities: 5, alive: true, claimed: false, ...c,
     })),
@@ -62,7 +62,7 @@ describe('order failure feedback (#5)', () => {
   });
 
   it('the movement engine distinguishes off-map / separate-landmass / no-route', () => {
-    const mv = readFileSync(path.join(root, 'src/game/units/movement.ts'), 'utf8');
+    const mv = readFileSync(path.join(root, 'src/game/movement/orders.ts'), 'utf8');
     expect(mv).toContain('off the road network');
     expect(mv).toContain('separate landmass');
   });

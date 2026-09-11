@@ -26,7 +26,7 @@ describe('game tickets and command wire schema', () => {
     expect('countryId' in parsed).toBe(false);
   });
 
-  it('accepts typed v2 attack, retreat, and split commands', () => {
+  it('accepts typed v3 attack, retreat, and split commands', () => {
     expect(commandPayloadSchema.parse({
       type: 'attackArmy', armyId: 'army-1', target: { kind: 'army', armyId: 'army-2' },
     })).toMatchObject({ target: { kind: 'army', armyId: 'army-2' } });
@@ -72,6 +72,18 @@ describe('game tickets and command wire schema', () => {
     expect(serverMessageSchema.parse({
       type: 'devEnvironment', timeOfDayHours: null, raining: false, devControlsEnabled: true,
     })).toMatchObject({ type: 'devEnvironment', timeOfDayHours: null, raining: false });
+  });
+
+  it('requires kind-specific event identity and ownership fields', () => {
+    const envelope = (event: unknown) => ({ type: 'delta', fromRevision: 0, revision: 1,
+      delta: { changed: {}, upserts: {}, removals: {}, redactions: [] }, events: [event] });
+    expect(serverMessageSchema.safeParse(envelope({ id: 'event-1', kind: 'unitCompleted', provinceId: 2, unitTypeId: 'infantry' })).success).toBe(false);
+    expect(serverMessageSchema.safeParse(envelope({ id: 'event-1', kind: 'unitCompleted', ownerCountryId: 1,
+      provinceId: 2, unitTypeId: 'infantry', armyId: 'army-3', x: 10, z: 20 })).success).toBe(true);
+    expect(serverMessageSchema.safeParse(envelope({ id: 'event-2', kind: 'engaged', attacker: 1, defender: 2,
+      battleId: 'battle-1', frontId: 'front-1' })).success).toBe(false);
+    expect(serverMessageSchema.safeParse(envelope({ id: 'event-2', kind: 'engaged', attacker: 1, defender: 2,
+      battleId: 'battle-1', frontId: 'front-1', x: 10, z: 20 })).success).toBe(true);
   });
 
   it('accepts a ticket nonce once and rejects replay', () => {

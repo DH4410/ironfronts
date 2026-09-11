@@ -49,13 +49,13 @@ describe('single authoritative game runtime', () => {
 
   it('projects private state per viewer and emits change-only removals/redactions', () => {
     const runtime = new GameRuntime(tinyWorld());
-    const before = projectFor(runtime.session.state, runtime.world, 1);
+    const before = projectFor(runtime.session.state, runtime.world, runtime.session.graph, 1);
     expect(before.ownCountry?.id).toBe(1);
     expect(Object.keys(before.provinceBuildings).every((id) => before.provinceOwners[Number(id)] === 1)).toBe(true);
     const foreign = Object.values(runtime.session.state.armies).find((army) => army.ownerCountryId === 2)!;
     foreign.x = 1_100;
     foreign.z = 450;
-    const after = projectFor(runtime.session.state, runtime.world, 1);
+    const after = projectFor(runtime.session.state, runtime.world, runtime.session.graph, 1);
     const delta = diffProjection(before, after);
     if (before.armies[foreign.id]) {
       expect(delta?.removals.armies).toContain(foreign.id);
@@ -66,8 +66,8 @@ describe('single authoritative game runtime', () => {
 
   it('keeps advancing with no connected clients', () => {
     const runtime = new GameRuntime(tinyWorld());
-    runtime.tick(1);
-    expect(runtime.session.gameTimeHours).toBe(1);
+    runtime.tick(1 / 1800);
+    expect(runtime.session.gameTimeHours).toBeCloseTo(1 / 1800);
   });
 
   it('projects the next movement waypoint with a sim-speed-aware wall-clock ETA', () => {
@@ -90,6 +90,21 @@ describe('single authoritative game runtime', () => {
     expect(fast.durationMs).toBeCloseTo(normal.durationMs / 2);
   });
 
+  it('projects detached authoritative province capabilities', () => {
+    const runtime = new GameRuntime(tinyWorld());
+    const provinceId = Number(Object.keys(runtime.session.state.provinceBuildings).find((id) =>
+      runtime.session.state.provinceOwners[Number(id)] === 1)!);
+    const first = runtime.projection(1).provinceActions[provinceId];
+    expect(first.production.some((option) => option.available)).toBe(true);
+    expect(first.construction.every((option) => typeof option.available === 'boolean')).toBe(true);
+    expect(first.canSetRally).toBe(true);
+    runtime.session.state.countries[1].stockpile.funds = 0;
+    const second = runtime.projection(1).provinceActions[provinceId];
+    expect(second.production.filter((option) => option.available).some((option) => !option.affordable)).toBe(true);
+    (second.production as Array<unknown>).splice(0);
+    expect(runtime.projection(1).provinceActions[provinceId].production.length).toBeGreaterThan(0);
+  });
+
   it('round-trips authoritative state and permanent seats through game.json', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'ironfronts-game-'));
     const persistence = new GamePersistence(path.join(directory, 'game.json'));
@@ -97,7 +112,7 @@ describe('single authoritative game runtime', () => {
       const runtime = new GameRuntime(tinyWorld());
       expect(runtime.join('account-a', 1)).toMatchObject({ ok: true });
       runtime.session.state.provinceOwners[5] = 1;
-      runtime.tick(2);
+      runtime.tick(2 / 1800);
       await persistence.save({
         formatVersion: 2,
         gameId: 'world-at-war-2',
@@ -110,7 +125,7 @@ describe('single authoritative game runtime', () => {
       const saved = await persistence.load();
       const restored = new GameRuntime(tinyWorld(), saved!.runtime);
       expect(restored.seat('account-a')).toBe(1);
-      expect(restored.session.gameTimeHours).toBeCloseTo(2, 5);
+      expect(restored.session.gameTimeHours).toBeCloseTo(2 / 1800, 5);
       expect(restored.session.state.countries[1].controller).toBe('player');
       expect(restored.session.state.provinceOwners[5]).toBe(1);
     } finally {

@@ -146,7 +146,7 @@ describe('bug 8 — pooled-hp casualty accounting is coherent', () => {
     // Step combat in small slices; check the invariant after every pass while
     // the weak stack is being ground down.
     for (let i = 0; i < 20 && s.armies.small; i += 1) {
-      stepCombat(ctx(s), 900);
+      stepCombat(ctx(s), 0.05);
       const g = s.armies.small?.units[0];
       if (!g) break;
       expect(g.count).toBe(Math.max(0, Math.ceil(g.hp / 100)));

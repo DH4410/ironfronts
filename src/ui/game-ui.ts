@@ -1,5 +1,5 @@
 /**
- * In-game strategic command UI (v2).
+ * In-game strategic command UI.
  *
  * Builds the player HUD once, then updates cached nodes from a single
  * coalesced `render(state)` driven by `UiStore` subscription. No animation
@@ -783,12 +783,14 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         province.coastal ? 'c' : '',
         dep ? `${dep.controlled ? 'C' : ''}${dep.extracting ? 'E' : ''}` : '',
         province.isOwn,
-        (province.producible ?? []).map((u) => u.id).join(','),
+        (province.producible ?? []).map((u) => `${u.id}:${u.affordable}`).join(','),
         (province.queue ?? []).map((q) => `${q.id}:${Math.round(q.progress * 100)}:${Math.round(q.etaSeconds)}`).join(','),
         (province.buildable ?? []).map((b) => `${b.id}${b.affordable ? '+' : '-'}`).join(','),
         (province.construction ?? []).map((q) => `${q.id}:${Math.round(q.progress * 100)}:${Math.round(q.etaSeconds)}`).join(','),
         province.rally ? `${Math.round(province.rally.x)},${Math.round(province.rally.z)}` : '-',
         province.awaitingRallyTarget ? 'arm' : '',
+        province.commandPending ? 'pending' : '',
+        province.canSetRally ? 'rally-ok' : 'rally-blocked',
       ].join('|');
       if (nextPvResourceKey !== pvResourceKey) {
         pvResourceKey = nextPvResourceKey;
@@ -820,6 +822,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
             const thumb = productionIcon
               ? createIcon(productionIcon, 'ifg-buildbtn__thumb')
               : createUnitPortrait(u.id, u.name);
+            b.disabled = province.commandPending === true || !u.affordable;
             thumb.classList.add('ifg-buildbtn__thumb');
             b.append(thumb);
             b.setAttribute('aria-label', `${u.name} — ${u.costLabel}`);
@@ -827,8 +830,9 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
               title: u.name,
               description: UNIT_ROLE_NOTE[u.id],
               cost: u.costLabel,
+              disabledReason: u.reason,
             }));
-            b.addEventListener('click', () => actions.produceUnit(province.id, u.id));
+            if (u.affordable) b.addEventListener('click', () => actions.produceUnit(province.id, u.id));
             return b;
           }));
           // Rally point: where finished units march. Placed by a map click.
@@ -837,8 +841,10 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
             ? 'Click map…'
             : province.rally ? 'Move rally' : 'Set rally point';
           pvRallyBtn.classList.toggle('is-active', province.awaitingRallyTarget === true);
+          pvRallyBtn.disabled = province.commandPending === true || province.canSetRally !== true;
           pvRallyBtn.onclick = () => actions.rallyPoint(province.id, 'arm');
           pvRallyClear.hidden = !province.rally;
+          pvRallyClear.disabled = province.commandPending === true;
           pvRallyClear.onclick = () => actions.rallyPoint(province.id, 'clear');
         } else {
           pvRally.hidden = true;
@@ -862,7 +868,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
             btn.type = 'button';
             const icon = FACILITY_ICON[b.id];
             if (icon) btn.append(createIcon(icon, 'ifg-buildbtn__thumb'));
-            btn.disabled = !b.affordable;
+            btn.disabled = !b.affordable || province.commandPending === true;
             btn.setAttribute('aria-label', `${b.name} — ${b.costLabel}`);
             bindTooltip(btn, () => ({
               title: b.name,

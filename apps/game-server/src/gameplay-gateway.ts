@@ -27,6 +27,8 @@ export interface GameplayGatewayOptions {
   readonly world: WorldDescriptor;
   readonly clock: AuthoritativeGameClock;
   readonly revision: () => number;
+  readonly publishNow: () => void;
+  readonly beforeDebugChange: () => void;
   readonly saveGameInBackground: () => void;
   readonly devSimSpeed: { get(): number; set(multiplier: number): void; enabled: boolean };
   readonly devEnvironment: {
@@ -62,8 +64,8 @@ export class GameplayGateway {
     this.sockets.on('connection', (socket) => this.handleConnection(socket));
   }
 
-  send(connection: GameplayConnection, message: ServerMessage): void {
-    this.sendSocket(connection.socket, message);
+  send(connection: GameplayConnection, message: ServerMessage): boolean {
+    return this.sendSocket(connection.socket, message);
   }
 
   broadcast(message: ServerMessage): void {
@@ -71,11 +73,14 @@ export class GameplayGateway {
   }
 
   closeAll(code = 1001, reason = 'Server shutting down'): void {
-    for (const connection of this.connections) connection.socket.close(code, reason);
+    for (const socket of this.sockets.clients) socket.close(code, reason);
   }
 
-  private sendSocket(socket: WebSocket, message: ServerMessage): void {
-    if (socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+  private sendSocket(socket: WebSocket, message: ServerMessage): boolean {
+    if (socket.readyState !== WebSocket.OPEN) return false;
+    if (socket.bufferedAmount > 2_000_000) { socket.close(1013, 'Resynchronize slow connection'); return false; }
+    socket.send(JSON.stringify(message));
+    return true;
   }
 
   private handleConnection(socket: WebSocket): void {
@@ -115,7 +120,7 @@ export class GameplayGateway {
             protocolVersion: PROTOCOL_VERSION,
             capabilities: [
               'filtered-baseline', 'change-only-deltas', 'resync',
-              'optimistic-commands', 'sparse-clock-sync',
+              'pending-commands', 'authoritative-timeline',
             ],
             world: this.options.world,
             countryId: claims.countryId,
@@ -127,6 +132,7 @@ export class GameplayGateway {
           this.sendSocket(socket, {
             type: 'devSimSpeed', multiplier: this.options.devSimSpeed.get(),
             devControlsEnabled: this.options.devSimSpeed.enabled,
+            movementMultiplier: this.options.runtime.session.movementSpeedMultiplier,
           });
           this.sendSocket(socket, {
             type: 'devEnvironment', ...this.options.devEnvironment.get(),
@@ -136,11 +142,22 @@ export class GameplayGateway {
           return;
         }
         if (!connection) throw new Error('Authentication required.');
-        if (message.type === 'devSetSimSpeed') {
-          this.options.devSimSpeed.set(message.multiplier);
+        if (message.type === 'ping') {
+          this.sendSocket(socket, { type: 'pong', sentAt: message.sentAt, serverEpochMs: Date.now() }); return;
+        }
+        if (message.type === 'devSetSimSpeed' || message.type === 'devSetClock' || message.type === 'devSetMovementSpeed') {
+          if (!this.options.devSimSpeed.enabled) return;
+          this.options.beforeDebugChange();
+          if (message.type === 'devSetSimSpeed') this.options.devSimSpeed.set(message.multiplier);
+          else if (message.type === 'devSetClock') this.options.clock.setEpoch(message.epochMs);
+          else this.options.runtime.session.movementSpeedMultiplier = message.multiplier;
+          this.options.publishNow();
+          this.broadcast({ type: 'clockSync', clock: this.options.clock.snapshot() });
+          this.options.saveGameInBackground();
           this.broadcast({
             type: 'devSimSpeed', multiplier: this.options.devSimSpeed.get(),
             devControlsEnabled: this.options.devSimSpeed.enabled,
+            movementMultiplier: this.options.runtime.session.movementSpeedMultiplier,
           });
           return;
         }
@@ -172,9 +189,10 @@ export class GameplayGateway {
           return;
         }
         const result = this.options.runtime.command(connection.countryId, message.command);
-        if (result.ok) this.options.saveGameInBackground();
+        if (result.ok) { this.options.publishNow(); this.options.saveGameInBackground(); }
         const acknowledgement: ServerMessage = {
           type: 'commandAck', commandId: message.commandId, ok: result.ok,
+          ...(result.ok ? { appliedRevision: connection.revision } : {}),
           ...(result.reason ? { reason: result.reason } : {}),
           ...(result.requiredWarCountryIds?.length
             ? { requiredWarCountryIds: result.requiredWarCountryIds } : {}),
@@ -189,6 +207,7 @@ export class GameplayGateway {
         });
       }
     });
+    socket.on('error', (error) => this.options.log('warn', 'socket_error', { message: error.message }));
     socket.on('close', () => {
       clearTimeout(authenticationTimeout);
       if (connection) this.connections.delete(connection);

@@ -1,3 +1,4 @@
+import { armyAtNode } from './movement/position';
 /**
  * Urban unit production.
  *
@@ -15,8 +16,6 @@ import { makeGroup, mergeStacks, type ArmyStack } from './units/army';
 import { nearestNode } from './movement/graph';
 import { issueMoveOrder } from './units/movement';
 
-/** Accelerated prototype clock: real build times divided by this. */
-const BUILD_TIME_SCALE = 4;
 
 export interface ProduceResult {
   readonly ok: boolean;
@@ -71,7 +70,7 @@ export function queueUnit(
     unitTypeId,
     ownerCountryId: countryId,
     progressHours: 0,
-    totalHours: type.buildTimeHours / BUILD_TIME_SCALE,
+    totalHours: type.buildTimeHours ,
   };
   session.state.nextOrderId += 1;
   (session.state.productionQueues[provinceId] ??= []).push(order);
@@ -82,6 +81,7 @@ export interface UnitCompletion {
   readonly provinceId: number;
   readonly unitTypeId: string;
   readonly armyId: string;
+  readonly ownerCountryId: number;
 }
 
 /** Advance every queue; returns units finished this tick (for notifications). */
@@ -95,13 +95,18 @@ export function stepProduction(session: SimContext, dtHours: number): UnitComple
       queue.shift();
     }
     if (queue.length === 0) continue;
+    let remaining = dtHours;
+    while (queue.length > 0 && remaining > 1e-12) {
     const active = queue[0];
-    active.progressHours += dtHours;
-    if (active.progressHours < active.totalHours) continue;
+    if (active.ownerCountryId !== session.state.provinceOwners[provinceId]) { queue.shift(); continue; }
+    const used = Math.min(remaining, Math.max(0, active.totalHours - active.progressHours));
+    active.progressHours += used;
+    remaining -= used;
+    if (active.progressHours + 1e-12 < active.totalHours) break;
 
     queue.shift();
     const armyId = spawnUnit(session, provinceId, active.unitTypeId, active.ownerCountryId);
-    completed.push({ provinceId, unitTypeId: active.unitTypeId, armyId });
+    completed.push({ provinceId, unitTypeId: active.unitTypeId, armyId, ownerCountryId: active.ownerCountryId });
 
     // Rally point: march the fresh unit (or the idle stack it joined) toward it.
     const rally = session.state.rallyPoints[provinceId];
@@ -109,6 +114,7 @@ export function stepProduction(session: SimContext, dtHours: number): UnitComple
     if (rally && army && !army.order && army.status === 'idle') {
       issueMoveOrder(session, armyId, rally.x, rally.z, 'move');
     }
+  }
   }
   // Drop empty queues so the record stays sparse.
   for (const [pid, queue] of Object.entries(session.state.productionQueues)) {
@@ -134,7 +140,7 @@ function spawnUnit(
   // Auto-stack onto a friendly idle army already at that node.
   const existing = Object.values(session.state.armies)
     .filter((a) => a.ownerCountryId === ownerCountryId
-      && a.graphNodeId === node && !a.order && a.extractingNodeId === null
+      && armyAtNode(session, a, node) && a.graphNodeId === node && !a.order && a.extractingNodeId === null
       && a.status !== 'engaged' && a.status !== 'retreating')
     .sort((a, b) => {
       const an = Number(a.id.replace(/^army-/, ''));

@@ -13,12 +13,15 @@ export interface GameClockReading {
 }
 
 /**
- * Advances sparse server time locally at 1:1 wall-clock speed. A later sample
+ * Advances sparse server time locally at the authoritative simulation speed. A later sample
  * changes the target, never the displayed hand position: ordinary drift is
  * recovered at no more than 10% extra/slower speed and therefore cannot jump.
  */
 export class InterpolatedGameClock {
   private initialized = false;
+  private speed = 1;
+  private generation = -1;
+  private fresh = true;
   private gameStartedAtEpochMs = 0;
   private utcOffsetMinutes = 120;
   private targetEpochMs = 0;
@@ -30,17 +33,24 @@ export class InterpolatedGameClock {
 
   synchronize(sync: GameClockSync): void {
     const now = this.monotonicNow();
-    if (this.initialized) this.advance(now);
+    if (this.initialized && this.generation === sync.generation && this.fresh && sync.speed === this.speed) this.advance(now);
     else {
       this.initialized = true;
-      this.displayedEpochMs = sync.serverEpochMs;
+      this.displayedEpochMs = sync.gameEpochMs;
       this.displayedAtMonotonicMs = now;
     }
     this.gameStartedAtEpochMs = sync.gameStartedAtEpochMs;
     this.utcOffsetMinutes = sync.utcOffsetMinutes;
-    this.targetEpochMs = sync.serverEpochMs;
+    this.targetEpochMs = sync.gameEpochMs;
+    this.speed = sync.speed;
+    this.generation = sync.generation;
+    this.fresh = true;
     this.targetAtMonotonicMs = now;
   }
+
+  readEpochMs(): number { return this.advance(this.monotonicNow()); }
+
+  freeze(): void { if (this.initialized) this.advance(this.monotonicNow()); this.fresh = false; }
 
   read(): GameClockReading {
     if (!this.initialized) throw new Error('The game clock has not been synchronized.');
@@ -59,10 +69,12 @@ export class InterpolatedGameClock {
   }
 
   private advance(now: number): number {
+    if (!this.fresh) return this.displayedEpochMs;
+    now = Math.min(now, this.targetAtMonotonicMs + 1_500);
     const elapsed = Math.max(0, now - this.displayedAtMonotonicMs);
-    const natural = this.displayedEpochMs + elapsed;
-    const target = this.targetEpochMs + Math.max(0, now - this.targetAtMonotonicMs);
-    const maxCorrection = elapsed * MAX_CORRECTION_RATE;
+    const natural = this.displayedEpochMs + elapsed * this.speed;
+    const target = this.targetEpochMs + Math.max(0, now - this.targetAtMonotonicMs) * this.speed;
+    const maxCorrection = elapsed * MAX_CORRECTION_RATE * this.speed;
     const correction = Math.max(-maxCorrection, Math.min(maxCorrection, target - natural));
     this.displayedEpochMs = natural + correction;
     this.displayedAtMonotonicMs = now;

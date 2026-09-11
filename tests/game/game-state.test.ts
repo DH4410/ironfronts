@@ -12,21 +12,22 @@ function minimalState(): GameState {
     mode: 'campaign',
     fogOfWar: true,
     economyEnabled: true,
-    clock: { gameTimeHours: 12.5, startDate: '1 Sep 1939' }, simulationTick: 0,
+    clock: { gameTimeHours: 12.5, startDate: '1 Sep 1939', initialEpochMs: Date.UTC(1939,8,1,10), generation: 0 }, simulationTick: 0,
     countries: {
       24: {
         id: 24, name: 'Spain', color: '#8EB0BB', controller: 'player',
         stockpile: { ...emptyStockpile(), funds: 100 },
-        income: emptyStockpile(), industryCapacity: 10,
+        income: emptyStockpile(), industryCapacity: 10, warheads: 0,
       },
     },
-    provinceOwners: { 294: 24, 295: 41 },
+    provinceOwners: { 294: 24, 295: 0 },
     provinceBuildings: { 294: { barracks: 1, tankPlant: 1, ordnance: 0, missileSite: 0 } },
     productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: {
       'army-1': {
         id: 'army-1', ownerCountryId: 24, name: '1st Army', x: 100, z: 200,
         graphNodeId: 5, status: 'idle', order: null, extractingNodeId: null,
+        navalCrossing: null,
         units: [{ typeId: 'infantry', count: 4, hp: 400, experience: 0 }],
       },
     },
@@ -37,9 +38,10 @@ function minimalState(): GameState {
         extractorArmyId: null, status: 'idle', provenance: 'generatedNatural',
       },
     },
-    relations: {},
+    relations: {}, provinceDevastation: {}, diplomacyMessages: {}, diplomacyProposals: {},
+    nextDiplomacyId: 1,
     battles: {}, battleFronts: {},
-    nextArmyId: 2, nextBattleId: 1, nextOrderId: 1, nextEventId: 1,
+    nextArmyId: 2, nextBattleId: 1, nextFrontId: 1, nextOrderId: 1, nextEventId: 1,
   };
 }
 
@@ -48,11 +50,9 @@ describe('game-state serialization', () => {
     const state = minimalState();
     const restored = deserializeGameState(serializeGameState(state));
     expect(restored).toEqual(state);
-    // These records were added without a version bump; an older v2 save that
-    // omits them remains a valid v2 state and is initialized lazily on use.
-    expect(restored.diplomacyMessages).toBeUndefined();
-    expect(restored.diplomacyProposals).toBeUndefined();
-    expect(restored.nextDiplomacyId).toBeUndefined();
+    expect(restored.diplomacyMessages).toEqual({});
+    expect(restored.diplomacyProposals).toEqual({});
+    expect(restored.nextDiplomacyId).toBe(1);
   });
 
   it('cloneGameState is a deep, independent copy', () => {

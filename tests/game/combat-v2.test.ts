@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { stepCombat } from '../../src/game/combat';
-import { LEGACY_VOLLEY_GAME_HOURS } from '../../src/game/combat/constants';
+import { COMBAT_DAMAGE_SCALE } from '../../src/game/combat/constants';
 import { GAME_STATE_VERSION, emptyStockpile, type GameState } from '../../src/game/game-state';
 import { buildLandGraph } from '../../src/game/movement/graph';
 import type { SimContext } from '../../src/game/sim-context';
@@ -51,9 +51,9 @@ function context(armies: Record<string, ArmyStack>, relations: Record<string, 'w
 describe('v2 continuous combat', () => {
   it('contains translated armor-specific damage-per-hour profiles', () => {
     const rate = (soft: number, light: number, heavy: number) => ({
-      soft: soft / LEGACY_VOLLEY_GAME_HOURS,
-      light: light / LEGACY_VOLLEY_GAME_HOURS,
-      heavy: heavy / LEGACY_VOLLEY_GAME_HOURS,
+      soft: soft * COMBAT_DAMAGE_SCALE,
+      light: light * COMBAT_DAMAGE_SCALE,
+      heavy: heavy * COMBAT_DAMAGE_SCALE,
     });
     expect(UNIT_TYPES.map((unit) => [unit.id, unit.attack, unit.defense])).toEqual([
       ['infantry', rate(8, 4.4, 2.4), rate(6, 3.3, 1.8)],
@@ -76,21 +76,14 @@ describe('v2 continuous combat', () => {
     const ctx = context({ attackers, defenders }, { '1:2': 'war' });
 
     stepCombat(ctx, 0.05);
-    expect(defenders.units[0].hp).toBeCloseTo(2_000 - (80 / 900 * 0.05), 8);
-    expect(attackers.units[0].hp).toBeCloseTo(1_200 - (60 / 900 * 0.05), 8);
+    expect(defenders.units[0].hp).toBeCloseTo(2_000 - (80 * COMBAT_DAMAGE_SCALE / Math.sqrt(10) * 0.05), 8);
+    expect(attackers.units[0].hp).toBeCloseTo(1_200 - (60 * COMBAT_DAMAGE_SCALE / Math.sqrt(10) * 0.05), 8);
     expect(defenders.units[0].count).toBe(20); // overflow absorbed pooled damage
     const afterFirstTick = defenders.units[0].hp;
     stepCombat(ctx, 0.05);
     expect(defenders.units[0].hp).toBeLessThan(afterFirstTick);
 
-    const legacyEquivalent = context({
-      attackers: army('attackers', 1, 'infantry', 12),
-      defenders: army('defenders', 2, 'infantry', 20),
-    }, { '1:2': 'war' });
-    legacyEquivalent.state.armies.attackers.status = 'moving';
-    stepCombat(legacyEquivalent, LEGACY_VOLLEY_GAME_HOURS);
-    expect(legacyEquivalent.state.armies.defenders.units[0].hp).toBeCloseTo(1_920, 5);
-    expect(legacyEquivalent.state.armies.attackers.units[0].hp).toBeCloseTo(1_140, 5);
+
   });
 
   it('lets peaceful overlapping armies pass without battle or war', () => {
@@ -112,7 +105,7 @@ describe('v2 continuous combat', () => {
     const events = stepCombat(ctx, 0.05);
     expect(ctx.state.armies.target.units[0].hp).toBeLessThan(190);
     expect(events.some((event) => event.kind === 'bombardment')).toBe(true);
-    stepCombat(ctx, LEGACY_VOLLEY_GAME_HOURS);
+    stepCombat(ctx, 2);
     expect(ctx.state.armies.target).toBeUndefined();
   });
 });

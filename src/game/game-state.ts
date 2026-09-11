@@ -10,9 +10,10 @@
  * than `Map` so `JSON.stringify` works directly.
  */
 
+import { parseGameState } from './state-schema';
 import type { ArmyStack } from './units/army';
 
-export const GAME_STATE_VERSION = 2;
+export const GAME_STATE_VERSION = 3;
 
 export type ResourceKey = 'funds' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil';
 
@@ -169,6 +170,10 @@ export interface BattleState {
 }
 
 export interface GameClock {
+  /** Epoch origin; debug clock changes adjust this without changing elapsed simulation. */
+  initialEpochMs?: number;
+  generation?: number;
+    pendingHours?: number;
   /** Monotonic game-time in hours since scenario start. Drives every system. */
   gameTimeHours: number;
   readonly startDate: string;
@@ -230,6 +235,7 @@ export interface GameState {
 
   nextArmyId: number;
   nextBattleId: number;
+  nextFrontId?: number;
   nextOrderId: number;
   nextEventId: number;
 }
@@ -272,16 +278,8 @@ export function serializeGameState(state: GameState): string {
 }
 
 export function deserializeGameState(json: string): GameState {
-  const parsed = JSON.parse(json) as GameState;
-  if (parsed.version !== GAME_STATE_VERSION) {
-    throw new Error(
-      `Unsupported game-state version ${parsed.version}; expected ${GAME_STATE_VERSION}.`,
-    );
-  }
-  return parsed;
+  return parseGameState(JSON.parse(json));
 }
 
-/** Structural deep clone via the JSON round-trip — proves serializability too. */
-export function cloneGameState(state: GameState): GameState {
-  return deserializeGameState(serializeGameState(state));
-}
+/** Trusted runtime state is already plain data; validation belongs to restore. */
+export function cloneGameState(state: GameState): GameState { return structuredClone(state); }

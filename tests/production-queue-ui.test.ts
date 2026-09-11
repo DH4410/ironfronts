@@ -42,7 +42,14 @@ describe('0 A.D.-style production/construction queue', () => {
   });
 
   it('computes eta from the fixed normal-speed simulation rate, not a fabricated countdown', () => {
-    expect(mainTs).toContain('const GAME_HOURS_PER_REAL_SECOND = 0.5;');
-    expect(mainTs).toContain('(o.totalHours - o.progressHours) / GAME_HOURS_PER_REAL_SECOND');
+    expect(mainTs).toContain('const GAME_HOURS_PER_REAL_SECOND = 1 / 3_600;');
+    expect(mainTs).toContain('(o.totalHours - o.progressHours) / (GAME_HOURS_PER_REAL_SECOND * (activeSession?.devSimSpeed ?? 1))');
+  });
+
+  it('disables province actions while intent is pending and uses server affordability', () => {
+    expect(gameUi).toContain("province.commandPending === true || !u.affordable");
+    expect(gameUi).toContain("province.commandPending === true || province.canSetRally !== true");
+    expect(mainTs).toContain('session.productionOptions(provinceId)');
+    expect(mainTs).toContain('commandPending: session.pendingForProvince(provinceId)');
   });
 });

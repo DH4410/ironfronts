@@ -10,6 +10,7 @@
  * rate without re-deriving it.
  */
 
+import { PROTOTYPE_HOURS_PER_HOUR } from './time';
 import type { GameState, Stockpile } from './game-state';
 import { emptyStockpile } from './game-state';
 import type { WorldData } from './world-data';
@@ -45,7 +46,7 @@ export function recomputeIncome(state: GameState, world: WorldData): void {
   }
   for (const [countryId, line] of income) {
     const country = state.countries[countryId];
-    if (country) country.income = line;
+    if (country) country.income = Object.fromEntries(Object.entries(line).map(([key, value]) => [key, value * PROTOTYPE_HOURS_PER_HOUR])) as Stockpile;
   }
 }
 

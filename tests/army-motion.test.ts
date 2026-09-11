@@ -1,27 +1,53 @@
 import { describe, expect, it } from 'vitest';
-import { ArmyMotionInterpolator } from '../src/army-motion';
-
-describe('army network motion interpolation', () => {
-  it('continues toward the server waypoint for its remaining duration', () => {
+import { ArmyMotionInterpolator, presentedArmyPosition } from '../src/army-motion';
+import { ArmyPicker } from '../src/client/army-picker';
+describe('bounded authoritative army presentation', () => {
+  it('buffers samples and freezes prediction after half a second', () => {
     const motion = new ArmyMotionInterpolator();
-    motion.sample('a', 0, 10, { targetX: 100, targetZ: 10, durationMs: 1_000 }, 0, 1_000);
-    expect(motion.sample('a', 0, 10, { targetX: 100, targetZ: 10, durationMs: 1_000 }, 500, 1_000))
-      .toMatchObject({ x: 50, z: 10, remainingMs: 500 });
+    const leg = {targetX:100,targetZ:0,durationMs:1000,sampledAtEpochMs:0};
+    expect(motion.sample('a',0,0,leg,500,1000).x).toBeCloseTo(30);
+    expect(motion.sample('a',0,0,leg,5000,1000)).toMatchObject({x:50,remainingMs:0});
   });
-
-  it('rebases a correction from the displayed point without jumping', () => {
+  it('follows a verified corner instead of cutting diagonally', () => {
     const motion = new ArmyMotionInterpolator();
-    motion.sample('a', 0, 0, { targetX: 100, targetZ: 0, durationMs: 1_000 }, 0, 1_000);
-    const corrected = motion.sample('a', 45, 0, { targetX: 100, targetZ: 0, durationMs: 500 }, 400, 1_000);
-    expect(corrected.x).toBeCloseTo(40);
-    expect(motion.sample('a', 45, 0, { targetX: 100, targetZ: 0, durationMs: 500 }, 650, 1_000).x)
-      .toBeCloseTo(70);
+    motion.sample('a',0,0,{targetX:100,targetZ:0,durationMs:1000,sampledAtEpochMs:0},0,1000);
+    const leg={targetX:100,targetZ:100,durationMs:500,sampledAtEpochMs:1500};
+    const before=motion.sample('a',100,50,leg,950,1000);
+    expect(before.x).toBeCloseTo(75); expect(before.z).toBe(0);
+    const after=motion.sample('a',100,50,leg,1450,1000);
+    expect(after.x).toBe(100); expect(after.z).toBeCloseTo(25);
   });
-
-  it('takes the short path across the wrapped world seam', () => {
+  it('reconstructs every authoritative corner crossed between samples', () => {
     const motion = new ArmyMotionInterpolator();
-    motion.sample('a', 990, 0, { targetX: 10, targetZ: 0, durationMs: 1_000 }, 0, 1_000);
-    expect(motion.sample('a', 990, 0, { targetX: 10, targetZ: 0, durationMs: 1_000 }, 500, 1_000).x)
-      .toBeCloseTo(1_000);
+    motion.sample('a', 0, 0, {
+      targetX: 100, targetZ: 0, durationMs: 1000, sampledAtEpochMs: 0,
+      route: [{ x: 0, z: 0 }, { x: 100, z: 0 }, { x: 100, z: 100 }, { x: 200, z: 100 }],
+    }, 0, 1000);
+    const next = { targetX: 200, targetZ: 200, durationMs: 500, sampledAtEpochMs: 1500,
+      route: [{ x: 200, z: 100 }, { x: 200, z: 200 }] };
+    const firstCorner = motion.sample('a', 200, 100, next, 700, 1000);
+    expect(firstCorner.x).toBeCloseTo(100); expect(firstCorner.z).toBeCloseTo(0);
+    const secondCorner = motion.sample('a', 200, 100, next, 1200, 1000);
+    expect(secondCorner.x).toBeCloseTo(100); expect(secondCorner.z).toBeCloseTo(100);
+  });
+  it('uses the short wrapped edge and shares the marker trajectory with picking', () => {
+    const motion=new ArmyMotionInterpolator();
+    const point=motion.sample('a',990,0,{targetX:10,targetZ:0,durationMs:1000,sampledAtEpochMs:0},500,1000);
+    expect(point.x).toBeCloseTo(996);
+    expect(presentedArmyPosition(point,200).x).toBeCloseTo(1000);
+    expect(presentedArmyPosition(point,5000).x).toBeCloseTo(1000);
+  });
+  it('snaps on stops, clock generation changes and missing tracks', () => {
+    const motion=new ArmyMotionInterpolator();
+    motion.sample('a',0,0,{targetX:100,targetZ:0,durationMs:1000,generation:0},0,1000);
+    expect(motion.sample('a',20,0,undefined,500,1000)).toMatchObject({x:20,remainingMs:0});
+    motion.clear();
+    expect(motion.sample('a',200,0,{targetX:300,targetZ:0,durationMs:1000,generation:1},500,1000).x).toBe(200);
+  });
+  it('uses the presented marker position for CPU picking', () => {
+    const picker = new ArmyPicker();
+    picker.update([{ id:'a',x:0,z:0,targetX:100,targetZ:0,remainingMs:1000 }],0);
+    expect(picker.pick(50,0,5,1000,0.5)).toBe('a');
+    expect(picker.pick(0,0,5,1000,0.5)).toBeNull();
   });
 });

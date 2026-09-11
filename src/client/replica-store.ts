@@ -1,7 +1,7 @@
 import type { PlayerProjection, ProjectionDelta } from '@ironfronts/protocol';
 
 const COLLECTIONS = [
-  'countries', 'provinceOwners', 'provinceBuildings', 'productionQueues',
+  'countries', 'provinceOwners', 'provinceBuildings', 'provinceActions', 'productionQueues',
   'constructionQueues', 'rallyPoints', 'armies', 'resourceNodes', 'relations',
 ] as const;
 

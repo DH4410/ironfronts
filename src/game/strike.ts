@@ -5,12 +5,13 @@ import { destroyArmy } from './combat';
 import { relationOf, setRelation } from './game-state';
 import { wrappedDistance } from './geometry';
 import type { CommandResult, StrikeCommand } from './commands/types';
+import { PROTOTYPE_HOURS_PER_HOUR } from './time';
 
 /**
  * Game-hours to accrue one warhead per Ordnance Workshop level a country holds.
  * ~30 game-days at level 1 — deliberately rare; two workshops halve the wait.
  */
-export const HOURS_PER_WARHEAD = 30 * 24;
+export const HOURS_PER_WARHEAD = (30 * 24) / PROTOTYPE_HOURS_PER_HOUR;
 /** Hard cap on stockpiled warheads so a runaway leader cannot hoard. */
 const MAX_WARHEADS = 3;
 /**
@@ -24,7 +25,7 @@ const BLAST_RADIUS = 95;
  * defending stacks have sharply reduced combat output but still must be
  * defeated before the city can be captured. ~6 game-days.
  */
-const DEVASTATION_HOURS = 6 * 24;
+const DEVASTATION_HOURS = (6 * 24) / PROTOTYPE_HOURS_PER_HOUR;
 /**
  * World-space reach of a Missile Site. A strike must land within this distance
  * of one of the launching country's own Missile Sites — the CoW-style "build

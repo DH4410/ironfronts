@@ -1,17 +1,17 @@
 import {
-  GAME_ID, GAME_VERSION, type PlayerProjection,
+  GAME_ID, GAME_VERSION,
 } from '@ironfronts/protocol';
 import { config } from './config';
 import { loadWorld } from './world-loader';
 import { GameRuntime } from './runtime';
-import { diffProjection } from './projection';
+import { ProjectionPublisher } from './publisher';
+import { SimulationScheduler } from './scheduler';
 import { AuthoritativeGameClock } from './game-clock';
 import {
-  CLOCK_SYNC_INTERVAL_MS, SIMULATION_INTERVAL_MS, SIMULATION_TICK_HOURS, clampSimSpeed,
+  CLOCK_SYNC_INTERVAL_MS, SIMULATION_INTERVAL_MS, clampSimSpeed,
 } from './timing';
 import { GamePersistence, type PersistedGame } from './persistence';
 import { createInternalApiServer } from './internal-api';
-import { collectPendingEvents, eventsForCountry } from './event-feed';
 import { GameplayGateway } from './gameplay-gateway';
 
 function log(level: 'info' | 'warn' | 'error', event: string, fields: Record<string, unknown> = {}): void {
@@ -21,18 +21,19 @@ function log(level: 'info' | 'warn' | 'error', event: string, fields: Record<str
 const loaded = await loadWorld(config.worldDirectory);
 const gamePersistence = new GamePersistence(config.gameDataPath);
 let persisted = await gamePersistence.load();
+const currentWorld = persisted?.gameVersion === GAME_VERSION && persisted.worldHash === loaded.hash;
+const migratableV2World = persisted?.gameVersion === 'world-at-war@2' && persisted.worldHash === loaded.legacyHash;
 if (persisted && (
   persisted.formatVersion !== 2 || persisted.runtime?.version !== 2
-  || persisted.gameId !== GAME_ID || persisted.gameVersion !== GAME_VERSION
-  || persisted.worldHash !== loaded.hash
+  || persisted.gameId !== GAME_ID || !currentWorld && !migratableV2World
 )) {
   const archivePath = await gamePersistence.archiveExisting();
   log('warn', 'incompatible_save_archived', { archivePath, previousGameId: persisted.gameId });
   persisted = null;
 }
 const runtime = new GameRuntime(loaded.world, persisted?.runtime);
-const gameClock = new AuthoritativeGameClock(persisted?.gameStartedAtEpochMs);
-let revision = 0;
+const gameClock = new AuthoritativeGameClock(() => runtime.session.state, () => simSpeedMultiplier);
+const scheduler = new SimulationScheduler((hours) => runtime.tick(hours));
 
 function persistedGame(): PersistedGame {
   return {
@@ -57,7 +58,7 @@ if (!persisted) await saveGame();
 const server = createInternalApiServer({
   runtime,
   internalSecret: config.internalSecret,
-  revision: () => revision,
+  revision: () => publisher.revision,
   afterJoin: saveGame,
   log,
 });
@@ -91,15 +92,17 @@ function setDevEnvironment(next: { timeOfDayHours?: number; raining?: boolean })
   log('info', 'dev_environment_changed', { timeOfDayHours: devTimeOfDayHours, raining: devRaining });
 }
 
-const gateway = new GameplayGateway({
+const gateway: GameplayGateway = new GameplayGateway({
   server,
   runtime,
   clientOrigin: config.clientOrigin,
   ticketSecret: config.ticketSecret,
-  world: { version: loaded.version, hash: loaded.hash, assetBaseUrl: config.worldPublicUrl },
+  world: { version: loaded.version, hash: loaded.hash, artifactHashes: loaded.artifactHashes, assetBaseUrl: config.worldPublicUrl },
   clock: gameClock,
-  revision: () => revision,
+  revision: () => publisher.revision,
   saveGameInBackground,
+  publishNow: () => publisher.publish(),
+  beforeDebugChange: () => scheduler.pump(simSpeedMultiplier),
   devSimSpeed: { get: () => simSpeedMultiplier, set: setDevSimSpeed, enabled: devControlsEnabled },
   devEnvironment: {
     get: () => ({ timeOfDayHours: devTimeOfDayHours, raining: devRaining }),
@@ -109,42 +112,20 @@ const gateway = new GameplayGateway({
   log,
 });
 
+const publisher: ProjectionPublisher = new ProjectionPublisher(runtime, () => gateway.connections,
+  (connection, message) => gateway.send(connection, message), () => simSpeedMultiplier);
 const simulationTimer = setInterval(
-  () => runtime.tick(SIMULATION_TICK_HOURS * simSpeedMultiplier),
+  () => scheduler.pump(simSpeedMultiplier),
   SIMULATION_INTERVAL_MS,
 );
 const persistenceTimer = setInterval(saveGameInBackground, 5_000);
-// Civil time is interpolated by clients. This sparse sample corrects drift;
-// it is intentionally independent of the 10 Hz authoritative simulation.
+// Civil time is derived from simulation state. This sparse sample corrects
+// client interpolation drift between authoritative projection updates.
 const clockSyncTimer = setInterval(() => {
   const clock = gameClock.snapshot();
   gateway.broadcast({ type: 'clockSync', clock });
 }, CLOCK_SYNC_INTERVAL_MS);
-const publishTimer = setInterval(() => {
-  const pendingEvents = collectPendingEvents(runtime, revision);
-  if (!gateway.connections.size) return;
-  const byCountry = new Map<number, PlayerProjection>();
-  for (const connection of gateway.connections) {
-    if (!byCountry.has(connection.countryId)) {
-      byCountry.set(connection.countryId, runtime.projection(connection.countryId, simSpeedMultiplier));
-    }
-  }
-  const changes = [...gateway.connections].map((connection) => ({
-    connection,
-    next: byCountry.get(connection.countryId)!,
-    delta: diffProjection(connection.projection, byCountry.get(connection.countryId)!),
-  }));
-  if (!changes.some((entry) => entry.delta)) return;
-  revision += 1;
-  for (const { connection, next, delta } of changes) {
-    const events = eventsForCountry(pendingEvents, connection.countryId, revision);
-    if (delta) gateway.send(connection, {
-      type: 'delta', fromRevision: connection.revision, revision, delta, events,
-    });
-    connection.projection = next;
-    connection.revision = revision;
-  }
-}, 250);
+const publishTimer = setInterval(() => publisher.publish(), 250);
 
 server.listen(config.port, '127.0.0.1', () => log('info', 'listening', { port: config.port, gameId: GAME_ID }));
 

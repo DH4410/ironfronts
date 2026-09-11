@@ -9,6 +9,7 @@
  */
 
 import type { LandGraph } from './graph';
+import { MinHeap } from './min-heap';
 import { wrappedDistance } from '../geometry';
 
 export type EdgeAllowed = (from: number, to: number) => boolean;
@@ -28,41 +29,12 @@ export function findPath(
   const cameFrom = new Int32Array(graph.nodeCount).fill(-1);
   gScore[start] = 0;
 
-  // Binary min-heap of [fScore, node].
-  const heap: Array<[number, number]> = [[h(start), start]];
-  const push = (item: [number, number]): void => {
-    heap.push(item);
-    let i = heap.length - 1;
-    while (i > 0) {
-      const parent = (i - 1) >> 1;
-      if (heap[parent][0] <= heap[i][0]) break;
-      [heap[parent], heap[i]] = [heap[i], heap[parent]];
-      i = parent;
-    }
-  };
-  const pop = (): [number, number] => {
-    const top = heap[0];
-    const last = heap.pop() as [number, number];
-    if (heap.length > 0) {
-      heap[0] = last;
-      let i = 0;
-      for (;;) {
-        const l = 2 * i + 1;
-        const r = l + 1;
-        let smallest = i;
-        if (l < heap.length && heap[l][0] < heap[smallest][0]) smallest = l;
-        if (r < heap.length && heap[r][0] < heap[smallest][0]) smallest = r;
-        if (smallest === i) break;
-        [heap[smallest], heap[i]] = [heap[i], heap[smallest]];
-        i = smallest;
-      }
-    }
-    return top;
-  };
+  const heap = new MinHeap();
+  heap.push(h(start), start);
 
   const closed = new Uint8Array(graph.nodeCount);
-  while (heap.length > 0) {
-    const [, current] = pop();
+  while (heap.size > 0) {
+    const [, current] = heap.pop();
     if (current === goal) {
       const path: number[] = [current];
       let node = current;
@@ -86,7 +58,7 @@ export function findPath(
       if (tentative < gScore[next]) {
         gScore[next] = tentative;
         cameFrom[next] = current;
-        push([tentative + h(next), next]);
+        heap.push(tentative + h(next), next);
       }
     }
   }
@@ -99,33 +71,13 @@ export function closestReachablePath(
   edgeAllowed?: EdgeAllowed,
 ): number[] {
   if (start < 0 || start >= graph.nodeCount) return [];
-  const distance = new Float64Array(graph.nodeCount).fill(Infinity);
-  const parent = new Int32Array(graph.nodeCount).fill(-1);
-  const visited = new Uint8Array(graph.nodeCount);
-  distance[start] = 0;
+  const { distance, parent } = shortestPaths(graph, start, edgeAllowed);
   let best = start;
   let bestTarget = wrappedDistance(graph.nodeX[start], graph.nodeZ[start], targetX, targetZ, graph.width);
-  for (;;) {
-    let current = -1;
-    let currentDistance = Infinity;
-    for (let id = 0; id < graph.nodeCount; id += 1) {
-      if (!visited[id] && distance[id] < currentDistance) {
-        current = id;
-        currentDistance = distance[id];
-      }
-    }
-    if (current < 0) break;
-    visited[current] = 1;
-    const targetDistance = wrappedDistance(
-      graph.nodeX[current], graph.nodeZ[current], targetX, targetZ, graph.width,
-    );
-    if (targetDistance < bestTarget) { bestTarget = targetDistance; best = current; }
-    for (let i = 0; i < graph.adjacency[current].length; i += 1) {
-      const next = graph.adjacency[current][i];
-      if (edgeAllowed && !edgeAllowed(current, next)) continue;
-      const candidate = currentDistance + graph.edgeCost[current][i];
-      if (candidate < distance[next]) { distance[next] = candidate; parent[next] = current; }
-    }
+  for (let node = 0; node < graph.nodeCount; node++) {
+    if (!Number.isFinite(distance[node])) continue;
+    const targetDistance = wrappedDistance(graph.nodeX[node], graph.nodeZ[node], targetX, targetZ, graph.width);
+    if (targetDistance < bestTarget) { best = node; bestTarget = targetDistance; }
   }
   const path = [best];
   for (let node = best; parent[node] >= 0; node = parent[node]) path.push(parent[node]);
@@ -143,4 +95,23 @@ export function pathLength(graph: LandGraph, path: readonly number[]): number {
     );
   }
   return total;
+}
+
+/** One Dijkstra pass serves every possible destination of a retreat exit. */
+export function shortestPaths(graph: LandGraph, start: number, allowed?: EdgeAllowed): { distance: Float64Array; parent: Int32Array } {
+  const distance = new Float64Array(graph.nodeCount).fill(Infinity), parent = new Int32Array(graph.nodeCount).fill(-1);
+  if (start < 0 || start >= graph.nodeCount) return { distance, parent };
+  distance[start] = 0;
+  const heap = new MinHeap(); heap.push(0,start);
+  while (heap.size) {
+    const [cost,node] = heap.pop();
+    if (cost !== distance[node]) continue;
+    for (let i=0;i<graph.adjacency[node].length;i++) {
+      const next=graph.adjacency[node][i];
+      if (allowed && !allowed(node,next)) continue;
+      const candidate=cost+graph.edgeCost[node][i];
+      if (candidate < distance[next]) { distance[next]=candidate;parent[next]=node;heap.push(candidate,next); }
+    }
+  }
+  return { distance,parent };
 }

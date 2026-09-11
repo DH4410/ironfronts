@@ -24,7 +24,7 @@ export class GameRuntime {
       }, world);
     if (snapshot) {
       for (const [accountId, countryId] of snapshot.seats) {
-        if (!accountId || !this.session.state.countries[countryId] || this.accountsByCountry.has(countryId)) {
+        if (!accountId || this.seatsByAccount.has(accountId) || !this.session.state.countries[countryId] || this.accountsByCountry.has(countryId)) {
           throw new Error('Persisted country assignments are invalid.');
         }
         this.seatsByAccount.set(accountId, countryId);
@@ -90,7 +90,7 @@ export class GameRuntime {
   projection(countryId: number, simulationSpeedMultiplier = 1): PlayerProjection {
     const gameHoursPerRealSecond = SIMULATION_TICK_HOURS * 1_000 / SIMULATION_INTERVAL_MS
       * simulationSpeedMultiplier;
-    return projectFor(this.session.state, this.world, this.session.graph, countryId, gameHoursPerRealSecond);
+    return projectFor(this.session.state, this.world, this.session.graph, countryId, gameHoursPerRealSecond, this.session.movementSpeedMultiplier);
   }
 
   command(countryId: number, payload: CommandPayload) {

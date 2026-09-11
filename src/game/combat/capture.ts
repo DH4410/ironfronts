@@ -1,3 +1,4 @@
+import { armyAtNode } from '../movement/position';
 /** Province-center capture and capture-side cleanup. */
 
 import { relationOf } from '../game-state';
@@ -15,7 +16,7 @@ export interface CaptureEvent {
 export function stepCapture(session: SimContext): CaptureEvent[] {
   const events: CaptureEvent[] = [];
   for (const army of Object.values(session.state.armies)) {
-    if (army.status === 'engaged' || army.status === 'retreating') continue;
+    if (!armyAtNode(session, army) || army.status === 'engaged' || army.status === 'retreating') continue;
     const provinceId = provinceAtNode(session, army.graphNodeId);
     if (provinceId === null) continue;
     const owner = session.state.provinceOwners[provinceId] ?? 0;

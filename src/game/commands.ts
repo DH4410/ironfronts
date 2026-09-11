@@ -1,5 +1,6 @@
-/** Authoritative v2 gameplay command boundary and ownership gate. */
+/** Authoritative gameplay command boundary and ownership gate. */
 
+import { validateRally } from './commands/rally';
 import type { SimContext } from './sim-context';
 import { issueMoveOrder, issueStop } from './units/movement';
 import { issueManualRetreat } from './combat';
@@ -9,7 +10,6 @@ import { queueBuilding } from './construction';
 import { issueAttack } from './commands/attack';
 import { issueSplit } from './commands/split';
 import { issueStrike } from './strike';
-import { nearestNode } from './movement/graph';
 import {
   declareWar, endAlliance, proposeDiplomacy, respondDiplomacy, sendDiplomaticMessage,
 } from './diplomacy';
@@ -68,18 +68,11 @@ export function applyCommand(ctx: SimContext, command: GameCommand): CommandResu
         // spawns and silently ignores the order. Same reachability test the
         // spawn uses: the province's node and the rally node must share a
         // road-graph component.
-        const province = ctx.world.provinces.find((p) => p.id === command.provinceId);
-        const spawnNode = province
-          ? nearestNode(ctx.graph, province.center[0], province.center[1]) : -1;
-        const rallyNode = nearestNode(ctx.graph, command.target.x, command.target.z);
-        if (spawnNode < 0 || rallyNode < 0
-          || ctx.graph.component[spawnNode] !== ctx.graph.component[rallyNode]) {
-          return { ok: false, reason: 'No land route from this province to that rally point.' };
-        }
-        ctx.state.rallyPoints[command.provinceId] = { ...command.target };
-      } else {
-        delete ctx.state.rallyPoints[command.provinceId];
+        const result = validateRally(ctx, command.countryId, command.provinceId, command.target);
+        if (!result.ok) return result;
       }
+      if (command.target) ctx.state.rallyPoints[command.provinceId] = { ...command.target };
+      else delete ctx.state.rallyPoints[command.provinceId];
       return { ok: true };
     }
     case 'sendDiplomaticMessage':

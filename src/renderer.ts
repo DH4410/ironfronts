@@ -1,3 +1,6 @@
+import { generateRoadJunctions } from './graphics/road-junctions';
+import type { ArmyPickEntry } from './army-motion';
+import { ArmyPicker } from './client/army-picker';
 import { vec3 } from 'gl-matrix';
 import { StrategyCamera } from './camera';
 import { buildPropVisibility, buildTerrainVisibility, capVisibleInstances } from './chunk-visibility';
@@ -11,7 +14,7 @@ import { isValidCountryLabelPoint } from './country-labels/territory';
 import { buildDiplomacyColorData, findCountryByName } from './diplomacy';
 import { EnvironmentController, type TimeOfDayState } from './environment-controller';
 import { FRAME_UNIFORM_BYTES, packFrameUniforms } from './frame-uniforms';
-import { align4, fetchBinary, fetchJson, uploadMipmappedTexture, uploadTexture } from './gpu-utils';
+import { align4, uploadMipmappedTexture, uploadTexture } from './gpu-utils';
 import { loadInfantryModel, type InfantryModel } from './infantry-model';
 import { createMaterialTexture, createTreeMaterialTexture } from './material-texture';
 import {
@@ -40,7 +43,7 @@ import {
   extractFrustumPlanes, sphereIntersectsFrustum, sphereIntersectsHorizontalWorldWindow, WORLD_COPY_INDICES,
 } from './visibility';
 import { sampleWrappedField } from './world-sampling';
-import { loadWorldAssetBuffers, worldAssetUrl } from './world-assets';
+import { loadWorldAssetBuffers, fetchWorldBinary, fetchWorldJson } from './world-assets';
 import { getVisibleInstanceView, updateVisibleInstanceView } from './visible-instance-cache';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
@@ -387,7 +390,7 @@ export class WorldRenderer {
     if (this.initialized) return;
     if (!navigator.gpu) throw new Error('WebGPU is unavailable');
     report('Loading world manifest', 0.04);
-    this.manifest = await fetchJson<WorldManifest>(worldAssetUrl('world.json'));
+    this.manifest = await fetchWorldJson<WorldManifest>('world.json');
     this.provinceById = new Map(this.manifest.provinces.map((province) => [province.id, province]));
     this.countryById = new Map(this.manifest.politics.countries.map((country) => [country.id, country]));
     if (this.manifest.politics.countries.some((country) => country.id > 255)) {
@@ -459,12 +462,12 @@ export class WorldRenderer {
       },
     );
     try {
-      const graph = await fetchBinary(worldAssetUrl(this.manifest.buffers.connections.url));
+      const graph = await fetchWorldBinary(this.manifest.buffers.connections.url);
       this.connectionGraph = new Float32Array(graph);
-      const details = await fetchJson<{
+      const details = await fetchWorldJson<{
         provinces: Array<{ id: number; center: [number, number]; population: number }>;
       }>(
-        worldAssetUrl(this.manifest.sidecars.provinceDetails.url),
+        this.manifest.sidecars.provinceDetails.url,
       );
       // The 250 most populous provinces stand in for "real cities" — junction
       // markers keep clear of these so they never crowd a labelled settlement.
@@ -880,14 +883,14 @@ export class WorldRenderer {
   async setConnectionsVisible(enabled: boolean): Promise<void> {
     this.showConnections = enabled;
     if (!enabled || this.connections) return;
-    const data = await fetchBinary(worldAssetUrl(this.manifest.buffers.connections.url));
+    const data = await fetchWorldBinary(this.manifest.buffers.connections.url);
     this.connections = this.createInstanceLayer('movement connections', data, this.manifest.buffers.connections.count, 1, this.lineLayout);
   }
 
   async setWaterwayNetworkVisible(enabled: boolean): Promise<void> {
     this.showWaterwayNetwork = enabled;
     if (!enabled || this.waterwayNetwork) return;
-    const data = await fetchBinary(worldAssetUrl(this.manifest.buffers.waterwayNetworkLines.url));
+    const data = await fetchWorldBinary(this.manifest.buffers.waterwayNetworkLines.url);
     this.waterwayNetwork = this.createInstanceLayer(
       'authoritative waterway network', data, this.manifest.buffers.waterwayNetworkLines.count, 2, this.lineLayout,
     );
@@ -1017,7 +1020,7 @@ export class WorldRenderer {
    *   kind: 3 road junction, 4 small town
    */
   private createStrategicMarkerLayer(): void {
-    const junctions = this.generateRoadJunctions();
+    const junctions = generateRoadJunctions(this.connectionGraph, this.settlementCenters, (x,z) => this.sampleHeight(x,z));
     const data = new Float32Array(Math.max(1, junctions.length) * 4);
     let cursor = 0;
     for (const junction of junctions) {
@@ -1227,7 +1230,7 @@ export class WorldRenderer {
    */
   setArmyMarkers(
     records: Float32Array, count: number,
-    pickList: ReadonlyArray<{ id: string; x: number; z: number }> = [],
+    pickList: ReadonlyArray<ArmyPickEntry> = [],
     modelRecords: Float32Array = new Float32Array(), modelCount = 0,
   ): void {
     if (!this.armyMarkers) return;
@@ -1264,7 +1267,7 @@ export class WorldRenderer {
       this.armyModelSourceRevision += 1;
       this.visibleInfantrySourceRevision = -1;
     }
-    this.armyPickList = pickList;
+    this.armyPicker.update(pickList, this.elapsed);
   }
 
   /** Keep the high-poly skinned draw to infantry that can intersect the current
@@ -1314,7 +1317,7 @@ export class WorldRenderer {
     this.infantryModels.count = visibleCount;
   }
 
-  private armyPickList: ReadonlyArray<{ id: string; x: number; z: number }> = [];
+  private readonly armyPicker = new ArmyPicker();
 
   /** World-space ground point under a screen coordinate, or null over sky. */
   groundPointAt(clientX: number, clientY: number): [number, number] | null {
@@ -1353,17 +1356,7 @@ export class WorldRenderer {
     const ground = this.groundPointAt(clientX, clientY);
     if (!ground) return null;
     const radius = Math.max(28, this.camera.distance * 0.045);
-    const w = this.manifest.world.width;
-    let best: string | null = null;
-    let bestSq = radius * radius;
-    for (const entry of this.armyPickList) {
-      let dx = entry.x - ground[0];
-      if (dx > w / 2) dx -= w; else if (dx < -w / 2) dx += w;
-      const dz = entry.z - ground[1];
-      const dSq = dx * dx + dz * dz;
-      if (dSq < bestSq) { bestSq = dSq; best = entry.id; }
-    }
-    return best;
+    return this.armyPicker.pick(ground[0], ground[1], radius, this.manifest.world.width, this.elapsed);
   }
 
   /**
@@ -1373,39 +1366,6 @@ export class WorldRenderer {
    * minimum distance from the nearest labelled settlement so junction dots
    * never crowd real cities. Returns [] when the graph is not loaded.
    */
-  private generateRoadJunctions(): Array<{ x: number; z: number; town: boolean }> {
-    const graph = this.connectionGraph;
-    if (!graph || graph.length < 4) return [];
-    const CELL = 26;                 // world units — merges shared vertices
-    const MIN_SPACING = 150;         // between kept junction markers
-    const MIN_CITY_DISTANCE = 170;   // from one of the 250 largest settlements
-    const degree = new Map<number, { x: number; z: number; n: number }>();
-    const key = (x: number, z: number): number =>
-      Math.round(x / CELL) * 100_000 + Math.round(z / CELL);
-    for (let i = 0; i + 3 < graph.length; i += 4) {
-      for (const [x, z] of [[graph[i], graph[i + 1]], [graph[i + 2], graph[i + 3]]] as const) {
-        const k = key(x, z);
-        const entry = degree.get(k);
-        if (entry) entry.n += 1;
-        else degree.set(k, { x, z, n: 1 });
-      }
-    }
-    const cities = this.settlementCenters;
-    const kept: Array<{ x: number; z: number; town: boolean }> = [];
-    const candidates = [...degree.values()]
-      .filter((v) => v.n >= 3)
-      .sort((a, b) => b.n - a.n);
-    for (const v of candidates) {
-      if (kept.length >= 500) break;
-      if (this.sampleHeight(v.x, v.z) <= 0.05) continue; // land only
-      if (cities.some((c) => Math.hypot(c[0] - v.x, c[1] - v.z) < MIN_CITY_DISTANCE)) continue;
-      if (kept.some((m) => Math.hypot(m.x - v.x, m.z - v.z) < MIN_SPACING)) continue;
-      const town = v.n >= 4 && (Math.round(v.x * 7 + v.z * 13) & 7) === 0;
-      kept.push({ x: v.x, z: v.z, town });
-    }
-    return kept;
-  }
-
   private attachRuntimeBindings(): void {
     if (this.runtimeBindingsAttached) return;
     this.runtimeBindingsAttached = true;

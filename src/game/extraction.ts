@@ -1,3 +1,4 @@
+import { armyAtNode } from './movement/position';
 /**
  * Physical resource extraction.
  *
@@ -16,12 +17,12 @@ export interface ExtractResult {
 }
 
 /** Begin extracting at the resource node the army is standing on. */
-export function issueExtract(session: SimContext, armyId: string): ExtractResult {
+export function extractionEligibility(session: SimContext, armyId: string): ExtractResult & { nodeId?: number } {
   const army = session.state.armies[armyId];
   if (!army) return { ok: false, reason: 'No such army.' };
   if (army.status === 'engaged') return { ok: false, reason: 'Army is in close combat.' };
   if (army.status === 'retreating') return { ok: false, reason: 'Army is retreating.' };
-  if (army.order) return { ok: false, reason: 'Army is moving.' };
+  if (army.order || !armyAtNode(session, army)) return { ok: false, reason: 'Army is moving.' };
   if (!canExtract(army)) return { ok: false, reason: 'Engineers or infantry required.' };
 
   const node = Object.values(session.state.resourceNodes).find(
@@ -32,6 +33,14 @@ export function issueExtract(session: SimContext, armyId: string): ExtractResult
     return { ok: false, reason: 'Deposit is not under your control.' };
   }
 
+  return { ok: true, nodeId: node.id };
+}
+
+export function issueExtract(session: SimContext, armyId: string): ExtractResult {
+  const eligible = extractionEligibility(session, armyId);
+  if (!eligible.ok || eligible.nodeId === undefined) return eligible;
+  const army = session.state.armies[armyId];
+  const node = session.state.resourceNodes[eligible.nodeId];
   // Release any previous extractor of this node.
   if (node.extractorArmyId && node.extractorArmyId !== armyId) {
     const prev = session.state.armies[node.extractorArmyId];

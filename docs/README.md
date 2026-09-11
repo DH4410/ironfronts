@@ -12,7 +12,7 @@ This handbook documents the current repository and runtime. Implementation-speci
 
 - [Auth server](auth-server/README.md): accounts, SQLite sessions, cookies/CORS, public API, game tickets, and operations.
 - [Game server](game-server/README.md): authoritative simulation, protocol, persistence, configuration, and troubleshooting.
-- [Browser client](client/README.md): bootstrap, auth/lobby flow, WebSocket replica, optimistic UI, controls, audio, and teardown.
+- [Browser client](client/README.md): bootstrap, auth/lobby flow, authoritative WebSocket replica, pending commands, controls, audio, and teardown.
 - [WebGPU rendering](client/rendering.md): world loading, GPU pipeline, culling, quality presets, diagnostics, and performance.
 
 ## Offline pipeline
@@ -24,7 +24,7 @@ This handbook documents the current repository and runtime. Implementation-speci
 
 - [Architecture](game-server/architecture.md)
 - [Configuration and operations](game-server/operations.md)
-- [Protocol v2](game-server/protocol-v2.md)
+- [Protocol v3](game-server/protocol.md)
 - [Authoritative simulation](game-server/simulation.md)
 - [State, world loading, and persistence](game-server/persistence.md)
 - [Validation and troubleshooting](game-server/validation.md)

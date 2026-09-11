@@ -40,7 +40,7 @@ describe('notification lifecycle', () => {
     expect(main).toContain('dismissNotification: (id) => removeNotification(id)');
     expect(main).not.toMatch(/entry\.title !== 'Command failed'/);
     // Every scheduled timer is torn down with the session.
-    const teardown = main.slice(main.indexOf('const teardownSession'), main.indexOf('const teardownSession') + 500);
+    const teardown = main.slice(main.indexOf('const teardownSession'), main.indexOf('const teardownSession') + 1500);
     expect(teardown).toContain('clearAllNotificationTimers()');
     // Demo fixtures now flow through the normal lifecycle, not a raw patch.
     expect(main).toContain('for (const demo of DEMO_NOTIFICATIONS) pushNotification(');

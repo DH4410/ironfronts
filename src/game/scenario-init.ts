@@ -10,6 +10,8 @@
  * this file only lays out turn 0.
  */
 
+import { INITIAL_GAME_EPOCH_MS } from './time';
+
 import type { ScenarioDef, ScenarioSelection } from './scenario';
 import type { WorldData, WorldProvince } from './world-data';
 import type {
@@ -151,6 +153,7 @@ function spawnArmy(
     status: 'idle',
     order: null,
     extractingNodeId: null,
+    navalCrossing: null,
   };
 }
 
@@ -306,7 +309,7 @@ export function initGameState(
     mode: scenario.mode,
     fogOfWar: scenario.fogOfWar && !sandbox,
     economyEnabled: scenario.economyEnabled && !sandbox,
-    clock: { gameTimeHours: 0, startDate: selection.startDate },
+    clock: { gameTimeHours: 0, startDate: selection.startDate, initialEpochMs: INITIAL_GAME_EPOCH_MS, generation: 0 },
     simulationTick: 0,
     countries,
     provinceOwners,
@@ -319,11 +322,12 @@ export function initGameState(
     battleFronts: {},
     resourceNodes,
     relations: {},
+    provinceDevastation: {},
     diplomacyMessages: {},
     diplomacyProposals: {},
     nextDiplomacyId: 1,
     nextArmyId,
-    nextBattleId: 1,
+    nextBattleId: 1, nextFrontId: 1,
     nextOrderId: 1,
     nextEventId: 1,
   };

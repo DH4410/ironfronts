@@ -6,7 +6,7 @@ function baseline(): PlayerProjection {
   return {
     simulationTick: 0, viewerCountryId: 1, startCamera: { x: 0, z: 0, distance: 900 },
     countries: { 1: { id: 1, name: 'A', color: '#fff', controller: 'player', alive: true } },
-    provinceOwners: { 1: 1 }, provinceBuildings: {}, productionQueues: {}, constructionQueues: {},
+    provinceOwners: { 1: 1 }, provinceBuildings: {}, provinceActions: {}, productionQueues: {}, constructionQueues: {},
     rallyPoints: {}, armies: {}, resourceNodes: {}, ownCountry: { id: 1 }, relations: {},
   };
 }

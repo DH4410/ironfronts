@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-export const PROTOCOL_VERSION = 2 as const;
+export const PROTOCOL_VERSION = 3 as const;
 export const GAME_ID = 'world-at-war-2' as const;
-export const GAME_VERSION = 'world-at-war@2' as const;
+export const GAME_VERSION = 'world-at-war@3' as const;
 
 const confirmedWars = z.array(z.number().int().positive()).optional();
 const attackTargetSchema = z.discriminatedUnion('kind', [
@@ -59,6 +59,9 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   // sends it (see gameplay-gateway.ts). Not a gameplay command: it changes
   // the whole server's simulation pace for every connected player, so it is
   // never wrapped in the commandId-acked command envelope above.
+  z.object({ type: z.literal('devSetClock'), epochMs: z.number().finite().min(-8.64e15).max(8.64e15) }),
+  z.object({ type: z.literal('devSetMovementSpeed'), multiplier: z.number().finite().min(0).max(32) }),
+  z.object({ type: z.literal('ping'), sentAt: z.number().finite() }),
   z.object({ type: z.literal('devSetSimSpeed'), multiplier: z.number().finite().min(0).max(32) }),
   // Same dev/test-only, server-wide semantics as devSetSimSpeed above: applies
   // to every connected player, ignored in production. Fields are independently
@@ -125,7 +128,13 @@ export interface ProjectedArmy {
   moveRoute?: ReadonlyArray<{ x: number; z: number }>;
   moveIntent?: 'move' | 'attack';
   /** Next authoritative movement waypoint and wall-clock time remaining. */
-  motion?: { targetX: number; targetZ: number; durationMs: number };
+  motion?: {
+    targetX: number; targetZ: number; durationMs: number;
+    /** Remaining authoritative road polyline, beginning at the sampled position. */
+    route?: ReadonlyArray<{ x: number; z: number }>;
+    sampledAtEpochMs?: number; generation?: number;
+  };
+  actions?: { canExtract: boolean; extractableNodeId: number | null; extractReason?: string };
   suspendedOrder?: { x: number; z: number; intent: 'move' | 'attack' } | null;
   battleFronts?: ReadonlyArray<{
     id: string;
@@ -151,11 +160,18 @@ export interface ProjectedArmy {
 
 export interface PlayerProjection {
   simulationTick: number;
+  timeline?: { elapsedSeconds: number; speed: number; movementSpeed: number; sampledAtEpochMs: number; generation: number };
   viewerCountryId: number;
   startCamera: { x: number; z: number; distance: number };
   countries: Record<number, PublicCountry>;
   provinceOwners: Record<number, number>;
   provinceBuildings: Record<number, { barracks: number; tankPlant: number; ordnance: number; missileSite: number }>;
+  provinceActions: Record<number, {
+    production: ReadonlyArray<{ unitTypeId: string; available: boolean; affordable: boolean; reason?: string }>;
+    construction: ReadonlyArray<{ buildingId: 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite'; available: boolean; affordable: boolean; reason?: string }>;
+    canSetRally: boolean;
+    rallyReason?: string;
+  }>;
   productionQueues: Record<number, unknown[]>;
   constructionQueues: Record<number, unknown[]>;
   // `route` is the server-derived road polyline from the province's node to the
@@ -185,6 +201,9 @@ export interface PlayerProjection {
  */
 export interface GameClockSync {
   gameStartedAtEpochMs: number;
+  gameEpochMs: number;
+  speed: number;
+  generation: number;
   serverEpochMs: number;
   utcOffsetMinutes: number;
 }
@@ -195,31 +214,34 @@ export interface PresentationCatalogs {
 }
 
 export interface WorldDescriptor {
+  artifactHashes: Record<string, string>;
   version: string;
   hash: string;
   assetBaseUrl: string;
 }
 
+export type ProjectionCollection = 'countries' | 'provinceOwners' | 'provinceBuildings' | 'provinceActions' | 'productionQueues' | 'constructionQueues' | 'rallyPoints' | 'armies' | 'resourceNodes' | 'relations';
 export type ProjectionDelta = {
-  changed: Partial<Omit<PlayerProjection, 'countries' | 'provinceOwners' | 'provinceBuildings' | 'productionQueues' | 'constructionQueues' | 'rallyPoints' | 'armies' | 'resourceNodes' | 'relations'>>;
-  upserts: Partial<{ [K in 'countries' | 'provinceOwners' | 'provinceBuildings' | 'productionQueues' | 'constructionQueues' | 'rallyPoints' | 'armies' | 'resourceNodes' | 'relations']: Record<string, unknown> }>;
-  removals: Partial<Record<'countries' | 'provinceOwners' | 'provinceBuildings' | 'productionQueues' | 'constructionQueues' | 'rallyPoints' | 'armies' | 'resourceNodes' | 'relations', string[]>>;
+  changed: Partial<Omit<PlayerProjection, ProjectionCollection>>;
+  upserts: Partial<{ [K in ProjectionCollection]: Record<string, unknown> }>;
+  removals: Partial<Record<ProjectionCollection, string[]>>;
   redactions: string[];
 };
 
 export type ServerMessage =
-  | { type: 'hello'; gameId: string; gameVersion: string; protocolVersion: 2; capabilities: string[]; world: WorldDescriptor; countryId: number }
+  | { type: 'hello'; gameId: string; gameVersion: string; protocolVersion: 3; capabilities: string[]; world: WorldDescriptor; countryId: number }
   | { type: 'baseline'; revision: number; state: PlayerProjection; catalogs: PresentationCatalogs; clock: GameClockSync }
   | { type: 'delta'; fromRevision: number; revision: number; delta: ProjectionDelta; events: FilteredEvent[] }
   | { type: 'clockSync'; clock: GameClockSync }
-  | { type: 'commandAck'; commandId: string; ok: boolean; reason?: string; requiredWarCountryIds?: readonly number[] }
+  | { type: 'commandAck'; commandId: string; ok: boolean; appliedRevision?: number; reason?: string; requiredWarCountryIds?: readonly number[] }
   | { type: 'event'; event: FilteredEvent }
+  | { type: 'pong'; sentAt: number; serverEpochMs: number }
   | { type: 'error'; code: string; message: string; retryable?: boolean }
   // Sent right after `baseline` and again whenever the multiplier changes.
   // `devControlsEnabled: false` in production — the server ignores
   // devSetSimSpeed there regardless, but the client uses this to hide the
   // control entirely rather than offer a lever that silently does nothing.
-  | { type: 'devSimSpeed'; multiplier: number; devControlsEnabled: boolean }
+  | { type: 'devSimSpeed'; multiplier: number; devControlsEnabled: boolean; movementMultiplier?: number }
   // Sent right after `baseline` and again whenever a devSetEnvironment message
   // changes it. `timeOfDayHours: null` means "no override" — the client keeps
   // deriving lighting from the civil clock as usual.
@@ -228,53 +250,27 @@ export type ServerMessage =
     devControlsEnabled: boolean;
   };
 
-export const serverMessageSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('hello'), gameId: z.string(), gameVersion: z.string(),
-    protocolVersion: z.literal(PROTOCOL_VERSION), capabilities: z.array(z.string()),
-    world: z.object({ version: z.string(), hash: z.string(), assetBaseUrl: z.url() }),
-    countryId: z.number().int().positive(),
-  }),
-  z.object({
-    type: z.literal('baseline'), revision: z.number().int().nonnegative(),
-    state: z.custom<PlayerProjection>((value) => Boolean(value && typeof value === 'object')),
-    catalogs: z.custom<PresentationCatalogs>((value) => Boolean(value && typeof value === 'object')),
-    clock: z.object({
-      gameStartedAtEpochMs: z.number().finite(), serverEpochMs: z.number().finite(),
-      utcOffsetMinutes: z.number().int(),
-    }),
-  }),
-  z.object({ type: z.literal('delta'), fromRevision: z.number().int().nonnegative(), revision: z.number().int().nonnegative(), delta: z.custom<ProjectionDelta>((value) => Boolean(value && typeof value === 'object')), events: z.array(z.custom<FilteredEvent>((value) => Boolean(value && typeof value === 'object'))) }),
-  z.object({
-    type: z.literal('clockSync'),
-    clock: z.object({
-      gameStartedAtEpochMs: z.number().finite(), serverEpochMs: z.number().finite(),
-      utcOffsetMinutes: z.number().int(),
-    }),
-  }),
-  z.object({ type: z.literal('commandAck'), commandId: z.string(), ok: z.boolean(), reason: z.string().optional(), requiredWarCountryIds: z.array(z.number().int().positive()).optional() }),
-  z.object({ type: z.literal('event'), event: z.custom<FilteredEvent>((value) => Boolean(value && typeof value === 'object')) }),
-  z.object({ type: z.literal('error'), code: z.string(), message: z.string(), retryable: z.boolean().optional() }),
-  z.object({
-    type: z.literal('devSimSpeed'), multiplier: z.number().finite().min(0).max(32),
-    devControlsEnabled: z.boolean(),
-  }),
-  z.object({
-    type: z.literal('devEnvironment'),
-    timeOfDayHours: z.number().finite().min(0).max(24).nullable(),
-    raining: z.boolean(),
-    devControlsEnabled: z.boolean(),
-  }),
-]);
+export { serverMessageSchema } from './server-schema';
 
-export interface FilteredEvent { id: string; kind: string; message?: string; [key: string]: unknown }
+type EventBase = { id: string; message?: string };
+type LocatedEvent = EventBase & { x: number; z: number };
+type CombatCountries = { attacker: number; defender: number };
+export type FilteredEvent =
+  | LocatedEvent & { kind: 'unitCompleted'; ownerCountryId: number; provinceId: number; unitTypeId: string; armyId: string }
+  | LocatedEvent & { kind: 'buildingCompleted'; ownerCountryId: number; provinceId: number; buildingId: 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite' }
+  | LocatedEvent & { kind: 'capture'; provinceId: number; fromCountryId: number; toCountryId: number }
+  | LocatedEvent & CombatCountries & { kind: 'engaged' | 'combatPulse' | 'retreat' | 'battleEnded'; battleId: string; frontId: string }
+  | LocatedEvent & CombatCountries & { kind: 'reinforced'; battleId: string; frontId: string; armyId: string }
+  | LocatedEvent & CombatCountries & { kind: 'destroyed'; armyId: string; battleId?: string; frontId?: string }
+  | LocatedEvent & CombatCountries & { kind: 'bombardment'; armyId: string; targetArmyId: string }
+  | LocatedEvent & CombatCountries & { kind: 'strike'; provinceId: number };
 
 export interface GameTicketClaims {
   accountId: string;
   gameId: string;
   countryId: number;
   audience: 'game-server';
-  protocolVersion: 2;
+  protocolVersion: 3;
   expiresAt: number;
   nonce: string;
 }
@@ -284,7 +280,7 @@ export interface GameLobby {
   gameId: string;
   name: string;
   gameVersion: string;
-  protocolVersion: 2;
+  protocolVersion: 3;
   assignedCountryId: number | null;
   countries: LobbyCountry[];
 }
@@ -339,7 +335,7 @@ export interface SessionResponse {
   assignment?: { gameId: string; countryId: number } | null;
   profile?: CommanderProfile;
 }
-export interface ConnectResponse { ticket: string; websocketUrl: string; protocolVersion: 2 }
+export interface ConnectResponse { ticket: string; websocketUrl: string; protocolVersion: 3 }
 
 export const credentialsSchema = z.object({
   username: z.string().trim().min(3).max(32),

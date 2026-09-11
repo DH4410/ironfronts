@@ -1,16 +1,16 @@
 import {
-  computeArmyVisibility, projectArmyView, visibleResourceNodes,
+  extractionEligibility, movementEdgeAllowed, computeArmyVisibility, projectArmyView, visibleResourceNodes,
   currentMovementLeg, legalRetreatPaths, stackExtractionRate, nearestNode, findPath,
+  UNIT_TYPES, BUILDINGS, buildOptions, producibleUnits,
   type GameState, type LandGraph, type WorldData,
 } from '@ironfronts/game-core';
 import type { PlayerProjection, ProjectionDelta, PublicCountry } from '@ironfronts/protocol';
 
 export function projectFor(
-  state: GameState, world: WorldData, graphOrViewer: LandGraph | number, viewerId?: number,
-  gameHoursPerRealSecond = 0.5,
+  state: GameState, world: WorldData, graph: LandGraph, viewerCountryId: number,
+  gameHoursPerRealSecond = 1 / 3_600, movementSpeedMultiplier = 1, sampledAtEpochMs = Date.now(),
 ): PlayerProjection {
-  const graph = typeof graphOrViewer === 'number' ? null : graphOrViewer;
-  const viewerCountryId = typeof graphOrViewer === 'number' ? graphOrViewer : viewerId!;
+  const aliveCountries = new Set(Object.values(state.provinceOwners));
   const countries: Record<number, PublicCountry> = {};
   for (const country of Object.values(state.countries)) {
     countries[country.id] = {
@@ -18,7 +18,7 @@ export function projectFor(
       name: country.name,
       color: country.color,
       controller: country.controller,
-      alive: Object.values(state.provinceOwners).some((owner) => owner === country.id),
+      alive: aliveCountries.has(country.id),
     };
   }
   const ownProvince = (id: string): boolean => state.provinceOwners[Number(id)] === viewerCountryId;
@@ -29,7 +29,12 @@ export function projectFor(
   const armies = Object.fromEntries(Object.keys(state.armies).flatMap((armyId) => {
     const army = projectArmyView(state, world, viewerCountryId, armyId, visibility);
     if (!army) return [];
-    let projected = army;
+    let projected: import('@ironfronts/protocol').ProjectedArmy = army;
+    if (graph && army.own) {
+      const eligibility = extractionEligibility({ state, world, graph }, army.id);
+      projected = { ...projected, actions: { canExtract: eligibility.ok, extractableNodeId: eligibility.nodeId ?? null,
+        ...(eligibility.reason ? { extractReason: eligibility.reason } : {}) } };
+    }
     if (graph && army.own && army.status === 'engaged') {
       projected = {
         ...projected,
@@ -45,13 +50,16 @@ export function projectFor(
     }
     if (graph && army.status !== 'unknown' && gameHoursPerRealSecond > 0) {
       const source = state.armies[army.id];
-      const leg = source ? currentMovementLeg({ state, world, graph }, source) : null;
+      const leg = source ? currentMovementLeg({ state, world, graph, movementSpeedMultiplier }, source) : null;
       if (leg && leg.worldUnitsPerGameHour > 0) {
+        const route = source!.order ? orderRouteForClient(source!.order, graph, source!.x, source!.z) ?? undefined : undefined;
         projected = {
           ...projected,
           motion: {
+            sampledAtEpochMs, generation: state.clock.generation ?? 0,
             targetX: leg.targetX,
             targetZ: leg.targetZ,
+            route,
             durationMs: leg.distance / (leg.worldUnitsPerGameHour * gameHoursPerRealSecond) * 1_000,
           },
         };
@@ -77,6 +85,25 @@ export function projectFor(
     }
   }
   const owned = world.provinces.filter((province) => state.provinceOwners[province.id] === viewerCountryId);
+  const provinceActions = Object.fromEntries(owned.map((province) => {
+    const productionAvailable = new Set(producibleUnits({ state, world, graph: graph! }, province.id, viewerCountryId));
+    const constructionOptions = new Map(buildOptions({ state, world, graph: graph! }, province.id, viewerCountryId).map((option) => [option.id, option]));
+    return [province.id, {
+      production: UNIT_TYPES.map((unit) => {
+        const available = productionAvailable.has(unit.id);
+        const affordable = Object.entries(unit.cost).every(([key, value]) => (own?.stockpile[key as keyof typeof own.stockpile] ?? 0) >= (value ?? 0));
+        return { unitTypeId: unit.id, available, affordable,
+          ...(!available ? { reason: `Requires a ${unit.requiredBuilding}.` } : !affordable ? { reason: 'Insufficient resources.' } : {}) };
+      }),
+      construction: Object.keys(BUILDINGS).map((buildingId) => {
+        const id = buildingId as keyof typeof BUILDINGS;
+        const option = constructionOptions.get(id);
+        return { buildingId: id, available: Boolean(option), affordable: option?.affordable ?? false,
+          ...(!option ? { reason: 'Already built, queued, or unavailable here.' } : !option.affordable ? { reason: 'Insufficient resources.' } : {}) };
+      }),
+      canSetRally: Boolean(graph), ...(!graph ? { rallyReason: 'Movement network unavailable.' } : {}),
+    }];
+  }));
   const capitalId = world.countries.find((country) => country.id === viewerCountryId)?.capitalProvinceId;
   const capital = world.provinces.find((province) => province.id === capitalId) ?? owned[0];
   const diplomacy = {
@@ -89,7 +116,9 @@ export function projectFor(
       .map((proposal) => ({ ...proposal }))
       .sort((a, b) => a.createdAtTick - b.createdAtTick || a.id.localeCompare(b.id)),
   };
-  return {
+  return structuredClone({
+    timeline: { elapsedSeconds: state.clock.gameTimeHours * 3_600, speed: gameHoursPerRealSecond * 3_600,
+      movementSpeed: movementSpeedMultiplier, sampledAtEpochMs, generation: state.clock.generation ?? 0 },
     simulationTick: state.simulationTick,
     viewerCountryId,
     startCamera: homelandCamera(
@@ -100,11 +129,12 @@ export function projectFor(
     countries,
     provinceOwners: { ...state.provinceOwners },
     provinceBuildings: privateMap(state.provinceBuildings),
+    provinceActions,
     productionQueues: privateMap(state.productionQueues),
     constructionQueues: privateMap(state.constructionQueues),
     rallyPoints: graph
       ? Object.fromEntries(Object.entries(privateMap(state.rallyPoints)).map(([id, point]) => [
-        id, { ...point, route: rallyRouteForClient(world, graph, Number(id), point) ?? undefined },
+        id, { ...point, route: rallyRouteForClient(world, graph, Number(id), point, state, viewerCountryId) ?? undefined },
       ]))
       : privateMap(state.rallyPoints),
     armies,
@@ -118,7 +148,7 @@ export function projectFor(
     relations: { ...state.relations },
     diplomacy,
     outcome: state.outcome ? { ...state.outcome } : undefined,
-  };
+  });
 }
 
 /**
@@ -215,7 +245,7 @@ export function orderRouteForClient(
  */
 export function rallyRouteForClient(
   world: WorldData, graph: LandGraph,
-  provinceId: number, rally: { x: number; z: number },
+  provinceId: number, rally: { x: number; z: number }, state: GameState, countryId: number,
 ): Array<{ x: number; z: number }> | null {
   const province = world.provinces.find((p) => p.id === provinceId);
   if (!province) return null;
@@ -223,7 +253,7 @@ export function rallyRouteForClient(
   if (from < 0) return null;
   const to = nearestNode(graph, rally.x, rally.z, 600, graph.component[from]);
   if (to < 0) return null;
-  const path = findPath(graph, from, to);
+  const path = findPath(graph, from, to, movementEdgeAllowed({ state, world, graph }, countryId));
   if (!path || path.length < 2) return null;
   return path.map((nodeId) => ({ x: graph.nodeX[nodeId], z: graph.nodeZ[nodeId] }));
 }
@@ -254,7 +284,7 @@ export function retreatExitsForClient(
 
 const COLLECTIONS = [
   'countries', 'provinceOwners', 'provinceBuildings', 'productionQueues',
-  'constructionQueues', 'rallyPoints', 'armies', 'resourceNodes', 'relations',
+  'constructionQueues', 'provinceActions', 'rallyPoints', 'armies', 'resourceNodes', 'relations',
 ] as const;
 
 function same(a: unknown, b: unknown): boolean {
@@ -264,6 +294,10 @@ function same(a: unknown, b: unknown): boolean {
 export function diffProjection(previous: PlayerProjection, next: PlayerProjection): ProjectionDelta | null {
   const delta: ProjectionDelta = { changed: {}, upserts: {}, removals: {}, redactions: [] };
   if (previous.simulationTick !== next.simulationTick) delta.changed.simulationTick = next.simulationTick;
+  if (previous.simulationTick !== next.simulationTick || previous.timeline?.speed !== next.timeline?.speed
+    || previous.timeline?.movementSpeed !== next.timeline?.movementSpeed || previous.timeline?.generation !== next.timeline?.generation) {
+    delta.changed.timeline = next.timeline;
+  }
   if (!same(previous.ownCountry, next.ownCountry)) delta.changed.ownCountry = next.ownCountry;
   if (!same(previous.diplomacy, next.diplomacy)) delta.changed.diplomacy = next.diplomacy;
   if (!same(previous.outcome, next.outcome)) delta.changed.outcome = next.outcome;

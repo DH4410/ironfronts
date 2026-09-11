@@ -1,3 +1,4 @@
+import { SpatialIndex } from './spatial-index';
 /**
  * Fog of war — information visibility.
  *
@@ -26,7 +27,6 @@
 
 import type { GameState } from './game-state';
 import type { WorldData } from './world-data';
-import { strongestGroup } from './units/army';
 import { unitType } from './units/unit-catalog';
 import { wrappedDistanceSq } from './geometry';
 
@@ -47,9 +47,9 @@ export function friendlyVisionSources(
   const sources: VisionSource[] = [];
   for (const army of Object.values(state.armies)) {
     if (army.ownerCountryId !== viewerCountryId) continue;
-    const lead = strongestGroup(army);
-    const outer = lead ? unitType(lead.typeId).visionOuter : 150;
-    const inner = lead ? unitType(lead.typeId).visionInner : 80;
+    const living = army.units.filter((g) => g.count > 0 && g.hp > 0);
+    const outer = Math.max(0, ...living.map((g) => unitType(g.typeId).visionOuter));
+    const inner = Math.max(0, ...living.map((g) => unitType(g.typeId).visionInner));
     sources.push({ x: army.x, z: army.z, outerSq: outer * outer, innerSq: inner * inner });
   }
   return sources;
@@ -87,12 +87,14 @@ export function computeArmyVisibility(
   }
 
   const sources = friendlyVisionSources(state, world, viewerCountryId);
+  const positions = new SpatialIndex(sources, world.width);
+  const radius = Math.sqrt(Math.max(0, ...sources.map((source) => Math.max(source.outerSq, source.innerSq))));
   for (const army of Object.values(state.armies)) {
     if (army.ownerCountryId === viewerCountryId) {
       result.set(army.id, 'visible');
       continue;
     }
-    let level = pointContactLevel(sources, army.x, army.z, world.width);
+    let level = pointContactLevel(positions.query(army.x, army.z, radius), army.x, army.z, world.width);
     if (level === 'hidden' && ownsGroundAt(state, world, viewerCountryId, army.x, army.z)) {
       level = 'contact';
     }

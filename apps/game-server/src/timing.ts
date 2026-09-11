@@ -1,10 +1,10 @@
 /** Existing authoritative gameplay cadence: ten fixed simulation steps/sec. */
 export const SIMULATION_INTERVAL_MS = 100;
 /** Existing gameplay delta per step. Movement/economy balance depends on it. */
-export const SIMULATION_TICK_HOURS = 0.5 / 10;
+export const SIMULATION_TICK_HOURS = 0.1 / 3_600;
 
 /** Civil-clock corrections are sparse; interpolation happens in the browser. */
-export const CLOCK_SYNC_INTERVAL_MS = 60_000;
+export const CLOCK_SYNC_INTERVAL_MS = 1_000;
 
 /** Dev/test simulation-speed multiplier bounds. 0 pauses; 32 is the fastest
  *  fast-forward that stays numerically stable for the fixed step above. */

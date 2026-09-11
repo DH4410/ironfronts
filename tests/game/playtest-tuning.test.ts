@@ -92,7 +92,7 @@ describe('opening economy is lean but non-zero', () => {
 });
 
 describe('strategic movement pacing', () => {
-  const src = readFileSync(path.join(root, 'src/game/units/movement.ts'), 'utf8');
+  const src = ['src/game/movement/speed.ts','src/game/units/movement.ts'].map(file => readFileSync(path.join(root,file),'utf8')).join('\n');
 
   it('applies a single global sub-1 pacing scale to the travel budget', () => {
     expect(src).toMatch(/const STRATEGIC_MOVEMENT_SCALE = 0?\.[0-9]+;/);

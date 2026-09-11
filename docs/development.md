@@ -79,7 +79,7 @@ The client currently relies on the root TypeScript configuration rather than its
 | Area | Coverage |
 |---|---|
 | `tests/server` | Auth store, game runtime/persistence/projection, tickets/protocol |
-| `tests/client` | Replica deltas, optimistic command behavior, interpolated clock |
+| `tests/client` | Replica deltas, pending command behavior, interpolated clock, world integrity |
 | `tests/game` | State/scenario/world graph, commands, movement, visibility, combat/retreat, economy/construction/resources |
 | Root renderer-support tests | Camera, picking, quality, labels, environment, performance accounting, shaders, audio, UI presentation |
 | `tests/architecture.test.ts` | Cycles and layer/dependency/browser-global rules |

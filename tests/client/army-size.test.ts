@@ -17,7 +17,7 @@ function state(armies: Record<string, ProjectedArmy>): PlayerProjection {
   return {
     simulationTick: 0, viewerCountryId: 1, startCamera: { x: 0, z: 0, distance: 900 },
     countries: { 1: { id: 1, name: 'A', color: '#fff', controller: 'player', alive: true } },
-    provinceOwners: {}, provinceBuildings: {}, productionQueues: {}, constructionQueues: {},
+    provinceOwners: {}, provinceBuildings: {}, provinceActions: {}, productionQueues: {}, constructionQueues: {},
     rallyPoints: {},
     armies,
     resourceNodes: {},

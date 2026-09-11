@@ -7,9 +7,9 @@ Ironfronts is an authoritative multiplayer grand-strategy prototype with a nativ
 - Persistent single-world multiplayer simulation at 10 authoritative ticks per second
 - Account registration/login with SQLite-backed HttpOnly sessions
 - Permanent country selection and short-lived, single-use gameplay tickets
-- Protocol-v2 WebSocket baselines, change-only deltas, resync, events, and command acknowledgements
+- Protocol-v3 WebSocket baselines, change-only deltas, resync, delivery-aware events, and revision acknowledgements
 - Graph-based army movement, neutral-territory confirmation, pursuit, splitting, extraction, production, and construction
-- Directional close combat with ten-unit frontage, 30-minute volleys, armor-specific damage, retreats, and artillery bombardment
+- Directional close combat with ten-unit frontage, continuous damage, armor-specific damage, retreats, and artillery bombardment
 - Per-country fog-of-war projections and contact markers
 - WebGPU terrain, water, infrastructure, cities/props, political overlays, labels, weather, armies, and diagnostics
 - Deterministic world compiler with recoverable promotion and generation reports
@@ -24,7 +24,7 @@ The repository is an npm-workspace monorepo:
 | `apps/client` + `src/client`, `src/ui`, `src/renderer*` | Browser login/menu, authoritative replica, HUD, audio, WebGPU presentation |
 | `apps/auth-server` | Accounts, sessions, public lobby facade, gameplay-ticket issuance |
 | `apps/game-server` | Country seats, commands, simulation, fog projections, game persistence |
-| `packages/protocol` | Shared v2 schemas/types and ticket signing |
+| `packages/protocol` | Shared v3 gameplay schemas/types and ticket signing |
 | `packages/game-core` + `src/game` | Browser-free authoritative rules and plain game state |
 | `scripts/world`, `scripts/infrastructure` | Offline world compiler |
 | `material` | Immutable source geometry/topology/movement/metadata |

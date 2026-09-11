@@ -80,17 +80,19 @@ describe('rallyRouteForClient', () => {
   const world = {
     width: 10_000, height: 5_000,
     provinces: [{ id: 7, center: [0, 0], terrainId: 4, population: 1, coastal: false, urban: true }],
+    provinceAt: () => 7,
   } as never;
+  const state = { provinceOwners: { 7: 1 }, relations: {} } as never;
 
   it('returns the road polyline from the province node to the rally node', () => {
-    const route = rallyRouteForClient(world, graph, 7, { x: 395, z: 5 });
+    const route = rallyRouteForClient(world, graph, 7, { x: 395, z: 5 }, state, 1);
     expect(route && route.length).toBeGreaterThanOrEqual(2);
     expect(route![0]).toEqual({ x: 0, z: 0 });
     expect(route![route!.length - 1]).toEqual({ x: 400, z: 0 });
   });
 
   it('is null for an unknown province', () => {
-    expect(rallyRouteForClient(world, graph, 999, { x: 0, z: 0 })).toBeNull();
+    expect(rallyRouteForClient(world, graph, 999, { x: 0, z: 0 }, state, 1)).toBeNull();
   });
 });
 
