@@ -3,10 +3,13 @@
  *
  * Built at runtime from the already-loaded `connections.f32` buffer — no
  * build-pipeline change. Stride-8 records are `[x1, y1, x2, y2, medium, suppressed, 0, 0]`
- * where `medium === 1` means a LAND edge. Sea / ferry edges (`medium === 0`) are
- * excluded: a land army must never cross water just because the raw graph is
- * connected. Hidden / dotted connections live in a separate buffer and are not
- * present here at all.
+ * where `medium === 1` means a LAND edge. Sea / ferry edges (`medium === 0`)
+ * are kept out of the land `adjacency`/`edgeCost`/`component` used by normal
+ * pathfinding — a land army must never cross water just because the raw
+ * graph is connected — but are still registered, in the `seaAdjacency`/
+ * `seaEdgeCost` side table, for the explicit timed naval-crossing flow in
+ * `units/movement.ts` (embark → transit → disembark). Hidden / dotted
+ * connections live in a separate buffer and are not present here at all.
  *
  * `suppressed === 1` marks a land edge whose corridor leaves the coastline
  * (`scripts/infrastructure/segment-audit.mjs`). Both its endpoints are still
@@ -32,6 +35,7 @@ export const GRAPH_CELL = 20;
 
 const CONNECTION_STRIDE = 8;
 const MEDIUM_LAND = 1;
+const MEDIUM_SEA = 0;
 const EDGE_SUPPRESSED = 1;
 
 export interface LandGraph {
@@ -50,6 +54,16 @@ export interface LandGraph {
   readonly nodeCount: number;
   readonly width: number;
   readonly height: number;
+  /**
+   * Sea/ferry edges (raw `medium === 0` records) in the SAME node-id space as
+   * the land graph above — a coastal node reachable by land also appears
+   * here if it has a ferry link. Kept fully separate from `adjacency` so
+   * every existing land-only pathfinding call (the overwhelming majority)
+   * is completely unaffected; only naval-crossing code (movement.ts) reads
+   * this. node id -> [neighbourNodeId...] / cost, mirroring adjacency/edgeCost.
+   */
+  readonly seaAdjacency: readonly number[][];
+  readonly seaEdgeCost: readonly number[][];
 }
 
 export function buildLandGraph(
@@ -81,35 +95,46 @@ export function buildLandGraph(
 
   const adjacency: number[][] = [];
   const edgeCost: number[][] = [];
-  const linkOnce = (a: number, b: number, cost: number): void => {
-    (adjacency[a] ??= []);
-    (edgeCost[a] ??= []);
-    const at = adjacency[a].indexOf(b);
+  const seaAdjacency: number[][] = [];
+  const seaEdgeCost: number[][] = [];
+  const linkOnce = (list: number[][], costs: number[][], a: number, b: number, cost: number): void => {
+    (list[a] ??= []);
+    (costs[a] ??= []);
+    const at = list[a].indexOf(b);
     if (at === -1) {
-      adjacency[a].push(b);
-      edgeCost[a].push(cost);
-    } else if (cost < edgeCost[a][at]) {
-      edgeCost[a][at] = cost;
+      list[a].push(b);
+      costs[a].push(cost);
+    } else if (cost < costs[a][at]) {
+      costs[a][at] = cost;
     }
   };
 
   for (let offset = 0; offset + CONNECTION_STRIDE <= connections.length; offset += CONNECTION_STRIDE) {
-    if (connections[offset + 4] !== MEDIUM_LAND) continue;
+    const medium = connections[offset + 4];
+    if (medium !== MEDIUM_LAND && medium !== MEDIUM_SEA) continue;
     // Register both endpoints regardless of suppression so node ids stay
     // stable across an audited rebuild; only the linking is skipped.
     const a = getNode(connections[offset], connections[offset + 1]);
     const b = getNode(connections[offset + 2], connections[offset + 3]);
     if (a === b) continue;
-    if (connections[offset + 5] === EDGE_SUPPRESSED) continue;
-    const cost = wrappedDistance(xs[a], zs[a], xs[b], zs[b], width) || GRAPH_CELL;
-    linkOnce(a, b, cost);
-    linkOnce(b, a, cost);
+    if (medium === MEDIUM_LAND) {
+      if (connections[offset + 5] === EDGE_SUPPRESSED) continue;
+      const cost = wrappedDistance(xs[a], zs[a], xs[b], zs[b], width) || GRAPH_CELL;
+      linkOnce(adjacency, edgeCost, a, b, cost);
+      linkOnce(adjacency, edgeCost, b, a, cost);
+    } else {
+      const cost = wrappedDistance(xs[a], zs[a], xs[b], zs[b], width) || GRAPH_CELL;
+      linkOnce(seaAdjacency, seaEdgeCost, a, b, cost);
+      linkOnce(seaAdjacency, seaEdgeCost, b, a, cost);
+    }
   }
 
   const nodeCount = xs.length;
   for (let id = 0; id < nodeCount; id += 1) {
     adjacency[id] ??= [];
     edgeCost[id] ??= [];
+    seaAdjacency[id] ??= [];
+    seaEdgeCost[id] ??= [];
   }
 
   const component = new Int32Array(nodeCount).fill(-1);
@@ -145,6 +170,8 @@ export function buildLandGraph(
     nodeCount,
     width,
     height,
+    seaAdjacency,
+    seaEdgeCost,
   };
 }
 

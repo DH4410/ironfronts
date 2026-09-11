@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { commandPayloadSchema, GAME_ID, PROTOCOL_VERSION } from '../../packages/protocol/src/index';
+import {
+  clientMessageSchema, commandPayloadSchema, GAME_ID, PROTOCOL_VERSION, serverMessageSchema,
+} from '../../packages/protocol/src/index';
 import { signGameTicket, verifyGameTicket } from '../../packages/protocol/src/ticket';
 import { TicketNonceStore } from '../../apps/game-server/src/ticket-nonces';
 
@@ -59,6 +61,17 @@ describe('game tickets and command wire schema', () => {
     expect(() => commandPayloadSchema.parse({
       type: 'proposeDiplomacy', targetCountryId: 2, proposal: 'surrender',
     })).toThrow();
+  });
+
+  it('accepts devSetEnvironment with either field optional, and its devEnvironment broadcast', () => {
+    expect(clientMessageSchema.parse({ type: 'devSetEnvironment', timeOfDayHours: 13.5 }))
+      .toEqual({ type: 'devSetEnvironment', timeOfDayHours: 13.5 });
+    expect(clientMessageSchema.parse({ type: 'devSetEnvironment', raining: true }))
+      .toEqual({ type: 'devSetEnvironment', raining: true });
+    expect(() => clientMessageSchema.parse({ type: 'devSetEnvironment', timeOfDayHours: 30 })).toThrow();
+    expect(serverMessageSchema.parse({
+      type: 'devEnvironment', timeOfDayHours: null, raining: false, devControlsEnabled: true,
+    })).toMatchObject({ type: 'devEnvironment', timeOfDayHours: null, raining: false });
   });
 
   it('accepts a ticket nonce once and rejects replay', () => {

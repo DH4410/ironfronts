@@ -60,6 +60,14 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   // the whole server's simulation pace for every connected player, so it is
   // never wrapped in the commandId-acked command envelope above.
   z.object({ type: z.literal('devSetSimSpeed'), multiplier: z.number().finite().min(0).max(32) }),
+  // Same dev/test-only, server-wide semantics as devSetSimSpeed above: applies
+  // to every connected player, ignored in production. Fields are independently
+  // optional so a caller can change just the clock or just the rain.
+  z.object({
+    type: z.literal('devSetEnvironment'),
+    timeOfDayHours: z.number().finite().min(0).max(24).optional(),
+    raining: z.boolean().optional(),
+  }),
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 
@@ -211,7 +219,14 @@ export type ServerMessage =
   // `devControlsEnabled: false` in production — the server ignores
   // devSetSimSpeed there regardless, but the client uses this to hide the
   // control entirely rather than offer a lever that silently does nothing.
-  | { type: 'devSimSpeed'; multiplier: number; devControlsEnabled: boolean };
+  | { type: 'devSimSpeed'; multiplier: number; devControlsEnabled: boolean }
+  // Sent right after `baseline` and again whenever a devSetEnvironment message
+  // changes it. `timeOfDayHours: null` means "no override" — the client keeps
+  // deriving lighting from the civil clock as usual.
+  | {
+    type: 'devEnvironment'; timeOfDayHours: number | null; raining: boolean;
+    devControlsEnabled: boolean;
+  };
 
 export const serverMessageSchema = z.discriminatedUnion('type', [
   z.object({
@@ -242,6 +257,12 @@ export const serverMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('error'), code: z.string(), message: z.string(), retryable: z.boolean().optional() }),
   z.object({
     type: z.literal('devSimSpeed'), multiplier: z.number().finite().min(0).max(32),
+    devControlsEnabled: z.boolean(),
+  }),
+  z.object({
+    type: z.literal('devEnvironment'),
+    timeOfDayHours: z.number().finite().min(0).max(24).nullable(),
+    raining: z.boolean(),
     devControlsEnabled: z.boolean(),
   }),
 ]);

@@ -18,6 +18,8 @@ function coincidentNodeGraph(): LandGraph {
     nodeZ: new Float64Array([100, 100, 100]),
     adjacency: [[1], [0, 2], [1]],
     edgeCost: [[0.2], [0.2, 199.8], [199.8]],
+    seaAdjacency: [[], [], []],
+    seaEdgeCost: [[], [], []],
     component: new Int32Array([0, 0, 0]),
     componentSize: [3],
     nodeCount: 3,

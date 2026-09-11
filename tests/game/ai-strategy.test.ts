@@ -26,6 +26,8 @@ function corridorGraph(): LandGraph {
     nodeZ: new Float64Array(CENTERS.length).fill(100),
     adjacency,
     edgeCost,
+    seaAdjacency: CENTERS.map(() => []),
+    seaEdgeCost: CENTERS.map(() => []),
     component: new Int32Array(CENTERS.length),
     componentSize: [CENTERS.length],
     nodeCount: CENTERS.length,

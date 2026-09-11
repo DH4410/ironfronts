@@ -197,14 +197,19 @@ function findOrCreateFront(
   return front;
 }
 
+/** Mid sea-crossing — can't fight, can't be attacked (units/movement.ts). */
+function isNavalTransit(army: ArmyStack): boolean {
+  return army.status === 'embarking' || army.status === 'atSea' || army.status === 'disembarking';
+}
+
 function detectEngagements(session: SimContext, events: CombatEvent[]): void {
   const armies = Object.values(session.state.armies);
   for (let i = 0; i < armies.length; i += 1) {
     const a = armies[i];
-    if (a.retreat?.protected) continue;
+    if (a.retreat?.protected || isNavalTransit(a)) continue;
     for (let j = i + 1; j < armies.length; j += 1) {
       const b = armies[j];
-      if (b.retreat?.protected || a.ownerCountryId === b.ownerCountryId) continue;
+      if (b.retreat?.protected || isNavalTransit(b) || a.ownerCountryId === b.ownerCountryId) continue;
       if (relationOf(session.state, a.ownerCountryId, b.ownerCountryId) !== 'war') continue;
       if (wrappedDistance(a.x, a.z, b.x, b.z, session.world.width) > COMBAT_SNAP) continue;
       findOrCreateFront(session, a, b, events);

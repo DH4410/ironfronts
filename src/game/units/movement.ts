@@ -6,11 +6,70 @@ import { ensureArmyRuntimeState, mergeStacks, stackBaseSpeed } from './army';
 import {
   closestReachablePath, findPath, pathLength, type EdgeAllowed,
 } from '../movement/pathfind';
-import { nearestNode } from '../movement/graph';
+import { nearestNode, type LandGraph } from '../movement/graph';
 import { wrappedDistance } from '../geometry';
 import { TERRAIN_CLASS } from '../world-data';
 import { relationOf, setRelation } from '../game-state';
 import { computeArmyVisibility } from '../visibility';
+
+/**
+ * Embark/disembark dwell time for a sea/ferry crossing, chosen to read as
+ * ~20 real-world minutes at 1x sim speed — matching the server's fixed tick
+ * (apps/game-server/src/timing.ts, not imported here to keep src/game free
+ * of a dependency on the server package): SIMULATION_INTERVAL_MS = 100ms
+ * real per tick, SIMULATION_TICK_HOURS = 0.05 sim-hours per tick, so at 1x
+ * speed 1 real second = (1000 / 100) * 0.05 = 0.5 sim-hours. 20 real minutes
+ * = 1200 real seconds * 0.5 sim-hours/real-second = 600 sim-hours.
+ */
+export const NAVAL_DWELL_HOURS = 600;
+
+/**
+ * Land graph + sea/ferry edges merged into one routable view, built lazily
+ * and cached per graph instance. Only used as a fallback when a destination
+ * is unreachable on the land graph alone (a different landmass) — every
+ * ordinary land order still resolves via the untouched land-only graph, so
+ * existing pathing/messages are unaffected.
+ */
+const combinedGraphCache = new WeakMap<LandGraph, LandGraph>();
+function combinedGraph(graph: LandGraph): LandGraph {
+  const cached = combinedGraphCache.get(graph);
+  if (cached) return cached;
+  const adjacency = graph.adjacency.map((list, id) => [...list, ...graph.seaAdjacency[id]]);
+  const edgeCost = graph.edgeCost.map((list, id) => [...list, ...graph.seaEdgeCost[id]]);
+  const component = new Int32Array(graph.nodeCount).fill(-1);
+  const componentSize: number[] = [];
+  const stack: number[] = [];
+  for (let seed = 0; seed < graph.nodeCount; seed += 1) {
+    if (component[seed] !== -1) continue;
+    const componentId = componentSize.length;
+    component[seed] = componentId;
+    stack.length = 0;
+    stack.push(seed);
+    let size = 0;
+    while (stack.length > 0) {
+      const current = stack.pop() as number;
+      size += 1;
+      for (const next of adjacency[current]) {
+        if (component[next] === -1) {
+          component[next] = componentId;
+          stack.push(next);
+        }
+      }
+    }
+    componentSize.push(size);
+  }
+  const combined: LandGraph = { ...graph, adjacency, edgeCost, component, componentSize };
+  combinedGraphCache.set(graph, combined);
+  return combined;
+}
+
+/** Whether the hop from `from` to `to` is a sea/ferry edge (vs. a land edge). */
+function isSeaEdge(graph: LandGraph, from: number, to: number): boolean {
+  return graph.seaAdjacency[from]?.includes(to) ?? false;
+}
+
+/** Naval crossing states — army is not usable for combat/orders while so. */
+const NAVAL_STATUSES = new Set(['embarking', 'atSea', 'disembarking']);
 
 const TERRAIN_SPEED: Record<number, number> = {
   [TERRAIN_CLASS.plain]: 1,
@@ -51,7 +110,8 @@ export interface CurrentMovementLeg {
  * terrain, road, retreat, and global movement multipliers as simulation. */
 export function currentMovementLeg(session: SimContext, army: ArmyStack): CurrentMovementLeg | null {
   const order = army.order;
-  if (!order?.path.length || army.status === 'engaged') return null;
+  if (!order?.path.length || army.status === 'engaged'
+    || army.status === 'embarking' || army.status === 'disembarking') return null;
   const targetNode = order.path[0];
   const targetX = session.graph.nodeX[targetNode];
   const targetZ = session.graph.nodeZ[targetNode];
@@ -149,26 +209,40 @@ export function issueMoveOrder(
   ensureArmyRuntimeState(army);
   if (army.status === 'engaged') return { ok: false, reason: 'Army is in close combat.' };
   if (army.status === 'retreating') return { ok: false, reason: 'Army is retreating.' };
+  if (NAVAL_STATUSES.has(army.status)) return { ok: false, reason: 'Army is mid sea crossing.' };
 
   const component = session.graph.component[army.graphNodeId] ?? -1;
-  const goal = nearestNode(session.graph, destX, destZ, 600, component);
+  let graph = session.graph;
+  let goal = nearestNode(graph, destX, destZ, 600, component);
   if (goal < 0) {
-    // No reachable land-graph node near the point: it is water/void, or on a
-    // landmass this army cannot walk to.
-    const anyGoal = nearestNode(session.graph, destX, destZ, 600, -1);
+    // Not reachable on the land graph alone — try the combined land+sea view
+    // before giving up, so a destination on another landmass with a ferry
+    // link still resolves (the crossing itself is handled in stepMovement).
+    const merged = combinedGraph(session.graph);
+    const mergedComponent = merged.component[army.graphNodeId] ?? -1;
+    const mergedGoal = nearestNode(merged, destX, destZ, 600, mergedComponent);
+    if (mergedGoal >= 0) {
+      graph = merged;
+      goal = mergedGoal;
+    }
+  }
+  if (goal < 0) {
+    // No reachable graph node near the point at all: it is water/void, or on
+    // a landmass this army cannot reach even via a ferry link.
+    const anyGoal = nearestNode(combinedGraph(session.graph), destX, destZ, 600, -1);
     return anyGoal < 0
       ? { ok: false, reason: 'That destination is off the road network — pick a spot on land.' }
       : { ok: false, reason: 'That destination is on a separate landmass this army cannot reach.' };
   }
-  const unrestricted = findPath(session.graph, army.graphNodeId, goal);
+  const unrestricted = findPath(graph, army.graphNodeId, goal);
   if (!unrestricted) {
-    return { ok: false, reason: 'No land route to that location.' };
+    return { ok: false, reason: 'No route to that location.' };
   }
   const alreadyThere = unrestricted.length < 2;
   if (alreadyThere && intent === 'move') return { ok: false, reason: 'Already there.' };
 
   const currentlyLegal = findPath(
-    session.graph, army.graphNodeId, goal, movementEdgeAllowed(session, army.ownerCountryId),
+    graph, army.graphNodeId, goal, movementEdgeAllowed(session, army.ownerCountryId),
   );
   const required = new Set(currentlyLegal
     ? [] : warsRequiredForPath(session, army.ownerCountryId, unrestricted));
@@ -183,7 +257,7 @@ export function issueMoveOrder(
     return { ok: false, reason: 'War declaration required.', requiredWarCountryIds: missing };
   }
   const legal = currentlyLegal ?? findPath(
-    session.graph, army.graphNodeId, goal,
+    graph, army.graphNodeId, goal,
     movementEdgeAllowed(session, army.ownerCountryId, false, required),
   );
   if (!legal || (!alreadyThere && legal.length < 2)) {
@@ -196,7 +270,7 @@ export function issueMoveOrder(
     return { ok: true, nodes: 0 };
   }
   installOrder(
-    army, legal, session.graph.nodeX[goal], session.graph.nodeZ[goal], intent,
+    army, legal, graph.nodeX[goal], graph.nodeZ[goal], intent,
     target ?? { kind: 'position', x: destX, z: destZ },
   );
   return { ok: true, nodes: legal.length - 1 };
@@ -206,7 +280,7 @@ export function issueStop(session: SimContext, armyId: string): boolean {
   const army = session.state.armies[armyId];
   if (!army) return false;
   ensureArmyRuntimeState(army);
-  if (army.status === 'engaged' || army.status === 'retreating') return false;
+  if (army.status === 'engaged' || army.status === 'retreating' || NAVAL_STATUSES.has(army.status)) return false;
   army.order = null;
   army.extractingNodeId = null;
   if (army.status === 'moving' || army.status === 'extracting') army.status = 'idle';
@@ -258,6 +332,11 @@ function revalidateOrder(session: SimContext, army: ArmyStack, order: MoveOrder)
   // corridor was found to cross water. Treat a missing leading edge exactly
   // like an ownership-blocked one: re-path around it, or stop if nothing legal
   // remains. Without this a stale order lerps a land army straight over water.
+  // A sea/ferry leg can never be blocked by ownership/war (open water isn't
+  // territory) and is intentionally absent from the land-only adjacency
+  // checked below, so it is never treated as missing or re-audited here —
+  // stepMovement's naval state machine owns everything about that hop.
+  if (order.path.length > 0 && isSeaEdge(session.graph, army.graphNodeId, order.path[0])) return true;
   const nextMissing = order.path.length > 0
     && !session.graph.adjacency[army.graphNodeId]?.includes(order.path[0]);
   const nextInvalid = order.path.length > 0
@@ -378,6 +457,10 @@ export function stepMovement(session: SimContext, dtHours: number): void {
     ensureArmyRuntimeState(army);
     const order = army.order;
     if (!order || army.status === 'engaged') continue;
+    if (NAVAL_STATUSES.has(army.status)) {
+      stepNavalCrossing(session, army, order, dtHours);
+      continue;
+    }
     // A revalidated order can be left with an empty path when the route now
     // crosses ground this army may not enter (a neutral border it is not at
     // war with). Resolve it to a clean stop instead of leaving the stack in
@@ -394,6 +477,16 @@ export function stepMovement(session: SimContext, dtHours: number): void {
 
     while (budget > 0 && order.path.length > 0) {
       const targetNode = order.path[0];
+      if (isSeaEdge(graph, army.graphNodeId, targetNode)) {
+        // A sea/ferry hop is never crossed by the ordinary distance budget
+        // below — begin the timed embark/transit/disembark sequence instead
+        // and leave the rest of this tick's budget unused; stepNavalCrossing
+        // takes over on the next tick.
+        army.status = 'embarking';
+        army.navalCrossing = { fromNodeId: army.graphNodeId, toNodeId: targetNode, hoursRemaining: NAVAL_DWELL_HOURS };
+        budget = 0;
+        break;
+      }
       const tx = graph.nodeX[targetNode];
       const tz = graph.nodeZ[targetNode];
       const rawSegLen = wrappedDistance(army.x, army.z, tx, tz, world.width);
@@ -452,5 +545,67 @@ export function stepMovement(session: SimContext, dtHours: number): void {
       army.retreat = null;
       mergeArrivedStack(session, army);
     }
+  }
+}
+
+/**
+ * Advance one tick of an in-progress sea/ferry crossing. Embarking and
+ * disembarking are pure dwell timers (NAVAL_DWELL_HOURS each); the atSea
+ * phase reuses the same distance-budget edge traversal as ordinary land
+ * movement — reasonable open-water speed, no terrain penalty — for exactly
+ * the one sea edge in `crossing`, then hands off to the disembark timer.
+ */
+function stepNavalCrossing(
+  session: SimContext, army: ArmyStack, order: MoveOrder, dtHours: number,
+): void {
+  const { graph, world } = session;
+  const crossing = army.navalCrossing;
+  if (!crossing) {
+    // Defensive: should be unreachable (status and navalCrossing are always
+    // set together), but never leave a stack stuck in a naval status with no
+    // crossing data to drive it.
+    army.status = 'idle';
+    return;
+  }
+  if (army.status === 'embarking') {
+    crossing.hoursRemaining -= dtHours;
+    if (crossing.hoursRemaining <= 0) army.status = 'atSea';
+    return;
+  }
+  if (army.status === 'atSea') {
+    const tx = graph.nodeX[crossing.toNodeId];
+    const tz = graph.nodeZ[crossing.toNodeId];
+    const rawSegLen = wrappedDistance(army.x, army.z, tx, tz, world.width);
+    const advance = stackBaseSpeed(army) * dtHours * STRATEGIC_MOVEMENT_SCALE * ROAD_BONUS;
+    if (rawSegLen < 1 || advance >= rawSegLen) {
+      army.x = tx;
+      army.z = tz;
+      army.lastGraphNodeId = army.graphNodeId;
+      army.graphNodeId = crossing.toNodeId;
+      order.path.shift();
+      order.edgeProgress = 0;
+      army.status = 'disembarking';
+      crossing.hoursRemaining = NAVAL_DWELL_HOURS;
+    } else {
+      const t = advance / rawSegLen;
+      let dx = tx - army.x;
+      if (dx > world.width / 2) dx -= world.width;
+      else if (dx < -world.width / 2) dx += world.width;
+      army.x = ((army.x + dx * t) % world.width + world.width) % world.width;
+      army.z += (tz - army.z) * t;
+    }
+    return;
+  }
+  // disembarking
+  crossing.hoursRemaining -= dtHours;
+  if (crossing.hoursRemaining > 0) return;
+  army.navalCrossing = null;
+  if (order.path.length === 0) {
+    army.order = null;
+    army.status = 'idle';
+    army.retreat = null;
+    mergeArrivedStack(session, army);
+  } else {
+    army.status = 'moving';
   }
 }

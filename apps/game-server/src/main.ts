@@ -77,6 +77,20 @@ function setDevSimSpeed(multiplier: number): void {
   log('info', 'dev_sim_speed_changed', { multiplier: simSpeedMultiplier });
 }
 
+// Same one-value-for-the-whole-process model as devSimSpeed above: a debug
+// weather/time change from any connected player is visible to all of them,
+// not a per-player preference.
+let devTimeOfDayHours: number | null = null;
+let devRaining = false;
+function setDevEnvironment(next: { timeOfDayHours?: number; raining?: boolean }): void {
+  if (!devControlsEnabled) return;
+  if (next.timeOfDayHours !== undefined) {
+    devTimeOfDayHours = Math.max(0, Math.min(24, next.timeOfDayHours));
+  }
+  if (next.raining !== undefined) devRaining = next.raining;
+  log('info', 'dev_environment_changed', { timeOfDayHours: devTimeOfDayHours, raining: devRaining });
+}
+
 const gateway = new GameplayGateway({
   server,
   runtime,
@@ -87,6 +101,11 @@ const gateway = new GameplayGateway({
   revision: () => revision,
   saveGameInBackground,
   devSimSpeed: { get: () => simSpeedMultiplier, set: setDevSimSpeed, enabled: devControlsEnabled },
+  devEnvironment: {
+    get: () => ({ timeOfDayHours: devTimeOfDayHours, raining: devRaining }),
+    set: setDevEnvironment,
+    enabled: devControlsEnabled,
+  },
   log,
 });
 

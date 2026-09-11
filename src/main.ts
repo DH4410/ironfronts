@@ -147,6 +147,13 @@ const debugPlayerForm = required<HTMLFormElement>('debug-player-form');
 
 let lightingClockUnlinked = false;
 let unlinkedLightingMultiplier = 1;
+/** Last server devEnvironment applied locally, so the 400ms HUD poll only
+ *  touches the renderer/audio when a broadcast actually changed something —
+ *  including when this client itself is the one that just sent it. */
+let lastAppliedDevEnvironment: { timeOfDayHours: number | null; raining: boolean } | null = null;
+/** Mirrors units/movement.ts's NAVAL_STATUSES — a stack mid sea-crossing
+ *  can't be moved, attacked with, split, or stopped from the HUD. */
+const NAVAL_TRANSIT_STATUSES = new Set(['embarking', 'atSea', 'disembarking']);
 const debugPlayerInput = required<HTMLInputElement>('debug-player-input');
 const debugWarForm = required<HTMLFormElement>('debug-war-form');
 const debugWarInput = required<HTMLInputElement>('debug-at-war');
@@ -746,12 +753,15 @@ async function startGame(token: number): Promise<void> {
     if (hour !== undefined) {
       setLightingClockUnlinked(true);
       renderer.setTimeOfDay(hour);
+      session.setDevEnvironment({ timeOfDayHours: hour });
     }
   }, attemptListener);
   for (const preset of debugTimePresets) {
     preset.addEventListener('click', () => {
       setLightingClockUnlinked(true);
-      renderer.setTimeOfDay(Number(preset.dataset.debugTime));
+      const hour = Number(preset.dataset.debugTime);
+      renderer.setTimeOfDay(hour);
+      session.setDevEnvironment({ timeOfDayHours: hour });
     }, attemptListener);
   }
   const applyTimeMultiplier = () => {
@@ -767,6 +777,7 @@ async function startGame(token: number): Promise<void> {
     renderer.setRainEnabled(debugRain.checked);
     void audio.setRainEnabled(debugRain.checked);
     uiStore.patch({ weather: { raining: debugRain.checked, label: debugRain.checked ? 'Rain' : 'Clear' } });
+    session.setDevEnvironment({ raining: debugRain.checked });
   }, attemptListener);
   debugThunder.addEventListener('click', () => {
     void audio.playThunder();
@@ -950,6 +961,37 @@ for (const button of debugSimSpeedButtons) {
   });
 }
 
+/**
+ * Apply the server-broadcast debug time-of-day/rain override to this client's
+ * renderer + audio, same as every other connected player sees — mirrors
+ * syncSimSpeedUi's shared-server-state model. Runs every HUD tick but only
+ * touches the renderer when the broadcast value actually changed, so it is a
+ * no-op for a server with no active override (the common case).
+ */
+function syncDevEnvironmentUi(session: RemoteGameSession, renderer: WorldRenderer): void {
+  const next = { timeOfDayHours: session.devTimeOfDayHours, raining: session.devRaining };
+  if (lastAppliedDevEnvironment
+    && lastAppliedDevEnvironment.timeOfDayHours === next.timeOfDayHours
+    && lastAppliedDevEnvironment.raining === next.raining) return;
+  lastAppliedDevEnvironment = next;
+  if (next.timeOfDayHours !== null) {
+    // Inline equivalent of the per-launch setLightingClockUnlinked(true) — that
+    // closure lives inside startGame and isn't reachable from this
+    // module-level function, so mirror its effect directly on the same
+    // module-level state (lightingClockUnlinked, debugTimeUnlink, etc.).
+    lightingClockUnlinked = true;
+    debugTimeUnlink.setAttribute('aria-pressed', 'true');
+    debugTimeUnlink.textContent = 'Relink';
+    debugTimeUnlink.title = 'Relink lighting to the real-life clock';
+    renderer.setTimeMultiplier(unlinkedLightingMultiplier);
+    renderer.setTimeOfDay(next.timeOfDayHours);
+  }
+  renderer.setRainEnabled(next.raining);
+  void audio.setRainEnabled(next.raining);
+  debugRain.checked = next.raining;
+  uiStore.patch({ weather: { raining: next.raining, label: next.raining ? 'Rain' : 'Clear' } });
+}
+
 async function bootstrapGameSession(
   renderer: WorldRenderer, session: RemoteGameSession,
 ): Promise<void> {
@@ -1044,6 +1086,7 @@ async function bootstrapGameSession(
     refreshSelectedProvince(session); // keep production / construction % live
     drainSessionEvents(session);
     syncSimSpeedUi();
+    syncDevEnvironmentUi(session, renderer);
   }, 400);
   const typingInField = (target: EventTarget | null): boolean => {
     const el = target as HTMLElement | null;
@@ -1966,11 +2009,15 @@ function refreshSelectedArmy(
       // 'strike' is a nation-level order, not an army targeting mode — the army
       // card never reflects it.
       targetingMode: view.own && targetingMode !== 'strike' ? targetingMode : null,
-      canMove: view.own && view.status !== 'engaged' && view.status !== 'retreating',
-      canAttack: view.own && view.status !== 'engaged' && view.status !== 'retreating',
+      canMove: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+        && !NAVAL_TRANSIT_STATUSES.has(view.status),
+      canAttack: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+        && !NAVAL_TRANSIT_STATUSES.has(view.status),
       canRetreat: view.own && view.status === 'engaged' && Boolean(view.legalRetreatExits?.length),
-      canSplit: view.own && view.status !== 'engaged' && view.status !== 'retreating',
+      canSplit: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+        && !NAVAL_TRANSIT_STATUSES.has(view.status),
       canStop: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+        && !NAVAL_TRANSIT_STATUSES.has(view.status)
         && (Boolean(view.moveOrder) || view.status === 'extracting' || targetingMode !== null),
       legalRetreatExits: view.legalRetreatExits,
       battleFronts: view.battleFronts,
