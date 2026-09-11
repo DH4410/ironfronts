@@ -870,7 +870,7 @@ async function startGame(token: number): Promise<void> {
   // attempt down and shows the loader's Retry / Return-to-Command error state.
   await withTimeout(
     renderer.initialize((stage, progress) => setLoadingStage(stage, 0.12 + progress * 0.8)),
-    90_000,
+    300_000,
     'Preparing the renderer',
   );
   if (token !== launchToken) return;
