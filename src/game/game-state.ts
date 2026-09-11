@@ -173,7 +173,7 @@ export interface GameClock {
   /** Epoch origin; debug clock changes adjust this without changing elapsed simulation. */
   initialEpochMs?: number;
   generation?: number;
-    pendingHours?: number;
+  pendingHours?: number;
   /** Monotonic game-time in hours since scenario start. Drives every system. */
   gameTimeHours: number;
   readonly startDate: string;

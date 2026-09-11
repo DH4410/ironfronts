@@ -221,7 +221,4 @@ export class GameConnection extends EventTarget {
     this.failPending('Connection closed.'); this.setStatus('closed');
     this.socket?.close(1000, 'Client closed'); this.socket = null;
   }
-
-  /** Dev/test only — server ignores this against a production server. Either
-   *  field may be omitted to leave that half of the environment unchanged. */
 }
