@@ -1326,7 +1326,8 @@ export class WorldRenderer {
 
   /** Gameplay province id under a world-space point, or -1 over water/void.
    *  Lets client code (e.g. siege VFX) resolve "which province is this fight
-   *  in" from an army's world coordinates without a screen raycast. */
+   *  in" from an army's world coordinates without a screen raycast — the
+   *  player projection never ships a battle front's own province id. */
   provinceIdAtWorld(worldX: number, worldZ: number): number {
     return gameplayProvinceId(this.sampleProvince(worldX, worldZ));
   }

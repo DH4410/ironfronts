@@ -3,7 +3,8 @@ import {
   CombatEffectPool, EFFECT_KIND, EFFECT_STRIDE, compassLabel, effectDensityForDistance,
 } from '../src/combat-effects';
 import {
-  battleClusterKey, combatHuddleOffset, HUDDLE_MAX_PULL, HUDDLE_TARGET_RADIUS, type Point,
+  buildBattleAnchors, combatHuddleOffset, groupEngagedByFront,
+  HUDDLE_MAX_PULL, HUDDLE_TARGET_RADIUS, type EngagedStackLike, type Point,
 } from '../src/combat-huddle';
 
 const CAM = { x: 0, z: 0 };
@@ -148,12 +149,85 @@ describe('combatHuddleOffset (render-only visual nudge)', () => {
   });
 });
 
-describe('battleClusterKey', () => {
-  it('groups nearby stacks (within the same ~70u cell) under one key', () => {
-    expect(battleClusterKey(140, 280)).toBe(battleClusterKey(150, 285));
+describe('groupEngagedByFront', () => {
+  it('groups two engaged stacks that report the same front id, centroid as the anchor', () => {
+    // COMBAT_SNAP is 26 world units (src/game/combat/constants.ts) — this is
+    // the separation two stacks can have the instant a front is created.
+    const stacks: EngagedStackLike[] = [
+      { id: 'a', x: 0, z: 0, ownerCountryId: 1, frontIds: ['front-1'] },
+      { id: 'b', x: 26, z: 0, ownerCountryId: 2, frontIds: ['front-1'] },
+    ];
+    const clusters = groupEngagedByFront(stacks);
+    expect(clusters.size).toBe(1);
+    const cluster = clusters.get('front-1')!;
+    expect(cluster.x).toBeCloseTo(13);
+    expect(cluster.z).toBeCloseTo(0);
+    expect(cluster.ownerCountryIds).toEqual(new Set([1, 2]));
+    expect([...cluster.memberIds].sort()).toEqual(['a', 'b']);
   });
 
-  it('separates stacks in different cells', () => {
-    expect(battleClusterKey(0, 0)).not.toBe(battleClusterKey(500, 0));
+  it('ignores stacks with no front id (not engaged / not fully visible)', () => {
+    const stacks: EngagedStackLike[] = [
+      { id: 'a', x: 0, z: 0, ownerCountryId: 1, frontIds: [] },
+    ];
+    expect(groupEngagedByFront(stacks).size).toBe(0);
+  });
+
+  it('separates two different fronts even if their stacks happen to sit close together', () => {
+    const stacks: EngagedStackLike[] = [
+      { id: 'a', x: 0, z: 0, ownerCountryId: 1, frontIds: ['front-1'] },
+      { id: 'b', x: 5, z: 0, ownerCountryId: 2, frontIds: ['front-2'] },
+    ];
+    expect(groupEngagedByFront(stacks).size).toBe(2);
+  });
+});
+
+describe('groupEngagedByFront + buildBattleAnchors + combatHuddleOffset end-to-end', () => {
+  it('converges two hostile stacks on a real front to a tight, non-zero-crossing gap', () => {
+    // A pair well outside the visual huddle radius but within HUDDLE_MAX_PULL
+    // of their shared front — a plausible "far apart despite being engaged"
+    // separation (reinforcements can join a front from an adjacent road node,
+    // well beyond COMBAT_SNAP's 26u trigger range).
+    const stacks: EngagedStackLike[] = [
+      { id: 'a', x: -50, z: 0, ownerCountryId: 1, frontIds: ['front-1'] },
+      { id: 'b', x: 50, z: 0, ownerCountryId: 2, frontIds: ['front-1'] },
+    ];
+    const anchors = buildBattleAnchors(groupEngagedByFront(stacks));
+    expect(anchors.get('a')).toEqual(anchors.get('b'));
+    const offsetA = combatHuddleOffset(stacks[0], anchors.get('a')!);
+    const offsetB = combatHuddleOffset(stacks[1], anchors.get('b')!);
+    const renderedA = { x: stacks[0].x + offsetA.x, z: stacks[0].z + offsetA.z };
+    const renderedB = { x: stacks[1].x + offsetB.x, z: stacks[1].z + offsetB.z };
+    const finalGap = Math.hypot(renderedA.x - renderedB.x, renderedA.z - renderedB.z);
+    // Both sides pull to within HUDDLE_TARGET_RADIUS of the shared anchor, so
+    // the resulting gap is exactly twice that — a clash, not two distant icons.
+    expect(finalGap).toBeCloseTo(2 * HUDDLE_TARGET_RADIUS, 5);
+    expect(finalGap).toBeLessThan(100); // the original 100u gap
+  });
+
+  it('still shrinks the gap (via HUDDLE_MAX_PULL) even for a pair far beyond the target radius', () => {
+    const stacks: EngagedStackLike[] = [
+      { id: 'a', x: -300, z: 0, ownerCountryId: 1, frontIds: ['front-1'] },
+      { id: 'b', x: 300, z: 0, ownerCountryId: 2, frontIds: ['front-1'] },
+    ];
+    const anchors = buildBattleAnchors(groupEngagedByFront(stacks));
+    const offsetA = combatHuddleOffset(stacks[0], anchors.get('a')!);
+    const offsetB = combatHuddleOffset(stacks[1], anchors.get('b')!);
+    const finalGap = Math.hypot(
+      (stacks[0].x + offsetA.x) - (stacks[1].x + offsetB.x),
+      (stacks[0].z + offsetA.z) - (stacks[1].z + offsetB.z),
+    );
+    expect(finalGap).toBeCloseTo(600 - 2 * HUDDLE_MAX_PULL, 5);
+    expect(finalGap).toBeLessThan(600); // still meaningfully closer, even if not down to the target radius
+  });
+
+  it('never assigns an anchor to a stack not part of any front', () => {
+    const stacks: EngagedStackLike[] = [
+      { id: 'a', x: 0, z: 0, ownerCountryId: 1, frontIds: ['front-1'] },
+      { id: 'b', x: 10, z: 0, ownerCountryId: 2, frontIds: ['front-1'] },
+      { id: 'bystander', x: 500, z: 500, ownerCountryId: 3, frontIds: [] },
+    ];
+    const anchors = buildBattleAnchors(groupEngagedByFront(stacks));
+    expect(anchors.has('bystander')).toBe(false);
   });
 });

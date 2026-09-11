@@ -3,17 +3,21 @@
  *
  * Two hostile stacks trigger a fight once they come within COMBAT_SNAP world
  * units (see src/game/combat/constants.ts) — but that authoritative trigger
- * range is still wide enough that the pair can render far apart on the map,
- * reading as two distant icons rather than a clash. This module never touches
+ * range is still wide enough (and a front can gain reinforcements from an
+ * adjacent road node afterward) that a fight can render far apart on the map,
+ * reading as distant icons rather than a clash. This module never touches
  * simulation coordinates; it only computes a render-layer nudge the caller
  * adds to the *displayed* position, so it can never desync the client from
  * the authoritative sim or multiplayer state.
  *
- * Every engaged stack in one grid cell (see `battleClusterKey`) huddles
- * toward the SAME shared anchor point — the same point syncCombatMarkers
- * already uses for the persistent crossed-swords battle marker — so the
- * army badges, that marker, and the continuous fight FX all read as one
- * clash instead of drifting apart from each other.
+ * Grouping is keyed off the authoritative battle-front id the sim already
+ * assigns (PlayerArmyView.battleFronts[].id — see src/game/player-view.ts),
+ * not a distance/grid heuristic, so it can never miss a pair the sim itself
+ * considers engaged. The player projection never ships a front's own x/z (or
+ * its province id), so each cluster's anchor is the centroid of its current
+ * members' positions instead — every army sharing a front converges toward
+ * that same anchor, and spawnOngoingBattleFx (src/main.ts) spawns its FX at
+ * that exact point too, so the huddle and the FX never drift apart.
  */
 
 export interface Point {
@@ -27,14 +31,6 @@ export interface HuddleOffset {
 }
 
 const ZERO: HuddleOffset = { x: 0, z: 0 };
-
-/** World-space grid used to cluster engaged stacks into one shared battle
- *  point (~one road-node's worth of slack). Matches syncCombatMarkers. */
-export const BATTLE_CLUSTER_GRID = 70;
-
-export function battleClusterKey(x: number, z: number): string {
-  return `${Math.round(x / BATTLE_CLUSTER_GRID)}:${Math.round(z / BATTLE_CLUSTER_GRID)}`;
-}
 
 /** Rendered gap (world units) an engaged stack huddles down to around its
  *  battle anchor — small enough that two badges read as one clash. */
@@ -60,4 +56,60 @@ export function combatHuddleOffset(
   if (dist <= targetRadius) return ZERO;
   const pull = Math.min(maxPull, dist - targetRadius);
   return { x: (dx / dist) * pull, z: (dz / dist) * pull };
+}
+
+export interface EngagedStackLike {
+  readonly id: string;
+  readonly x: number;
+  readonly z: number;
+  readonly ownerCountryId: number;
+  /** ids of every live battle front this army currently reports (the first
+   *  one is used as its cluster key). Pass [] for a non-engaged stack. */
+  readonly frontIds: readonly string[];
+}
+
+export interface BattleCluster {
+  readonly x: number;
+  readonly z: number;
+  readonly ownerCountryIds: ReadonlySet<number>;
+  readonly memberIds: readonly string[];
+}
+
+/**
+ * Group engaged stacks by the authoritative battle-front id they report,
+ * with each cluster's position the centroid of its current members. Stacks
+ * with no front id are skipped.
+ */
+export function groupEngagedByFront(stacks: Iterable<EngagedStackLike>): Map<string, BattleCluster> {
+  const sums = new Map<string, { sumX: number; sumZ: number; owners: Set<number>; members: string[] }>();
+  for (const stack of stacks) {
+    const frontId = stack.frontIds[0];
+    if (!frontId) continue;
+    const group = sums.get(frontId) ?? { sumX: 0, sumZ: 0, owners: new Set<number>(), members: [] };
+    group.sumX += stack.x;
+    group.sumZ += stack.z;
+    group.owners.add(stack.ownerCountryId);
+    group.members.push(stack.id);
+    sums.set(frontId, group);
+  }
+  const clusters = new Map<string, BattleCluster>();
+  for (const [frontId, group] of sums) {
+    clusters.set(frontId, {
+      x: group.sumX / group.members.length,
+      z: group.sumZ / group.members.length,
+      ownerCountryIds: group.owners,
+      memberIds: group.members,
+    });
+  }
+  return clusters;
+}
+
+/** One shared anchor per army id, taken from its cluster's centroid. */
+export function buildBattleAnchors(clusters: ReadonlyMap<string, BattleCluster>): Map<string, Point> {
+  const anchors = new Map<string, Point>();
+  for (const cluster of clusters.values()) {
+    const anchor: Point = { x: cluster.x, z: cluster.z };
+    for (const id of cluster.memberIds) anchors.set(id, anchor);
+  }
+  return anchors;
 }

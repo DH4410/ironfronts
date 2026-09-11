@@ -84,15 +84,16 @@ describe('locatable notification', () => {
 });
 
 describe('combat huddle (visual-only positioning)', () => {
-  it('builds one shared battle anchor per cluster from authoritative x/z, then nudges only the displayed armyMotion', () => {
+  it('groups engaged armies by their authoritative front id, then nudges only the displayed armyMotion', () => {
     const start = main.indexOf('// Combat huddle (visual only)');
     const block = main.slice(start, main.indexOf('for (const army of Object.values(session.state.armies)) {', start) + 4_000);
-    // Anchors are built from real (unrendered) positions, never mutated, one per battleClusterKey.
-    expect(block).toContain("if (a.status !== 'engaged') continue;");
-    expect(block).toContain('const key = battleClusterKey(a.x, a.z);');
-    expect(block).toContain('battleAnchors.set(key, { x: a.x, z: a.z })');
-    expect(block).toContain("army.status === 'engaged'");
-    expect(block).toContain('combatHuddleOffset({ x: army.x, z: army.z }, battleAnchors.get(battleClusterKey(army.x, army.z))!)');
+    // Anchors are grouped by the front id each engaged army reports (not a
+    // distance/grid heuristic), so no pair the sim considers engaged can be missed.
+    expect(block).toMatch(/Object\.values\(session\.state\.armies\)\s*\.filter\(\(a\) => a\.status === 'engaged'\)/);
+    expect(block).toContain('frontIds: (a.battleFronts ?? []).map((f) => f.id)');
+    expect(block).toContain('buildBattleAnchors(groupEngagedByFront(');
+    expect(block).toContain("army.status === 'engaged' ? battleAnchors.get(army.id) : undefined");
+    expect(block).toContain('combatHuddleOffset({ x: army.x, z: army.z }, battleAnchor)');
     // The offset is added to a fresh object (armyMotionRaw spread), never assigned back onto army.x/z.
     expect(block).toMatch(/const armyMotion = huddle[\s\S]{0,160}\.\.\.armyMotionRaw,\s*x: armyMotionRaw\.x \+ huddle\.x,\s*z: armyMotionRaw\.z \+ huddle\.z,\s*targetX: armyMotionRaw\.targetX \+ huddle\.x,\s*targetZ: armyMotionRaw\.targetZ \+ huddle\.z,/);
     expect(block).not.toMatch(/army\.x\s*=/);
@@ -110,19 +111,22 @@ describe('combat huddle (visual-only positioning)', () => {
 });
 
 describe('continuous battle FX (gunfire, smoke stalk, city-under-siege overlay)', () => {
-  it('spawns ongoing FX from the same HUD tick as the battle markers, gated on camera LOD', () => {
+  it('spawns ongoing FX per authoritative battle-front cluster, at the same centroid the huddle uses, gated on camera LOD', () => {
     const start = main.indexOf('function spawnOngoingBattleFx');
     const block = main.slice(start, main.indexOf('\nlet campaignOutcomeShown', start));
     expect(block).toContain('effectDensityForDistance(lastCombatCameraDistance)');
-    expect(block).toContain("a.status === 'engaged'");
-    // Only clusters with both sides present count as a real clash.
-    expect(block).toContain('cluster.owners.size < 2');
+    // Groups the same way the huddle above does — both sides must actually be
+    // present for a cluster to count as a real clash.
+    expect(block).toContain('groupEngagedByFront(');
+    expect(block).toContain('cluster.ownerCountryIds.size < 2) continue');
     // Gunshots: more frequent than the single spawnVolley the 'engaged'/'combatPulse' events already fire.
     expect(block).toContain("combatEffects.spawnVolley('infantry', cluster.x, cluster.z");
     // Smoke reuses the same EFFECT_KIND.smoke WGSL composition as the nuke's smoke stalk, smaller/continuous.
     expect(block).toContain('EFFECT_KIND.smoke');
     expect(block).toMatch(/lifetimeMs: 2_400/);
-    // City-under-siege: only when the engaged province actually has buildings.
+    // City-under-siege: resolve the province from the fight's own centroid
+    // (the projection never ships a front's province id) and only act when it
+    // actually has buildings.
     expect(block).toContain('renderer.provinceIdAtWorld(cluster.x, cluster.z)');
     expect(block).toContain('session.state.provinceBuildings[provinceId]');
     expect(block).toContain('buildingCount <= 0) continue');
