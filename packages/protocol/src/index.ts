@@ -25,8 +25,29 @@ export const commandPayloadSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('stopArmy'), armyId: z.string() }),
   z.object({ type: z.literal('extract'), armyId: z.string() }),
   z.object({ type: z.literal('produce'), provinceId: z.number().int().nonnegative(), unitTypeId: z.string() }),
-  z.object({ type: z.literal('build'), provinceId: z.number().int().nonnegative(), buildingId: z.enum(['barracks', 'tankPlant', 'ordnance']) }),
+  z.object({ type: z.literal('build'), provinceId: z.number().int().nonnegative(), buildingId: z.enum(['barracks', 'tankPlant', 'ordnance', 'missileSite']) }),
   z.object({ type: z.literal('setRally'), provinceId: z.number().int().nonnegative(), target: z.object({ x: z.number().finite(), z: z.number().finite() }).nullable() }),
+  z.object({
+    type: z.literal('sendDiplomaticMessage'),
+    targetCountryId: z.number().int().positive(),
+    body: z.string().min(1).max(500),
+  }),
+  z.object({
+    type: z.literal('proposeDiplomacy'),
+    targetCountryId: z.number().int().positive(),
+    proposal: z.enum(['alliance', 'peace']),
+  }),
+  z.object({
+    type: z.literal('respondDiplomacy'),
+    proposalId: z.string().min(1).max(100),
+    accept: z.boolean(),
+  }),
+  z.object({ type: z.literal('declareWar'), targetCountryId: z.number().int().positive() }),
+  z.object({ type: z.literal('endAlliance'), targetCountryId: z.number().int().positive() }),
+  z.object({
+    type: z.literal('strike'), provinceId: z.number().int().nonnegative(),
+    x: z.number().finite(), z: z.number().finite(),
+  }),
 ]);
 export type CommandPayload = z.infer<typeof commandPayloadSchema>;
 
@@ -50,6 +71,24 @@ export interface PublicCountry {
   alive: boolean;
 }
 
+export interface DiplomacyMessage {
+  id: string;
+  fromCountryId: number;
+  toCountryId: number;
+  body: string;
+  sentAtTick: number;
+}
+
+export interface DiplomacyProposal {
+  id: string;
+  fromCountryId: number;
+  toCountryId: number;
+  kind: 'alliance' | 'peace';
+  status: 'pending' | 'accepted' | 'declined' | 'withdrawn';
+  createdAtTick: number;
+  resolvedAtTick?: number;
+}
+
 export interface ProjectedArmy {
   id: string;
   name: string;
@@ -61,6 +100,10 @@ export interface ProjectedArmy {
   own: boolean;
   contact: 'contact' | 'visible';
   status: string;
+  /** Current road-graph node. Own armies only (server projection fills it);
+   *  the client needs it to tell whether the stack is actually on a deposit's
+   *  access node before offering Extract. */
+  graphNodeId?: number;
   composition: null | {
     unitCount: number;
     health: number;
@@ -104,7 +147,7 @@ export interface PlayerProjection {
   startCamera: { x: number; z: number; distance: number };
   countries: Record<number, PublicCountry>;
   provinceOwners: Record<number, number>;
-  provinceBuildings: Record<number, { barracks: number; tankPlant: number; ordnance: number }>;
+  provinceBuildings: Record<number, { barracks: number; tankPlant: number; ordnance: number; missileSite: number }>;
   productionQueues: Record<number, unknown[]>;
   constructionQueues: Record<number, unknown[]>;
   // `route` is the server-derived road polyline from the province's node to the
@@ -114,7 +157,17 @@ export interface PlayerProjection {
   armies: Record<string, ProjectedArmy>;
   resourceNodes: Record<number, unknown>;
   ownCountry: null | Record<string, unknown>;
-  relations: Record<string, 'peace' | 'war'>;
+  relations: Record<string, 'peace' | 'allied' | 'war'>;
+  diplomacy?: {
+    messages: DiplomacyMessage[];
+    proposals: DiplomacyProposal[];
+  };
+  /** Set once the campaign is decided from the viewer's point of view. */
+  outcome?: {
+    result: 'victory' | 'defeat';
+    reason: string;
+    atGameHours: number;
+  };
 }
 
 /**

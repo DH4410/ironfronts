@@ -1,28 +1,26 @@
 /**
- * Guards the dev-only Call of War prototype-art loader: it must never give
- * Vite/Rollup a build-time reference to dev-assets/callofwar-reference (an
- * eager OR lazy import.meta.glob on that path was proven, empirically, to
- * still ship the copyrighted images into `dist/assets` on `vite build` even
- * behind an `import.meta.env.DEV` guard — Vite's glob transform enumerates
- * matches at parse time, before any dead-code elimination runs). A plain
- * runtime template-literal URL carries no such reference.
+ * Unit portraits: committed painterly PNGs (project owner) take precedence
+ * over the inline SVG, which stays as the fallback for roster ids with no PNG
+ * and for unknown ids. The old dev-only Call of War reference loader is gone.
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { unitPortraitMarkup } from '../src/ui/unit-portraits';
 
-describe('unit-portraits dev prototype loader', () => {
+describe('unit portraits', () => {
   const source = readFileSync('src/ui/unit-portraits.ts', 'utf8');
 
-  it('never references dev-assets via import.meta.glob', () => {
-    expect(source).not.toMatch(/import\.meta\.glob\([^)]*dev-assets/);
+  it('bundles the raster portraits via an eager glob and prefers them', () => {
+    expect(source).toContain("import.meta.glob('./assets/units/*.png'");
+    expect(source).toMatch(/const raster = rasterPortrait\(typeId\);\s*\n\s*if \(raster\)/);
   });
 
-  it('resolves the prototype directory only through a runtime template string', () => {
-    expect(source).toMatch(/`\/dev-assets\/callofwar-reference\/\$\{stem\}\.webp`/);
+  it('no longer references the dev-only Call of War prototype directory', () => {
+    expect(source).not.toMatch(/dev-assets/);
+    expect(source).not.toMatch(/callofwar-reference/);
   });
 
-  it('falls back to the committed SVG for every real roster id', () => {
+  it('falls back to the committed SVG markup for every real roster id', () => {
     for (const id of ['infantry', 'engineer', 'armored-car', 'light-tank', 'medium-tank', 'artillery']) {
       expect(unitPortraitMarkup(id)).toContain('<svg');
     }

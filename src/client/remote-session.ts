@@ -13,6 +13,8 @@ interface OwnCountry {
   stockpile: Stockpile; income: Stockpile; industryCapacity: number;
   /** Live per-game-hour extraction rate by kind (stone/metal/oil); 0 when idle. */
   extraction?: { stone: number; metal: number; oil: number };
+  /** Ready strategic warheads (whole count). Absent on pre-strike projections. */
+  warheads?: number;
 }
 interface QueueOrder { id: string; unitTypeId: string; buildingId?: BuildingId; progressHours: number; totalHours: number }
 
@@ -23,7 +25,10 @@ export class RemoteGameSession extends EventTarget {
   readonly pendingBuildings: Array<{ provinceId: number; buildingId: BuildingId }> = [];
   readonly pendingCombat: Array<{
     attacker: number; defender: number;
-    kind: 'engaged' | 'reinforced' | 'combatPulse' | 'retreat' | 'destroyed' | 'bombardment' | 'battleEnded';
+    kind: 'engaged' | 'reinforced' | 'combatPulse' | 'retreat' | 'destroyed'
+      | 'bombardment' | 'battleEnded' | 'strike';
+    /** Strategic-strike impact point, world-space. Only on 'strike'. */
+    x?: number; z?: number; provinceId?: number;
   }> = [];
   readonly pendingCaptures: Array<{ provinceId: number; fromCountryId: number; toCountryId: number }> = [];
   private readonly optimistic = new Map<string, OptimisticMutation>();
@@ -59,12 +64,16 @@ export class RemoteGameSession extends EventTarget {
           toCountryId: Number(detail.toCountryId),
         });
       } else if ([
-        'engaged', 'reinforced', 'combatPulse', 'retreat', 'destroyed', 'bombardment', 'battleEnded',
+        'engaged', 'reinforced', 'combatPulse', 'retreat', 'destroyed', 'bombardment',
+        'battleEnded', 'strike',
       ].includes(kind)) {
         this.pendingCombat.push({
           kind: kind as (typeof this.pendingCombat)[number]['kind'],
           attacker: Number(detail.attacker),
           defender: Number(detail.defender),
+          ...(kind === 'strike' ? {
+            x: Number(detail.x), z: Number(detail.z), provinceId: Number(detail.provinceId),
+          } : {}),
         });
       }
     });
@@ -129,6 +138,50 @@ export class RemoteGameSession extends EventTarget {
     return { ok: true };
   }
 
+  /**
+   * Diplomacy is authoritative and never painted optimistically: another
+   * player may answer or change the relation at the same time. The optional
+   * callback only releases local UI busy state; rejected commands still flow
+   * through the session's shared commandFailed notification path.
+   */
+  private sendDiplomacyCommand(
+    command: CommandPayload, onResult?: (ok: boolean) => void,
+  ): { ok: true } {
+    this.connection.command(command, (ok, reason) => {
+      if (!ok) this.commandFailed(reason ?? 'Diplomacy command failed.');
+      onResult?.(ok);
+    });
+    return { ok: true };
+  }
+
+  sendDiplomaticMessage(targetCountryId: number, body: string, onResult?: (ok: boolean) => void) {
+    return this.sendDiplomacyCommand({
+      type: 'sendDiplomaticMessage', targetCountryId, body,
+    }, onResult);
+  }
+
+  proposeDiplomacy(
+    targetCountryId: number, proposal: 'alliance' | 'peace', onResult?: (ok: boolean) => void,
+  ) {
+    return this.sendDiplomacyCommand({
+      type: 'proposeDiplomacy', targetCountryId, proposal,
+    }, onResult);
+  }
+
+  respondDiplomacy(proposalId: string, accept: boolean, onResult?: (ok: boolean) => void) {
+    return this.sendDiplomacyCommand({
+      type: 'respondDiplomacy', proposalId, accept,
+    }, onResult);
+  }
+
+  declareWar(targetCountryId: number, onResult?: (ok: boolean) => void) {
+    return this.sendDiplomacyCommand({ type: 'declareWar', targetCountryId }, onResult);
+  }
+
+  endAlliance(targetCountryId: number, onResult?: (ok: boolean) => void) {
+    return this.sendDiplomacyCommand({ type: 'endAlliance', targetCountryId }, onResult);
+  }
+
   ownsArmy(armyId: string): boolean { return this.state.armies[armyId]?.own ?? false; }
   ownsProvince(provinceId: number): boolean { return this.state.provinceOwners[provinceId] === this.playerCountryId; }
 
@@ -148,6 +201,16 @@ export class RemoteGameSession extends EventTarget {
       const army = state.armies[armyId];
       if (army) { army.status = 'moving'; army.moveIntent = 'attack'; }
     }, onAccepted);
+  }
+  /**
+   * Strategic strike on an enemy province. Country-level order (no army), never
+   * painted optimistically — the server consumes the warhead and declares war.
+   */
+  orderStrike(provinceId: number, x: number, z: number, onAccepted?: () => void) {
+    if ((this.ownCountry.warheads ?? 0) < 1) {
+      return { ok: false, reason: 'No warhead is ready.' } as const;
+    }
+    return this.send({ type: 'strike', provinceId, x, z }, () => undefined, onAccepted);
   }
   orderAttackArmy(armyId: string, targetArmyId: string, onAccepted?: () => void) {
     if (!this.ownsArmy(armyId)) return { ok: false, reason: 'Not your army.' } as const;
@@ -192,13 +255,13 @@ export class RemoteGameSession extends EventTarget {
       this.deduct(state, this.unit(unitTypeId)?.cost);
     });
   }
-  build(provinceId: number, buildingId: BuildingId) {
+  build(provinceId: number, buildingId: BuildingId, onAccepted?: () => void) {
     if (!this.ownsProvince(provinceId)) return { ok: false, reason: 'Not your province.' } as const;
     const tempId = `optimistic-${Date.now()}`;
     return this.send({ type: 'build', provinceId, buildingId }, (state) => {
       ((state.constructionQueues[provinceId] ??= []) as QueueOrder[]).push({ id: tempId, unitTypeId: '', buildingId, progressHours: 0, totalHours: Number(this.building(buildingId)?.buildTimeHours ?? 1) / 4 });
       this.deduct(state, this.building(buildingId)?.cost);
-    });
+    }, onAccepted);
   }
   setRally(provinceId: number, x: number, z: number) {
     return this.send({ type: 'setRally', provinceId, target: { x, z } }, (state) => { state.rallyPoints[provinceId] = { x, z }; });
@@ -229,9 +292,10 @@ export class RemoteGameSession extends EventTarget {
   }
   buildable(provinceId: number): Array<{ id: BuildingId; affordable: boolean }> {
     if (!this.ownsProvince(provinceId)) return [];
-    const current = this.state.provinceBuildings[provinceId] ?? { barracks: 0, tankPlant: 0, ordnance: 0 };
+    const current = this.state.provinceBuildings[provinceId]
+      ?? { barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 0 };
     const queued = this.state.constructionQueues[provinceId] as QueueOrder[] | undefined;
-    return (['barracks', 'tankPlant', 'ordnance'] as BuildingId[])
+    return (['barracks', 'tankPlant', 'ordnance', 'missileSite'] as BuildingId[])
       .filter((id) => current[id] < 1 && !queued?.some((order) => order.buildingId === id))
       .map((id) => ({ id, affordable: this.affordable(this.building(id)?.cost) }));
   }
@@ -240,10 +304,29 @@ export class RemoteGameSession extends EventTarget {
     return Object.entries(cost).every(([key, amount]) =>
       typeof amount !== 'number' || (this.ownCountry.stockpile[key as keyof Stockpile] ?? 0) >= amount);
   }
-  extractableNodeAt(_armyId: string): number | null {
+  /**
+   * The deposit this army could start extracting right now, or null. Mirrors the
+   * server's `issueExtract` rule so the HUD never offers Extract where the order
+   * will be refused: the stack must be idle, on a controlled non-empty deposit's
+   * access node, and carry an extraction-capable unit.
+   */
+  extractableNodeAt(armyId: string): number | null {
+    const army = this.state.armies[armyId];
+    if (!army || !army.own || army.graphNodeId === undefined) return null;
+    if (army.moveOrder || army.status === 'moving' || army.status === 'engaged'
+      || army.status === 'retreating') return null;
+    const canExtract = (army.composition?.groups ?? []).some((group) => {
+      const rate = Number(
+        (this.unit(group.typeId) as { extractionRate?: number } | undefined)?.extractionRate ?? 0,
+      );
+      return rate > 0;
+    });
+    if (!canExtract) return null;
     const node = Object.values(this.state.resourceNodes).find((value) => {
-      const candidate = value as { remaining?: number; extractorArmyId?: string | null; controllerCountryId?: number };
-      return (candidate.remaining ?? 0) > 0 && candidate.controllerCountryId === this.playerCountryId;
+      const n = value as { accessNodeId?: number; remaining?: number; controllerCountryId?: number };
+      return n.accessNodeId === army.graphNodeId
+        && (n.remaining ?? 0) > 0
+        && n.controllerCountryId === this.playerCountryId;
     }) as { id?: number } | undefined;
     return node?.id ?? null;
   }

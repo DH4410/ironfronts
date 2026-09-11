@@ -101,14 +101,22 @@ export class StrategyCamera {
 
   update(deltaSeconds: number): void {
     vec3.set(this.move, 0, 0, 0);
-    if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) this.move[2] -= 1;
-    if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) this.move[2] += 1;
+    if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) this.move[2] += 1;
+    if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) this.move[2] -= 1;
     if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) this.move[0] -= 1;
     if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) this.move[0] += 1;
     if (vec3.squaredLength(this.move) > 0) {
       vec3.normalize(this.move, this.move);
       const speed = clamp(this.distance * 0.48, 140, 2_900) * deltaSeconds;
       this.pan(this.move[0] * speed, this.move[2] * speed);
+    }
+    // Keyboard zoom — the universal fallback when there is no wheel or pinch
+    // (a plain laptop touchpad).
+    let zoomKey = 0;
+    if (this.keys.has('Equal') || this.keys.has('NumpadAdd')) zoomKey -= 1;
+    if (this.keys.has('Minus') || this.keys.has('NumpadSubtract')) zoomKey += 1;
+    if (zoomKey !== 0) {
+      this.distance = clamp(this.distance * Math.exp(zoomKey * 1.6 * deltaSeconds), this.minDistance, this.maxDistance);
     }
     this.normalizeTarget();
     this.recalculateMatrices();
@@ -285,8 +293,37 @@ export class StrategyCamera {
     this.dragPointerId = null;
   };
 
+  private trackpadHits = 0;
+
+  /** Mouse wheels report chunky line/page deltas or large integer pixel steps;
+   *  a trackpad streams small, often fractional pixel deltas and carries a
+   *  horizontal component on a two-finger swipe. */
+  private wheelLooksLikeTrackpad(event: WheelEvent): boolean {
+    if (event.deltaMode !== 0) return false;
+    if (event.deltaX !== 0) return true;
+    return Math.abs(event.deltaY) < 40 || !Number.isInteger(event.deltaY);
+  }
+
   private onWheel = (event: WheelEvent): void => {
     event.preventDefault();
+    if (this.wheelLooksLikeTrackpad(event)) this.trackpadHits = Math.min(4, this.trackpadHits + 1);
+    else if (event.deltaMode !== 0 || Math.abs(event.deltaY) >= 100) this.trackpadHits = 0;
+    const trackpad = this.trackpadHits >= 2;
+
+    if (event.ctrlKey) {
+      // Chrome synthesises ctrl+wheel for a trackpad pinch. Boost it — the
+      // per-event deltas are tiny.
+      this.zoomAt(event.clientX, event.clientY, Math.exp(event.deltaY * 0.011));
+      return;
+    }
+    if (trackpad) {
+      // Two-finger scroll pans the map (map-app convention); pinch or +/- zoom.
+      this.panScreenDrag(
+        event.clientX, event.clientY,
+        event.clientX - event.deltaX, event.clientY - event.deltaY,
+      );
+      return;
+    }
     this.zoomAt(event.clientX, event.clientY, Math.exp(event.deltaY * 0.00115));
   };
 
@@ -322,7 +359,11 @@ export class StrategyCamera {
   }
 
   private onKeyDown = (event: KeyboardEvent): void => {
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLSelectElement) return;
+    // Never let WASD/arrow pan fire while the player is typing (diplomacy
+    // message body, roster filter, any future text field).
+    const target = event.target as HTMLElement | null;
+    if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement
+      || target instanceof HTMLTextAreaElement || target?.isContentEditable) return;
     this.keys.add(event.code);
   };
 

@@ -44,6 +44,9 @@ import { loadWorldAssetBuffers, worldAssetUrl } from './world-assets';
 import { getVisibleInstanceView, updateVisibleInstanceView } from './visible-instance-cache';
 
 const LABELS_ABOVE_PROPS_DISTANCE = 2_500;
+const ARMY_MARKER_PLATE_URL = new URL('./ui/assets/skins/army-counter-cartouche.png', import.meta.url).href;
+const ARMY_ROSTER_PLATE_URL = new URL('./ui/assets/skins/army-roster-plaque.png', import.meta.url).href;
+const ARMY_UNIT_SILHOUETTES_URL = new URL('./ui/assets/army-unit-silhouettes.png', import.meta.url).href;
 
 /** Player-start camera: north-up, near top-down (~83°; a true 90° breaks picking). */
 const PLAYER_START_YAW = 0;
@@ -139,6 +142,9 @@ export class WorldRenderer {
   private treeMaterialTexture!: GPUTexture;
   private provincePoliticalColorTexture!: GPUTexture;
   private diplomacyColorTexture!: GPUTexture;
+  private armyMarkerPlateTexture!: GPUTexture;
+  private armyRosterPlateTexture!: GPUTexture;
+  private armyUnitSilhouettesTexture!: GPUTexture;
   private politicalCache!: PoliticalCache;
   private countryColors!: Float32Array;
   private visibleTerrainBuffer!: GPUBuffer;
@@ -521,9 +527,16 @@ export class WorldRenderer {
     );
 
     report('Preparing terrain and tree materials', 0.49);
-    [this.materialTexture, this.treeMaterialTexture] = await Promise.all([
+    [
+      this.materialTexture, this.treeMaterialTexture,
+      this.armyMarkerPlateTexture, this.armyRosterPlateTexture,
+      this.armyUnitSilhouettesTexture,
+    ] = await Promise.all([
       createMaterialTexture(this.device),
       createTreeMaterialTexture(this.device),
+      this.loadArmyMarkerPlateTexture(),
+      this.loadArmyRosterPlateTexture(),
+      this.loadArmyUnitSilhouettesTexture(),
     ]);
     this.uniformBuffer = this.device.createBuffer({
       label: 'frame uniforms',
@@ -553,6 +566,12 @@ export class WorldRenderer {
         { binding: 11, resource: this.diplomacyColorTexture.createView() },
         { binding: 12, resource: { buffer: this.visibleTerrainBuffer } },
         { binding: 13, resource: this.terrainAlbedoTexture.createView() },
+        { binding: 14, resource: this.armyMarkerPlateTexture.createView() },
+        { binding: 15, resource: this.device.createSampler({
+          magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear',
+        }) },
+        { binding: 16, resource: this.armyUnitSilhouettesTexture.createView() },
+        { binding: 17, resource: this.armyRosterPlateTexture.createView() },
       ],
     });
 
@@ -754,13 +773,13 @@ export class WorldRenderer {
   }
 
   /** Replace the presentation cache with the viewer's authoritative relations. */
-  setDiplomaticRelations(relations: Readonly<Record<string, 'peace' | 'war'>>): void {
+  setDiplomaticRelations(relations: Readonly<Record<string, 'peace' | 'allied' | 'war'>>): void {
     const next = new Map<number, DiplomaticRelation>();
     for (const [key, relation] of Object.entries(relations)) {
-      if (relation !== 'war') continue;
+      if (relation === 'peace') continue;
       const [a, b] = key.split(':').map(Number);
       const other = a === this.playerCountryId ? b : b === this.playerCountryId ? a : 0;
-      if (other > 0 && this.countryById.has(other)) next.set(other, 'war');
+      if (other > 0 && this.countryById.has(other)) next.set(other, relation);
     }
     if (next.size === this.diplomaticRelations.size
       && [...next].every(([id, relation]) => this.diplomaticRelations.get(id) === relation)) return;
@@ -1005,10 +1024,10 @@ export class WorldRenderer {
     );
   }
 
-  /** Allocate the fixed-capacity army-marker instance buffer (5 vec4f per
+  /** Allocate the fixed-capacity army-marker instance buffer (7 vec4f per
    *  stack). `setArmyMarkers` fills only the used prefix each update. */
   private createArmyMarkerLayer(): void {
-    const zero = new Float32Array(WorldRenderer.ARMY_MARKER_CAPACITY * 20);
+    const zero = new Float32Array(WorldRenderer.ARMY_MARKER_CAPACITY * 28);
     this.armyMarkers = this.createInstanceLayer(
       'army stack markers', zero.buffer as ArrayBuffer, 0, 0, this.lineLayout,
     );
@@ -1031,6 +1050,104 @@ export class WorldRenderer {
     this.combatEffects = this.createInstanceLayer(
       'combat effects', zeroEffects.buffer as ArrayBuffer, 0, 0, this.lineLayout,
     );
+  }
+
+  private async loadArmyMarkerPlateTexture(): Promise<GPUTexture> {
+    try {
+      const response = await fetch(ARMY_MARKER_PLATE_URL);
+      if (!response.ok) throw new Error(`Marker plate request failed: ${response.status}`);
+      const bitmap = await createImageBitmap(await response.blob());
+      const texture = this.device.createTexture({
+        label: 'painted army marker plate',
+        size: [bitmap.width, bitmap.height],
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      this.device.queue.copyExternalImageToTexture(
+        { source: bitmap }, { texture }, [bitmap.width, bitmap.height],
+      );
+      bitmap.close();
+      return texture;
+    } catch (error) {
+      // Keep the strategic layer usable if the optional painted surface cannot
+      // load. The shader still supplies its border, unit glyph, count and bar.
+      console.warn('Could not load the painted army marker plate; using a flat fallback.', error);
+      const texture = this.device.createTexture({
+        label: 'flat army marker fallback',
+        size: [1, 1],
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      this.device.queue.writeTexture(
+        { texture }, new Uint8Array([48, 58, 48, 255]),
+        { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1],
+      );
+      return texture;
+    }
+  }
+
+  private async loadArmyUnitSilhouettesTexture(): Promise<GPUTexture> {
+    try {
+      const response = await fetch(ARMY_UNIT_SILHOUETTES_URL);
+      if (!response.ok) throw new Error(`Army silhouette request failed: ${response.status}`);
+      const bitmap = await createImageBitmap(await response.blob());
+      const texture = this.device.createTexture({
+        label: 'army marker unit silhouette atlas',
+        size: [bitmap.width, bitmap.height],
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      this.device.queue.copyExternalImageToTexture(
+        { source: bitmap }, { texture }, [bitmap.width, bitmap.height],
+      );
+      bitmap.close();
+      return texture;
+    } catch (error) {
+      console.warn('Could not load army silhouettes; using an opaque fallback.', error);
+      const texture = this.device.createTexture({
+        label: 'army silhouette fallback',
+        size: [1, 1],
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      this.device.queue.writeTexture(
+        { texture }, new Uint8Array([246, 241, 218, 255]),
+        { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1],
+      );
+      return texture;
+    }
+  }
+
+  private async loadArmyRosterPlateTexture(): Promise<GPUTexture> {
+    try {
+      const response = await fetch(ARMY_ROSTER_PLATE_URL);
+      if (!response.ok) throw new Error(`Army roster plate request failed: ${response.status}`);
+      const bitmap = await createImageBitmap(await response.blob());
+      const texture = this.device.createTexture({
+        label: 'painted army roster plaque',
+        size: [bitmap.width, bitmap.height],
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      this.device.queue.copyExternalImageToTexture(
+        { source: bitmap }, { texture }, [bitmap.width, bitmap.height],
+      );
+      bitmap.close();
+      return texture;
+    } catch (error) {
+      console.warn('Could not load the painted army roster plaque; using a flat fallback.', error);
+      const texture = this.device.createTexture({
+        label: 'flat army roster fallback',
+        size: [1, 1],
+        format: 'rgba8unorm-srgb',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      this.device.queue.writeTexture(
+        { texture }, new Uint8Array([38, 45, 36, 255]),
+        { bytesPerRow: 4, rowsPerImage: 1 }, [1, 1],
+      );
+      return texture;
+    }
   }
 
   /**
@@ -1096,7 +1213,7 @@ export class WorldRenderer {
   }
 
   /**
-   * Replace the drawn army markers. `records` is 20 floats per stack; see
+   * Replace the drawn army markers. `records` is 28 floats per stack; see
    * `armyMarkerShader`. `count` stacks are drawn; the rest of the capacity is
    * ignored. Cheap: one buffer write, no pipeline or bind-group churn.
    */
@@ -1108,10 +1225,10 @@ export class WorldRenderer {
     if (!this.armyMarkers) return;
     const capped = Math.min(count, WorldRenderer.ARMY_MARKER_CAPACITY);
     if (capped > 0) {
-      for (let index = 0; index < capped; index += 1) records[index * 20 + 19] = this.elapsed;
+      for (let index = 0; index < capped; index += 1) records[index * 28 + 27] = this.elapsed;
       this.device.queue.writeBuffer(
         this.armyMarkers.buffer, 0,
-        records.buffer as ArrayBuffer, records.byteOffset, capped * 20 * 4,
+        records.buffer as ArrayBuffer, records.byteOffset, capped * 28 * 4,
       );
     }
     this.device.queue.writeBuffer(
@@ -1466,7 +1583,11 @@ export class WorldRenderer {
       inverseViewProjection: this.camera.inverseViewProjection,
       camera: [this.camera.position[0], this.camera.position[1], this.camera.position[2], this.camera.target[0]],
       sunTime: [...lighting.sunDirection, this.elapsed],
-      viewport: [this.canvas.width, this.canvas.height, 1 / this.canvas.width, 1 / this.canvas.height],
+      // .z carries the backing-store scale (graphics-quality preset, 0.75..1.5)
+      // so HUD-scale overlays — army markers, count badges, combat FX — can
+      // keep a constant on-screen size instead of ballooning at low render
+      // scale, where the pixel buffer (and viewport.xy) is smaller.
+      viewport: [this.canvas.width, this.canvas.height, this.effectiveRenderScale, 1 / this.canvas.height],
       map: [this.manifest.world.width, this.manifest.world.height, this.manifest.terrain.maxHeight, this.debugView],
       interaction: [this.hoveredId, this.camera.distance, tintMode, countryBordersEnabled],
       terrainInfo: [this.manifest.terrain.chunksX, this.manifest.terrain.chunksY, this.manifest.terrain.gridResolution, this.showWireframe ? 1 : 0],

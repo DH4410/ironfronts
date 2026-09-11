@@ -93,6 +93,9 @@ function makeCountryState(
     stockpile,
     income: emptyStockpile(),
     industryCapacity: selectable ? 10 : 6,
+    // Selectable powers open with one warhead ready so the strategic strike is
+    // usable from turn one; minors start dry and must build an Ordnance Workshop.
+    warheads: selectable && !sandbox ? 1 : 0,
   };
 }
 
@@ -106,7 +109,7 @@ function assignStartingBuildings(
   const out = new Map<number, ProvinceBuildings>();
   const ordered = [...cities].sort((a, b) => b.population - a.population);
   ordered.forEach((province, index) => {
-    const buildings: ProvinceBuildings = { barracks: 0, tankPlant: 0, ordnance: 0 };
+    const buildings: ProvinceBuildings = { barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 0 };
     if (province.id === capitalId) {
       buildings.barracks = 1;
       buildings.tankPlant = 1;
@@ -227,7 +230,7 @@ export function initGameState(
         provinceBuildings[provinceId] = buildings;
       }
     } else if (cities[0]) {
-      provinceBuildings[cities[0].id] = { barracks: 1, tankPlant: 0, ordnance: 0 };
+      provinceBuildings[cities[0].id] = { barracks: 1, tankPlant: 0, ordnance: 0, missileSite: 0 };
     }
   }
 
@@ -313,6 +316,9 @@ export function initGameState(
     battleFronts: {},
     resourceNodes,
     relations: {},
+    diplomacyMessages: {},
+    diplomacyProposals: {},
+    nextDiplomacyId: 1,
     nextArmyId,
     nextBattleId: 1,
     nextOrderId: 1,

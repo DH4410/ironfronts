@@ -11,7 +11,12 @@ export { UNIT_TYPES, unitType } from '../../../src/game/units/unit-catalog';
 export { stackExtractionRate } from '../../../src/game/units/army';
 export { currentMovementLeg } from '../../../src/game/units/movement';
 export { BUILDINGS } from '../../../src/game/construction';
-export type { GameState, CountryState, ResourceNodeState } from '../../../src/game/game-state';
+export {
+  declareWar, endAlliance, proposeDiplomacy, respondDiplomacy, sendDiplomaticMessage,
+} from '../../../src/game/diplomacy';
+export type {
+  GameState, CountryState, DiplomacyMessage, DiplomacyProposal, Relation, ResourceNodeState,
+} from '../../../src/game/game-state';
 export type { GameCommand, CommandResult } from '../../../src/game/commands';
 export type { WorldData } from '../../../src/game/world-data';
 export type { LandGraph } from '../../../src/game/movement/graph';

@@ -4,13 +4,13 @@ import {
 } from '../src/army-map-presentation';
 
 describe('army map presentation LOD data', () => {
-  it('maps rule-level troop types onto four distinct map models', () => {
+  it('maps rule-level troop types onto six distinct counter silhouettes', () => {
     expect(visualKindForUnit('infantry')).toBe(0);
-    expect(visualKindForUnit('engineer')).toBe(0);
-    expect(visualKindForUnit('light-tank')).toBe(1);
-    expect(visualKindForUnit('armored-car')).toBe(1);
-    expect(visualKindForUnit('medium-tank')).toBe(2);
-    expect(visualKindForUnit('artillery')).toBe(3);
+    expect(visualKindForUnit('engineer')).toBe(1);
+    expect(visualKindForUnit('armored-car')).toBe(2);
+    expect(visualKindForUnit('light-tank')).toBe(3);
+    expect(visualKindForUnit('medium-tank')).toBe(4);
+    expect(visualKindForUnit('artillery')).toBe(5);
   });
 
   it('combines counts and health by visual kind and finds the dominant kind', () => {
@@ -27,7 +27,11 @@ describe('army map presentation LOD data', () => {
       { kind: 1, count: 7, health: 5.5 / 7 },
       { kind: 2, count: 1, health: 0.5 },
     ]);
-    expect(dominantVisualKind(formation)).toBe(1);
+    expect(dominantVisualKind(buildArmyCompositionRows([
+      { typeId: 'infantry', count: 3, health: 1 },
+      { typeId: 'engineer', count: 1, health: 0.5 },
+      { typeId: 'armored-car', count: 5, health: 0.8 },
+    ]))).toBe(2);
   });
 
   it('uses at most four slots, guarantees each present category, and respects tiny armies', () => {
@@ -45,7 +49,7 @@ describe('army map presentation LOD data', () => {
     expect(new Set(mixed.map((slot) => slot.kind))).toEqual(new Set([0, 1, 2, 3]));
   });
 
-  it('builds one close-marker row per visual kind with its combined amount', () => {
+  it('builds one close-marker row per exact unit type, largest formation first', () => {
     expect(buildArmyCompositionRows([
       { typeId: 'infantry', count: 3, health: 1 },
       { typeId: 'engineer', count: 2, health: 0.5 },
@@ -54,10 +58,12 @@ describe('army map presentation LOD data', () => {
       { typeId: 'medium-tank', count: 2, health: 0.25 },
       { typeId: 'artillery', count: 6, health: 0.5 },
     ])).toEqual([
-      { kind: 0, count: 5, health: 0.8 },
-      { kind: 1, count: 5, health: 0.8 },
-      { kind: 2, count: 2, health: 0.25 },
-      { kind: 3, count: 6, health: 0.5 },
+      { kind: 5, count: 6, health: 0.5 },
+      { kind: 2, count: 4, health: 0.75 },
+      { kind: 0, count: 3, health: 1 },
+      { kind: 1, count: 2, health: 0.5 },
+      { kind: 4, count: 2, health: 0.25 },
+      { kind: 3, count: 1, health: 1 },
     ]);
   });
 });

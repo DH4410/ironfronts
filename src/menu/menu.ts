@@ -60,13 +60,21 @@ export function mountMenu(handlers: MenuHandlers): void {
   newCampaign.classList.toggle('is-preview', previewOnly);
   if (previewOnly) {
     const sub = newCampaign.querySelector('small');
-    if (sub) sub.textContent = "Inspect the setup flow — your campaign stays untouched.";
+    if (sub) sub.textContent = "Inspect the setup flow. Your campaign stays untouched.";
+    const previewBanner = document.getElementById('ifm-registry-preview');
+    if (previewBanner) {
+      previewBanner.textContent = assignedCountry
+        ? `Preview only. Your campaign as ${assignedCountry.name} is already in progress. `
+          + `Go back and choose Continue to resume it. Picking a country here will not start a new game.`
+        : `Preview only. Picking a country here will not start a new game.`;
+      previewBanner.hidden = false;
+    }
   }
   continueButton.disabled = assignedCountry === null;
   continueButton.classList.toggle('is-disabled', assignedCountry === null);
   continueButton.classList.toggle('is-assigned', assignedCountry !== null);
   requiredId<HTMLElement>('ifm-continue-detail').textContent = assignedCountry
-    ? `${assignedCountry.name} — resume where you left off.` : 'No field assignment.';
+    ? `${assignedCountry.name}. Resume where you left off.` : 'No field assignment.';
   if (assignedCountry) {
     continueButton.addEventListener('click', () => void deploy(assignedCountry.id));
     const flagUrl = resolveFlagUrl(assignedCountry.name);
@@ -262,19 +270,92 @@ export function mountMenu(handlers: MenuHandlers): void {
     }
     if (countryHint) {
       countryHint.textContent = previewOnly
-        ? `Preview of the nation-selection flow. A second campaign slot isn't built yet, so this cannot deploy — your current campaign is safe.`
+        ? `Preview of the nation-selection flow. A second campaign slot isn't built yet, so this cannot deploy. Your current campaign is safe.`
         : country === null
           ? 'Select a beige country. Grey countries cannot be claimed.'
-          : `${country.name} is selected — join to take command for the whole campaign.`;
+          : `${country.name} is selected. Join to take command for the whole campaign.`;
     }
   }
 
   function selectCountry(country: GameLobby['countries'][number]): void {
     selectedCountryId = country.id;
     mapController?.setSelection(country.id);
+    syncNationList();
     playCue('select');
     updateConfirmEnabled();
   }
+
+  // Searchable country list beside the map (the raster alone made finding a
+  // claimable country trial-and-error).
+  const countryListEl = document.getElementById('ifm-country-list');
+  const countrySearchEl = document.getElementById('ifm-country-search') as HTMLInputElement | null;
+  let nationListBuilt = false;
+
+  function buildNationList(): void {
+    if (!countryListEl || nationListBuilt) return;
+    const selectableIds = new Set(selectableCountries(handlers.lobby).map((c) => c.id));
+    const rows = [...handlers.lobby.countries].sort((a, b) => {
+      const sa = selectableIds.has(a.id) ? 0 : 1;
+      const sb = selectableIds.has(b.id) ? 0 : 1;
+      return sa - sb || a.name.localeCompare(b.name);
+    });
+    countryListEl.replaceChildren(...rows.map((country) => {
+      const claimable = selectableIds.has(country.id);
+      const li = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ifm__country-row';
+      button.dataset.countryId = String(country.id);
+      button.dataset.name = country.name.toLowerCase();
+      button.setAttribute('role', 'option');
+      // In preview mode a claimable row still selects (to preview on the map);
+      // deployment is blocked by the footer, not the list.
+      button.disabled = !claimable;
+      const swatch = document.createElement('i');
+      swatch.className = 'ifm__country-swatch';
+      swatch.style.background = country.color;
+      const name = document.createElement('span');
+      name.className = 'ifm__country-name';
+      name.textContent = country.name;
+      const meta = document.createElement('span');
+      meta.className = 'ifm__country-meta';
+      meta.textContent = claimable
+        ? `${country.startingCities} cities`
+        : !country.alive ? 'no territory'
+          : country.claimed ? 'claimed'
+            : `${country.startingCities} cities`;
+      button.append(swatch, name, meta);
+      button.addEventListener('click', () => {
+        const picked = handlers.lobby.countries.find((c) => c.id === country.id);
+        if (picked) selectCountry(picked);
+      });
+      li.append(button);
+      return li;
+    }));
+    nationListBuilt = true;
+    syncNationList();
+  }
+
+  function syncNationList(): void {
+    if (!countryListEl) return;
+    for (const button of countryListEl.querySelectorAll<HTMLButtonElement>('.ifm__country-row')) {
+      const active = button.dataset.countryId === String(selectedCountryId);
+      button.classList.toggle('is-selected', active);
+      button.setAttribute('aria-selected', String(active));
+      if (active) button.scrollIntoView({ block: 'nearest' });
+    }
+  }
+
+  function filterNationList(query: string): void {
+    if (!countryListEl) return;
+    const needle = query.trim().toLowerCase();
+    for (const button of countryListEl.querySelectorAll<HTMLButtonElement>('.ifm__country-row')) {
+      const li = button.parentElement;
+      if (li) li.hidden = needle.length > 0 && !(button.dataset.name ?? '').includes(needle);
+    }
+  }
+
+  countrySearchEl?.addEventListener('input', () => filterNationList(countrySearchEl.value));
 
   function openNationPicker(): void {
     if (pickerOpen || !nationPicker) return;
@@ -282,6 +363,7 @@ export function mountMenu(handlers: MenuHandlers): void {
     nationPicker.hidden = false;
     document.getElementById('ifm-campaign')?.setAttribute('inert', '');
     playCue('dossier-open');
+    buildNationList();
     if (countryMap && !mapController) {
       if (countryHint) countryHint.textContent = 'Loading campaign map…';
       mapController = mountCampaignMap(countryMap, handlers.lobby, selectCountry, (status) => {
@@ -384,8 +466,8 @@ export function mountMenu(handlers: MenuHandlers): void {
   async function deployFromPicker(countryId: number): Promise<void> {
     if (previewOnly) {
       if (countryHint) {
-        countryHint.textContent = `Preview only — a second campaign slot isn't built yet. `
-          + `Your campaign${assignedCountry ? ` as ${assignedCountry.name}` : ''} is untouched; use Continue to resume it.`;
+        countryHint.textContent = `Preview only. A second campaign slot isn't built yet. `
+          + `Your campaign${assignedCountry ? ` as ${assignedCountry.name}` : ''} is untouched. Use Continue to resume it.`;
       }
       playCue('select');
       return;

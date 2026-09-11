@@ -21,7 +21,7 @@ export interface PlayerCountry {
   readonly color: string;
 }
 
-export type ResourceId = 'money' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil';
+export type ResourceId = 'money' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil' | 'warheads';
 
 export interface ResourceLine {
   readonly id: ResourceId;
@@ -99,6 +99,7 @@ export interface SelectedProvince {
     readonly barracks: number;
     readonly tankPlant: number;
     readonly ordnance: number;
+    readonly missileSite: number;
   } | null;
   /** Deposit control/extraction state, own provinces only. */
   readonly deposits?: {
@@ -135,6 +136,54 @@ export type NavId =
   | 'armies' | 'provinces' | 'production' | 'research'
   | 'diplomacy' | 'economy' | 'intelligence' | 'events';
 
+export type SidePanelId = 'diplomacy';
+
+export type DiplomacyRelation = 'neutral' | 'allied' | 'war';
+
+export interface DiplomacyCountryView {
+  readonly id: number;
+  readonly name: string;
+  readonly color: string;
+  readonly controller: 'player' | 'ai' | 'neutral';
+  readonly alive: boolean;
+  readonly relation: DiplomacyRelation;
+  /** Messages received since this cable was last opened. */
+  readonly unreadCount?: number;
+  /** Pending proposals from this country that require the player's answer. */
+  readonly incomingProposalCount?: number;
+}
+
+export interface DiplomacyMessageView {
+  readonly id: string;
+  readonly fromCountryId: number;
+  readonly toCountryId: number;
+  readonly body: string;
+  readonly sentAtTick: number;
+}
+
+export interface DiplomacyProposalView {
+  readonly id: string;
+  readonly fromCountryId: number;
+  readonly toCountryId: number;
+  readonly kind: 'alliance' | 'peace';
+  readonly status: 'pending' | 'accepted' | 'declined' | 'withdrawn';
+  readonly createdAtTick: number;
+  readonly resolvedAtTick?: number;
+}
+
+export type DiplomacyBusyAction =
+  | 'message' | 'alliance' | 'peace' | 'declare-war' | 'end-alliance' | 'proposal-response';
+
+export interface DiplomacyView {
+  readonly viewerCountryId: number | null;
+  readonly countries: readonly DiplomacyCountryView[];
+  readonly selectedCountryId: number | null;
+  readonly messages: readonly DiplomacyMessageView[];
+  readonly proposals: readonly DiplomacyProposalView[];
+  readonly busy: DiplomacyBusyAction | null;
+  readonly feedback: string | null;
+}
+
 export type NotificationKind =
   | 'warning' | 'combat' | 'completed' | 'diplomacy' | 'information';
 
@@ -150,6 +199,9 @@ export interface GameNotification {
   /** World point this event happened at. When present the toast is clickable
    *  and re-centres the camera there (e.g. "force under attack"). */
   readonly focus?: { readonly x: number; readonly z: number };
+  /** Number of identical events folded into this toast. Absent or 1 = a single
+   *  event; >1 renders a "×N" tally so a burst does not stack up separate cards. */
+  readonly count?: number;
 }
 
 export type CombatStatus = 'idle' | 'moving' | 'engaged' | 'retreating';
@@ -227,6 +279,9 @@ export interface StrategicUiState {
   readonly selectedProvince: SelectedProvince | null;
   readonly selectedArmy: ArmyStackView | null;
   readonly notifications: readonly GameNotification[];
+  /** One non-modal command drawer at a time; the map remains visible behind it. */
+  readonly activeSidePanel: SidePanelId | null;
+  readonly diplomacy: DiplomacyView;
   readonly quality: QualityLevel;
   /** Backing-store scale actually in use (diagnostics / verification). */
   readonly effectiveRenderScale: number;
@@ -258,6 +313,16 @@ export function createInitialState(overrides: Partial<StrategicUiState> = {}): S
     selectedProvince: null,
     selectedArmy: null,
     notifications: [],
+    activeSidePanel: null,
+    diplomacy: {
+      viewerCountryId: null,
+      countries: [],
+      selectedCountryId: null,
+      messages: [],
+      proposals: [],
+      busy: null,
+      feedback: null,
+    },
     quality: 'high',
     effectiveRenderScale: 1,
     paused: false,

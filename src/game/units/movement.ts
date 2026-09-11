@@ -2,7 +2,7 @@
 
 import type { SimContext } from '../sim-context';
 import type { ArmyStack, MoveOrder } from './army';
-import { ensureArmyRuntimeState, stackBaseSpeed } from './army';
+import { ensureArmyRuntimeState, mergeStacks, stackBaseSpeed } from './army';
 import {
   closestReachablePath, findPath, pathLength, type EdgeAllowed,
 } from '../movement/pathfind';
@@ -236,7 +236,14 @@ function targetPoint(session: SimContext, army: ArmyStack, order: MoveOrder): [n
     : [order.destX, order.destZ];
 }
 
-function revalidateOrder(session: SimContext, army: ArmyStack, order: MoveOrder): void {
+/**
+ * Re-audit a live order against the current graph and diplomacy. Returns
+ * `false` when the order can no longer make progress toward its target — it is
+ * walled off by territory this army may not enter, or the destination is
+ * simply unreachable — so the caller can stop the stack cleanly instead of
+ * leaving it re-pathing in place every tick (which read as marching forever).
+ */
+function revalidateOrder(session: SimContext, army: ArmyStack, order: MoveOrder): boolean {
   const [targetX, targetZ] = targetPoint(session, army, order);
   const targetArmy = order.target?.kind === 'army' ? session.state.armies[order.target.armyId] : null;
   const targetVisible = targetArmy && order.target?.kind === 'army'
@@ -257,7 +264,7 @@ function revalidateOrder(session: SimContext, army: ArmyStack, order: MoveOrder)
     && (nextMissing || !edgeAllowed(army.graphNodeId, order.path[0]));
   const pursuitChanged = order.target?.kind === 'army'
     && targetNode >= 0 && order.path[order.path.length - 1] !== targetNode;
-  if (!nextInvalid && !pursuitChanged) return;
+  if (!nextInvalid && !pursuitChanged) return true;
 
   let path = targetNode >= 0
     ? findPath(session.graph, army.graphNodeId, targetNode, edgeAllowed)
@@ -271,6 +278,17 @@ function revalidateOrder(session: SimContext, army: ArmyStack, order: MoveOrder)
     destZ: session.graph.nodeZ[path[path.length - 1]] ?? army.z,
   });
   order.edgeProgress = 0;
+
+  if (order.path.length === 0) return false;
+  // The best the repath could reach must actually be nearer the target than we
+  // already are; otherwise the target is boxed off and we would just oscillate.
+  const endNode = path[path.length - 1];
+  const armyToTarget = wrappedDistance(army.x, army.z, targetX, targetZ, session.world.width);
+  const endToTarget = wrappedDistance(
+    session.graph.nodeX[endNode], session.graph.nodeZ[endNode],
+    targetX, targetZ, session.world.width,
+  );
+  return endToTarget < armyToTarget - 1;
 }
 
 export interface RetreatPath {
@@ -329,14 +347,48 @@ export function issueRetreatOrder(session: SimContext, army: ArmyStack, route: R
   };
 }
 
-/** Advance every ordered stack. Friendly armies deliberately never auto-merge. */
+/**
+ * Fold a just-arrived stack into a friendly stack already resting on the same
+ * graph node. Both stacks must be genuinely at rest — no order, status `idle`,
+ * and not referenced by any battle front — so a merge can never absorb a stack
+ * that combat still tracks. The pre-existing stack keeps its id (selection and
+ * any rally wiring stay put); the arriving one is removed and replication drops
+ * it from the client on the next delta.
+ */
+function mergeArrivedStack(session: SimContext, arrived: ArmyStack): void {
+  if (arrived.order || arrived.status !== 'idle' || arrived.battleFrontIds?.length) return;
+  for (const other of Object.values(session.state.armies)) {
+    if (other === arrived) continue;
+    if (other.ownerCountryId !== arrived.ownerCountryId) continue;
+    if (other.graphNodeId !== arrived.graphNodeId) continue;
+    if (other.order || other.status !== 'idle' || other.battleFrontIds?.length) continue;
+    mergeStacks(other, arrived);
+    delete session.state.armies[arrived.id];
+    return;
+  }
+}
+
+/**
+ * Advance every ordered stack. On arrival a friendly stack now merges into an
+ * idle friendly stack already on the destination node (see `mergeArrivedStack`).
+ */
 export function stepMovement(session: SimContext, dtHours: number): void {
   const { graph, world } = session;
   for (const army of Object.values(session.state.armies)) {
     ensureArmyRuntimeState(army);
     const order = army.order;
-    if (!order || order.path.length === 0 || army.status === 'engaged') continue;
-    revalidateOrder(session, army, order);
+    if (!order || army.status === 'engaged') continue;
+    // A revalidated order can be left with an empty path when the route now
+    // crosses ground this army may not enter (a neutral border it is not at
+    // war with). Resolve it to a clean stop instead of leaving the stack in
+    // `moving` forever, which had it marching in place at the frontier.
+    if (order.path.length === 0 || !revalidateOrder(session, army, order)) {
+      army.order = null;
+      army.status = 'idle';
+      army.retreat = null;
+      mergeArrivedStack(session, army);
+      continue;
+    }
     let budget = stackBaseSpeed(army) * dtHours * STRATEGIC_MOVEMENT_SCALE
       * (army.status === 'retreating' ? 3 : 1);
 
@@ -344,7 +396,26 @@ export function stepMovement(session: SimContext, dtHours: number): void {
       const targetNode = order.path[0];
       const tx = graph.nodeX[targetNode];
       const tz = graph.nodeZ[targetNode];
-      const segLen = Math.max(1, wrappedDistance(army.x, army.z, tx, tz, world.width));
+      const rawSegLen = wrappedDistance(army.x, army.z, tx, tz, world.width);
+      // Coincident graph nodes (a zero-length road-graph edge) must not trap the
+      // stack. The partial-move branch below only clears a node once the tick's
+      // step reaches `segLen` — which the `Math.max(1, …)` floor keeps at 1 even
+      // for a duplicate node — and on slow terrain (mountain 0.48 × road 1.35 ⇒
+      // advance ≈ 0.83 < 1) that never happens, so the stack sits on the node
+      // reporting "moving" forever. Step through any sub-unit segment for free.
+      if (rawSegLen < 1) {
+        army.x = tx;
+        army.z = tz;
+        army.lastGraphNodeId = army.graphNodeId;
+        army.graphNodeId = targetNode;
+        order.path.shift();
+        order.edgeProgress = 0;
+        if (army.retreat?.protected && targetNode === army.retreat.protectedUntilNodeId) {
+          army.retreat.protected = false;
+        }
+        continue;
+      }
+      const segLen = rawSegLen;
       const speedScale = (TERRAIN_SPEED[world.terrainClassAt(army.x, army.z)] ?? 0.9) * ROAD_BONUS;
       const advance = budget * speedScale;
       if (advance >= segLen) {
@@ -379,6 +450,7 @@ export function stepMovement(session: SimContext, dtHours: number): void {
       army.order = null;
       army.status = 'idle';
       army.retreat = null;
+      mergeArrivedStack(session, army);
     }
   }
 }

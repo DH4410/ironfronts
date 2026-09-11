@@ -104,6 +104,11 @@ export class GameRuntime {
         || payload.target.z < 0 || payload.target.z > this.world.height)) {
       return { ok: false, reason: 'Target is outside the world.' };
     }
+    if (payload.type === 'strike'
+      && (payload.x < 0 || payload.x > this.world.width
+        || payload.z < 0 || payload.z > this.world.height)) {
+      return { ok: false, reason: 'Target is outside the world.' };
+    }
     const command = { ...payload, countryId } as GameCommand;
     return this.session.applyCommand(command);
   }

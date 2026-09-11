@@ -15,7 +15,9 @@ import { QUALITY_LEVELS, QUALITY_PRESETS, type QualityLevel } from '../graphics/
 import { renderSelectedArmyPanel, type ArmyPanelCommand } from './army';
 import { createFlag } from './flags';
 import { createIcon, type IconName } from './icons';
+import { createDiplomacyPanel } from './diplomacy-panel';
 import { buildNotification } from './notifications';
+import { groupQueueItems, type QueueGroup } from './queue-presentation';
 import { bindTooltip } from './tooltip';
 import { createUnitPortrait, UNIT_ROLE_NOTE } from './unit-portraits';
 import type {
@@ -27,10 +29,19 @@ export interface GameUiActions {
   clearSelection(): void;
   setQuality(level: QualityLevel): void;
   navSelect(id: NavId): void;
+  selectDiplomacyCountry(countryId: number): void;
+  sendDiplomaticMessage(countryId: number, body: string): void;
+  proposeAlliance(countryId: number): void;
+  offerPeace(countryId: number): void;
+  declareWar(countryId: number): void;
+  endAlliance(countryId: number): void;
+  respondDiplomacy(proposalId: string, accept: boolean): void;
   dismissNotification(id: string): void;
   togglePause(open: boolean): void;
   returnToMenu(): void;
   openDebugInspector(): void;
+  /** Arm map-click targeting for a strategic strike (the Warheads chip / N key). */
+  armStrike?: () => void;
   focusSelected?: () => void;
   /** Re-centre the camera on a world point (locatable notifications). */
   focusWorld?: (x: number, z: number) => void;
@@ -75,11 +86,12 @@ const PROVINCE_FIELDS = ['Allegiance', 'Terrain', 'Deposits', 'Extraction'] as c
 type ProvinceFieldKey = (typeof PROVINCE_FIELDS)[number];
 
 const FACILITY_CHIPS: ReadonlyArray<{
-  key: 'barracks' | 'tankPlant' | 'ordnance'; label: string; icon: IconName;
+  key: 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite'; label: string; icon: IconName;
 }> = [
   { key: 'barracks', label: 'Barracks', icon: 'structure-barracks' },
   { key: 'tankPlant', label: 'Tank plant', icon: 'structure-plant' },
   { key: 'ordnance', label: 'Ordnance works', icon: 'structure-ordnance' },
+  { key: 'missileSite', label: 'Missile site', icon: 'structure-ordnance' },
 ];
 
 /** Building id → 0 A.D. facility icon, for the graphical Build row. */
@@ -87,6 +99,15 @@ const FACILITY_ICON: Record<string, IconName> = {
   barracks: 'structure-barracks',
   tankPlant: 'structure-plant',
   ordnance: 'structure-ordnance',
+  missileSite: 'structure-ordnance',
+};
+
+/** Compact painted marks for production types that lacked button icons. */
+const UNIT_PRODUCTION_ICON: Readonly<Partial<Record<string, IconName>>> = {
+  engineer: 'unit-engineer',
+  'armored-car': 'unit-armored-car',
+  'light-tank': 'unit-light-tank',
+  'medium-tank': 'unit-medium-tank',
 };
 
 /** Building id → one-line note for the Build tooltip. */
@@ -94,6 +115,7 @@ const FACILITY_NOTE: Record<string, string> = {
   barracks: 'Trains infantry and engineers.',
   tankPlant: 'Builds armoured cars and tanks.',
   ordnance: 'Builds artillery and heavy ordnance.',
+  missileSite: 'Stockpiles strategic warheads and launches strikes within range.',
 };
 
 const numberFormat = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
@@ -106,36 +128,122 @@ function formatEta(seconds: number): string {
 }
 
 /**
- * A 0 A.D.-style production/construction queue: the active order gets a
- * thumbnail, a fill bar, and a countdown; anything queued behind it is a
- * smaller inert thumbnail. Rebuilt whenever the caller's cache key changes
- * (see the pvResourceKey gate) rather than diffed in place — a queue is at
- * most a handful of items.
+ * Persistent visual state for one 0 A.D.-style queue slot. 0 A.D.'s
+ * selection panel keeps its queue button and resizes a progress overlay;
+ * keeping these nodes stable gives the browser transition real endpoints.
  */
-function renderQueue(
+interface QueueSlot {
+  readonly root: HTMLDivElement;
+  readonly mask: HTMLSpanElement;
+  readonly count: HTMLSpanElement;
+  readonly meta: HTMLDivElement;
+  readonly percent: HTMLSpanElement;
+  readonly eta: HTMLSpanElement;
+  readonly bar: HTMLDivElement;
+  readonly fill: HTMLElement;
+  item: QueueGroup;
+}
+
+interface QueueView {
+  readonly slots: Map<string, QueueSlot>;
+  orderKey: string;
+}
+
+const queueViews = new WeakMap<HTMLElement, QueueView>();
+
+function createQueueSlot(
+  item: QueueGroup, thumbFor: (id: string, label: string) => HTMLElement,
+): QueueSlot {
+  const root = el('div', 'ifg-queue__item');
+  root.setAttribute('role', 'listitem');
+
+  const portrait = el('div', 'ifg-queue__portrait');
+  const mask = el('span', 'ifg-queue__progress-mask');
+  mask.setAttribute('aria-hidden', 'true');
+  const count = el('span', 'ifg-queue__count');
+  count.setAttribute('aria-hidden', 'true');
+  portrait.append(thumbFor(item.id, item.label), mask, count);
+
+  const percent = el('span', 'ifg-queue__percent');
+  const eta = el('span', 'ifg-queue__eta');
+  const status = el('div', 'ifg-queue__status');
+  status.append(percent, eta);
+  const bar = el('div', 'ifg-queue__bar');
+  bar.setAttribute('role', 'progressbar');
+  bar.setAttribute('aria-valuemin', '0');
+  bar.setAttribute('aria-valuemax', '100');
+  const fill = el('i');
+  bar.append(fill);
+  const meta = el('div', 'ifg-queue__meta');
+  meta.append(status, bar);
+  root.append(portrait, meta);
+
+  const slot: QueueSlot = { root, mask, count, meta, percent, eta, bar, fill, item };
+  bindTooltip(root, () => {
+    const current = slot.item;
+    const queued = current.count > 1 ? ` · ${current.count - 1} queued` : '';
+    return {
+      title: current.label,
+      status: current.active
+        ? `${Math.round(current.progress * 100)}% · ${formatEta(current.etaSeconds)} left${queued}`
+        : current.count > 1 ? `${current.count} queued` : 'Queued',
+    };
+  });
+  return slot;
+}
+
+/**
+ * Update persistent queue slots in place. Progress ticks never replace the
+ * artwork or fill nodes, so the clipped overlay and bar can move smoothly.
+ */
+function updateQueue(
   container: HTMLElement, items: readonly import('./ui-state').QueueItem[],
   thumbFor: (id: string, label: string) => HTMLElement,
 ): void {
-  container.replaceChildren(...items.map((item) => {
-    const row = el('div', 'ifg-queue__item');
-    row.classList.toggle('is-active', item.active);
-    row.append(thumbFor(item.id, item.label));
-    if (item.active) {
-      const bar = el('div', 'ifg-queue__bar');
-      const fill = el('i');
-      fill.style.width = `${Math.round(item.progress * 100)}%`;
-      bar.append(fill);
-      const eta = el('span', 'ifg-queue__eta', formatEta(item.etaSeconds));
-      const meta = el('div', 'ifg-queue__meta');
-      meta.append(bar, eta);
-      row.append(meta);
+  const grouped = groupQueueItems(items);
+  let view = queueViews.get(container);
+  if (!view) {
+    view = { slots: new Map(), orderKey: '' };
+    queueViews.set(container, view);
+  }
+
+  const liveKeys = new Set(grouped.map((item) => item.key));
+  for (const key of view.slots.keys()) {
+    if (!liveKeys.has(key)) view.slots.delete(key);
+  }
+
+  const roots = grouped.map((item) => {
+    let slot = view.slots.get(item.key);
+    if (!slot) {
+      slot = createQueueSlot(item, thumbFor);
+      view.slots.set(item.key, slot);
     }
-    bindTooltip(row, () => ({
-      title: item.label,
-      status: item.active ? `${Math.round(item.progress * 100)}% — ${formatEta(item.etaSeconds)} left` : 'Queued',
-    }));
-    return row;
-  }));
+    slot.item = item;
+
+    const progress = Math.max(0, Math.min(100, Math.round(item.progress * 100)));
+    slot.root.classList.toggle('is-active', item.active);
+    slot.root.classList.toggle('is-queued', !item.active);
+    slot.root.dataset.count = String(item.count);
+    slot.meta.hidden = !item.active;
+    slot.count.hidden = item.count < 2;
+    slot.count.textContent = `×${item.count}`;
+    slot.mask.style.transform = `translateY(${item.active ? progress : 0}%)`;
+    slot.fill.style.width = `${progress}%`;
+    slot.percent.textContent = `${progress}%`;
+    slot.eta.textContent = `${formatEta(item.etaSeconds)} left`;
+    slot.bar.setAttribute('aria-valuenow', String(progress));
+    slot.bar.setAttribute('aria-label', `${item.label} progress`);
+    slot.root.setAttribute('aria-label', item.active
+      ? `${item.label}, ${progress} percent, ${formatEta(item.etaSeconds)} remaining${item.count > 1 ? `, ${item.count - 1} more queued` : ''}`
+      : `${item.label}, ${item.count > 1 ? `${item.count} orders queued` : 'queued'}`);
+    return slot.root;
+  });
+
+  const nextOrderKey = grouped.map((item) => item.key).join('|');
+  if (view.orderKey !== nextOrderKey) {
+    container.replaceChildren(...roots);
+    view.orderKey = nextOrderKey;
+  }
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -166,6 +274,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   const resourceIcon: Partial<Record<string, IconName>> = {
     money: 'funds', manpower: 'manpower', food: 'food',
     stone: 'node-stone', metal: 'metal', oil: 'oil',
+    warheads: 'structure-ordnance',
   };
 
   const clockBlock = el('div', 'ifg-topbar__clock');
@@ -211,15 +320,24 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
 
   const dockMore = el('div', 'ifg-dock__more');
   dockMore.hidden = true;
+  const dockButtons = new Map<NavId, HTMLButtonElement>();
   for (const section of DOCK_SECTIONS) {
     const b = el('button', 'ifg-dock__btn');
     b.type = 'button';
-    b.disabled = true;
+    const available = section.id === 'diplomacy';
+    b.disabled = !available;
     b.dataset.nav = section.id;
     b.title = `${section.label} — not available yet`;
     b.setAttribute('aria-label', `${section.label} (not available yet)`);
+    if (available) {
+      b.title = section.label;
+      b.setAttribute('aria-label', section.label);
+      b.setAttribute('aria-controls', 'ifg-diplomacy-panel');
+      b.setAttribute('aria-expanded', 'false');
+    }
     b.append(createIcon(section.icon), el('span', 'ifg-dock__tip', section.label));
     b.addEventListener('click', () => actions.navSelect(section.id));
+    dockButtons.set(section.id, b);
     dockMore.append(b);
   }
   expandBtn.addEventListener('click', () => {
@@ -229,6 +347,17 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     expandBtn.classList.toggle('is-open', open);
   });
   dock.append(dockMore, expandBtn);
+
+  const diplomacyPanel = createDiplomacyPanel({
+    close: () => actions.navSelect('diplomacy'),
+    selectCountry: actions.selectDiplomacyCountry,
+    sendMessage: actions.sendDiplomaticMessage,
+    proposeAlliance: actions.proposeAlliance,
+    offerPeace: actions.offerPeace,
+    declareWar: actions.declareWar,
+    endAlliance: actions.endAlliance,
+    respondProposal: actions.respondDiplomacy,
+  });
 
   // ---------------- map-mode cluster (top-right) ----------------
   const modeCluster = el('div', 'ifg-modes');
@@ -346,7 +475,9 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   pvProduce.append(el('small', 'ifg-card__restitle', 'Produce'));
   const pvProduceList = el('div', 'ifg-card__prodlist');
   pvProduce.append(pvProduceList);
-  const pvQueue = el('div', 'ifg-queue');
+  const pvQueue = el('div', 'ifg-queue ifg-queue--production');
+  pvQueue.setAttribute('role', 'list');
+  pvQueue.setAttribute('aria-label', 'Unit production queue');
   pvQueue.hidden = true;
   pvProduce.append(pvQueue);
   const pvRally = el('div', 'ifg-card__actions');
@@ -363,9 +494,11 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   const pvBuild = el('div', 'ifg-card__resources');
   pvBuild.hidden = true;
   pvBuild.append(el('small', 'ifg-card__restitle', 'Build'));
-  const pvBuildList = el('div', 'ifg-card__prodlist');
+  const pvBuildList = el('div', 'ifg-card__prodlist ifg-card__prodlist--buildings');
   pvBuild.append(pvBuildList);
-  const pvConstruction = el('div', 'ifg-queue');
+  const pvConstruction = el('div', 'ifg-queue ifg-queue--construction');
+  pvConstruction.setAttribute('role', 'list');
+  pvConstruction.setAttribute('aria-label', 'Building construction queue');
   pvConstruction.hidden = true;
   pvBuild.append(pvConstruction);
 
@@ -416,20 +549,26 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     qualitySeg.append(button);
   }
   const qualityBlurb = el('p', 'ifg-overlay__blurb', '');
-  qualityGroup.append(qualitySeg, qualityBlurb);
+  const qualityScope = el('p', 'ifg-overlay__blurb ifg-overlay__blurb--muted',
+    'Affects world rendering — terrain detail, trees, buildings, render sharpness. '
+    + 'Most visible zoomed in. The HUD, army markers and country names stay the '
+    + 'same size at every setting.');
+  qualityGroup.append(qualitySeg, qualityBlurb, qualityScope);
 
   const secondary = el('div', 'ifg-overlay__secondary');
-  for (const [label, title] of [
-    ['More settings (main menu)', 'Full settings live in the main menu for now'],
-    ['Save', 'Saving is not available yet'],
-    ['Return to Main Menu', 'Returning to the menu mid-operation is not available yet'],
+  for (const [label, reason] of [
+    ['More settings (main menu)', 'Full settings live in the main menu for now.'],
+    ['Save', 'The operation autosaves on the server — there is no manual save yet.'],
+    ['Return to Main Menu', 'Leaving mid-operation is not wired up yet; close this tab to end the session.'],
   ] as const) {
+    const row = el('div', 'ifg-overlay__link-row');
     const b = el('button', 'ifg-overlay__link', label);
     b.type = 'button';
     b.disabled = true;
-    b.title = title;
+    b.title = reason;
     if (label.startsWith('Return')) b.addEventListener('click', () => actions.returnToMenu());
-    secondary.append(b);
+    row.append(b, el('small', 'ifg-overlay__link-reason', reason));
+    secondary.append(row);
   }
   const diagLine = el('p', 'ifg-overlay__diag', '');
   overlayCard.append(resumeButton, qualityGroup, secondary, diagLine);
@@ -438,11 +577,18 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     if (event.target === overlay) actions.togglePause(false);
   });
 
-  root.append(topbar, dock, modeCluster, notifyStack, provinceCard, armyCard, overlay);
+  root.append(topbar, dock, diplomacyPanel.element, modeCluster, notifyStack, provinceCard, armyCard, overlay);
   document.body.append(root);
 
   const onKey = (event: KeyboardEvent): void => {
     if (event.key === 'Escape' && store.get().phase === 'in-game') {
+      if (store.get().activeSidePanel) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const panel = store.get().activeSidePanel;
+        if (panel) actions.navSelect(panel);
+        return;
+      }
       actions.togglePause(!store.get().paused);
     }
   };
@@ -458,11 +604,25 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   let weatherKey = '';
   let pvFlagKey = '';
   let pvResourceKey = '';
+  let renderedSidePanel: StrategicUiState['activeSidePanel'] = null;
 
   const render = (state: StrategicUiState): void => {
     root.hidden = state.phase !== 'in-game';
     root.dataset.phase = state.phase;
     inspectorButton.hidden = !state.debugEnabled;
+
+    const diplomacyOpen = state.activeSidePanel === 'diplomacy';
+    const diplomacyDockButton = dockButtons.get('diplomacy');
+    if (diplomacyDockButton) {
+      diplomacyDockButton.classList.toggle('is-on', diplomacyOpen);
+      diplomacyDockButton.setAttribute('aria-expanded', String(diplomacyOpen));
+      diplomacyDockButton.setAttribute('aria-pressed', String(diplomacyOpen));
+    }
+    diplomacyPanel.render(diplomacyOpen, state.diplomacy);
+    if (renderedSidePanel === 'diplomacy' && state.activeSidePanel === null) {
+      diplomacyDockButton?.focus({ preventScroll: true });
+    }
+    renderedSidePanel = state.activeSidePanel;
 
     // `.brand { display:flex }` beats [hidden]; override inline, re-asserted so
     // it outlasts the menu launch transition.
@@ -485,8 +645,23 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     const slots = state.resources.map((r) => r.id).join(',');
     if (slots !== resourceSlots) {
       resourceStrip.replaceChildren(...state.resources.map((line) => {
+        // The Warheads chip doubles as the strike trigger — activating it arms
+        // map-click targeting, the same order the N key gives. Kept as a <span>
+        // (not <button>) so it inherits the chip styling unchanged.
         const chip = el('span', 'ifg-res');
         chip.dataset.res = line.id;
+        if (line.id === 'warheads' && actions.armStrike) {
+          const arm = actions.armStrike;
+          chip.classList.add('is-actionable');
+          chip.setAttribute('role', 'button');
+          chip.tabIndex = 0;
+          chip.style.cursor = 'pointer';
+          chip.title = 'Launch strategic strike (or press N)';
+          chip.addEventListener('click', () => arm());
+          chip.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); arm(); }
+          });
+        }
         const ic = resourceIcon[line.id];
         if (ic) chip.append(createIcon(ic, 'ifg-res__icon'));
         const stack = el('span', 'ifg-res__stack');
@@ -585,13 +760,16 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       pvFieldValue.get('Deposits')!.textContent = depositKinds.length
         ? depositKinds.map((k) => k[0].toUpperCase() + k.slice(1)).join(' · ')
         : province.isOwn === false ? 'Unknown' : 'None';
+      // Plain-language: either an engineer is mining, or the action the player
+      // needs to take is to send one. "Controlled / Uncontrolled" read as jargon.
       pvFieldValue.get('Extraction')!.textContent = !depositKinds.length ? '—'
-        : province.deposits?.extracting ? 'Under way'
-        : province.deposits?.controlled ? 'Controlled' : 'Uncontrolled';
+        : province.deposits?.extracting ? 'Engineer working it'
+        : province.isOwn === false ? '—'
+        : 'Idle — move an engineer here';
 
       // Facilities row — own provinces only, shown when at least one stands.
       const b = province.buildings;
-      const anyFacility = Boolean(b && (b.barracks > 0 || b.tankPlant > 0 || b.ordnance > 0));
+      const anyFacility = Boolean(b && (b.barracks > 0 || b.tankPlant > 0 || b.ordnance > 0 || b.missileSite > 0));
       pvFacilities.hidden = !anyFacility;
       if (b) {
         for (const { key } of FACILITY_CHIPS) {
@@ -630,16 +808,20 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
 
         // PRODUCE panel.
         const prod = province.producible ?? [];
+        const q = province.queue ?? [];
         pvProduce.hidden = !(province.isOwn && prod.length > 0);
         if (province.isOwn && prod.length > 0) {
           pvProduceList.replaceChildren(...prod.map((u) => {
-            // Portrait-thumb button, RTS build-panel style: the drawing reads
-            // first, the cost + role sit on the hover tooltip.
+            // Text-free RTS button: a dedicated painted unit mark wins
+            // when available; the full name, role, and cost stay on tooltip.
             const b = el('button', 'ifg-buildbtn');
             b.type = 'button';
-            const thumb = createUnitPortrait(u.id, u.name);
+            const productionIcon = UNIT_PRODUCTION_ICON[u.id];
+            const thumb = productionIcon
+              ? createIcon(productionIcon, 'ifg-buildbtn__thumb')
+              : createUnitPortrait(u.id, u.name);
             thumb.classList.add('ifg-buildbtn__thumb');
-            b.append(thumb, el('span', 'ifg-buildbtn__label', u.name));
+            b.append(thumb);
             b.setAttribute('aria-label', `${u.name} — ${u.costLabel}`);
             bindTooltip(b, () => ({
               title: u.name,
@@ -649,16 +831,6 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
             b.addEventListener('click', () => actions.produceUnit(province.id, u.id));
             return b;
           }));
-          const q = province.queue ?? [];
-          pvQueue.hidden = q.length === 0;
-          if (q.length) {
-            renderQueue(pvQueue, q, (id, label) => {
-              const thumb = createUnitPortrait(id, label);
-              thumb.classList.add('ifg-queue__thumb');
-              return thumb;
-            });
-          }
-
           // Rally point: where finished units march. Placed by a map click.
           pvRally.hidden = false;
           pvRallyBtn.textContent = province.awaitingRallyTarget
@@ -671,6 +843,12 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         } else {
           pvRally.hidden = true;
         }
+        pvQueue.hidden = q.length === 0;
+        updateQueue(pvQueue, q, (id, label) => {
+          const thumb = createUnitPortrait(id, label);
+          thumb.classList.add('ifg-queue__thumb');
+          return thumb;
+        });
 
         // BUILD panel — offered buildings and anything under construction.
         const buildable = province.buildable ?? [];
@@ -678,14 +856,12 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         pvBuild.hidden = !province.isOwn || (buildable.length === 0 && construction.length === 0);
         if (!pvBuild.hidden) {
           pvBuildList.replaceChildren(...buildable.map((b) => {
-            // Facility icon (0 A.D. art) + short label. Unaffordable buildings
-            // stay on the list, disabled, with the cost on the tooltip so the
-            // player knows what to save for.
+            // Large, text-free facility tile. Unaffordable buildings stay on
+            // the list with name, cost, and reason available on hover/focus.
             const btn = el('button', 'ifg-buildbtn');
             btn.type = 'button';
             const icon = FACILITY_ICON[b.id];
             if (icon) btn.append(createIcon(icon, 'ifg-buildbtn__thumb'));
-            btn.append(el('span', 'ifg-buildbtn__label', b.name));
             btn.disabled = !b.affordable;
             btn.setAttribute('aria-label', `${b.name} — ${b.costLabel}`);
             bindTooltip(btn, () => ({
@@ -699,16 +875,14 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
             }
             return btn;
           }));
-          pvConstruction.hidden = construction.length === 0;
-          if (construction.length) {
-            renderQueue(pvConstruction, construction, (id, label) => {
-              const icon = FACILITY_ICON[id];
-              const thumb = icon ? createIcon(icon, 'ifg-queue__thumb ifg-icon') : el('span', 'ifg-queue__thumb');
-              if (!icon) thumb.textContent = label.slice(0, 1);
-              return thumb;
-            });
-          }
         }
+        pvConstruction.hidden = construction.length === 0;
+        updateQueue(pvConstruction, construction, (id, label) => {
+          const icon = FACILITY_ICON[id];
+          const thumb = icon ? createIcon(icon, 'ifg-queue__thumb ifg-icon') : el('span', 'ifg-queue__thumb');
+          if (!icon) thumb.textContent = label.slice(0, 1);
+          return thumb;
+        });
 
         if (dep && hasDeposits) {
           pvResStatus.hidden = false;

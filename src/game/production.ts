@@ -123,7 +123,11 @@ function spawnUnit(
   const world = session.world;
   const province = world.provinces.find((p) => p.id === provinceId);
   const [cx, cz] = province ? province.center : [world.width / 2, world.height / 2];
-  const node = nearestNode(session.graph, cx, cz, 500);
+  // Uncapped: the nearest land node to the city, however far. A 500u cap used to
+  // fail for cities set back from the road graph and fall back to node 0 — a
+  // real node elsewhere on the map, which made pathfinding place the new stack
+  // in the wrong place entirely.
+  const node = nearestNode(session.graph, cx, cz);
   const nx = node >= 0 ? session.graph.nodeX[node] : cx;
   const nz = node >= 0 ? session.graph.nodeZ[node] : cz;
 

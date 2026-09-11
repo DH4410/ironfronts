@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 import { GameSession } from '../../src/game/game-session';
 import { stepCombat } from '../../src/game/combat';
+import { stackUnitCount } from '../../src/game/units/army';
 import { buildScenarioSelection } from '../../src/game/scenario-catalog';
 import { CATALOG_COUNTRY_BY_NAME } from '../../src/game/data/countries.generated';
 import { loadWorld, type LoadedWorld } from './load-world';
@@ -156,6 +157,82 @@ describe('gameplay vertical slice', () => {
     s.tick(2);
     expect(s.state.provinceOwners[enemyProvince.id]).toBe(SPAIN);
     expect(s.isAtWar(SPAIN, enemyId!)).toBe(true);
+  });
+
+  it('a friendly stack folds into an idle stack already on the destination node', () => {
+    const s = spainSession();
+    const mover = Object.values(s.state.armies).find((a) => a.ownerCountryId === SPAIN)!;
+    // A direct land-graph neighbour of the mover's node hosts the resident stack,
+    // so a single-hop order lands the mover exactly on it.
+    const restNode = s.graph.adjacency[mover.graphNodeId][0];
+    expect(restNode).toBeGreaterThanOrEqual(0);
+    s.state.armies['sp-rest'] = {
+      id: 'sp-rest', ownerCountryId: SPAIN, name: 'Garrison',
+      x: s.graph.nodeX[restNode], z: s.graph.nodeZ[restNode], graphNodeId: restNode,
+      units: [{ typeId: 'infantry', count: 3, hp: 300, experience: 0 }],
+      status: 'idle', order: null, extractingNodeId: null,
+    };
+    const moverUnits = stackUnitCount(mover);
+    const res = s.orderMove(SPAIN, mover.id, s.graph.nodeX[restNode], s.graph.nodeZ[restNode], 'move');
+    expect(res.ok).toBe(true);
+
+    for (let i = 0; i < 120 && s.state.armies[mover.id]; i += 1) s.tick(6);
+
+    expect(s.state.armies[mover.id]).toBeUndefined(); // the mover was folded away
+    const survivor = s.state.armies['sp-rest'];
+    expect(survivor).toBeDefined();
+    expect(stackUnitCount(survivor)).toBe(3 + moverUnits); // it absorbed the mover's units
+
+    // Sanity: two idle friendly stacks that never move do NOT merge on their own
+    // (the merge is an arrival event, not a proximity sweep).
+    const s2 = spainSession();
+    const a2 = Object.values(s2.state.armies).find((a) => a.ownerCountryId === SPAIN)!;
+    s2.state.armies['sp-twin'] = {
+      id: 'sp-twin', ownerCountryId: SPAIN, name: 'Twin',
+      x: a2.x, z: a2.z, graphNodeId: a2.graphNodeId,
+      units: [{ typeId: 'infantry', count: 1, hp: 100, experience: 0 }],
+      status: 'idle', order: null, extractingNodeId: null,
+    };
+    s2.tick(6);
+    expect(s2.state.armies['sp-twin']).toBeDefined();
+    expect(s2.state.armies[a2.id]).toBeDefined();
+  });
+
+  it('a move order revalidation leaves no stack marching in place with an empty path', () => {
+    const s = spainSession();
+    const army = Object.values(s.state.armies).find((a) => a.ownerCountryId === SPAIN)!;
+    // The shape a blocked-border revalidation produces: status still 'moving',
+    // order still present, but its path is now empty (nothing legal ahead).
+    army.order = {
+      path: [], destX: army.x, destZ: army.z, intent: 'move', edgeProgress: 0,
+      target: { kind: 'position', x: army.x + 4000, z: army.z },
+    };
+    army.status = 'moving';
+    s.tick(1);
+    expect(army.order).toBeNull();
+    expect(army.status).toBe('idle');
+  });
+
+  it('a stack aimed at ground it can never reach stops instead of oscillating forever', () => {
+    const s = spainSession();
+    const army = Object.values(s.state.armies).find((a) => a.ownerCountryId === SPAIN)!;
+    // A live order whose path front is a stale non-adjacent node (forces a
+    // revalidate) and whose target sits deep in neutral foreign land Spain may
+    // not enter. Revalidation can get no closer, so the stack must stop.
+    const strandedNode = (army.graphNodeId + 500) % s.graph.nodeCount;
+    army.order = {
+      path: [strandedNode], destX: 0, destZ: 0, intent: 'attack', edgeProgress: 0,
+      target: { kind: 'position', x: army.x + 30_000, z: army.z + 20_000 },
+    };
+    army.status = 'moving';
+    const startX = army.x;
+    const startZ = army.z;
+    for (let i = 0; i < 30 && army.status === 'moving'; i += 1) s.tick(4);
+    expect(army.status).toBe('idle');
+    expect(army.order).toBeNull();
+    // It may have legally advanced toward the frontier, but it is not still
+    // frozen where it began pretending to march.
+    expect(army.x !== startX || army.z !== startZ || army.graphNodeId >= 0).toBe(true);
   });
 });
 

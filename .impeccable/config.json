@@ -1,0 +1,44 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/ui/game-ui.css"
+        ],
+        "createdAt": "2026-09-07T20:23:09.611Z",
+        "reason": "pre-existing Ironfronts HUD design language (side-accent borders are pervasive and intentional in this stamped-dossier UI); pass-6 is a functional fix pass, not a design audit, and only adjusted one border value"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/menu/menu.css"
+        ],
+        "createdAt": "2026-09-07T20:23:09.963Z",
+        "reason": "pre-existing menu/dossier accent-border styling, not introduced by pass-6 (only reserved viewport margin + added a warning banner)"
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "src/ui/game-ui.css"
+        ],
+        "createdAt": "2026-09-07T20:23:10.329Z",
+        "reason": "flagged lines (.ifg-modes__item width / .ifg-modes__label max-width expand-on-active) are pre-existing micro-interactions not touched by pass-6"
+      },
+      {
+        "rule": "layout-transition",
+        "value": "*",
+        "files": [
+          "src/menu/menu.css"
+        ],
+        "createdAt": "2026-09-07T20:23:42.213Z",
+        "reason": "menu.css:125 .ifm__corner hover-grow (16px->22px on 4 tiny bracket elements) is a pre-existing decorative flourish from Aug 2026, untouched by pass-6"
+      }
+    ]
+  }
+}

@@ -1,4 +1,7 @@
-export type ArmyVisualKind = 0 | 1 | 2 | 3;
+/** Six silhouettes shown in the strategic counter atlas. */
+export type ArmyVisualKind = 0 | 1 | 2 | 3 | 4 | 5;
+/** Four close-range model families; engineers share infantry and light armour shares a hull. */
+export type ArmyModelKind = 0 | 1 | 2 | 3;
 
 export interface ProjectedTroopGroup {
   readonly typeId: string;
@@ -7,20 +10,35 @@ export interface ProjectedTroopGroup {
 }
 
 export interface ArmyFormationGroup {
+  readonly kind: ArmyModelKind;
+  readonly count: number;
+  readonly health: number;
+}
+
+export interface ArmyCompositionRow {
   readonly kind: ArmyVisualKind;
   readonly count: number;
   readonly health: number;
 }
 
 export function visualKindForUnit(typeId: string): ArmyVisualKind {
+  if (typeId === 'engineer') return 1;
+  if (typeId === 'armored-car') return 2;
+  if (typeId === 'light-tank') return 3;
+  if (typeId === 'medium-tank') return 4;
+  if (typeId === 'artillery') return 5;
+  return 0;
+}
+
+function modelKindForUnit(typeId: string): ArmyModelKind {
   if (typeId === 'armored-car' || typeId === 'light-tank') return 1;
   if (typeId === 'medium-tank') return 2;
   if (typeId === 'artillery') return 3;
   return 0;
 }
 
-/** Collapse rule-level unit types into the four categories readable on the map. */
-export function buildArmyCompositionRows(groups: readonly ProjectedTroopGroup[]): ArmyFormationGroup[] {
+/** Keep all six rule-level categories distinct, ordered by battlefield weight. */
+export function buildArmyCompositionRows(groups: readonly ProjectedTroopGroup[]): ArmyCompositionRow[] {
   const buckets = new Map<ArmyVisualKind, { count: number; weightedHealth: number }>();
   for (const group of groups) {
     if (group.count <= 0) continue;
@@ -32,14 +50,25 @@ export function buildArmyCompositionRows(groups: readonly ProjectedTroopGroup[])
   }
   return [...buckets.entries()]
     .map(([kind, bucket]) => ({ kind, count: bucket.count, health: bucket.weightedHealth / bucket.count }))
-    .sort((a, b) => a.kind - b.kind)
-    .slice(0, 4);
+    .sort((a, b) => b.count - a.count || a.kind - b.kind);
 }
 
 /** Spread the composition categories over at most four close-range models. */
 export function buildArmyFormation(groups: readonly ProjectedTroopGroup[]): ArmyFormationGroup[] {
-  const categories = buildArmyCompositionRows(groups)
-    .map((group) => ({ ...group, slots: 1, remainder: 0 }));
+  const buckets = new Map<ArmyModelKind, { count: number; weightedHealth: number }>();
+  for (const group of groups) {
+    if (group.count <= 0) continue;
+    const kind = modelKindForUnit(group.typeId);
+    const bucket = buckets.get(kind) ?? { count: 0, weightedHealth: 0 };
+    bucket.count += group.count;
+    bucket.weightedHealth += group.health * group.count;
+    buckets.set(kind, bucket);
+  }
+  const categories = [...buckets.entries()]
+    .map(([kind, bucket]) => ({
+      kind, count: bucket.count, health: bucket.weightedHealth / bucket.count, slots: 1, remainder: 0,
+    }))
+    .sort((a, b) => a.kind - b.kind);
   const totalUnits = categories.reduce((sum, category) => sum + category.count, 0);
   const slotLimit = Math.min(4, totalUnits);
   const remaining = Math.max(0, slotLimit - categories.length);
@@ -64,7 +93,7 @@ export function buildArmyFormation(groups: readonly ProjectedTroopGroup[]): Army
   })));
 }
 
-export function dominantVisualKind(formation: readonly ArmyFormationGroup[]): ArmyVisualKind {
+export function dominantVisualKind(formation: readonly ArmyCompositionRow[]): ArmyVisualKind {
   return formation.reduce((dominant, candidate) => candidate.count > dominant.count ? candidate : dominant,
     formation[0] ?? { kind: 0 as const, count: 0, health: 0 }).kind;
 }

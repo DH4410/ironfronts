@@ -25,13 +25,17 @@ export { stepCapture, type CaptureEvent } from './combat/capture';
 export interface CombatEvent {
   readonly kind:
     | 'engaged' | 'reinforced' | 'combatPulse' | 'retreat'
-    | 'destroyed' | 'bombardment' | 'battleEnded';
+    | 'destroyed' | 'bombardment' | 'battleEnded' | 'strike';
   readonly attacker: number;
   readonly defender: number;
   readonly battleId?: string;
   readonly frontId?: string;
   readonly armyId?: string;
   readonly targetArmyId?: string;
+  /** Strategic-strike impact point and province, world-space. Only on 'strike'. */
+  readonly x?: number;
+  readonly z?: number;
+  readonly provinceId?: number;
 }
 
 function initializeState(session: SimContext): void {
@@ -219,6 +223,13 @@ function removeArmyFromFront(session: SimContext, front: BattleFrontState, armyI
 
 function removeArmyFromAllFronts(session: SimContext, armyId: string): void {
   for (const front of Object.values(session.state.battleFronts)) removeArmyFromFront(session, front, armyId);
+}
+
+/** Detach a stack from every front and delete it. The shared "this army is
+ *  gone" primitive — combat wipes, artillery kills, and strategic strikes. */
+export function destroyArmy(session: SimContext, armyId: string): void {
+  removeArmyFromAllFronts(session, armyId);
+  delete session.state.armies[armyId];
 }
 
 function legalFirstNodes(session: SimContext, army: ArmyStack, front: BattleFrontState): number[] {

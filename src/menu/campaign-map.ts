@@ -31,14 +31,28 @@ interface MapRect {
   readonly height: number;
 }
 
+/** Zoom + pan window into the country raster. `zoom` 1 = whole map. */
+export interface MapView {
+  readonly zoom: number;
+  readonly originX: number;
+  readonly originY: number;
+}
+
+const FULL_VIEW: MapView = { zoom: 1, originX: 0, originY: 0 };
+export const MAX_MAP_ZOOM = 6;
+
+const clamp = (value: number, min: number, max: number): number =>
+  Math.max(min, Math.min(max, value));
+
 /**
  * Translate a pointer into the country raster's pixel space. The canvas uses
  * `object-fit: contain`, so its bitmap may be letterboxed inside the element;
  * those insets must be removed before scaling or edge clicks select a country
- * offset from the one under the pointer.
+ * offset from the one under the pointer. `view` folds in the zoom + pan
+ * window; omitted, it resolves against the whole map (zoom 1).
  */
 export function campaignMapCoordinates(
-  clientX: number, clientY: number, rect: MapRect,
+  clientX: number, clientY: number, rect: MapRect, view: MapView = FULL_VIEW,
 ): readonly [number, number] | null {
   if (rect.width <= 0 || rect.height <= 0) return null;
   const mapAspect = CAMPAIGN_MAP_WIDTH / CAMPAIGN_MAP_HEIGHT;
@@ -49,9 +63,13 @@ export function campaignMapCoordinates(
   const displayTop = rect.top + (rect.height - displayHeight) / 2;
   if (clientX < displayLeft || clientX >= displayLeft + displayWidth
     || clientY < displayTop || clientY >= displayTop + displayHeight) return null;
+  const windowWidth = CAMPAIGN_MAP_WIDTH / view.zoom;
+  const windowHeight = CAMPAIGN_MAP_HEIGHT / view.zoom;
+  const fractionX = (clientX - displayLeft) / displayWidth;
+  const fractionY = (clientY - displayTop) / displayHeight;
   return [
-    Math.min(CAMPAIGN_MAP_WIDTH - 1, Math.floor((clientX - displayLeft) / displayWidth * CAMPAIGN_MAP_WIDTH)),
-    Math.min(CAMPAIGN_MAP_HEIGHT - 1, Math.floor((clientY - displayTop) / displayHeight * CAMPAIGN_MAP_HEIGHT)),
+    clamp(Math.floor(view.originX + fractionX * windowWidth), 0, CAMPAIGN_MAP_WIDTH - 1),
+    clamp(Math.floor(view.originY + fractionY * windowHeight), 0, CAMPAIGN_MAP_HEIGHT - 1),
   ];
 }
 
@@ -77,52 +95,156 @@ export function mountCampaignMap(
   let ids: Uint16Array | null = null;
   let selectedCountryId: number | null = null;
 
+  // Zoom + pan window into the raster. zoom 1 = whole map; origin is the
+  // top-left raster pixel currently shown. All pointer math folds this in via
+  // `campaignMapCoordinates(..., view)`.
+  const view = { zoom: 1, originX: 0, originY: 0 };
+  const windowSize = (): readonly [number, number] =>
+    [CAMPAIGN_MAP_WIDTH / view.zoom, CAMPAIGN_MAP_HEIGHT / view.zoom];
+  const clampOrigin = (): void => {
+    const [winW, winH] = windowSize();
+    view.originX = clamp(view.originX, 0, CAMPAIGN_MAP_WIDTH - winW);
+    view.originY = clamp(view.originY, 0, CAMPAIGN_MAP_HEIGHT - winH);
+  };
+  const displayBox = (rect: MapRect): MapRect => {
+    const mapAspect = CAMPAIGN_MAP_WIDTH / CAMPAIGN_MAP_HEIGHT;
+    const rectAspect = rect.width / rect.height;
+    const width = rectAspect > mapAspect ? rect.height * mapAspect : rect.width;
+    const height = rectAspect > mapAspect ? rect.height : rect.width / mapAspect;
+    return { left: rect.left + (rect.width - width) / 2, top: rect.top + (rect.height - height) / 2, width, height };
+  };
+
+  // Colour for one raster pixel: ocean, an anti-aliasable boundary (any of the
+  // four neighbours belongs to a different country), or the fill for its state.
+  const colorAt = (rx: number, ry: number): readonly number[] => {
+    const index = ry * CAMPAIGN_MAP_WIDTH + rx;
+    const id = ids![index];
+    if (id === 0) return COLORS.ocean;
+    const boundary = (rx > 0 && ids![index - 1] !== id)
+      || (rx < CAMPAIGN_MAP_WIDTH - 1 && ids![index + 1] !== id)
+      || (ry > 0 && ids![index - CAMPAIGN_MAP_WIDTH] !== id)
+      || (ry < CAMPAIGN_MAP_HEIGHT - 1 && ids![index + CAMPAIGN_MAP_WIDTH] !== id);
+    if (boundary) return COLORS.border;
+    return id === selectedCountryId
+      ? COLORS.selected
+      : playableIds.has(id) ? COLORS.available : COLORS.unavailable;
+  };
+
   const draw = (): void => {
     if (!ids) return;
     const image = context.createImageData(CAMPAIGN_MAP_WIDTH, CAMPAIGN_MAP_HEIGHT);
-    for (let y = 0; y < CAMPAIGN_MAP_HEIGHT; y += 1) {
-      for (let x = 0; x < CAMPAIGN_MAP_WIDTH; x += 1) {
-        const index = y * CAMPAIGN_MAP_WIDTH + x;
-        const id = ids[index];
-        const boundary = id > 0 && (
-          (x > 0 && ids[index - 1] !== id)
-          || (y > 0 && ids[index - CAMPAIGN_MAP_WIDTH] !== id)
-        );
-        const color = id === 0
-          ? COLORS.ocean
-          : boundary
-            ? COLORS.border
-            : id === selectedCountryId
-              ? COLORS.selected
-              : playableIds.has(id) ? COLORS.available : COLORS.unavailable;
-        image.data.set(color, index * 4);
+    const [winW, winH] = windowSize();
+    // Nearest-neighbour sampling stair-steps borders once zoomed in. Above 1x,
+    // average an NxN grid of sub-samples per pixel so coastlines and country
+    // edges anti-alias instead of turning blocky.
+    const grid = view.zoom > 1.05 ? 3 : 1;
+    const inv = 1 / grid;
+    const n = grid * grid;
+    for (let cy = 0; cy < CAMPAIGN_MAP_HEIGHT; cy += 1) {
+      for (let cx = 0; cx < CAMPAIGN_MAP_WIDTH; cx += 1) {
+        let r = 0;
+        let g = 0;
+        let b = 0;
+        let a = 0;
+        for (let sy = 0; sy < grid; sy += 1) {
+          const fy = (cy + (sy + 0.5) * inv) / CAMPAIGN_MAP_HEIGHT;
+          const ry = Math.min(CAMPAIGN_MAP_HEIGHT - 1, Math.floor(view.originY + fy * winH));
+          for (let sx = 0; sx < grid; sx += 1) {
+            const fx = (cx + (sx + 0.5) * inv) / CAMPAIGN_MAP_WIDTH;
+            const rx = Math.min(CAMPAIGN_MAP_WIDTH - 1, Math.floor(view.originX + fx * winW));
+            const c = colorAt(rx, ry);
+            r += c[0]; g += c[1]; b += c[2]; a += c[3];
+          }
+        }
+        const o = (cy * CAMPAIGN_MAP_WIDTH + cx) * 4;
+        image.data[o] = r / n;
+        image.data[o + 1] = g / n;
+        image.data[o + 2] = b / n;
+        image.data[o + 3] = a / n;
       }
     }
     context.putImageData(image, 0, 0);
   };
 
-  const countryAt = (event: PointerEvent | MouseEvent): LobbyCountry | null => {
-    if (!ids) return null;
+  // Inner client box of the canvas, with the decorative border removed —
+  // `object-fit: contain` and every pointer mapping work off this box.
+  const innerRect = (): MapRect => {
     const rect = canvas.getBoundingClientRect();
-    // getBoundingClientRect includes the decorative border; object-fit uses the
-    // inner client box. Exclude it so even narrow border countries stay exact.
-    const point = campaignMapCoordinates(event.clientX, event.clientY, {
+    return {
       left: rect.left + canvas.clientLeft,
       top: rect.top + canvas.clientTop,
       width: canvas.clientWidth,
       height: canvas.clientHeight,
-    });
+    };
+  };
+
+  const countryAt = (event: PointerEvent | MouseEvent): LobbyCountry | null => {
+    if (!ids) return null;
+    const point = campaignMapCoordinates(event.clientX, event.clientY, innerRect(), view);
     if (!point) return null;
     const [x, y] = point;
     return countriesById.get(ids[y * CAMPAIGN_MAP_WIDTH + x]) ?? null;
   };
 
+  // --- zoom + pan -----------------------------------------------------------
+  let drag: { x: number; y: number; moved: boolean } | null = null;
+
+  canvas.addEventListener('wheel', (event) => {
+    if (!ids) return;
+    event.preventDefault();
+    const box = displayBox(innerRect());
+    const fx = clamp((event.clientX - box.left) / box.width, 0, 1);
+    const fy = clamp((event.clientY - box.top) / box.height, 0, 1);
+    const [winW, winH] = windowSize();
+    const worldX = view.originX + fx * winW;
+    const worldY = view.originY + fy * winH;
+    const factor = event.deltaY < 0 ? 1.2 : 1 / 1.2;
+    view.zoom = clamp(view.zoom * factor, 1, MAX_MAP_ZOOM);
+    const [nextW, nextH] = windowSize();
+    view.originX = view.zoom === 1 ? 0 : worldX - fx * nextW;
+    view.originY = view.zoom === 1 ? 0 : worldY - fy * nextH;
+    clampOrigin();
+    draw();
+  }, { passive: false });
+
+  canvas.addEventListener('pointerdown', (event) => {
+    if (event.button !== 0 || !ids) return;
+    drag = { x: event.clientX, y: event.clientY, moved: false };
+    try { canvas.setPointerCapture(event.pointerId); } catch { /* not fatal */ }
+  });
+  const endDrag = (event: PointerEvent): void => {
+    if (!drag) return;
+    try { canvas.releasePointerCapture(event.pointerId); } catch { /* already released */ }
+    // Keep `drag` alive through the click that fires right after pointerup so
+    // the click handler can tell a pan from a select; clear it next tick.
+    setTimeout(() => { drag = null; }, 0);
+  };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+
   canvas.addEventListener('pointermove', (event) => {
+    if (drag) {
+      const box = displayBox(innerRect());
+      const dx = event.clientX - drag.x;
+      const dy = event.clientY - drag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+      drag.x = event.clientX;
+      drag.y = event.clientY;
+      const [winW, winH] = windowSize();
+      view.originX -= (dx / box.width) * winW;
+      view.originY -= (dy / box.height) * winH;
+      clampOrigin();
+      draw();
+      canvas.style.cursor = 'grabbing';
+      return;
+    }
     const country = countryAt(event);
-    canvas.style.cursor = country && playableIds.has(country.id) ? 'pointer' : 'not-allowed';
+    canvas.style.cursor = country && playableIds.has(country.id)
+      ? 'pointer'
+      : view.zoom > 1 ? 'grab' : 'not-allowed';
     onStatus({
       country,
-      message: !country ? 'Move over a country to inspect it.'
+      message: !country ? 'Scroll to zoom, drag to pan. Move over a country to inspect it.'
         : playableIds.has(country.id)
           ? `${country.name} · ${country.startingCities} starting cities · Available`
           : unavailableReason(country),
@@ -133,6 +255,7 @@ export function mountCampaignMap(
     onStatus({ country: null, message: 'Select a beige country. Grey countries cannot be claimed.' });
   });
   canvas.addEventListener('click', (event) => {
+    if (drag?.moved) return; // a pan, not a pick
     const country = countryAt(event);
     if (!country || !playableIds.has(country.id)) return;
     selectedCountryId = country.id;

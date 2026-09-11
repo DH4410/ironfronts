@@ -24,7 +24,7 @@ export interface DamageProfile {
 }
 
 /** Production buildings. */
-export type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
+export type BuildingId = 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite';
 
 export interface ResourceCost {
   readonly funds?: number;

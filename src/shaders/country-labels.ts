@@ -1,7 +1,15 @@
 import { commonWgsl } from './common';
 
-export const COUNTRY_LABEL_FADE_START_ALTITUDE = 600;
-export const COUNTRY_LABEL_FADE_END_ALTITUDE = 250;
+/**
+ * Country names are camera-independent world geometry, so zooming in makes them
+ * grow on screen. They read as strategic-overview furniture — full strength only
+ * at the pulled-back altitudes, fading out as the player drops toward regional
+ * and province zoom (playtest F1: at one notch in they still dominated the
+ * frame). Fully opaque at/above START, gone at/below END; below END the label
+ * pass is skipped entirely (see renderer.ts).
+ */
+export const COUNTRY_LABEL_FADE_START_ALTITUDE = 1100;
+export const COUNTRY_LABEL_FADE_END_ALTITUDE = 430;
 
 export const countryLabelShader = commonWgsl + /* wgsl */ `
 struct CountryLabelGlyph { a: vec4f, b: vec4f, c: vec4f };

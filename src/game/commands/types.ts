@@ -72,11 +72,54 @@ export interface RallyCommand {
   readonly target: { readonly x: number; readonly z: number } | null;
 }
 
+export interface SendDiplomaticMessageCommand {
+  readonly type: 'sendDiplomaticMessage';
+  readonly countryId: number;
+  readonly targetCountryId: number;
+  readonly body: string;
+}
+
+export interface ProposeDiplomacyCommand {
+  readonly type: 'proposeDiplomacy';
+  readonly countryId: number;
+  readonly targetCountryId: number;
+  readonly proposal: 'alliance' | 'peace';
+}
+
+export interface RespondDiplomacyCommand {
+  readonly type: 'respondDiplomacy';
+  readonly countryId: number;
+  readonly proposalId: string;
+  readonly accept: boolean;
+}
+
+export interface DeclareWarCommand {
+  readonly type: 'declareWar';
+  readonly countryId: number;
+  readonly targetCountryId: number;
+}
+
+export interface EndAllianceCommand {
+  readonly type: 'endAlliance';
+  readonly countryId: number;
+  readonly targetCountryId: number;
+}
+
 export type GameCommand =
   | MoveArmyCommand | AttackCommand | RetreatArmyCommand | SplitArmyCommand
-  | StopArmyCommand | ExtractCommand | ProduceCommand | BuildCommand | RallyCommand;
+  | StopArmyCommand | ExtractCommand | ProduceCommand | BuildCommand | RallyCommand
+  | SendDiplomaticMessageCommand | ProposeDiplomacyCommand | RespondDiplomacyCommand
+  | DeclareWarCommand | EndAllianceCommand | StrikeCommand;
 
 export type GameCommandType = GameCommand['type'];
+
+export interface StrikeCommand {
+  readonly type: 'strike';
+  readonly countryId: number;
+  readonly provinceId: number;
+  readonly x: number;
+  readonly z: number;
+}
 
 export interface CommandResult {
   readonly ok: boolean;
@@ -85,4 +128,12 @@ export interface CommandResult {
   readonly armyId?: string;
   readonly nodes?: number;
   readonly requiredWarCountryIds?: readonly number[];
+  /** Set by a successful `strike` so `GameSession` can raise the combat event. */
+  readonly strike?: {
+    readonly attacker: number;
+    readonly defender: number;
+    readonly provinceId: number;
+    readonly x: number;
+    readonly z: number;
+  };
 }

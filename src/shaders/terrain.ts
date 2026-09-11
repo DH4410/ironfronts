@@ -190,12 +190,18 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     let owner = u32(round(politicalColor.a * 255.0));
     if (owner > 0u) {
       let diplomacyMode = uniforms.interaction.z > 2.5;
+      // Balanced / "strategic" default mode (z ~1). Foreign land reads through
+      // the diplomacy palette here too so you can tell your ground (gold) from
+      // neutral (grey) and hostile (red) without switching to a dedicated mode.
+      let strategicMode = uniforms.interaction.z > 0.5 && uniforms.interaction.z < 1.5;
       let diplomacyColor = diplomacyColorFor(owner);
       let isPlayer = diplomacyColor.a > 0.25 && diplomacyColor.a < 0.75;
       let hasRelationship = diplomacyColor.a > 0.75;
-      var overlayColor = select(politicalColor.rgb, diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode);
+      var overlayColor = select(politicalColor.rgb, diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode || strategicMode);
       if (hasRelationship) {
-        overlayColor = min(diplomacyColor.rgb * 1.30, vec3f(1.0));
+        // A gentle lift only — the palette is already tuned; the old 1.30x
+        // pushed war red and allied blue into lurid territory.
+        overlayColor = min(diplomacyColor.rgb * 1.08, vec3f(1.0));
       }
       let overview = smoothstep(
         ${POLITICAL_OVERVIEW_START_ALTITUDE.toFixed(1)},
@@ -248,6 +254,15 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
       if (hasRelationship) {
         overlayStrength = ${POLITICAL_MAP_TINT_STRENGTH.toFixed(2)};
       }
+      // Neutral foreign land: a firm grey wash in strategic mode so it is
+      // unmistakably "not yours" at gameplay zoom, and desaturated further so
+      // it reads as grey rather than a muted biome. (War / allied land is
+      // already forced to the full tint above; the player's own is below.)
+      if (!isPlayer && !hasRelationship && strategicMode) {
+        overlayStrength = max(overlayStrength, 0.44);
+        let grey = dot(coloredSurface, vec3f(0.32, 0.5, 0.18));
+        coloredSurface = mix(coloredSurface, vec3f(grey * 0.92, grey, grey * 0.96), 0.55);
+      }
       baseColor = mix(baseColor, coloredSurface, overlayStrength);
       // Political and diplomacy modes are ownership-first at every zoom.
       // Balanced mode only becomes ownership-first at strategic altitude. At
@@ -280,7 +295,9 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
   let sunFacing = clamp(dot(shadeNormal, sunDirection) * 0.5 + 0.5, 0.0, 1.0);
   let reliefStrength = smoothstep(0.05, 0.36, slope) * uniforms.lighting.x;
   let relief = mix(1.0, mix(0.5, 1.45, sunFacing), reliefStrength);
-  var lit = baseColor * max(surfaceLight(shadeNormal) * relief, vec3f(0.4));
+  // Floor lifted so a shadowed slope at night is still readable — the player
+  // needs to see their own units after dark, not a black patch.
+  var lit = baseColor * max(surfaceLight(shadeNormal) * relief, vec3f(0.52));
   lit += vec3f(0.12, 0.15, 0.13) * pow(max(dot(normal, normalize(sunDirection + normalize(uniforms.camera.xyz - input.worldPosition))), 0.0), 24.0) * 0.08 * uniforms.lighting.x;
   lit += wetSurfaceSheen(normal, input.worldPosition);
   if (nightMapCompensation > 0.001) {
@@ -288,6 +305,16 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     let targetLuminance = mix(0.36, 0.52, smoothstep(0.10, 0.72, countryLuminance));
     let readableCountryColor = min(nightMapColor * (targetLuminance / countryLuminance), vec3f(1.0));
     lit = mix(lit, readableCountryColor, nightMapCompensation * 0.52);
+  }
+
+  // F3(b): close-zoom terrain read as too dark and soft against an overview
+  // that is fine. A mild gamma + gain lift that ramps in only below the
+  // close-zoom band and is fully gone by regional zoom, so the accepted
+  // pulled-back look is untouched.
+  let closeLift = 1.0 - smoothstep(1600.0, 2600.0, uniforms.interaction.y);
+  if (closeLift > 0.001) {
+    let lifted = pow(max(lit, vec3f(0.0)), vec3f(0.92)) * 1.10;
+    lit = mix(lit, lifted, closeLift * 0.7);
   }
 
   let debugMode = u32(uniforms.map.w + 0.5);

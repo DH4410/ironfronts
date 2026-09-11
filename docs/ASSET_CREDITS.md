@@ -158,6 +158,181 @@ as the Ironfronts repository). Used where no suitable 0 A.D. artwork exists:
 (map modes), `pickaxe.svg` (resource overlay toggle), `provinces.svg`,
 `event.svg`, `close.svg`, `focus.svg`.
 
+### Painted WW2 RTS button icons
+
+**Source:** Original Ironfronts assets prepared on 2026-09-08. The four unit
+buttons are 256 px derivatives of the established Ironfronts unit portraits
+listed below. The building and command illustrations were generated with
+OpenAI's built-in image generator. They are not copied from 0 A.D., Call of
+War, or another third party and carry the same licence as this repository.
+
+**Prompt direction:** realistic historical-strategy illustration on true
+transparent alpha; hand-painted gouache and opaque watercolor, believable
+WW2 construction and proportions, strong silhouettes, muted olive/khaki/
+gunmetal/brick colors, visible brushwork, and softly broken edges. Command
+prompts requested sober military objects and field-map marks. Building prompts
+requested ground-level wartime architecture rather than toy-like isometric
+facilities. Their selected silhouettes use infantry and rifle racks for the
+barracks, an emerging tank for the tank plant, and a field gun plus shells for
+the ordnance works so each remains identifiable at 64 px. Every prompt
+prohibited text, frames, badges, glossy gold, thick
+cartoon outlines, and mobile-game rendering. The direction was informed by
+the official [0 A.D. icon showcase](https://play0ad.com/team-blog-icon-showcase/)
+and the role clarity of the official [Call of War unit roster](https://wiki.callofwar.com/wiki/UNITS/),
+without using either game's artwork as generator input.
+
+**Modification:** the 320 px portrait derivatives and 1254-1536 px generator
+outputs were high-quality bicubic downscaled without changing aspect ratio,
+centered on 256x256 transparent RGBA canvases for runtime use.
+
+| Runtime file | Slot |
+|---|---|
+| `src/ui/assets/icons/ironfronts/unit-engineer-icon.png` | Engineer production button |
+| `src/ui/assets/icons/ironfronts/unit-armored-car-icon.png` | Armored-car production button |
+| `src/ui/assets/icons/ironfronts/unit-light-tank-icon.png` | Light-tank production button |
+| `src/ui/assets/icons/ironfronts/unit-medium-tank-icon.png` | Medium-tank production button |
+| `src/ui/assets/icons/ironfronts/structure-barracks-icon.png` | Barracks build button |
+| `src/ui/assets/icons/ironfronts/structure-tank-plant-icon.png` | Tank-plant build button |
+| `src/ui/assets/icons/ironfronts/structure-ordnance-icon.png` | Ordnance-works build button |
+| `src/ui/assets/icons/ironfronts/command-move.png` | Move command |
+| `src/ui/assets/icons/ironfronts/command-attack.png` | Attack command |
+| `src/ui/assets/icons/ironfronts/command-retreat.png` | Retreat command |
+| `src/ui/assets/icons/ironfronts/command-split.png` | Split command |
+| `src/ui/assets/icons/ironfronts/command-stop.png` | Stop command |
+| `src/ui/assets/icons/ironfronts/command-extract.png` | Extract command |
+
+### Strategic army-counter art
+
+**Source:** Original Ironfronts assets generated with OpenAI's built-in image
+generator on 2026-09-08 and prepared for this project. They are not copied from
+0 A.D., Call of War, or any other third party and carry the same licence as the
+Ironfronts repository.
+
+**Backplate prompt direction:** a compact front-facing WW2 military map counter
+made from worn gunmetal and field-green enamel, aged brass rim, a recessed
+condition channel, restrained hand-painted texture, no unit symbol, no number,
+no text, no insignia, no glossy mobile-game rendering, and a genuinely
+transparent exterior.
+
+**Silhouette prompt direction:** one historically plausible WW2 unit per image,
+side/profile view with realistic proportions and a strong field-manual stencil
+outline. The six subjects were an infantry rifleman, combat engineer with
+entrenching tool, armoured reconnaissance car, light tank, medium tank, and
+towed field gun. Bone paint and charcoal line work only; no badges, labels,
+frames, scenery, modern equipment, exaggerated cartoon shapes, or watermark.
+
+**Modification:** four generator outputs contained a rendered transparency
+checker. `scripts/prepare-army-marker-silhouettes.mjs` separates warm bone paint
+and charcoal line work from that neutral checker, retains the connected subject,
+and Lanczos-downscales each result to a true-alpha 96x96 stencil. The six
+individual sprites are packed into a 576x96 runtime atlas in exact shader order.
+The painted surface stays separate from live silhouettes, per-type amounts,
+owner colour, condition, selection, engagement, and fog-of-war state.
+
+| Runtime file | Slot |
+|---|---|
+| `src/ui/assets/army-marker-plate.png` | Original counter reference; superseded in runtime by the irregular cartouche |
+| `src/ui/assets/army-unit-silhouettes.png` | Six-cell WebGPU silhouette atlas |
+| `src/ui/assets/icons/ironfronts/marker-infantry.png` | Infantry counter silhouette |
+| `src/ui/assets/icons/ironfronts/marker-engineer.png` | Engineer counter silhouette |
+| `src/ui/assets/icons/ironfronts/marker-armored-car.png` | Armoured-car counter silhouette |
+| `src/ui/assets/icons/ironfronts/marker-light-tank.png` | Light-tank counter silhouette |
+| `src/ui/assets/icons/ironfronts/marker-medium-tank.png` | Medium-tank counter silhouette |
+| `src/ui/assets/icons/ironfronts/marker-artillery.png` | Artillery counter silhouette |
+
+### Irregular field-command UI skins
+
+**Source:** Original Ironfronts assets generated with OpenAI's built-in image
+generator on 2026-09-09. The existing Ironfronts counter plate was supplied as
+a material/palette reference only. No 0 A.D. or Call of War artwork was copied.
+
+**Direction:** replace generic square UI fills with readable, genuinely
+transparent, hand-painted field-command objects: a winged army cartouche, a
+vertical composition shield, an arched unit-card frame, a scalable stitched
+panel surround, a wide control medallion, a dedicated building plaque, a
+production-queue slot, and a low action ribbon. All use
+soot iron, chipped field-green enamel or leather, oxidised brass, bone edge
+wear, realistic 1930s-1940s proportions, and restrained historical-RTS craft.
+Every prompt explicitly excluded text, numbers, icons, flags, insignia, logos,
+watermarks, scenery, square corners, glossy mobile-game rendering, and fantasy
+ornament.
+
+**Generated sources:**
+
+- `exec-52885de1-2ef3-4dec-8ec5-352c5806fb20.png` - army cartouche
+- `exec-9f73864b-dfa3-4fd8-97ad-51137d79d9aa.png` - composition shield
+- `exec-d6f164ac-4bdf-470e-bb5e-de7f1250c41e.png` - unit-card arch
+- `exec-01b68991-c78b-4387-a7b0-23590d4453e9.png` - campaign panel surround
+- `exec-8bfa0afb-bffe-4498-a978-406d6b26174f.png` - control medallion
+- `exec-f815f73e-a9ed-4b8a-9ea7-eec9234696ea.png` - action ribbon
+- `exec-4bad58e0-37f9-40e3-aee6-447bdcb04917.png` - wide command medallion, replacing the first near-square version
+- `exec-fef80e54-e8a7-4ee8-bfb8-167274894fce.png` - tapered roster shield, replacing the first boxier version
+- `exec-b3c75fed-08ad-4d6b-a92a-04304568dce4.png` - building / production plaque
+- `exec-8c7fd6cd-6815-4ffe-b0f1-84bc992e05c8.png` - production-queue portrait slot
+
+Sources are retained under
+`C:\Users\dimah\.codex\generated_images\01a07cbe-934b-7b62-bd93-3bfc096b5146`.
+`scripts/prepare-generated-ui-skins.mjs` alpha-trims and premultiplied-alpha
+Lanczos-downscales them without changing their aspect. It also derives the
+enclosed alpha mask used by the arched unit cards.
+
+| Runtime file | Use |
+|---|---|
+| `src/ui/assets/skins/army-counter-cartouche.png` | WebGPU strategic army counter and DOM fallback |
+| `src/ui/assets/skins/army-roster-plaque.png` | WebGPU close-zoom six-type composition roster |
+| `src/ui/assets/skins/army-unit-card-frame.png` | Arched army-detail portrait surround |
+| `src/ui/assets/skins/army-unit-card-mask.png` | Generated outer silhouette for portrait-card clipping |
+| `src/ui/assets/skins/hud-panel-frame.png` | Nine-slice top bar, panels, notices, and dialogs |
+| `src/ui/assets/skins/hud-control-plate.png` | Wide fixed-aspect command and icon controls |
+| `src/ui/assets/skins/hud-building-plaque.png` | Larger facility and unit-production controls |
+| `src/ui/assets/skins/hud-queue-slot.png` | Unit and construction queue portraits with a progress groove |
+| `src/ui/assets/skins/hud-action-ribbon.png` | Nine-slice text actions, status rows, and tooltips |
+
+### War-room menu repair kit
+
+**Source:** Original Ironfronts assets generated with OpenAI's built-in image
+generator on 2026-09-09. They replace low-resolution source-sheet crops that
+were stretched or screen-blended at runtime. No third-party game artwork was
+used.
+
+**Direction:** clean transparent 1930s-1940s dossier hardware with the same
+blackened iron, worn field green, old brass, and restrained paper wear as the
+in-game command surfaces. The set contains a scalable equipment rail, a torn
+cloth-and-paper map surround with an open centre, one corner fastener, a brass
+compass rose, and a faint repeatable plotting grid. Prompts excluded text,
+labels, scenery, black crop backgrounds, checkerboards, glossy rendering, and
+fantasy ornament.
+
+**Generated sources:**
+
+- `exec-b9bd8f77-f09d-4434-bb94-28ed4cc8d921.png` - dossier edge rail
+- `exec-5b9107af-4efb-49db-a1b7-78aa34a69e18.png` - torn map surround
+- `exec-49302bf2-c5ff-416c-8900-b86b1437926a.png` - corner fastener
+- `exec-164b274e-bc51-44a7-a308-681b5e63f146.png` - compass rose
+- `exec-3d0195c7-cefd-4718-ac3e-6ed4aeaf8e5b.png` - plotting grid
+
+`scripts/prepare-generated-ui-skins.mjs` alpha-trims and premultiplied-alpha
+resizes this set into `public/menu/kit`. Its `--despill-red-edges` mode removes
+the generator's semi-transparent red edge matte without changing opaque brass
+or paper. CSS uses nine-slice framing and repeatable overlays rather than
+stretching the whole source image.
+
+| Runtime file | Use |
+|---|---|
+| `public/menu/kit/edge-strip.png` | Nine-sliced dossier top/bottom equipment rail |
+| `public/menu/kit/torn-paper-frame.png` | Nine-sliced campaign-map surround |
+| `public/menu/kit/corner-fastener.png` | Dossier corner hardware |
+| `public/menu/kit/compass-marker.png` | Campaign-map compass overlay |
+| `public/menu/kit/map-grid.png` | Repeating transparent plotting grid |
+
+### `public/ui/diplomatic-cable-watermark.png`
+
+Original Ironfronts project artwork generated with OpenAI's built-in image
+generation tool on 2026-09-07. The prompt requested a transparent, distressed
+two-colour 1939 field-envelope and radio-arc watermark in the HUD's brass and
+cream palette. Used decoratively in the diplomacy drawer header; no control or
+game state depends on the image.
+
 ### `water.png`
 
 **Source: User-provided Ironfronts asset.** A painterly water-drop-in-a-bowl
@@ -169,3 +344,33 @@ and carries the same licence as the Ironfronts repository.
 128×128 (~16 KB) for runtime — it is only ever drawn as a ~14–24 px icon.
 Regenerate from the original with `scripts/`-style tooling if a larger size is
 ever needed.
+
+### Painterly unit portraits & facility / stance art
+
+**Source: User-provided Ironfronts assets.** Painterly WW2 unit portraits,
+facility building art and order-stance emblems generated by the project owner
+(OpenAI image tool) for Ironfronts. Not from 0 A.D. or any other third party;
+same licence as the Ironfronts repository.
+
+**Modification:** each ~1240 px, ~1.7 MB source PNG was alpha-trimmed and
+Lanczos-downscaled with Pillow — portraits to 384 px, icons to 256 px
+(90–210 KB each). Regenerate larger from the originals if ever needed.
+
+| Runtime file | Slot | Wired? |
+|---|---|---|
+| `src/ui/assets/units/infantry.png` | Infantry composition portrait | yes (raster beats the SVG) |
+| `src/ui/assets/units/engineer.png` | Engineer / pioneer portrait | yes |
+| `src/ui/assets/units/armored-car.png` | Armoured-car portrait | yes |
+| `src/ui/assets/units/light-tank.png` | Light-tank portrait | yes |
+| `src/ui/assets/units/medium-tank.png` | Medium-tank portrait | yes |
+| `src/ui/assets/units/artillery.png` | Artillery portrait | yes |
+| `src/ui/assets/icons/ironfronts/barracks.png` | Detailed barracks art | legacy; replaced in Build row by the compact generated icon above |
+| `src/ui/assets/icons/ironfronts/tank-plant.png` | Detailed tank-plant art | legacy; replaced in Build row by the compact generated icon above |
+| `src/ui/assets/icons/ironfronts/ordnance.png` | Detailed ordnance art | legacy; replaced in Build row by the compact generated icon above |
+| `src/ui/assets/icons/ironfronts/fortress.png` | `structure-fortress` | reserved — no fortress building exists yet |
+| `src/ui/assets/icons/ironfronts/settlement.png` | `structure-city` (walled town) | reserved — no city/settlement icon slot yet |
+| `src/ui/assets/icons/ironfronts/stance-attack.png` | `stance-attack` (three swords) | reserved — no army-stance system |
+| `src/ui/assets/icons/ironfronts/stance-attack-defend.png` | `stance-attack-defend` (crossed swords + shield) | reserved |
+| `src/ui/assets/icons/ironfronts/stance-defend.png` | `stance-defend` (shield + planted spears) | reserved |
+| `src/ui/assets/icons/ironfronts/stance-retreat.png` | `stance-retreat` (soldier + fall-back arrow) | reserved |
+| `src/ui/assets/icons/ironfronts/stance-defend-retreat.png` | `stance-defend-retreat` (double shield + fall-back arrow) | reserved |

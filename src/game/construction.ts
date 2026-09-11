@@ -32,9 +32,10 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
   barracks: { label: 'Barracks', cost: { funds: 120, stone: 60 }, buildTimeHours: 48 },
   ordnance: { label: 'Ordnance Workshop', cost: { funds: 220, stone: 70, metal: 60 }, buildTimeHours: 72 },
   tankPlant: { label: 'Tank Plant', cost: { funds: 300, stone: 90, metal: 120 }, buildTimeHours: 96 },
+  missileSite: { label: 'Missile Site', cost: { funds: 400, stone: 120, metal: 150 }, buildTimeHours: 120 },
 };
 
-const EMPTY_BUILDINGS: ProvinceBuildings = { barracks: 0, tankPlant: 0, ordnance: 0 };
+const EMPTY_BUILDINGS: ProvinceBuildings = { barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 0 };
 
 export interface BuildResult {
   readonly ok: boolean;

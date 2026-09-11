@@ -10,6 +10,8 @@ import { mountMenu } from './menu/menu';
 import { mountGameUi, type GameUiActions } from './ui/game-ui';
 import {
   createInitialState, createUiStore, type GameNotification, type ResourceLine,
+  type DiplomacyBusyAction, type DiplomacyCountryView, type DiplomacyMessageView,
+  type DiplomacyProposalView, type DiplomacyView,
 } from './ui/ui-state';
 import { autoDismissDelay, isSticky } from './ui/notification-lifecycle';
 import { DEMO_ARMY, type ArmyPanelCommand } from './ui/army';
@@ -26,7 +28,7 @@ import { RemoteGameSession } from './client/remote-session';
 import { configureWorldAssetBase } from './world-assets';
 import { CombatEffectPool, EFFECT_KIND, effectDensityForDistance } from './combat-effects';
 import type { SessionResponse } from '@ironfronts/protocol';
-import { buildArmyCompositionRows, buildArmyFormation, dominantVisualKind } from './army-map-presentation';
+import { buildArmyCompositionRows, buildArmyFormation } from './army-map-presentation';
 import { ArmyMotionInterpolator } from './army-motion';
 
 type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
@@ -78,13 +80,19 @@ function handleRally(provinceId: number, action: 'arm' | 'clear'): void {
 function handleBuild(provinceId: number, buildingId: string): void {
   const session = activeSession;
   if (!session) return;
-  const result = session.build(provinceId, buildingId as BuildingId);
+  // Wait for the server ack before announcing "started": an invalid target
+  // (e.g. a non-urban province) is refused server-side and surfaces its own
+  // "Order rejected" notification, so an eager optimistic toast here would
+  // contradict it.
+  const result = session.build(provinceId, buildingId as BuildingId, () => {
+    pushNotification('information', `${buildingLabel(buildingId as BuildingId)} started`,
+      'Construction is under way.');
+    if (selectedProvinceId === provinceId) refreshSelectedProvince(session);
+  });
   if (!result.ok) {
     pushNotification('warning', 'Construction', result.reason ?? 'Cannot build that here.');
     return;
   }
-  pushNotification('information', `${buildingLabel(buildingId as BuildingId)} started`,
-    'Construction is under way.');
   if (selectedProvinceId === provinceId) refreshSelectedProvince(session);
 }
 
@@ -218,6 +226,10 @@ let rendererStarted = false;
 let activeRenderer: WorldRenderer | undefined;
 let activeSession: RemoteGameSession | undefined;
 let activeConnection: GameConnection | undefined;
+const readDiplomacyMessages = new Set<string>();
+const announcedDiplomacyItems = new Set<string>();
+const diplomacyProposalStatuses = new Map<string, string>();
+let diplomacyBootstrapped = false;
 /** Pooled world-space combat visuals; fed by drainSessionEvents, drawn from onStats. */
 const combatEffects = new CombatEffectPool(320);
 let lastCombatCameraDistance = 3_000;
@@ -233,7 +245,7 @@ let activeStopQuotes: (() => void) | null = null;
 let loaderHideTimer: number | undefined;
 let selectedArmyId: string | null = null;
 let awaitingMoveTarget = false;
-let targetingMode: 'move' | 'attack' | 'retreat' | 'split' | null = null;
+let targetingMode: 'move' | 'attack' | 'retreat' | 'split' | 'strike' | null = null;
 let pendingSplitGroups: Array<{ typeId: string; count: number }> | null = null;
 // Selected province: id + the renderer-supplied labels, kept so the card can be
 // re-projected from GameState (e.g. after a capture) without a reselect.
@@ -467,6 +479,21 @@ async function startGame(token: number): Promise<void> {
   const attemptListener = { signal: attemptEvents.signal } as const;
   launchDisposers.push(() => attemptEvents.abort());
 
+  // The connection reconnects on its own (1s, then every 2.5s) but did so
+  // silently — an unstable link just looked like a frozen game. Surface it, and
+  // confirm when the stream recovers.
+  let connectionDropped = false;
+  connection.addEventListener('connection-error', () => {
+    if (connectionDropped) return;
+    connectionDropped = true;
+    pushNotification('warning', 'Connection lost', 'Reconnecting to the command server…');
+  }, attemptListener);
+  connection.addEventListener('state', () => {
+    if (!connectionDropped) return;
+    connectionDropped = false;
+    pushNotification('information', 'Reconnected', 'Live command stream restored.');
+  }, attemptListener);
+
   const disposeRendererOnPagehide = (event: PageTransitionEvent): void => {
     if (!event.persisted) renderer.dispose();
   };
@@ -511,7 +538,17 @@ async function startGame(token: number): Promise<void> {
     const hoveredId = renderer.pickArmyAt(clientX, clientY);
     const hovered = hoveredId && hoveredId !== selectedArmyId ? session.army(hoveredId) : null;
     const strikable = Boolean(hovered && !hovered.own);
-    if (strikable) {
+    // In attack mode a click also lands on enemy/neutral *territory* (an
+    // orderAttackProvince fallback), so the cursor must accept a province the
+    // same way the click does — otherwise it reads "not allowed" over ground
+    // the order will happily take.
+    const groundStrikable = targetingMode === 'attack' && !strikable && (() => {
+      const ground = renderer.groundPointAt(clientX, clientY);
+      if (!ground) return false;
+      const provinceId = renderer.provinceIdAt(clientX, clientY);
+      return provinceId >= 0 && !session.ownsProvince(provinceId);
+    })();
+    if (strikable || groundStrikable) {
       canvas.style.cursor = 'url(/cursors/action-attack.png) 1 1, crosshair';
     } else if (targetingMode === 'attack') {
       canvas.style.cursor = 'url(/cursors/cursor-no.png) 13 14, not-allowed';
@@ -542,13 +579,59 @@ async function startGame(token: number): Promise<void> {
       saveQuality(level);
       uiStore.patch({ quality: level, effectiveRenderScale: renderer.effectiveRenderScale });
     },
-    navSelect: () => { /* No player-facing system is implemented yet. */ },
+    navSelect: (id) => {
+      if (id !== 'diplomacy') return;
+      const open = uiStore.get().activeSidePanel === 'diplomacy';
+      uiStore.patch({ activeSidePanel: open ? null : 'diplomacy' });
+      if (!open) {
+        const selected = uiStore.get().diplomacy.selectedCountryId
+          ?? Object.values(session.state.countries)
+            .filter((country) => country.id !== session.playerCountryId)
+            .sort((a, b) => a.name.localeCompare(b.name))[0]?.id
+          ?? null;
+        if (selected !== null) markDiplomacyRead(session, selected);
+        syncDiplomacyView(session, selected ?? undefined);
+      }
+    },
+    selectDiplomacyCountry: (countryId) => {
+      for (const message of session.state.diplomacy?.messages ?? []) {
+        if (message.fromCountryId === countryId || message.toCountryId === countryId) {
+          readDiplomacyMessages.add(message.id);
+        }
+      }
+      uiStore.patch({ activeSidePanel: 'diplomacy' });
+      syncDiplomacyView(session, countryId);
+    },
+    sendDiplomaticMessage: (countryId, body) => {
+      diplomacyCommand(session, 'message', (done) => session.sendDiplomaticMessage(countryId, body, done));
+    },
+    proposeAlliance: (countryId) => {
+      void showGameConfirmation('Propose alliance?', 'Send an alliance proposal to this country?')
+        .then((yes) => { if (yes) diplomacyCommand(session, 'alliance', (done) => session.proposeDiplomacy(countryId, 'alliance', done)); });
+    },
+    offerPeace: (countryId) => {
+      void showGameConfirmation('Offer peace?', 'Send a peace proposal to end this war?')
+        .then((yes) => { if (yes) diplomacyCommand(session, 'peace', (done) => session.proposeDiplomacy(countryId, 'peace', done)); });
+    },
+    declareWar: (countryId) => {
+      const name = session.state.countries[countryId]?.name ?? 'this country';
+      void showGameConfirmation('Declare war?', `Open hostilities with ${name}?`)
+        .then((yes) => { if (yes) diplomacyCommand(session, 'declare-war', (done) => session.declareWar(countryId, done)); });
+    },
+    endAlliance: (countryId) => {
+      void showGameConfirmation('End alliance?', 'End the current alliance with this country?')
+        .then((yes) => { if (yes) diplomacyCommand(session, 'end-alliance', (done) => session.endAlliance(countryId, done)); });
+    },
+    respondDiplomacy: (proposalId, accept) => {
+      diplomacyCommand(session, 'proposal-response', (done) => session.respondDiplomacy(proposalId, accept, done));
+    },
     dismissNotification: (id) => removeNotification(id),
     togglePause: (open) => uiStore.patch({ paused: open }),
     returnToMenu: () => { /* Disabled in the UI until a safe menu-return path exists. */ },
     openDebugInspector: () => {
       if (debugEnabled) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3', key: 'F3' }));
     },
+    armStrike: () => armStrike(session),
     focusWorld: (x, z) => renderer.focus(x, z, 900),
     armyCommand: (command) => handleArmyCommand(command),
     produceUnit: (provinceId, unitTypeId) => handleProduce(provinceId, unitTypeId),
@@ -594,6 +677,14 @@ async function startGame(token: number): Promise<void> {
       void music.setState('war');
     } else if (state.enemies.length === 0 && music.getState() === 'war') {
       void music.setState('peace');
+    }
+    // Spell out the win condition the first time each war opens: taking that
+    // country's capital is what ends it.
+    for (const enemy of state.enemies) {
+      if (announcedWarAims.has(enemy.id)) continue;
+      announcedWarAims.add(enemy.id);
+      pushNotification('information', 'War aims',
+        `Capture ${enemy.name}'s capital to knock them out of the war.`);
     }
   };
   renderer.onProvinceSelected = (info) => {
@@ -779,7 +870,7 @@ async function startGame(token: number): Promise<void> {
   // attempt down and shows the loader's Retry / Return-to-Command error state.
   await withTimeout(
     renderer.initialize((stage, progress) => setLoadingStage(stage, 0.12 + progress * 0.8)),
-    90_000,
+    300_000,
     'Preparing the renderer',
   );
   if (token !== launchToken) return;
@@ -862,6 +953,10 @@ for (const button of debugSimSpeedButtons) {
 async function bootstrapGameSession(
   renderer: WorldRenderer, session: RemoteGameSession,
 ): Promise<void> {
+  readDiplomacyMessages.clear();
+  announcedDiplomacyItems.clear();
+  diplomacyProposalStatuses.clear();
+  diplomacyBootstrapped = false;
   selectedArmyId = null;
   awaitingMoveTarget = false;
   targetingMode = null;
@@ -910,6 +1005,10 @@ async function bootstrapGameSession(
     renderer.setDiplomaticRelations(session.state.relations);
   };
   session.addEventListener('change', syncDiplomaticRelations);
+  const onDiplomacySessionChange = (): void => syncDiplomacyView(session);
+  session.addEventListener('change', onDiplomacySessionChange);
+  launchDisposers.push(() => session.removeEventListener('change', onDiplomacySessionChange));
+  syncDiplomacyView(session);
 
   uiStore.patch({
     playerCountry: { name: player.name, color: player.color },
@@ -946,8 +1045,25 @@ async function bootstrapGameSession(
     drainSessionEvents(session);
     syncSimSpeedUi();
   }, 400);
+  const typingInField = (target: EventTarget | null): boolean => {
+    const el = target as HTMLElement | null;
+    return Boolean(el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable));
+  };
   const onKey = (event: KeyboardEvent): void => {
-    if (event.repeat || !selectedArmyId) return;
+    if (event.repeat || typingInField(event.target)) return;
+    // Strategic strike is a nation-level order, not an army order, so it has a
+    // keyboard arm (N) — the only keyed order in the game. It needs no
+    // selection; the next map click picks the target province.
+    if (event.code === 'KeyN' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      armStrike(session);
+      return;
+    }
+    if (event.key === 'Escape' && targetingMode === 'strike') {
+      targetingMode = null;
+      pushNotification('information', 'Strike cancelled', 'The strategic strike was called off.');
+      return;
+    }
+    if (!selectedArmyId) return;
     // Army commands are intentionally click-only so camera/navigation keys can
     // never issue an order. Escape remains the universal cancel/deselect key.
     if (event.key === 'Escape') deselectArmy();
@@ -957,9 +1073,9 @@ async function bootstrapGameSession(
     window.clearInterval(hudTimer);
     window.clearInterval(civilClockTimer);
     armyMotionInterpolator.clear();
+    clearAllNotificationTimers();
     window.removeEventListener('keydown', onKey);
     session.removeEventListener('change', syncDiplomaticRelations);
-    clearAllNotificationTimers();
     combatEffects.clear();
     if (activeSession === session) activeSession = undefined;
   };
@@ -978,7 +1094,7 @@ async function bootstrapGameSession(
   );
 }
 
-const armyMarkerScratch = new Float32Array(20 * 1_024);
+const armyMarkerScratch = new Float32Array(28 * 1_024);
 const armyModelScratch = new Float32Array(16 * 4_096);
 const armyMotionInterpolator = new ArmyMotionInterpolator();
 /** LineRecord (8 f32) per own-army route segment — see renderer.setOrderRoutes. */
@@ -1072,10 +1188,51 @@ function syncArmyMarkers(
   const activeArmyIds = new Set<string>();
   const activeModelKeys = new Set<string>();
   armyPickScratch.length = 0;
+
+  // F2: past a far-zoom threshold, friendly stacks whose markers visually
+  // overlap pile into an unreadable blob. Greedily merge any stack within one
+  // marker-width (in world units at this zoom) of an already-kept
+  // representative; the rest fold their strength into its badge. Individual
+  // markers return on zoom-in, or when the selected army is in the group.
+  const clusterSuppressed = new Set<string>();
+  const clusterAggregate = new Map<string, number>();
+  const clusterDistance = renderer.camera.distance;
+  if (clusterDistance > 3_800) {
+    // ~ one on-screen marker width, in world units (camera px->world ~ dist*0.00145).
+    const mergeRadius = clusterDistance * 0.11;
+    const mergeRadiusSq = mergeRadius * mergeRadius;
+    const own = Object.values(session.state.armies)
+      .filter((a) => a.own && a.contact === 'visible');
+    const groups: string[][] = [];
+    for (const a of own) {
+      let joined: string[] | undefined;
+      for (const g of groups) {
+        const rep = session.state.armies[g[0]];
+        if (rep && (rep.x - a.x) ** 2 + (rep.z - a.z) ** 2 <= mergeRadiusSq) { joined = g; break; }
+      }
+      if (joined) joined.push(a.id);
+      else groups.push([a.id]);
+    }
+    for (const ids of groups) {
+      if (ids.length < 2 || (selectedArmyId !== null && ids.includes(selectedArmyId))) continue;
+      let repId = ids[0];
+      let repCount = -1;
+      let sum = 0;
+      for (const id of ids) {
+        const c = session.state.armies[id]?.composition?.unitCount ?? 0;
+        sum += c;
+        if (c > repCount) { repCount = c; repId = id; }
+      }
+      for (const id of ids) if (id !== repId) clusterSuppressed.add(id);
+      clusterAggregate.set(repId, sum);
+    }
+  }
+
   for (const army of Object.values(session.state.armies)) {
     if (count >= 1_024) break;
     const identified = army.contact === 'visible';
     activeArmyIds.add(army.id);
+    if (clusterSuppressed.has(army.id)) continue; // folded into a cluster marker
     const armyMotion = armyMotionInterpolator.sample(
       army.id,
       army.x,
@@ -1091,38 +1248,72 @@ function syncArmyMarkers(
     if (army.own && army.id === selectedArmyId && army.moveRoute && army.moveRoute.length >= 2) {
       const colorFlag = army.moveIntent === 'attack' ? 1 : 0;
       const retreatFlag = army.status === 'retreating' ? 1 : 0;
-      const emitSegment = (ax: number, az: number, bx: number, bz: number, arrow: number): void => {
+      // `fraction` is 0 at the army and 1 at the destination; the route shader
+      // uses it for a head-to-tail brightening and a slow flow pulse.
+      const emitSegment = (
+        ax: number, az: number, bx: number, bz: number, arrow: number, fraction = 1,
+      ): void => {
         if (routeCount >= 4_096) return;
         routeScratch[routeCursor] = ax;
         routeScratch[routeCursor + 1] = az;
         routeScratch[routeCursor + 2] = bx;
         routeScratch[routeCursor + 3] = bz;
         routeScratch[routeCursor + 4] = colorFlag;
-        routeScratch[routeCursor + 5] = 0;
+        routeScratch[routeCursor + 5] = fraction;
         routeScratch[routeCursor + 6] = retreatFlag;
         routeScratch[routeCursor + 7] = arrow;
         routeCursor += 8;
         routeCount += 1;
       };
       const route = army.moveRoute;
+      const legs = Math.max(1, route.length - 1);
+      const worldW = renderer.manifest?.world.width ?? 0;
+      const wrapDelta = (d: number): number => {
+        if (!worldW) return d;
+        if (d > worldW / 2) return d - worldW;
+        if (d < -worldW / 2) return d + worldW;
+        return d;
+      };
+      // Direction-of-travel chevrons marched along the route at a fixed world
+      // spacing, so a long path reads as "this way" without selecting the army
+      // (F4: the line alone had only a single arrowhead at the destination).
+      const CHEVRON_SPACING = 46;
+      const CHEV_WING = 6;
+      const CHEV_COS = Math.cos(2.5);
+      const CHEV_SIN = Math.sin(2.5);
+      let untilChevron = CHEVRON_SPACING * 0.5;
       for (let i = 0; i + 1 < route.length; i += 1) {
-        emitSegment(route[i].x, route[i].z, route[i + 1].x, route[i + 1].z, 0);
+        emitSegment(route[i].x, route[i].z, route[i + 1].x, route[i + 1].z, 0, (i + 0.5) / legs);
+        const lx = wrapDelta(route[i + 1].x - route[i].x);
+        const lz = route[i + 1].z - route[i].z;
+        const legLen = Math.hypot(lx, lz) || 1;
+        const ex = lx / legLen;
+        const ez = lz / legLen;
+        for (let d = untilChevron; d < legLen; d += CHEVRON_SPACING) {
+          const cx = route[i].x + ex * d;
+          const cz = route[i].z + ez * d;
+          const frac = (i + d / legLen) / legs;
+          emitSegment(
+            cx + CHEV_WING * (ex * CHEV_COS - ez * CHEV_SIN),
+            cz + CHEV_WING * (ex * CHEV_SIN + ez * CHEV_COS), cx, cz, 1, frac,
+          );
+          emitSegment(
+            cx + CHEV_WING * (ex * CHEV_COS + ez * CHEV_SIN),
+            cz + CHEV_WING * (-ex * CHEV_SIN + ez * CHEV_COS), cx, cz, 1, frac,
+          );
+        }
+        untilChevron = ((untilChevron - legLen) % CHEVRON_SPACING + CHEVRON_SPACING) % CHEVRON_SPACING;
       }
       // Chevron at the destination, oriented by the final leg tangent, in the
       // route's own colour. Kept small so it never buries the end point.
       const tip = route[route.length - 1];
       const prev = route[route.length - 2];
-      const worldW = renderer.manifest?.world.width ?? 0;
-      let tx = tip.x - prev.x;
-      if (worldW) {
-        if (tx > worldW / 2) tx -= worldW;
-        else if (tx < -worldW / 2) tx += worldW;
-      }
+      const tx = wrapDelta(tip.x - prev.x);
       const tz = tip.z - prev.z;
       const tlen = Math.hypot(tx, tz) || 1;
       const ux = tx / tlen;
       const uz = tz / tlen;
-      const WING = 34;
+      const WING = 9;
       const COS = Math.cos(2.5); // ~143deg: wings sweep back from the tip
       const SIN = Math.sin(2.5);
       emitSegment(tip.x + WING * (ux * COS - uz * SIN), tip.z + WING * (ux * SIN + uz * COS), tip.x, tip.z, 1);
@@ -1131,28 +1322,37 @@ function syncArmyMarkers(
 
     const formation = identified ? buildArmyFormation(army.composition?.groups ?? []) : [];
     const compositionRows = identified ? buildArmyCompositionRows(army.composition?.groups ?? []) : [];
+    armyMarkerScratch.fill(0, cursor, cursor + 28);
     armyMarkerScratch[cursor] = armyMotion.x;
     armyMarkerScratch[cursor + 1] = armyMotion.z;
     armyMarkerScratch[cursor + 2] = packRgb(army.ownerColor);
     armyMarkerScratch[cursor + 3] = identified ? 1 : 2;
     // Contact markers render as '?'; don't ship the real strength/health.
-    armyMarkerScratch[cursor + 4] = identified ? army.composition?.unitCount ?? 0 : 0;
+    const clusterSum = clusterAggregate.get(army.id);
+    armyMarkerScratch[cursor + 4] = clusterSum ?? (identified ? army.composition?.unitCount ?? 0 : 0);
     armyMarkerScratch[cursor + 5] = identified ? army.composition?.health ?? 0 : 0;
-    armyMarkerScratch[cursor + 6] = army.id === selectedArmyId ? 1 : 0;
-    armyMarkerScratch[cursor + 7] = identified ? dominantVisualKind(formation) : 4;
-    for (let row = 0; row < 4; row += 1) {
-      armyMarkerScratch[cursor + 8 + row] = compositionRows[row]?.count ?? 0;
-      armyMarkerScratch[cursor + 12 + row] = compositionRows[row]?.kind ?? 4;
+    // Marker flags: bit 0 selected, bit 1 engaged / under fire, bit 2 cluster.
+    armyMarkerScratch[cursor + 6] = (army.id === selectedArmyId ? 1 : 0)
+      | (army.status === 'engaged' ? 2 : 0)
+      | (clusterSum !== undefined ? 4 : 0);
+    armyMarkerScratch[cursor + 7] = compositionRows.length;
+    for (let row = 0; row < 6; row += 1) {
+      const lane = row < 4 ? row : row - 4;
+      const countBase = row < 4 ? cursor + 8 : cursor + 12;
+      const kindBase = row < 4 ? cursor + 16 : cursor + 20;
+      armyMarkerScratch[countBase + lane] = compositionRows[row]?.count ?? 0;
+      armyMarkerScratch[kindBase + lane] = compositionRows[row]?.kind ?? 6;
     }
-    armyMarkerScratch[cursor + 16] = armyMotion.targetX;
-    armyMarkerScratch[cursor + 17] = armyMotion.targetZ;
-    armyMarkerScratch[cursor + 18] = armyMotion.remainingMs / 1_000;
-    armyMarkerScratch[cursor + 19] = 0;
-    cursor += 20;
+    armyMarkerScratch[cursor + 24] = armyMotion.targetX;
+    armyMarkerScratch[cursor + 25] = armyMotion.targetZ;
+    armyMarkerScratch[cursor + 26] = armyMotion.remainingMs / 1_000;
+    armyMarkerScratch[cursor + 27] = 0;
+    cursor += 28;
     count += 1;
     armyPickScratch.push({ id: army.id, x: armyMotion.x, z: armyMotion.z });
 
     if (identified && army.id === selectedArmyId && army.artillery && count < 1_024) {
+      armyMarkerScratch.fill(0, cursor, cursor + 28);
       armyMarkerScratch[cursor] = armyMotion.x;
       armyMarkerScratch[cursor + 1] = armyMotion.z;
       armyMarkerScratch[cursor + 2] = packRgb(army.ownerColor);
@@ -1161,8 +1361,7 @@ function syncArmyMarkers(
       armyMarkerScratch[cursor + 5] = 0;
       armyMarkerScratch[cursor + 6] = 0;
       armyMarkerScratch[cursor + 7] = 0;
-      armyMarkerScratch.fill(0, cursor + 8, cursor + 20);
-      cursor += 20;
+      cursor += 28;
       count += 1;
     }
     if (identified && formation.length) {
@@ -1293,11 +1492,26 @@ function syncArmyMarkers(
       const tl = Math.hypot(tdx, tdz) || 1;
       const rx = tdx / tl;
       const rz = tdz / tl;
-      const W = 30;
+      // Rally point itself is a constant-px screen-space marker (army-marker
+      // layer, type 4) so it keeps size and contrast against terrain at full
+      // strategic zoom (F15c). A short world-space chevron just short of it
+      // keeps the incoming route direction.
+      if (count < 1_024) {
+        armyMarkerScratch.fill(0, cursor, cursor + 28);
+        armyMarkerScratch[cursor] = tip.x;
+        armyMarkerScratch[cursor + 1] = tip.z;
+        armyMarkerScratch[cursor + 2] = packRgb('#e9d3aa');
+        armyMarkerScratch[cursor + 3] = 4; // rally marker
+        cursor += 28;
+        count += 1;
+      }
       const C = Math.cos(2.5);
       const S = Math.sin(2.5);
-      emitRally(tip.x + W * (rx * C - rz * S), tip.z + W * (rx * S + rz * C), tip.x, tip.z, 1);
-      emitRally(tip.x + W * (rx * C + rz * S), tip.z + W * (-rx * S + rz * C), tip.x, tip.z, 1);
+      const cbx = tip.x - rx * 26;
+      const cbz = tip.z - rz * 26;
+      const CW = 14;
+      emitRally(cbx + CW * (rx * C - rz * S), cbz + CW * (rx * S + rz * C), cbx, cbz, 1);
+      emitRally(cbx + CW * (rx * C + rz * S), cbz + CW * (-rx * S + rz * C), cbx, cbz, 1);
     }
   }
   renderer.setArmyMarkers(armyMarkerScratch, count, armyPickScratch, armyModelScratch, modelCount);
@@ -1399,6 +1613,21 @@ function chooseSplitGroups(session: RemoteGameSession, armyId: string): Promise<
 
 // ---- army selection + orders --------------------------
 
+/** Arm strategic-strike targeting: the next map click on an enemy province asks
+ *  for confirmation, then spends a warhead. Nation-level, no army selection. */
+function armStrike(session: RemoteGameSession): void {
+  const ready = session.ownCountry.warheads ?? 0;
+  if (ready < 1) {
+    pushNotification('warning', 'No warhead ready',
+      'Build a Missile Site to stockpile strategic warheads.');
+    return;
+  }
+  targetingMode = 'strike';
+  awaitingMoveTarget = false;
+  pushNotification('warning', 'Strategic strike armed',
+    `Click an enemy province within Missile Site range. ${ready} warhead${ready === 1 ? '' : 's'} ready · Esc to cancel.`);
+}
+
 /** A one-shot red reticle that snaps onto the click point and fades. Pure DOM,
  *  no renderer pipeline — the immediate "acknowledged" cue for an attack order. */
 let attackFlashEl: HTMLDivElement | null = null;
@@ -1420,6 +1649,37 @@ function flashAttackTarget(clientX: number, clientY: number): void {
 function handleMapClick(
   renderer: WorldRenderer, session: RemoteGameSession, clientX: number, clientY: number,
 ): boolean {
+  // 0. Armed strategic strike -> confirm, then spend a warhead on the province.
+  if (targetingMode === 'strike') {
+    const ground = renderer.groundPointAt(clientX, clientY);
+    const provinceId = renderer.provinceIdAt(clientX, clientY);
+    targetingMode = null;
+    if (!ground || provinceId < 0) {
+      pushNotification('warning', 'Strike aborted', 'Aim at land inside an enemy province.');
+      return true;
+    }
+    if (session.ownsProvince(provinceId)) {
+      pushNotification('warning', 'Strike aborted', 'That is your own territory.');
+      return true;
+    }
+    const ownerId = session.state.provinceOwners[provinceId] ?? 0;
+    const ownerName = session.state.countries[ownerId]?.name;
+    void showGameConfirmation('Launch strategic strike?',
+      ownerName
+        ? `Devastate ${ownerName}'s province. This expends one warhead and forces open war.`
+        : 'Devastate this province. This expends one warhead.',
+    ).then((confirmed) => {
+      if (!confirmed) return;
+      const result = session.orderStrike(provinceId, ground[0], ground[1], () => {
+        void audio.playUiCue('confirm');
+        pushNotification('combat', 'Strike authorised', 'The warhead is away.');
+      });
+      if (!result.ok) {
+        pushNotification('warning', 'Strike failed', result.reason ?? 'The strike could not be ordered.');
+      }
+    });
+    return true;
+  }
   // 1. Armed destination order -> issue to the clicked ground point.
   if ((targetingMode === 'move' || targetingMode === 'split')
     && selectedArmyId && session.ownsArmy(selectedArmyId)) {
@@ -1507,13 +1767,17 @@ function handleMapClick(
       return true;
     }
   }
-  // 2. Otherwise, army pick.
+  // 2. Army pick. Clicking a different army selects it. Clicking the army that
+  //    is already selected drops it and falls through to the province beneath —
+  //    so a city with a garrison sitting on it is still selectable to queue
+  //    production or start a building.
   const hit = renderer.pickArmyAt(clientX, clientY);
-  if (hit) {
+  if (hit && hit !== selectedArmyId) {
     selectArmy(session, hit);
     return true;
   }
-  // 3. Nothing — let province selection proceed, and drop any army selection.
+  // 3. Nothing new picked — drop any army selection and let province
+  //    selection proceed on this same click.
   if (selectedArmyId) deselectArmy();
   return false;
 }
@@ -1699,7 +1963,9 @@ function refreshSelectedArmy(
       own: view.own,
       canExtract: view.own && !view.moveOrder && session.extractableNodeAt(view.id) !== null,
       awaitingMoveTarget: view.own && awaitingMoveTarget,
-      targetingMode: view.own ? targetingMode : null,
+      // 'strike' is a nation-level order, not an army targeting mode — the army
+      // card never reflects it.
+      targetingMode: view.own && targetingMode !== 'strike' ? targetingMode : null,
       canMove: view.own && view.status !== 'engaged' && view.status !== 'retreating',
       canAttack: view.own && view.status !== 'engaged' && view.status !== 'retreating',
       canRetreat: view.own && view.status === 'engaged' && Boolean(view.legalRetreatExits?.length),
@@ -1730,8 +1996,8 @@ function projectSelectedProvince(
     coastal: false,
     buildings: summary.isOwn
       ? ((session.state.provinceBuildings[provinceId] as {
-          barracks: number; tankPlant: number; ordnance: number;
-        } | undefined) ?? { barracks: 0, tankPlant: 0, ordnance: 0 })
+          barracks: number; tankPlant: number; ordnance: number; missileSite: number;
+        } | undefined) ?? { barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 0 })
       : null,
     deposits: summary.resources
       ? { controlled: summary.controlled, extracting: summary.extracting }
@@ -1807,8 +2073,28 @@ function syncCombatMarkers(session: RemoteGameSession): void {
   combatEffects.syncBattles([...seen.values()]);
 }
 
+let campaignOutcomeShown = false;
+/** Enemy country ids whose "take their capital" war-aim has been announced. */
+const announcedWarAims = new Set<number>();
+
 function drainSessionEvents(session: RemoteGameSession): void {
   const player = session.playerCountryId;
+
+  // Campaign decided — announce it once and pause the clock. The authoritative
+  // sim has already frozen; this is the player-facing acknowledgement.
+  const outcome = session.state.outcome;
+  if (outcome && !campaignOutcomeShown) {
+    campaignOutcomeShown = true;
+    const won = outcome.result === 'victory';
+    const day = Math.max(1, Math.floor(outcome.atGameHours / 24) + 1);
+    pushNotification(won ? 'completed' : 'warning',
+      won ? 'Victory' : 'Defeat',
+      `${outcome.reason} Campaign ${won ? 'won' : 'lost'} on day ${day}.`,
+      { sticky: true });
+    uiStore.patch({ paused: true });
+    void music.setState(won ? 'victory' : 'peace');
+  }
+
   for (const done of session.pendingCompletions.splice(0)) {
     // Only the player's own production is player news.
     if (session.state.provinceOwners[done.provinceId] !== player) continue;
@@ -1836,6 +2122,71 @@ function drainSessionEvents(session: RemoteGameSession): void {
     // moment contact is made, so it fires once per battle, not every tick.
     if (ev.attacker !== player && ev.defender !== player) continue;
     const mine = ev.defender === player;
+    if (ev.kind === 'strike') {
+      // Missing coords means the event lost its payload in transit — surface the
+      // news without detonating a blast at the world origin.
+      const sx = ev.x;
+      const sz = ev.z;
+      if (sx === undefined || sz === undefined || !Number.isFinite(sx) || !Number.isFinite(sz)) {
+        pushNotification('combat',
+          mine ? 'Strategic strike on our soil' : 'Strategic strike lands',
+          mine ? 'An enemy warhead has devastated one of your provinces.'
+            : 'Your warhead has devastated the target province.');
+        maybePlayCombatAlert();
+        continue;
+      }
+      // Always shown — a strategic strike is never LOD-culled. Choreographed in
+      // phases so it reads as a real detonation with motion: a blinding flash
+      // and core fireball, a shockwave of dust racing outward along the ground,
+      // a stalk of smoke climbing from the impact point (smoke rises with age,
+      // so older puffs sit higher), then a slow mushroom cap and lingering haze.
+      combatEffects.spawn(EFFECT_KIND.targetFlash, sx, sz, { scale: 3.0 });
+      combatEffects.spawn(EFFECT_KIND.explosion, sx, sz, { scale: 2.8 });
+      for (let ring = 0; ring < 3; ring += 1) {
+        window.setTimeout(() => {
+          const rad = 40 + ring * 70;
+          for (let k = 0; k < 8; k += 1) {
+            const ang = (k / 8) * Math.PI * 2 + ring * 0.4;
+            combatEffects.spawn(EFFECT_KIND.dust, sx + Math.cos(ang) * rad, sz + Math.sin(ang) * rad,
+              { scale: 1.6 - ring * 0.3, lifetimeMs: 1_600 });
+          }
+        }, 40 + ring * 130);
+      }
+      for (let step = 0; step < 6; step += 1) {
+        window.setTimeout(() => {
+          const jitter = (step % 2 === 0 ? 1 : -1) * (6 + step * 3);
+          combatEffects.spawn(EFFECT_KIND.smoke, sx + jitter, sz - jitter * 0.5,
+            { scale: 1.6 + step * 0.35, lifetimeMs: 6_500 });
+          if (step === 2 || step === 4) {
+            combatEffects.spawn(EFFECT_KIND.explosion, sx + jitter, sz + jitter, { scale: 1.4 });
+          }
+        }, 120 + step * 140);
+      }
+      window.setTimeout(() => {
+        combatEffects.spawn(EFFECT_KIND.smoke, sx, sz, { scale: 4.2, lifetimeMs: 8_000 });
+        for (let k = 0; k < 4; k += 1) {
+          const ang = (k / 4) * Math.PI * 2;
+          combatEffects.spawn(EFFECT_KIND.smoke, sx + Math.cos(ang) * 34, sz + Math.sin(ang) * 34,
+            { scale: 3.0, lifetimeMs: 7_000 });
+        }
+      }, 900);
+      // The province keeps smouldering: a lazy plume every few seconds for ~45s
+      // so a freshly struck city reads as devastated well after the blast.
+      for (let wisp = 0; wisp < 9; wisp += 1) {
+        window.setTimeout(() => {
+          const drift = (Math.random() - 0.5) * 40;
+          combatEffects.spawn(EFFECT_KIND.smoke, sx + drift, sz + (Math.random() - 0.5) * 40,
+            { scale: 2.0 + Math.random() * 1.4, lifetimeMs: 5_500 });
+        }, 2_500 + wisp * 4_800);
+      }
+      pushNotification('combat',
+        mine ? 'Strategic strike on our soil' : 'Strategic strike lands',
+        mine ? 'An enemy warhead has devastated one of your provinces.'
+          : 'Your warhead has devastated the target province.',
+        { focus: { x: sx, z: sz } });
+      maybePlayCombatAlert();
+      continue;
+    }
     // World-space visuals for the same event, near-camera only (LOD gated).
     if (fxDensity > 0) {
       const atkSpot = battleSpotFor(ev.attacker, ev.attacker);
@@ -1916,7 +2267,7 @@ function drainSessionEvents(session: RemoteGameSession): void {
     const from = session.state.countries[cap.fromCountryId]?.name ?? '?';
     pushNotification('combat',
       cap.toCountryId === player ? 'Province captured' : 'Province lost',
-      `${to} took a province from ${from}.`);
+      cap.toCountryId === player ? `Taken from ${from}` : `${to} took it from you`);
   }
 }
 
@@ -1959,18 +2310,165 @@ function pushNotification(
   kind: GameNotification['kind'], title: string, body?: string,
   options: { sticky?: boolean; focus?: { x: number; z: number } } = {},
 ): void {
-  const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const sticky = isSticky(kind, options.sticky);
   const previous = uiStore.get().notifications;
+  const delay = autoDismissDelay(kind, options.sticky);
+
+  // Fold a burst of identical events (same kind + title, e.g. "Province captured"
+  // through an offensive) into the existing toast with a running "×N" tally
+  // rather than letting near-duplicate cards crowd the stack. Never merge a
+  // toast that carries a focus point (a located battle you can click to fly to)
+  // or a sticky one — each of those points somewhere specific.
+  const twin = options.focus
+    ? undefined
+    : previous.find((entry) => entry.kind === kind && entry.title === title
+        && !entry.sticky && !entry.focus);
+  if (twin) {
+    const merged = { ...twin, body, at: Date.now(), count: (twin.count ?? 1) + 1 };
+    uiStore.patch({ notifications: previous.map((entry) => (entry.id === twin.id ? merged : entry)) });
+    if (delay !== null) {
+      clearNotificationTimer(twin.id);
+      notificationTimers.set(twin.id, window.setTimeout(() => removeNotification(twin.id), delay));
+    }
+    return;
+  }
+
+  const id = `n-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   const notifications = [...previous, { id, kind, title, body, at: Date.now(), sticky, focus: options.focus }].slice(-4);
   // Anything the last-4 cap just dropped no longer needs its auto-dismiss timer.
   const kept = new Set(notifications.map((entry) => entry.id));
   for (const entry of previous) if (!kept.has(entry.id)) clearNotificationTimer(entry.id);
   uiStore.patch({ notifications });
-  const delay = autoDismissDelay(kind, options.sticky);
   if (delay !== null) {
     notificationTimers.set(id, window.setTimeout(() => removeNotification(id), delay));
   }
+}
+
+function diplomacyRelation(session: RemoteGameSession, countryId: number): 'neutral' | 'allied' | 'war' {
+  const a = Math.min(session.playerCountryId, countryId);
+  const b = Math.max(session.playerCountryId, countryId);
+  const relation = session.state.relations[`${a}:${b}`] ?? 'peace';
+  return relation === 'allied' || relation === 'war' ? relation : 'neutral';
+}
+
+function sameDiplomacyView(previous: DiplomacyView, next: DiplomacyView): boolean {
+  const sameCountries = previous.countries.length === next.countries.length
+    && previous.countries.every((country: DiplomacyCountryView, index) => {
+      const candidate = next.countries[index];
+      return country.id === candidate.id && country.name === candidate.name
+        && country.color === candidate.color && country.controller === candidate.controller
+        && country.alive === candidate.alive && country.relation === candidate.relation
+        && country.unreadCount === candidate.unreadCount
+        && country.incomingProposalCount === candidate.incomingProposalCount;
+    });
+  const sameMessages = previous.messages.length === next.messages.length
+    && previous.messages.every((message: DiplomacyMessageView, index) => {
+      const candidate = next.messages[index];
+      return message.id === candidate.id && message.fromCountryId === candidate.fromCountryId
+        && message.toCountryId === candidate.toCountryId && message.body === candidate.body
+        && message.sentAtTick === candidate.sentAtTick;
+    });
+  const sameProposals = previous.proposals.length === next.proposals.length
+    && previous.proposals.every((proposal: DiplomacyProposalView, index) => {
+      const candidate = next.proposals[index];
+      return proposal.id === candidate.id && proposal.fromCountryId === candidate.fromCountryId
+        && proposal.toCountryId === candidate.toCountryId && proposal.kind === candidate.kind
+        && proposal.status === candidate.status && proposal.createdAtTick === candidate.createdAtTick
+        && proposal.resolvedAtTick === candidate.resolvedAtTick;
+    });
+  return previous.viewerCountryId === next.viewerCountryId
+    && previous.selectedCountryId === next.selectedCountryId
+    && previous.busy === next.busy && previous.feedback === next.feedback
+    && sameCountries && sameMessages && sameProposals;
+}
+
+function syncDiplomacyView(session: RemoteGameSession, selectedCountryId?: number): void {
+  const projection = session.state;
+  const diplomacy = projection.diplomacy ?? { messages: [], proposals: [] };
+  if (!diplomacyBootstrapped) {
+    for (const message of diplomacy.messages) announcedDiplomacyItems.add(`message:${message.id}`);
+    for (const proposal of diplomacy.proposals) announcedDiplomacyItems.add(`proposal:${proposal.id}`);
+    diplomacyBootstrapped = true;
+  }
+  for (const message of diplomacy.messages) {
+    const key = `message:${message.id}`;
+    if (!announcedDiplomacyItems.has(key) && message.toCountryId === projection.viewerCountryId) {
+      pushNotification('diplomacy', 'Incoming diplomatic cable',
+        `${projection.countries[message.fromCountryId]?.name ?? 'Foreign office'} sent a message.`);
+      announcedDiplomacyItems.add(key);
+    }
+  }
+  for (const proposal of diplomacy.proposals) {
+    const key = `proposal:${proposal.id}`;
+    const previousStatus = diplomacyProposalStatuses.get(proposal.id);
+    if (previousStatus && previousStatus !== proposal.status && proposal.fromCountryId === projection.viewerCountryId) {
+      const other = projection.countries[proposal.toCountryId]?.name ?? 'Foreign office';
+      pushNotification('diplomacy', 'Diplomatic proposal resolved', `${other} ${proposal.status} your ${proposal.kind} proposal.`);
+    }
+    diplomacyProposalStatuses.set(proposal.id, proposal.status);
+    if (!announcedDiplomacyItems.has(key) && proposal.toCountryId === projection.viewerCountryId
+      && proposal.status === 'pending') {
+      pushNotification('diplomacy', 'Diplomatic proposal received',
+        `${projection.countries[proposal.fromCountryId]?.name ?? 'Foreign office'} sent a ${proposal.kind} proposal.`);
+      announcedDiplomacyItems.add(key);
+    }
+  }
+  const current = uiStore.get().diplomacy;
+  const target = selectedCountryId ?? current.selectedCountryId;
+  const countries = Object.values(projection.countries)
+    .filter((country) => country.id !== projection.viewerCountryId)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((country) => {
+      const messages = diplomacy.messages.filter((message) =>
+        (message.fromCountryId === projection.viewerCountryId && message.toCountryId === country.id)
+        || (message.toCountryId === projection.viewerCountryId && message.fromCountryId === country.id));
+      const incoming = diplomacy.proposals.filter((proposal) =>
+        proposal.status === 'pending' && proposal.toCountryId === projection.viewerCountryId
+        && proposal.fromCountryId === country.id).length;
+      return {
+        id: country.id, name: country.name, color: country.color, controller: country.controller,
+        alive: country.alive, relation: diplomacyRelation(session, country.id),
+        unreadCount: messages.filter((message) => message.toCountryId === projection.viewerCountryId
+          && !readDiplomacyMessages.has(message.id)).length,
+        incomingProposalCount: incoming,
+      };
+    });
+  const selected = countries.some((country) => country.id === target) ? target : (countries[0]?.id ?? null);
+  const selectedMessages = selected === null ? [] : diplomacy.messages.filter((message) =>
+    (message.fromCountryId === projection.viewerCountryId && message.toCountryId === selected)
+    || (message.toCountryId === projection.viewerCountryId && message.fromCountryId === selected));
+  const selectedProposals = selected === null ? [] : diplomacy.proposals.filter((proposal) =>
+    proposal.fromCountryId === selected || proposal.toCountryId === selected);
+  const next: DiplomacyView = {
+    viewerCountryId: projection.viewerCountryId,
+    countries,
+    selectedCountryId: selected,
+    messages: selectedMessages,
+    proposals: selectedProposals,
+    busy: current.busy,
+    feedback: current.feedback,
+  };
+  if (!sameDiplomacyView(current, next)) uiStore.patch({ diplomacy: next });
+}
+
+function markDiplomacyRead(session: RemoteGameSession, countryId: number): void {
+  for (const message of session.state.diplomacy?.messages ?? []) {
+    if (message.fromCountryId === countryId || message.toCountryId === countryId) readDiplomacyMessages.add(message.id);
+  }
+}
+
+function diplomacyCommand(
+  session: RemoteGameSession, action: DiplomacyBusyAction, send: (done: (ok: boolean) => void) => { ok: true },
+): void {
+  uiStore.patch({ diplomacy: { ...uiStore.get().diplomacy, busy: action, feedback: null } });
+  send((ok) => {
+    const labels: Record<DiplomacyBusyAction, string> = {
+      message: 'Cable sent.', alliance: 'Alliance proposal sent.', peace: 'Peace offer sent.',
+      'declare-war': 'War declared.', 'end-alliance': 'Alliance ended.', 'proposal-response': 'Proposal response sent.',
+    };
+    uiStore.patch({ diplomacy: { ...uiStore.get().diplomacy, busy: null, feedback: ok ? labels[action] : 'Command rejected.' } });
+    syncDiplomacyView(session);
+  });
 }
 
 /**
@@ -1992,7 +2490,7 @@ function playerResourceLines(session: RemoteGameSession): ResourceLine[] {
     id, label, value: Math.round(value),
     delta: delta === undefined ? undefined : Number(delta.toFixed(1)),
   });
-  return [
+  const lines = [
     line('money', 'Funds', s.funds, inc.funds),
     line('manpower', 'Manpower', s.manpower, inc.manpower),
     line('food', 'Food', s.food, inc.food),
@@ -2001,6 +2499,11 @@ function playerResourceLines(session: RemoteGameSession): ResourceLine[] {
     line('metal', 'Metal', s.metal, ext.metal ?? 0),
     line('oil', 'Oil', s.oil, ext.oil ?? 0),
   ];
+  // Only surfaced once a warhead is ready — a rare mechanic, not permanent
+  // clutter. The chip is the discovery hook for the N-to-strike order.
+  const warheads = Math.floor(country.warheads ?? 0);
+  if (warheads >= 1) lines.push(line('warheads', 'Warheads', warheads));
+  return lines;
 }
 
 function renderDiplomacyState(renderer: WorldRenderer, state: DiplomacyState): void {

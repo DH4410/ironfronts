@@ -39,12 +39,31 @@ export interface CountryState {
   income: Stockpile;
   /** Abstract build-throughput stat, not a stockpile. */
   industryCapacity: number;
+  /**
+   * Ready strategic warheads. Accrues slowly while the country holds an
+   * Ordnance Workshop; one is spent per strategic strike. Optional and
+   * defaulted on load so pre-strike v2 saves keep working (no GAME_VERSION
+   * bump — the save gate checks version/id, not shape).
+   */
+  warheads?: number;
+}
+
+/** Terminal state of a campaign, from the human player's point of view. */
+export interface GameOutcome {
+  readonly result: 'victory' | 'defeat';
+  readonly reason: string;
+  /** Game-hour the campaign was decided. */
+  readonly atGameHours: number;
 }
 
 export interface ProvinceBuildings {
   barracks: number;
   tankPlant: number;
   ordnance: number;
+  /** Rocket-launch site: accrues strategic warheads and defines the reach a
+   *  strike can be aimed within. Additive field — pre-missile v2 saves default
+   *  it to 0 on load (see GameSession.restore), no GAME_VERSION bump. */
+  missileSite: number;
 }
 
 /** One queued building. Same capture rule as a `ProductionOrder`: it belongs to
@@ -101,7 +120,25 @@ export interface ResourceNodeState {
   readonly provenance: ResourceProvenance;
 }
 
-export type Relation = 'peace' | 'war';
+export type Relation = 'peace' | 'allied' | 'war';
+
+export interface DiplomacyMessage {
+  readonly id: string;
+  readonly fromCountryId: number;
+  readonly toCountryId: number;
+  readonly body: string;
+  readonly sentAtTick: number;
+}
+
+export interface DiplomacyProposal {
+  readonly id: string;
+  readonly fromCountryId: number;
+  readonly toCountryId: number;
+  readonly kind: 'alliance' | 'peace';
+  status: 'pending' | 'accepted' | 'declined' | 'withdrawn';
+  readonly createdAtTick: number;
+  resolvedAtTick?: number;
+}
 
 export type BattleRole = 'attack' | 'defense';
 
@@ -167,8 +204,29 @@ export interface GameState {
   battleFronts: Record<string, BattleFrontState>;
   resourceNodes: Record<number, ResourceNodeState>;
 
-  /** Directed-pair relation key "a:b" with a < b -> 'war' (absent = peace). */
+  /** Undirected-pair relation key "a:b" with a < b (absent = peace). */
   relations: Record<string, Relation>;
+
+  /**
+   * Sparse: province id -> game-hour at which strike devastation lifts. While a
+   * province is devastated its shattered administration cannot rally a scratch
+   * defence, so an attacking stack walks in and takes it. Additive optional
+   * field — pre-strike v2 saves default it to `{}` on load, no GAME_VERSION bump.
+   */
+  provinceDevastation?: Record<number, number>;
+
+  /**
+   * Set once the campaign is decided, then frozen. Absent = still in progress.
+   * Additive optional field — no GAME_VERSION bump.
+   */
+  outcome?: GameOutcome;
+
+  /** Optional for compatibility with v2 snapshots created before diplomacy. */
+  diplomacyMessages?: Record<string, DiplomacyMessage>;
+  /** Optional for compatibility with v2 snapshots created before diplomacy. */
+  diplomacyProposals?: Record<string, DiplomacyProposal>;
+  /** Shared monotonic id source for diplomacy records. */
+  nextDiplomacyId?: number;
 
   nextArmyId: number;
   nextBattleId: number;
@@ -194,6 +252,14 @@ export function setRelation(state: GameState, a: number, b: number, relation: Re
   const key = relationKey(a, b);
   if (relation === 'peace') delete state.relations[key];
   else state.relations[key] = relation;
+  if (relation === 'war') {
+    for (const proposal of Object.values(state.diplomacyProposals ?? {})) {
+      if (proposal.status !== 'pending'
+        || relationKey(proposal.fromCountryId, proposal.toCountryId) !== key) continue;
+      proposal.status = 'withdrawn';
+      proposal.resolvedAtTick = state.simulationTick;
+    }
+  }
 }
 
 /**

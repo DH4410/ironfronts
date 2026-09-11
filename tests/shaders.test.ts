@@ -11,10 +11,16 @@ describe('WGSL programs', () => {
     expect(armyModelShader).toContain('smoothstep(1500.0, 1900.0, uniforms.interaction.y)');
     expect(armyModelShader).toContain('fn armyKindCountVertex');
     expect(armyModelShader).toContain('mix(model.a.xy, model.d.xy, travel)');
-    expect(armyMarkerShader).toContain('fn dominantIcon');
+    expect(armyMarkerShader).toContain('fn unitKindIcon');
+    expect(armyMarkerShader).toContain('armyUnitSilhouettes');
+    expect(armyMarkerShader).toContain('armyRosterPlate');
+    expect(armyMarkerShader).toContain('fn glyphCoveragePx');
+    expect(armyMarkerShader).toContain('fn squareLocal');
+    expect(armyMarkerShader).toContain('for (var index = 0u; index < 6u');
     expect(armyMarkerShader).toContain('fn armyCompositionVertex');
     expect(armyMarkerShader).toContain('fn armyCompositionFragment');
-    expect(armyMarkerShader).toContain('smoothstep(4400.0, 5000.0, zoom)');
+    expect(armyMarkerShader).toContain('identified && needsManifest && selected');
+    expect(armyMarkerShader).toContain('smoothstep(7600.0, 9200.0, zoom)');
   });
 
   it('keeps strategic troop models small relative to roads and towns', () => {
@@ -143,8 +149,11 @@ describe('WGSL programs', () => {
 
   it('derives political tint and country borders from mutable province ownership', () => {
     expect(terrainShader).toContain('let politicalColor = politicalColorAt(input.mapUv)');
-    expect(terrainShader).toContain('diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode');
-    expect(terrainShader).toContain('diplomacyColor.rgb * 1.30');
+    expect(terrainShader).toContain('diplomacyColor.rgb, isPlayer || hasRelationship || diplomacyMode || strategicMode');
+    expect(terrainShader).toContain('diplomacyColor.rgb * 1.08');
+    // Strategic default mode also greys foreign land so ownership reads at play zoom.
+    expect(terrainShader).toContain('let strategicMode = uniforms.interaction.z > 0.5 && uniforms.interaction.z < 1.5');
+    expect(terrainShader).toContain('if (!isPlayer && !hasRelationship && strategicMode)');
     expect(terrainShader).toContain('overlayStrength = max(overlayStrength, 0.30)');
     expect(terrainShader).toContain('let isPlayer = diplomacyColor.a > 0.25 && diplomacyColor.a < 0.75');
     expect(terrainShader).toContain('select(0.45, 0.85, uniforms.interaction.z > 1.5)');
@@ -163,7 +172,7 @@ describe('WGSL programs', () => {
     expect(lineShader).toContain('let countryBoundary = line.b.z < 0.0 && line.b.y > 0.5');
     expect(lineShader).toContain('height0 = abs(line.b.z) + 0.8');
     expect(lineShader).toContain('(lineParams.enabled & 2u) != 0u');
-    expect(lineShader).toContain('mix(0.60, 0.94, nearFactor)');
+    expect(lineShader).toContain('mix(0.82, 0.97, nearFactor)');
     expect(lineShader).toContain('if (riverSignal >= 0.15) { discard; }');
     expect(lineShader).toContain('styledColor = mix(input.outerColor, input.innerColor, centerCoverage)');
     expect(lineShader).toContain('mix(0.30, 0.10, nearFactor)');
@@ -178,7 +187,7 @@ describe('WGSL programs', () => {
     expect(lineShader).toContain('color.a = mix(color.a, 0.92, overviewFade * 0.6)');
     expect(lineShader).toContain('color.a *= mix(1.0, 0.22, overviewFade)');
     // The pre-existing near-zoom weights are still the baseline the fade builds on.
-    expect(lineShader).toContain('mix(0.60, 0.94, nearFactor)');
+    expect(lineShader).toContain('mix(0.82, 0.97, nearFactor)');
     expect(lineShader).toContain('mix(0.30, 0.10, nearFactor)');
   });
 
@@ -267,6 +276,10 @@ describe('WGSL programs', () => {
       { binding: 11, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 12, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },
       { binding: 13, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 14, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 15, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
+      { binding: 16, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 17, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ] });
     const layer = device.createBindGroupLayout({ entries: [
       { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },

@@ -75,9 +75,12 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
     // political boundary merely because its implicit owner differs.
     let countryBoundary = line.b.z < 0.0 && line.b.y > 0.5;
     if (countryBoundary && countryBordersVisible) {
-      widthPixels = 2.65 - nearFactor * 0.58;
-      color = vec4f(0.035, 0.047, 0.043, mix(0.60, 0.94, nearFactor));
-      innerColor = vec4f(0.77, 0.71, 0.57, mix(0.52, 0.86, nearFactor));
+      // Bold, high-contrast national outline: a near-black casing under a bright
+      // bone line, thick and opaque at every zoom so ownership stays legible
+      // even where the terrain colour shifts under it.
+      widthPixels = 3.6 - nearFactor * 0.5;
+      color = vec4f(0.03, 0.035, 0.03, mix(0.82, 0.97, nearFactor));
+      innerColor = vec4f(0.87, 0.81, 0.63, mix(0.72, 0.96, nearFactor));
       countryCasing = 1.0;
     } else if (!provinceBordersVisible) {
       color.a = 0.0;
@@ -101,14 +104,24 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
     widthPixels = 2.1 + nearFactor * 0.75;
     color = select(vec4f(0.05, 0.91, 1.0, 0.94), vec4f(0.98, 0.71, 0.12, 0.96), line.b.z > 0.5);
   } else if (lineParams.mode == 3u) {
-    // Order route. b.x: 0 move (cream) / 1 attack (muted red) / 2 rally (blue);
-    // b.z > 0.5 retreat (amber, overrides); b.w > 0.5 = destination chevron.
-    widthPixels = 1.9 + nearFactor * 1.0;
-    var routeColor = vec4f(0.94, 0.89, 0.74, 0.92);
-    if (line.b.x > 1.5) { routeColor = vec4f(0.42, 0.66, 0.95, 0.88); }
-    else if (line.b.x > 0.5) { routeColor = vec4f(0.82, 0.30, 0.24, 0.94); }
-    if (line.b.z > 0.5) { routeColor = vec4f(0.92, 0.62, 0.24, 0.94); }
-    if (line.b.w > 0.5) { widthPixels += 1.4; routeColor.a = min(1.0, routeColor.a + 0.06); }
+    // Order route. b.x: 0 move (cream) / 1 attack (muted rose) / 2 rally (blue);
+    // b.z > 0.5 retreat (dusty amber, overrides); b.w > 0.5 = destination
+    // chevron; b.y = 0..1 fraction from the army to the destination.
+    // Kept wide, low-alpha and desaturated so it reads as a ghosted intent
+    // rather than a hard painted line; the fraction drives a head-to-tail
+    // brightening and a slow pulse that flows toward the target.
+    widthPixels = 2.3 + nearFactor * 1.0;
+    var routeColor = vec4f(0.90, 0.86, 0.74, 0.55);
+    if (line.b.x > 1.5) { routeColor = vec4f(0.52, 0.66, 0.86, 0.54); }
+    else if (line.b.x > 0.5) { routeColor = vec4f(0.70, 0.46, 0.44, 0.48); }
+    if (line.b.z > 0.5) { routeColor = vec4f(0.78, 0.60, 0.44, 0.50); }
+    routeColor.a *= mix(0.62, 1.0, line.b.y);
+    // A faint white stripe crawls toward the destination — barely there.
+    let crawl = fract(line.b.y * 9.0 - uniforms.sunTime.w * 0.6);
+    let stripe = smoothstep(0.86, 1.0, crawl) + smoothstep(0.14, 0.0, crawl);
+    routeColor = mix(routeColor, vec4f(0.96, 0.96, 0.93, routeColor.a), stripe * 0.16);
+    // The destination chevron is a thin sharp mark, not a bar.
+    if (line.b.w > 0.5) { widthPixels *= 0.55; routeColor.a = min(1.0, routeColor.a * 1.5); }
     color = routeColor;
     innerColor = routeColor;
   }

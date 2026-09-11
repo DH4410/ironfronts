@@ -79,6 +79,16 @@ export function projectFor(
   const owned = world.provinces.filter((province) => state.provinceOwners[province.id] === viewerCountryId);
   const capitalId = world.countries.find((country) => country.id === viewerCountryId)?.capitalProvinceId;
   const capital = world.provinces.find((province) => province.id === capitalId) ?? owned[0];
+  const diplomacy = {
+    messages: Object.values(state.diplomacyMessages ?? {})
+      .filter((message) => message.fromCountryId === viewerCountryId || message.toCountryId === viewerCountryId)
+      .map((message) => ({ ...message }))
+      .sort((a, b) => a.sentAtTick - b.sentAtTick || a.id.localeCompare(b.id)),
+    proposals: Object.values(state.diplomacyProposals ?? {})
+      .filter((proposal) => proposal.fromCountryId === viewerCountryId || proposal.toCountryId === viewerCountryId)
+      .map((proposal) => ({ ...proposal }))
+      .sort((a, b) => a.createdAtTick - b.createdAtTick || a.id.localeCompare(b.id)),
+  };
   return {
     simulationTick: state.simulationTick,
     viewerCountryId,
@@ -103,8 +113,11 @@ export function projectFor(
       id: own.id, name: own.name, color: own.color, controller: own.controller,
       stockpile: { ...own.stockpile }, income: { ...own.income }, industryCapacity: own.industryCapacity,
       extraction,
+      warheads: Math.floor(own.warheads ?? 0),
     } : null,
     relations: { ...state.relations },
+    diplomacy,
+    outcome: state.outcome ? { ...state.outcome } : undefined,
   };
 }
 
@@ -252,6 +265,8 @@ export function diffProjection(previous: PlayerProjection, next: PlayerProjectio
   const delta: ProjectionDelta = { changed: {}, upserts: {}, removals: {}, redactions: [] };
   if (previous.simulationTick !== next.simulationTick) delta.changed.simulationTick = next.simulationTick;
   if (!same(previous.ownCountry, next.ownCountry)) delta.changed.ownCountry = next.ownCountry;
+  if (!same(previous.diplomacy, next.diplomacy)) delta.changed.diplomacy = next.diplomacy;
+  if (!same(previous.outcome, next.outcome)) delta.changed.outcome = next.outcome;
   for (const key of COLLECTIONS) {
     const before = previous[key] as Record<string, unknown>;
     const after = next[key] as Record<string, unknown>;

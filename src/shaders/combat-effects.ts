@@ -87,12 +87,20 @@ fn combatEffectVertex(
 
   let zoom = uniforms.interaction.y;
   let zoomScale = mix(0.7, 1.35, smoothstep(4600.0, 700.0, zoom));
-  let half = effectPixelSize(kind) * max(0.15, effect.b.y) * sizeAge * zoomScale;
+  // The battle marker is a strategic-awareness pin: it must not shrink away as
+  // the player pulls back to survey the front. Hold it near full size up close
+  // and let it grow as the camera climbs so clustered fights stay readable on
+  // the strategic map.
+  let markerZoomScale = mix(1.0, 1.7, smoothstep(1500.0, 9000.0, zoom));
+  let effZoomScale = select(zoomScale, markerZoomScale, kind == 8);
+  let half = effectPixelSize(kind) * max(0.15, effect.b.y) * sizeAge * effZoomScale * uniforms.viewport.z;
 
   // Fade: transients fade over their life; the battle marker holds (its pulse
-  // is size + fragment glow). Everything fades out past strategic zoom.
+  // is size + fragment glow) and — unlike every transient — stays at full
+  // opacity all the way out to max zoom, since that is exactly when the player
+  // needs to see where the fighting is.
   let lifeFade = select(1.0 - smoothstep(0.55, 1.0, age), 0.85 + 0.15 * sin(effect.a.w * 6.2831853), kind == 8);
-  let zoomFade = 1.0 - smoothstep(4400.0, 5000.0, zoom);
+  let zoomFade = select(1.0 - smoothstep(4400.0, 5000.0, zoom), 1.0, kind == 8);
 
   var output: EffectOut;
   output.uv = corner;
@@ -118,6 +126,21 @@ fn softDisc(uv: vec2f, edge: f32) -> f32 {
 
 fn ring(uv: vec2f, radius: f32, width: f32) -> f32 {
   return 1.0 - smoothstep(width, width * 2.4, abs(length(uv) - radius));
+}
+
+// Three-octave value-noise turbulence, ~0..0.875, mean ~0.4. Used to break the
+// circular silhouette off the explosion and battle smoke so neither reads as a
+// painted disc or ring.
+fn turbulence(p: vec2f) -> f32 {
+  var f = 0.0;
+  var amp = 0.5;
+  var q = p;
+  for (var i = 0; i < 3; i = i + 1) {
+    f = f + amp * valueNoise(q);
+    q = q * 2.03;
+    amp = amp * 0.5;
+  }
+  return f;
 }
 
 @fragment
@@ -155,12 +178,19 @@ fn combatEffectFragment(input: EffectOut) -> @location(0) vec4f {
     let n = valueNoise(uv * 2.4 + input.seed * 27.0 + vec2f(input.age * 1.5, 0.0));
     a = softDisc(uv, 0.05) * (0.35 + 0.5 * n) * 0.62;
     rgb = mix(vec3f(0.14, 0.14, 0.15), vec3f(0.3, 0.29, 0.28), n);
-  } else if (kind == 6) {                 // explosion — fireball to smoke
-    let n = valueNoise(uv * 3.2 + input.seed * 51.0);
-    let fire = softDisc(uv * (1.0 + input.age), 0.0) * (1.0 - input.age);
-    let smoke = softDisc(uv, 0.05) * input.age * (0.4 + 0.5 * n);
-    rgb = mix(vec3f(0.22, 0.2, 0.19), mix(vec3f(1.0, 0.55, 0.16), vec3f(1.0, 0.95, 0.7), fire), fire);
-    a = clamp(fire * 1.3 + smoke * 0.7, 0.0, 1.0);
+  } else if (kind == 6) {                 // explosion — hot flash that billows into smoke
+    let t = input.age;
+    let turb = turbulence(uv * 2.6 + input.seed * 40.0 + vec2f(0.0, -t * 1.6));
+    // Dissolve the silhouette with turbulence so it never reads as a clean disc.
+    let body = smoothstep(1.0, 0.12, length(uv) + (turb - 0.5) * 0.95);
+    let flash = 1.0 - smoothstep(0.0, 0.30, t);      // brief fireball
+    let cooling = smoothstep(0.08, 0.85, t);         // smoke takes over
+    let heat = body * flash * (0.55 + 0.7 * turb);
+    let smoke = body * cooling * (0.35 + 0.55 * turb);
+    let fireCol = mix(vec3f(1.0, 0.32, 0.07), vec3f(1.0, 0.88, 0.52), clamp(heat, 0.0, 1.0));
+    let smokeCol = mix(vec3f(0.08, 0.07, 0.07), vec3f(0.30, 0.28, 0.27), turb);
+    rgb = mix(smokeCol, fireCol, clamp(heat * 1.4, 0.0, 1.0));
+    a = clamp(heat * 1.5 + smoke * 0.85, 0.0, 1.0);
   } else if (kind == 7) {                 // target flash — red reticle
     let cross = max(
       step(abs(uv.x), 0.06) * step(abs(uv.y), 0.85),
@@ -168,16 +198,18 @@ fn combatEffectFragment(input: EffectOut) -> @location(0) vec4f {
     );
     a = clamp(ring(uv, 0.78, 0.05) + cross, 0.0, 1.0);
     rgb = vec3f(0.95, 0.28, 0.20);
-  } else {                                // battle marker — pulsing spark burst, not a cross/X
-    // A giant crossed-blades "X" read as a cartoon cancel icon at a glance;
-    // a compact radiating burst plus a breathing ring reads as "fighting
-    // here" without borrowing another symbol's meaning.
-    let core = softDisc(uv * 2.6, 0.0);
-    let spikes = pow(max(0.0, 1.0 - abs(uv.x) * 2.2), 3.0) + pow(max(0.0, 1.0 - abs(uv.y) * 2.2), 3.0);
-    let burst = clamp(core * 0.9 + spikes * 0.35, 0.0, 1.0);
-    let pulse = ring(uv, 0.58 + 0.3 * input.age, 0.045) * (1.0 - input.age * 0.6);
-    rgb = mix(vec3f(1.0, 0.8, 0.4), vec3f(0.93, 0.34, 0.2), clamp(burst * 0.5 + pulse * 0.6, 0.0, 1.0));
-    a = clamp(burst * 0.8 + pulse * 0.75, 0.0, 1.0);
+  } else {                                // battle marker — a smouldering smoke plume, no ring or cross
+    // A pulsing ring / crossed-blades "X" both read as HUD chrome. A turbulent
+    // dark smoke puff with a flickering ember core reads as "fighting here"
+    // without borrowing another symbol, and never draws a circle.
+    let ph = input.age;                    // repeating 0..1 pulse phase
+    let turb = turbulence(uv * 2.4 + input.seed * 30.0 + vec2f(0.0, -ph * 1.2));
+    let puff = smoothstep(1.0, 0.05, length(uv * vec2f(1.0, 0.82)) + (turb - 0.5) * 0.7);
+    let smoke = puff * (0.4 + 0.5 * turb);
+    let ember = softDisc(uv * 3.4, 0.0) * (0.45 + 0.4 * sin(ph * 18.849 + input.seed * 9.0));
+    rgb = mix(vec3f(0.11, 0.10, 0.10), vec3f(0.33, 0.31, 0.30), turb);
+    rgb = mix(rgb, vec3f(1.0, 0.46, 0.15), clamp(ember, 0.0, 1.0));
+    a = clamp(smoke * 0.72 + ember * 0.5, 0.0, 1.0);
   }
 
   let out = clamp(a * input.alpha * (0.7 + 0.3 * input.intensity), 0.0, 1.0);
