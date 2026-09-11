@@ -180,6 +180,34 @@ describe('groupEngagedByFront', () => {
     ];
     expect(groupEngagedByFront(stacks).size).toBe(2);
   });
+
+  it('joins EVERY front an army reports, so a two-front army never leaves either front a singleton', () => {
+    // A stack fighting two directions at once reports both front ids; it must
+    // not silently drop out of one just because it also joined the other.
+    const stacks: EngagedStackLike[] = [
+      { id: 'pivot', x: 0, z: 0, ownerCountryId: 1, frontIds: ['front-1', 'front-2'] },
+      { id: 'enemyA', x: 10, z: 0, ownerCountryId: 2, frontIds: ['front-1'] },
+      { id: 'enemyB', x: -10, z: 0, ownerCountryId: 3, frontIds: ['front-2'] },
+    ];
+    const clusters = groupEngagedByFront(stacks);
+    expect(clusters.size).toBe(2);
+    expect(clusters.get('front-1')!.ownerCountryIds).toEqual(new Set([1, 2]));
+    expect(clusters.get('front-2')!.ownerCountryIds).toEqual(new Set([1, 3]));
+    expect(clusters.get('front-1')!.memberIds).toContain('pivot');
+    expect(clusters.get('front-2')!.memberIds).toContain('pivot');
+  });
+
+  it('single fully-visible member still forms a real cluster (own army vs. a fog-obscured enemy)', () => {
+    // A front id only exists because the sim built a real two-sided fight —
+    // the enemy simply isn't fully visible to this viewer, so only the
+    // player's own army reports it. This must still be treated as a live fight.
+    const stacks: EngagedStackLike[] = [
+      { id: 'mine', x: 0, z: 0, ownerCountryId: 1, frontIds: ['front-1'] },
+    ];
+    const clusters = groupEngagedByFront(stacks);
+    expect(clusters.size).toBe(1);
+    expect(clusters.get('front-1')!.memberIds).toEqual(['mine']);
+  });
 });
 
 describe('groupEngagedByFront + buildBattleAnchors + combatHuddleOffset end-to-end', () => {

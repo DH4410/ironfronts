@@ -115,10 +115,12 @@ describe('continuous battle FX (gunfire, smoke stalk, city-under-siege overlay)'
     const start = main.indexOf('function spawnOngoingBattleFx');
     const block = main.slice(start, main.indexOf('\nlet campaignOutcomeShown', start));
     expect(block).toContain('effectDensityForDistance(lastCombatCameraDistance)');
-    // Groups the same way the huddle above does — both sides must actually be
-    // present for a cluster to count as a real clash.
+    // Groups the same way the huddle above does — a cluster only exists
+    // because a fully-visible engaged army reported that front id, so no
+    // separate owner-diversity check is needed (and none would fire FX for
+    // the player's own engaged army against a fog-obscured enemy).
     expect(block).toContain('groupEngagedByFront(');
-    expect(block).toContain('cluster.ownerCountryIds.size < 2) continue');
+    expect(block).not.toContain('ownerCountryIds.size < 2');
     // Gunshots: more frequent than the single spawnVolley the 'engaged'/'combatPulse' events already fire.
     expect(block).toContain("combatEffects.spawnVolley('infantry', cluster.x, cluster.z");
     // Smoke reuses the same EFFECT_KIND.smoke WGSL composition as the nuke's smoke stalk, smaller/continuous.

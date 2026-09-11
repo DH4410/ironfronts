@@ -2143,7 +2143,12 @@ function spawnOngoingBattleFx(session: RemoteGameSession, renderer: WorldRendere
   const activeFronts = new Set<string>();
   const activeProvinces = new Set<number>();
   for (const [frontId, cluster] of clusters) {
-    if (cluster.ownerCountryIds.size < 2) continue; // a stray stack, not a real clash
+    // No owner-diversity check needed: a cluster only exists because some
+    // fully-visible army reported this front id, and a front id only exists
+    // because the sim built a real two-sided fight — so this is always a
+    // genuine clash, even when the other side is only fog-obscured (a
+    // 'contact' stack never reports engaged/battleFronts, so it can't be a
+    // cluster member, but the player's own engaged army still deserves FX).
     activeFronts.add(frontId);
     const jitter = (spread: number): number => (Math.random() - 0.5) * spread;
 

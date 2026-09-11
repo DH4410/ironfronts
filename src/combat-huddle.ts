@@ -63,8 +63,10 @@ export interface EngagedStackLike {
   readonly x: number;
   readonly z: number;
   readonly ownerCountryId: number;
-  /** ids of every live battle front this army currently reports (the first
-   *  one is used as its cluster key). Pass [] for a non-engaged stack. */
+  /** ids of every live battle front this army currently reports. An army
+   *  fighting on more than one front joins every one of those clusters (so a
+   *  front never silently loses a member just because that army also has a
+   *  second, unrelated fight going). Pass [] for a non-engaged stack. */
   readonly frontIds: readonly string[];
 }
 
@@ -76,21 +78,21 @@ export interface BattleCluster {
 }
 
 /**
- * Group engaged stacks by the authoritative battle-front id they report,
+ * Group engaged stacks by every authoritative battle-front id they report,
  * with each cluster's position the centroid of its current members. Stacks
- * with no front id are skipped.
+ * with no front id contribute nothing.
  */
 export function groupEngagedByFront(stacks: Iterable<EngagedStackLike>): Map<string, BattleCluster> {
   const sums = new Map<string, { sumX: number; sumZ: number; owners: Set<number>; members: string[] }>();
   for (const stack of stacks) {
-    const frontId = stack.frontIds[0];
-    if (!frontId) continue;
-    const group = sums.get(frontId) ?? { sumX: 0, sumZ: 0, owners: new Set<number>(), members: [] };
-    group.sumX += stack.x;
-    group.sumZ += stack.z;
-    group.owners.add(stack.ownerCountryId);
-    group.members.push(stack.id);
-    sums.set(frontId, group);
+    for (const frontId of stack.frontIds) {
+      const group = sums.get(frontId) ?? { sumX: 0, sumZ: 0, owners: new Set<number>(), members: [] };
+      group.sumX += stack.x;
+      group.sumZ += stack.z;
+      group.owners.add(stack.ownerCountryId);
+      group.members.push(stack.id);
+      sums.set(frontId, group);
+    }
   }
   const clusters = new Map<string, BattleCluster>();
   for (const [frontId, group] of sums) {
@@ -104,7 +106,9 @@ export function groupEngagedByFront(stacks: Iterable<EngagedStackLike>): Map<str
   return clusters;
 }
 
-/** One shared anchor per army id, taken from its cluster's centroid. */
+/** One shared anchor per army id, taken from its cluster's centroid. An army
+ *  in more than one cluster (fighting two fronts) gets whichever cluster is
+ *  visited last — still a real fight it's in, never a no-op. */
 export function buildBattleAnchors(clusters: ReadonlyMap<string, BattleCluster>): Map<string, Point> {
   const anchors = new Map<string, Point>();
   for (const cluster of clusters.values()) {
