@@ -512,7 +512,9 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     b.title = `${label} — not available yet`;
     pvActions.append(b);
   }
-  provinceCard.append(pvHead, pvGrid, pvFacilities, pvResources, pvProduce, pvBuild, pvActions);
+  const pvDetails = el('div', 'ifg-card__details');
+  pvDetails.append(pvFacilities, pvResources, pvProduce, pvBuild);
+  provinceCard.append(pvHead, pvGrid, pvDetails, pvActions);
 
   // ---------------- centered selected-army command overlay ----------------
   const armyCard = el('section', 'ifg-army-panel');

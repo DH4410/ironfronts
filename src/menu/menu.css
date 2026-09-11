@@ -14,7 +14,7 @@
 }
 
 .ifm {
-  position: fixed; inset: 0; z-index: 40; overflow: hidden; color: var(--hud-text); isolation: isolate;
+  position: fixed; inset: 0; z-index: 40; width: 100%; height: 100dvh; min-height: 100svh; overflow: hidden; color: var(--hud-text); isolation: isolate;
   font-size: clamp(14px, .72vw + 5.5px, 20px);
   display: grid; grid-template-rows: 1fr auto;
   background: var(--hud-bg);
@@ -414,8 +414,9 @@
 .ifm__subpage--dossier { padding: 3vh 2vw; overflow: auto; }
 .ifm__file--dossier {
   width: min(1520px, 96vw);
-  height: min(860px, calc(100dvh - max(120px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 96px)));
+  height: min(860px, 100%, calc(100dvh - max(120px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 96px)));
   max-height: calc(100dvh - max(120px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 96px));
+  max-height: min(100%, calc(100dvh - max(120px, env(safe-area-inset-top) + env(safe-area-inset-bottom) + 96px)));
   box-sizing: border-box;
   margin: auto;
 }
@@ -424,7 +425,7 @@
 .ifm__file--dossier .ifm__file-header h2 { font-size: 1.85em; }
 .ifm__file--dossier .ifm__file-header p { font-size: .95em; }
 .ifm__dossier {
-  flex: 1 1 auto; min-height: 0; overflow: auto;
+  flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain;
   display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 2.2em;
   padding: 1.9em 2.8em;
 }
@@ -450,7 +451,7 @@
 
 .ifm__file-actions {
   flex: 0 0 auto; position: relative; display: flex; align-items: center; gap: 1.2em;
-  padding: 1em 2.3em; border-top: 1px solid var(--hud-line); background: rgba(0,0,0,.22);
+  padding: 1em 2.3em; min-height: 64px; border-top: 1px solid var(--hud-line); background: rgba(0,0,0,.22);
 }
 .ifm__file-actions-note {
   flex: 1 1 auto; font: 400 .82em/1.3 var(--ifm-sans); color: var(--hud-text-dim);
@@ -472,7 +473,7 @@
     linear-gradient(var(--hud-panel-strong), var(--hud-panel-strong)),
     url('/menu/paper.jpg') center/cover;
   background-blend-mode: multiply;
-  border: 1px solid var(--hud-line); box-shadow: 0 3vh 6vh rgba(0,0,0,.6);
+  border: 1px solid var(--hud-line); box-shadow: 0 3vh 6vh rgba(0,0,0,.6); overflow: hidden;
 }
 .ifm__registry-head {
   flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 1.2em;
@@ -638,8 +639,9 @@
 
   .ifm__subpage--dossier { padding: 2.4vh 2vw; }
   .ifm__file--dossier {
-    height: min(820px, calc(100dvh - 44px));
+    height: min(820px, 100%, calc(100dvh - 44px));
     max-height: calc(100dvh - 44px);
+    max-height: min(100%, calc(100dvh - 44px));
   }
   .ifm__file--dossier .ifm__file-header { padding: .9em 1.8em; }
   .ifm__dossier { padding: 1.2em 1.6em; gap: 1.4em; }
@@ -719,8 +721,8 @@
   .ifm__doc-footer { padding: .8em 1em; gap: 1em; }
 
   .ifm__subpage--dossier { padding: 0; overflow: auto; }
-  .ifm__file--dossier { width: 100%; height: auto; max-height: none; min-height: calc(100dvh - 20px); }
-  .ifm__dossier { grid-template-columns: minmax(0, 1fr); padding: 1em; gap: 1em; }
+  .ifm__file--dossier { width: 100%; height: 100%; max-height: 100%; min-height: 0; }
+  .ifm__dossier { grid-template-columns: minmax(0, 1fr); padding: 1em; gap: 1em; overflow: auto; }
   .ifm__file-actions { flex-wrap: wrap; padding: 1em; }
   .ifm__file-actions .ifm__primary { width: 100%; }
 

@@ -697,6 +697,9 @@
   left: 50%;
   bottom: 18px;
   width: min(480px, calc(100vw - 48px));
+  height: clamp(238px, 31dvh, 340px);
+  max-height: calc(100dvh - 82px);
+  min-height: 0;
   padding: 10px 14px 12px 14px;
   background-color: #171911;
   background-image: var(--ifg-panel);
@@ -707,6 +710,9 @@
   opacity: 0;
   transform: translate(-50%, 14px);
   transition: transform 0.18s var(--ifg-ease), opacity 0.14s ease;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  overflow: hidden;
 }
 .ifg-card:not([hidden]) { transform: translate(-50%, 0); opacity: 1; }
 /* Owner-colour left edge, exactly like the selected-army panel. */
@@ -749,6 +755,13 @@
   padding: 6px 0;
   border-top: 1px solid var(--ifg-rule-soft);
   border-bottom: 1px solid var(--ifg-rule-soft);
+}
+.ifg-card__details {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-right: 3px;
 }
 @media (max-width: 720px) { .ifg-card__grid { grid-template-columns: 1fr 1fr; } }
 .ifg-field { display: flex; flex-direction: column; gap: 2px; line-height: 1.2; min-width: 0; }
@@ -1601,7 +1614,7 @@
 @media (max-width: 860px) {
   .ifg-topbar__country-name { display: none; }
   .ifg-topbar__resources { gap: 7px; }
-  .ifg-army-panel { width: calc(100vw - 24px); bottom: 12px; }
+  .ifg-army-panel { width: calc(100vw - 24px); height: clamp(210px, 29dvh, 300px); max-height: calc(100dvh - 72px); bottom: 12px; }
   .ifg-army-panel__body { grid-template-columns: 180px minmax(270px, 1fr) 250px; }
   .ifg-army-panel__units { grid-template-columns: repeat(auto-fit, minmax(82px, 1fr)); }
   .ifg-army-panel__identity small { display: none; }
