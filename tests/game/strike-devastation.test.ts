@@ -3,13 +3,13 @@ import type { LandGraph } from '../../src/game/movement/graph';
 import type { SimContext } from '../../src/game/sim-context';
 import type { WorldData } from '../../src/game/world-data';
 import type { GameState } from '../../src/game/game-state';
-import { stepCapture } from '../../src/game/combat';
+import { stepCapture, stepCombat } from '../../src/game/combat';
+import { DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER } from '../../src/game/combat/constants';
 import { stepWarheads } from '../../src/game/strike';
 
 /**
- * Playtest: "make it so a very weak city is very easy to take over" after a
- * strike. A strike stamps `provinceDevastation[id]`, and while that window is
- * open stepCapture stops letting a lone adjacent enemy stack contest the flip.
+ * A strike stamps `provinceDevastation[id]`. It weakens a city garrison in
+ * combat but never allows an attacker to capture through a defender.
  */
 function graph(): LandGraph {
   return {
@@ -70,7 +70,7 @@ function ctx(devastatedUntilHours: number | undefined): SimContext {
   return { state, graph: graph(), world: world() };
 }
 
-describe('strike devastation eases capture', () => {
+describe('strike devastation weakens defenders without bypassing capture', () => {
   it('a lone adjacent defender still blocks capture of an undamaged province', () => {
     const c = ctx(undefined);
     const events = stepCapture(c);
@@ -78,18 +78,48 @@ describe('strike devastation eases capture', () => {
     expect(c.state.provinceOwners[5]).toBe(2);
   });
 
-  it('a devastated province flips even with that defender sitting next to it', () => {
+  it('a devastated province still engages its defender before it can flip', () => {
     const c = ctx(200); // devastation lifts at hour 200; clock is at 10
+    expect(stepCapture(c)).toHaveLength(0);
+    expect(c.state.provinceOwners[5]).toBe(2);
+
+    const combat = stepCombat(c, 0);
+    expect(combat.some((event) => event.kind === 'engaged')).toBe(true);
+    expect(c.state.armies.atk.status).toBe('engaged');
+    expect(c.state.armies.def.status).toBe('engaged');
+    expect(stepCapture(c)).toHaveLength(0);
+    expect(c.state.provinceOwners[5]).toBe(2);
+  });
+
+  it('reduces a devastated garrison to 40% of its normal combat output', () => {
+    const normal = ctx(undefined);
+    const devastated = ctx(200);
+
+    stepCombat(normal, 900);
+    stepCombat(devastated, 900);
+
+    const normalAttackerLoss = 240 - normal.state.armies.atk.units[0].hp;
+    const devastatedAttackerLoss = 240 - devastated.state.armies.atk.units[0].hp;
+    const normalDefenderLoss = 240 - normal.state.armies.def.units[0].hp;
+    const devastatedDefenderLoss = 240 - devastated.state.armies.def.units[0].hp;
+
+    expect(devastatedAttackerLoss)
+      .toBeCloseTo(normalAttackerLoss * DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER, 8);
+    expect(devastatedDefenderLoss).toBeCloseTo(normalDefenderLoss, 8);
+    expect(devastatedDefenderLoss).toBeGreaterThan(devastatedAttackerLoss * 3);
+  });
+
+  it.each([
+    ['without devastation', undefined],
+    ['during devastation', 200],
+  ])('an undefended province flips immediately %s', (_label, devastatedUntil) => {
+    const c = ctx(devastatedUntil);
+    delete c.state.armies.def;
+
     const events = stepCapture(c);
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ provinceId: 5, fromCountryId: 2, toCountryId: 1 });
     expect(c.state.provinceOwners[5]).toBe(1);
-  });
-
-  it('once the devastation window has passed the defender blocks capture again', () => {
-    const c = ctx(5); // already expired at clock hour 10
-    expect(stepCapture(c)).toHaveLength(0);
-    expect(c.state.provinceOwners[5]).toBe(2);
   });
 
   it('stepWarheads prunes devastation entries whose window has elapsed', () => {
