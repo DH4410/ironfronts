@@ -83,6 +83,21 @@ export class RemoteGameSession extends EventTarget {
   get ownCountry(): OwnCountry { return this.state.ownCountry as unknown as OwnCountry; }
   readClock(): GameClockReading { return this.connection.readClock(); }
 
+  /**
+   * Live headcount of every unit in the player's own army stacks (infantry,
+   * tanks, everything with a unit count) — a real military total, not the
+   * flavor "national population" figure shown pre-game. Recomputed from the
+   * current projection each read, so it stays correct as armies are built,
+   * merged, split or destroyed.
+   */
+  get armySize(): number {
+    let total = 0;
+    for (const army of Object.values(this.state.armies)) {
+      if (army.own && army.composition) total += army.composition.unitCount;
+    }
+    return total;
+  }
+
   /** Dev/test only. See GameConnection.setDevSimSpeed. */
   get devSimSpeed(): number { return this.connection.devSimSpeed; }
   get devSimSpeedEnabled(): boolean { return this.connection.devSimSpeedEnabled; }

@@ -17,7 +17,15 @@ import type { WorldData } from './world-data';
 /** Per 100k population, per game-hour. Deliberately gentle. */
 const FUNDS_PER_100K = 0.9;
 const MANPOWER_PER_100K = 0.5;
-const FOOD_PER_PROVINCE = 0.15;
+// econ-rebalance: infantry's food cost rose 20x (5 -> 100, steeper than
+// funds' 10x) while this rate stayed put, so food income silently became the
+// dominant bottleneck — a small nation's funds/manpower would balloon unspent
+// while food crawled back for tens of hours per unit. Raised ~2.7x so food's
+// time-to-afford-one-infantry roughly tracks funds' (still the tighter of the
+// two for a tank), not so far that it revives spam: a fresh selectable
+// country still takes hours per infantry from income alone, nowhere near the
+// near-instant old cadence.
+const FOOD_PER_PROVINCE = 0.4;
 const URBAN_FUNDS_BONUS = 4;
 
 export function recomputeIncome(state: GameState, world: WorldData): void {

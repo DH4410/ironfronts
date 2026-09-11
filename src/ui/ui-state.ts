@@ -21,7 +21,7 @@ export interface PlayerCountry {
   readonly color: string;
 }
 
-export type ResourceId = 'money' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil' | 'warheads';
+export type ResourceId = 'money' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil' | 'warheads' | 'army';
 
 export interface ResourceLine {
   readonly id: ResourceId;
@@ -300,6 +300,9 @@ export const DEFAULT_RESOURCES: readonly ResourceLine[] = [
   { id: 'stone', label: 'Stone', value: null },
   { id: 'metal', label: 'Metal', value: null },
   { id: 'oil', label: 'Oil', value: null },
+  // Live headcount of the player's own army (infantry + tanks + everything
+  // else with a unit count) — NOT a national population figure.
+  { id: 'army', label: 'Army', value: null },
 ];
 
 export function createInitialState(overrides: Partial<StrategicUiState> = {}): StrategicUiState {

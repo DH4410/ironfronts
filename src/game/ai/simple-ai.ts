@@ -246,21 +246,31 @@ function produceUnits(session: SimContext, situation: Assessment): void {
   }
 }
 
-/** Cheap infantry is the staple; armour only once the metal really covers it. */
+/**
+ * Cheap infantry is the staple; armour only once the metal really covers it.
+ *
+ * Funds/food thresholds sit at roughly 1.5-2x the unit's actual cost (see
+ * unit-catalog.ts) — enough headroom that a passing gate always affords the
+ * unit outright, without starving the AI the way a leftover 3-4x buffer sized
+ * for the old, much cheaper costs would against the current, slower economy.
+ * Metal/oil/manpower gates are untouched: those costs did not change.
+ */
 function chooseUnit(
-  stockpile: { funds: number; manpower: number; metal: number; oil: number },
+  stockpile: { funds: number; manpower: number; food: number; metal: number; oil: number },
   options: readonly string[], miners: number,
 ): string | null {
   if (miners < 2 && options.includes('engineer')
     && stockpile.funds > 120 && stockpile.manpower > 80) return 'engineer';
   if (options.includes('medium-tank')
-    && stockpile.metal > 400 && stockpile.oil > 200 && stockpile.funds > 300) return 'medium-tank';
+    && stockpile.metal > 400 && stockpile.oil > 200
+    && stockpile.funds > 3_600 && stockpile.food > 675) return 'medium-tank';
   if (options.includes('light-tank')
-    && stockpile.metal > 220 && stockpile.oil > 120 && stockpile.funds > 180) return 'light-tank';
+    && stockpile.metal > 220 && stockpile.oil > 120
+    && stockpile.funds > 2_000 && stockpile.food > 450) return 'light-tank';
   if (options.includes('artillery')
     && stockpile.metal > 200 && stockpile.funds > 220) return 'artillery';
   if (options.includes('infantry')
-    && stockpile.manpower > 120 && stockpile.funds > 80) return 'infantry';
+    && stockpile.manpower > 120 && stockpile.funds > 400 && stockpile.food > 150) return 'infantry';
   return null;
 }
 

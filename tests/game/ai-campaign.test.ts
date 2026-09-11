@@ -26,7 +26,14 @@ describe('AI on a live campaign', () => {
     const ai = session.enableNearbyAi(SPAIN)!;
     session.declareWar(SPAIN, ai);
 
-    for (let i = 0; i < 200; i += 1) session.tick(1.5);
+    // econ-rebalance: unit costs (funds/food) rose sharply, so a minor's
+    // garrison grows more slowly than it used to (food income was raised
+    // alongside the costs — see economy.ts — but is still the binding
+    // resource). Sparing a field detachment — needing a surplus over
+    // `requiredGarrison` — takes materially longer than the old 200-tick
+    // (300-hour) window; empirically that first happens around tick 500
+    // against this scenario's static neighbour threat, so run well past it.
+    for (let i = 0; i < 700; i += 1) session.tick(1.5);
 
     const situation = assess(
       session, aiMemory(session.state), ai, indexArmies(session.state), indexProvinces(session),

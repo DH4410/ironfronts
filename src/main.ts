@@ -2498,6 +2498,8 @@ function playerResourceLines(session: RemoteGameSession): ResourceLine[] {
     line('stone', 'Stone', s.stone, ext.stone ?? 0),
     line('metal', 'Metal', s.metal, ext.metal ?? 0),
     line('oil', 'Oil', s.oil, ext.oil ?? 0),
+    // Live military headcount — not a stockpile, no rate.
+    line('army', 'Army', session.armySize),
   ];
   // Only surfaced once a warhead is ready — a rare mechanic, not permanent
   // clutter. The chip is the discovery hook for the N-to-strike order.
