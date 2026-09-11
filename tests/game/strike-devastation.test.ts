@@ -17,6 +17,8 @@ function graph(): LandGraph {
     nodeZ: new Float64Array([100, 100]),
     adjacency: [[1], [0]],
     edgeCost: [[200], [200]],
+    seaAdjacency: [[], []],
+    seaEdgeCost: [[], []],
     component: new Int32Array([0, 0]),
     componentSize: [2],
     nodeCount: 2,

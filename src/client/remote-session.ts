@@ -103,6 +103,14 @@ export class RemoteGameSession extends EventTarget {
   get devSimSpeedEnabled(): boolean { return this.connection.devSimSpeedEnabled; }
   setDevSimSpeed(multiplier: number): void { this.connection.setDevSimSpeed(multiplier); }
 
+  /** Dev/test only. See GameConnection.setDevEnvironment. */
+  get devTimeOfDayHours(): number | null { return this.connection.devTimeOfDayHours; }
+  get devRaining(): boolean { return this.connection.devRaining; }
+  get devEnvironmentEnabled(): boolean { return this.connection.devEnvironmentEnabled; }
+  setDevEnvironment(next: { timeOfDayHours?: number; raining?: boolean }): void {
+    this.connection.setDevEnvironment(next);
+  }
+
   unit(typeId: string): Record<string, unknown> | undefined {
     return this.catalogs.units.find((unit) => unit.id === typeId);
   }

@@ -67,6 +67,9 @@ export function issueSplit(ctx: SimContext, command: SplitArmyCommand): CommandR
   if (parent.status === 'engaged' || parent.status === 'retreating') {
     return { ok: false, reason: 'Cannot split during close combat or retreat.' };
   }
+  if (parent.status === 'embarking' || parent.status === 'atSea' || parent.status === 'disembarking') {
+    return { ok: false, reason: 'Cannot split mid sea crossing.' };
+  }
   const groups = requestedGroups(parent, command.groups);
   if (typeof groups === 'string') return { ok: false, reason: groups };
   const id = `army-${ctx.state.nextArmyId}`;

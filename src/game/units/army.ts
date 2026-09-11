@@ -14,7 +14,13 @@ export type ArmyStatus =
   | 'moving'
   | 'extracting'
   | 'engaged'
-  | 'retreating';
+  | 'retreating'
+  /** Boarding transport at the coastal node before a sea/ferry crossing. */
+  | 'embarking'
+  /** Underway on a sea/ferry edge between two coastal nodes. */
+  | 'atSea'
+  /** Unloading at the coastal node after a sea/ferry crossing. */
+  | 'disembarking';
 
 export interface UnitGroup {
   readonly typeId: string;
@@ -73,6 +79,14 @@ export interface ArmyStack {
     targetArmyId: string | null;
     manualTarget: boolean;
   };
+  /** Present only while status is 'embarking' | 'atSea' | 'disembarking'. */
+  navalCrossing?: {
+    readonly fromNodeId: number;
+    readonly toNodeId: number;
+    /** Counts down during 'embarking'/'disembarking'; unused during 'atSea'
+     *  (that phase instead consumes the normal movement distance budget). */
+    hoursRemaining: number;
+  } | null;
 }
 
 export function groupMaxHp(group: UnitGroup): number {
@@ -90,6 +104,7 @@ export function ensureArmyRuntimeState(stack: ArmyStack): void {
   stack.battleFrontIds ??= [];
   stack.retreat ??= null;
   stack.artillery ??= { targetArmyId: null, manualTarget: false };
+  stack.navalCrossing ??= null;
 }
 
 export function stackUnitCount(stack: ArmyStack): number {

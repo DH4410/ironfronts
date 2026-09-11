@@ -82,6 +82,9 @@ export function armyActivityLabel(status: string, awaitingMoveTarget: boolean, o
   if (status === 'engaged') return 'Engaged in combat';
   if (status === 'retreating') return 'Withdrawing';
   if (status === 'extracting') return 'Extracting resources';
+  if (status === 'embarking') return 'Embarking…';
+  if (status === 'atSea') return 'At sea';
+  if (status === 'disembarking') return 'Disembarking…';
   if (status === 'idle') return 'Holding position';
   return status.replace(/(^|[-_ ])\w/g, (letter) => letter.toUpperCase());
 }
