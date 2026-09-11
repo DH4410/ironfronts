@@ -20,6 +20,10 @@ export class GameConnection extends EventTarget {
    *  even usable (always false against a production server). */
   devSimSpeed = 1;
   devSimSpeedEnabled = false;
+  /** Server-wide debug time-of-day/rain override, or null for no override. */
+  devTimeOfDayHours: number | null = null;
+  devRaining = false;
+  devEnvironmentEnabled = false;
   private readonly gameClock = new InterpolatedGameClock();
   private socket: WebSocket | null = null;
   private closed = false;
@@ -128,6 +132,11 @@ export class GameConnection extends EventTarget {
           this.devSimSpeed = message.multiplier;
           this.devSimSpeedEnabled = message.devControlsEnabled;
           this.dispatchEvent(new Event('dev-sim-speed'));
+        } else if (message.type === 'devEnvironment') {
+          this.devTimeOfDayHours = message.timeOfDayHours;
+          this.devRaining = message.raining;
+          this.devEnvironmentEnabled = message.devControlsEnabled;
+          this.dispatchEvent(new Event('dev-environment'));
         } else if (message.type === 'error') {
           if (!ready) {
             settleError(new Error(message.message), 1008, 'Server rejected connection');
@@ -187,6 +196,13 @@ export class GameConnection extends EventTarget {
   setDevSimSpeed(multiplier: number): void {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
     this.socket.send(JSON.stringify({ type: 'devSetSimSpeed', multiplier }));
+  }
+
+  /** Dev/test only — server ignores this against a production server. Either
+   *  field may be omitted to leave that half of the environment unchanged. */
+  setDevEnvironment(next: { timeOfDayHours?: number; raining?: boolean }): void {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    this.socket.send(JSON.stringify({ type: 'devSetEnvironment', ...next }));
   }
 
   close(): void { this.closed = true; this.socket?.close(1000, 'Client closed'); }

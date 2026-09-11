@@ -274,7 +274,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   const resourceIcon: Partial<Record<string, IconName>> = {
     money: 'funds', manpower: 'manpower', food: 'food',
     stone: 'node-stone', metal: 'metal', oil: 'oil',
-    warheads: 'structure-ordnance',
+    warheads: 'structure-ordnance', army: 'stat-troops',
   };
 
   const clockBlock = el('div', 'ifg-topbar__clock');

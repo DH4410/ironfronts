@@ -29,6 +29,11 @@ export interface GameplayGatewayOptions {
   readonly revision: () => number;
   readonly saveGameInBackground: () => void;
   readonly devSimSpeed: { get(): number; set(multiplier: number): void; enabled: boolean };
+  readonly devEnvironment: {
+    get(): { timeOfDayHours: number | null; raining: boolean };
+    set(next: { timeOfDayHours?: number; raining?: boolean }): void;
+    enabled: boolean;
+  };
   readonly log: (
     level: 'info' | 'warn' | 'error', event: string, fields?: Record<string, unknown>,
   ) => void;
@@ -123,6 +128,10 @@ export class GameplayGateway {
             type: 'devSimSpeed', multiplier: this.options.devSimSpeed.get(),
             devControlsEnabled: this.options.devSimSpeed.enabled,
           });
+          this.sendSocket(socket, {
+            type: 'devEnvironment', ...this.options.devEnvironment.get(),
+            devControlsEnabled: this.options.devEnvironment.enabled,
+          });
           this.options.log('info', 'client_connected', { countryId: claims.countryId });
           return;
         }
@@ -132,6 +141,14 @@ export class GameplayGateway {
           this.broadcast({
             type: 'devSimSpeed', multiplier: this.options.devSimSpeed.get(),
             devControlsEnabled: this.options.devSimSpeed.enabled,
+          });
+          return;
+        }
+        if (message.type === 'devSetEnvironment') {
+          this.options.devEnvironment.set(message);
+          this.broadcast({
+            type: 'devEnvironment', ...this.options.devEnvironment.get(),
+            devControlsEnabled: this.options.devEnvironment.enabled,
           });
           return;
         }

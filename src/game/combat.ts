@@ -13,7 +13,7 @@ import { issueRetreatOrder, retreatPaths, type RetreatPath } from './units/movem
 import { unitType } from './units/unit-catalog';
 import { computeArmyVisibility } from './visibility';
 import { wrappedDistance } from './geometry';
-import { COMBAT_SNAP } from './combat/constants';
+import { COMBAT_SNAP, DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER } from './combat/constants';
 import {
   addDamage, applyPendingDamage, calculateDamage, type GroupRef, type PendingDamage,
 } from './combat/damage';
@@ -63,6 +63,17 @@ function sideArmies(session: SimContext, side: BattleFrontSideState): ArmyStack[
 
 function sideHp(session: SimContext, side: BattleFrontSideState): number {
   return sideArmies(session, side).reduce((sum, army) => sum + stackHp(army), 0);
+}
+
+function isDevastated(session: SimContext, provinceId: number | null): boolean {
+  return provinceId !== null
+    && (session.state.provinceDevastation?.[provinceId] ?? 0) > session.state.clock.gameTimeHours;
+}
+
+function scaledDamage(
+  damage: Array<{ ref: GroupRef; amount: number }>, multiplier: number,
+): Array<{ ref: GroupRef; amount: number }> {
+  return multiplier === 1 ? damage : damage.map(({ ref, amount }) => ({ ref, amount: amount * multiplier }));
 }
 
 function sideBaseline(side: BattleFrontSideState): number {
@@ -197,14 +208,19 @@ function findOrCreateFront(
   return front;
 }
 
+/** Mid sea-crossing — can't fight, can't be attacked (units/movement.ts). */
+function isNavalTransit(army: ArmyStack): boolean {
+  return army.status === 'embarking' || army.status === 'atSea' || army.status === 'disembarking';
+}
+
 function detectEngagements(session: SimContext, events: CombatEvent[]): void {
   const armies = Object.values(session.state.armies);
   for (let i = 0; i < armies.length; i += 1) {
     const a = armies[i];
-    if (a.retreat?.protected) continue;
+    if (a.retreat?.protected || isNavalTransit(a)) continue;
     for (let j = i + 1; j < armies.length; j += 1) {
       const b = armies[j];
-      if (b.retreat?.protected || a.ownerCountryId === b.ownerCountryId) continue;
+      if (b.retreat?.protected || isNavalTransit(b) || a.ownerCountryId === b.ownerCountryId) continue;
       if (relationOf(session.state, a.ownerCountryId, b.ownerCountryId) !== 'war') continue;
       if (wrappedDistance(a.x, a.z, b.x, b.z, session.world.width) > COMBAT_SNAP) continue;
       findOrCreateFront(session, a, b, events);
@@ -427,8 +443,16 @@ export function stepCombat(session: SimContext, dtHours: number): CombatEvent[] 
   for (const front of activeFronts) {
     const a = sideArmies(session, front.sideA);
     const b = sideArmies(session, front.sideB);
-    addDamage(pending, calculateDamage(a, front.sideA.role, b, dtHours));
-    addDamage(pending, calculateDamage(b, front.sideB.role, a, dtHours));
+    const devastationMultiplier = isDevastated(session, front.provinceId)
+      ? DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER : 1;
+    addDamage(pending, scaledDamage(
+      calculateDamage(a, front.sideA.role, b, dtHours),
+      front.sideA.role === 'defense' ? devastationMultiplier : 1,
+    ));
+    addDamage(pending, scaledDamage(
+      calculateDamage(b, front.sideB.role, a, dtHours),
+      front.sideB.role === 'defense' ? devastationMultiplier : 1,
+    ));
   }
   applyPendingDamage(pending);
   if (session.state.simulationTick % 10 === 0) {

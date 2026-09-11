@@ -15,6 +15,14 @@ struct LineOutput {
   @location(4) @interpolate(flat) countryCasing: f32,
   @location(5) mapUv: vec2f,
   @location(6) @interpolate(flat) borderMode: f32,
+  // Plain (non-hovered/non-selected) country-boundary segments only: two probe
+  // UVs a few world units either side of the line, for the fragment stage to
+  // test against the player's own country (the political/diplomacy textures
+  // are fragment-visibility-only, so the probe positions are computed here in
+  // the vertex stage but sampled down in lineFragment).
+  @location(7) @interpolate(flat) ownBorderCandidate: f32,
+  @location(8) @interpolate(flat) sideUvA: vec2f,
+  @location(9) @interpolate(flat) sideUvB: vec2f,
 };
 
 @vertex
@@ -67,6 +75,9 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   var color = vec4f(0.055, 0.085, 0.077, mix(0.30, 0.10, nearFactor));
   var innerColor = color;
   var countryCasing = 0.0;
+  var ownBorderCandidate = 0.0;
+  var sideUvA = vec2f(0.0);
+  var sideUvB = vec2f(0.0);
   if (line.b.y < 0.5) { color.a *= 0.46; }
   if (lineParams.mode == 0u) {
     let provinceBordersVisible = (lineParams.enabled & 1u) != 0u;
@@ -82,6 +93,20 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
       color = vec4f(0.03, 0.035, 0.03, mix(0.82, 0.97, nearFactor));
       innerColor = vec4f(0.87, 0.81, 0.63, mix(0.72, 0.96, nearFactor));
       countryCasing = 1.0;
+      // Precompute two probe points a few world units either side of the
+      // border line (not on the line itself, which sits exactly on the seam)
+      // for the fragment stage to test ownership against — the political and
+      // diplomacy textures are fragment-visibility-only in the pipeline
+      // layout, so the actual owner lookup happens in lineFragment using the
+      // same test terrain.ts already uses for the political map tint.
+      let segWorld0 = vec2f(line.a.x, line.a.y);
+      let segWorld1 = vec2f(line.a.z, line.a.w);
+      let segDirection = normalize(segWorld1 - segWorld0 + vec2f(0.000001, 0.0));
+      let segNormal = vec2f(-segDirection.y, segDirection.x);
+      let segMid = (segWorld0 + segWorld1) * 0.5;
+      sideUvA = (segMid + segNormal * 6.0) / uniforms.map.xy;
+      sideUvB = (segMid - segNormal * 6.0) / uniforms.map.xy;
+      ownBorderCandidate = 1.0;
     } else if (!provinceBordersVisible) {
       color.a = 0.0;
     }
@@ -90,12 +115,14 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
       color = vec4f(0.96, 0.78, 0.35, 0.96);
       innerColor = color;
       countryCasing = 0.0;
+      ownBorderCandidate = 0.0;
     }
     if (selected && (provinceBordersVisible || countryBordersVisible)) {
       widthPixels = max(widthPixels + nearFactor * 0.6, 3.6);
       color = vec4f(0.04, 0.05, 0.05, 0.98);
       innerColor = vec4f(0.99, 0.9, 0.62, 1.0);
       countryCasing = 1.0;
+      ownBorderCandidate = 0.0;
     }
   } else if (lineParams.mode == 1u) {
     widthPixels = 1.1;
@@ -153,6 +180,9 @@ fn lineVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_index) 
   output.countryCasing = countryCasing;
   output.mapUv = select(uv0, uv1, endpoint == 1u);
   output.borderMode = select(0.0, 1.0, lineParams.mode == 0u);
+  output.ownBorderCandidate = ownBorderCandidate;
+  output.sideUvA = sideUvA;
+  output.sideUvB = sideUvB;
   return output;
 }
 
@@ -170,6 +200,28 @@ fn lineFragment(input: LineOutput) -> @location(0) vec4f {
   var styledColor = input.outerColor;
   if (input.countryCasing > 0.5) {
     styledColor = mix(input.outerColor, input.innerColor, centerCoverage);
+  }
+  if (input.ownBorderCandidate > 0.5) {
+    // Is either side of this plain country boundary the player's own
+    // country? Same owner-lookup + "is this the viewer's own country" test
+    // terrain.ts uses for the political map tint (diplomacyColor.a in
+    // (0.25, 0.75) marks the viewer's nation), just probed on both sides of
+    // the line instead of one point.
+    let sideOwnerA = politicalOwnerAt(input.sideUvA);
+    let sideOwnerB = politicalOwnerAt(input.sideUvB);
+    let sideAIsPlayer = sideOwnerA > 0u
+      && diplomacyColorFor(sideOwnerA).a > 0.25 && diplomacyColorFor(sideOwnerA).a < 0.75;
+    let sideBIsPlayer = sideOwnerB > 0u
+      && diplomacyColorFor(sideOwnerB).a > 0.25 && diplomacyColorFor(sideOwnerB).a < 0.75;
+    if (sideAIsPlayer || sideBIsPlayer) {
+      // The player's own frontier reads as unmistakably "mine": a bright warm
+      // gold in place of the neutral cream every other country-vs-country
+      // border uses — clearly distinguishable at a glance from a neutral
+      // AI-vs-AI boundary.
+      let ownOuter = vec4f(0.05, 0.045, 0.01, input.outerColor.a);
+      let ownInner = vec4f(1.0, 0.86, 0.32, 1.0);
+      styledColor = mix(ownOuter, ownInner, centerCoverage);
+    }
   }
   let color = vec4f(styledColor.rgb, styledColor.a * input.fogVisibility * edgeCoverage);
   if (color.a < 0.002) { discard; }

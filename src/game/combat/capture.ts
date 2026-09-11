@@ -23,19 +23,13 @@ export function stepCapture(session: SimContext): CaptureEvent[] {
       owner > 0 && relationOf(session.state, army.ownerCountryId, owner) !== 'war'
     )) continue;
 
-    // A province devastated by a recent strike cannot rally a scratch defence
-    // from a passing stack — an attacker just walks in. A stack that actually
-    // garrisons the node still fights through stepCombat (engaged armies are
-    // skipped above), so this only removes the "nearby unit contests it" case.
-    const devastatedUntil = session.state.provinceDevastation?.[provinceId] ?? 0;
-    const devastated = devastatedUntil > session.state.clock.gameTimeHours;
-    if (!devastated) {
-      const defended = Object.values(session.state.armies).some((other) => (
-        other.id !== army.id && other.ownerCountryId === owner
-        && wrappedDistance(other.x, other.z, army.x, army.z, session.world.width) <= COMBAT_SNAP
-      ));
-      if (defended) continue;
-    }
+    // A city changes hands only when nobody is physically defending it. Strike
+    // devastation weakens a garrison in stepCombat, but never bypasses it.
+    const defended = Object.values(session.state.armies).some((other) => (
+      other.id !== army.id && other.ownerCountryId === owner
+      && wrappedDistance(other.x, other.z, army.x, army.z, session.world.width) <= COMBAT_SNAP
+    ));
+    if (defended) continue;
     session.state.provinceOwners[provinceId] = army.ownerCountryId;
     delete session.state.productionQueues[provinceId];
     delete session.state.constructionQueues[provinceId];

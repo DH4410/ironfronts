@@ -30,6 +30,9 @@ import { CombatEffectPool, EFFECT_KIND, effectDensityForDistance } from './comba
 import type { SessionResponse } from '@ironfronts/protocol';
 import { buildArmyCompositionRows, buildArmyFormation } from './army-map-presentation';
 import { ArmyMotionInterpolator } from './army-motion';
+import { buildBattleAnchors, combatHuddleOffset, groupEngagedByFront } from './combat-huddle';
+import { MISSILE_RANGE } from './game/strike';
+import { wrappedDistance, wrappedDeltaX } from './game/geometry';
 
 type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
 
@@ -147,6 +150,13 @@ const debugPlayerForm = required<HTMLFormElement>('debug-player-form');
 
 let lightingClockUnlinked = false;
 let unlinkedLightingMultiplier = 1;
+/** Last server devEnvironment applied locally, so the 400ms HUD poll only
+ *  touches the renderer/audio when a broadcast actually changed something —
+ *  including when this client itself is the one that just sent it. */
+let lastAppliedDevEnvironment: { timeOfDayHours: number | null; raining: boolean } | null = null;
+/** Mirrors units/movement.ts's NAVAL_STATUSES — a stack mid sea-crossing
+ *  can't be moved, attacked with, split, or stopped from the HUD. */
+const NAVAL_TRANSIT_STATUSES = new Set(['embarking', 'atSea', 'disembarking']);
 const debugPlayerInput = required<HTMLInputElement>('debug-player-input');
 const debugWarForm = required<HTMLFormElement>('debug-war-form');
 const debugWarInput = required<HTMLInputElement>('debug-at-war');
@@ -746,12 +756,15 @@ async function startGame(token: number): Promise<void> {
     if (hour !== undefined) {
       setLightingClockUnlinked(true);
       renderer.setTimeOfDay(hour);
+      session.setDevEnvironment({ timeOfDayHours: hour });
     }
   }, attemptListener);
   for (const preset of debugTimePresets) {
     preset.addEventListener('click', () => {
       setLightingClockUnlinked(true);
-      renderer.setTimeOfDay(Number(preset.dataset.debugTime));
+      const hour = Number(preset.dataset.debugTime);
+      renderer.setTimeOfDay(hour);
+      session.setDevEnvironment({ timeOfDayHours: hour });
     }, attemptListener);
   }
   const applyTimeMultiplier = () => {
@@ -767,6 +780,7 @@ async function startGame(token: number): Promise<void> {
     renderer.setRainEnabled(debugRain.checked);
     void audio.setRainEnabled(debugRain.checked);
     uiStore.patch({ weather: { raining: debugRain.checked, label: debugRain.checked ? 'Rain' : 'Clear' } });
+    session.setDevEnvironment({ raining: debugRain.checked });
   }, attemptListener);
   debugThunder.addEventListener('click', () => {
     void audio.playThunder();
@@ -950,6 +964,37 @@ for (const button of debugSimSpeedButtons) {
   });
 }
 
+/**
+ * Apply the server-broadcast debug time-of-day/rain override to this client's
+ * renderer + audio, same as every other connected player sees — mirrors
+ * syncSimSpeedUi's shared-server-state model. Runs every HUD tick but only
+ * touches the renderer when the broadcast value actually changed, so it is a
+ * no-op for a server with no active override (the common case).
+ */
+function syncDevEnvironmentUi(session: RemoteGameSession, renderer: WorldRenderer): void {
+  const next = { timeOfDayHours: session.devTimeOfDayHours, raining: session.devRaining };
+  if (lastAppliedDevEnvironment
+    && lastAppliedDevEnvironment.timeOfDayHours === next.timeOfDayHours
+    && lastAppliedDevEnvironment.raining === next.raining) return;
+  lastAppliedDevEnvironment = next;
+  if (next.timeOfDayHours !== null) {
+    // Inline equivalent of the per-launch setLightingClockUnlinked(true) — that
+    // closure lives inside startGame and isn't reachable from this
+    // module-level function, so mirror its effect directly on the same
+    // module-level state (lightingClockUnlinked, debugTimeUnlink, etc.).
+    lightingClockUnlinked = true;
+    debugTimeUnlink.setAttribute('aria-pressed', 'true');
+    debugTimeUnlink.textContent = 'Relink';
+    debugTimeUnlink.title = 'Relink lighting to the real-life clock';
+    renderer.setTimeMultiplier(unlinkedLightingMultiplier);
+    renderer.setTimeOfDay(next.timeOfDayHours);
+  }
+  renderer.setRainEnabled(next.raining);
+  void audio.setRainEnabled(next.raining);
+  debugRain.checked = next.raining;
+  uiStore.patch({ weather: { raining: next.raining, label: next.raining ? 'Rain' : 'Clear' } });
+}
+
 async function bootstrapGameSession(
   renderer: WorldRenderer, session: RemoteGameSession,
 ): Promise<void> {
@@ -1040,10 +1085,12 @@ async function bootstrapGameSession(
     uiStore.patch({ resources: playerResourceLines(session) });
     syncArmyMarkers(session, renderer);
     syncCombatMarkers(session);
+    spawnOngoingBattleFx(session, renderer);
     refreshSelectedArmy(session);
     refreshSelectedProvince(session); // keep production / construction % live
     drainSessionEvents(session);
     syncSimSpeedUi();
+    syncDevEnvironmentUi(session, renderer);
   }, 400);
   const typingInField = (target: EventTarget | null): boolean => {
     const el = target as HTMLElement | null;
@@ -1228,12 +1275,31 @@ function syncArmyMarkers(
     }
   }
 
+  // Combat huddle (visual only): every engaged army is grouped by the
+  // authoritative battle-front id it reports (not a distance/grid heuristic,
+  // so it can never miss a pair the sim itself considers engaged) and pulled
+  // toward its cluster's centroid, so the army badges below and the
+  // continuous fight FX (spawnOngoingBattleFx, spawned at that same centroid)
+  // converge on the exact same spot instead of drifting apart. The player
+  // projection never ships a front's own x/z, hence the centroid rather than
+  // an authoritative anchor point. session.state.armies is never written
+  // here — only the marker/model scratch buffers this function packs, and
+  // only x/z (not the route target) are nudged.
+  const battleAnchors = buildBattleAnchors(groupEngagedByFront(
+    Object.values(session.state.armies)
+      .filter((a) => a.status === 'engaged')
+      .map((a) => ({
+        id: a.id, x: a.x, z: a.z, ownerCountryId: a.ownerCountryId,
+        frontIds: (a.battleFronts ?? []).map((f) => f.id),
+      })),
+  ));
+
   for (const army of Object.values(session.state.armies)) {
     if (count >= 1_024) break;
     const identified = army.contact === 'visible';
     activeArmyIds.add(army.id);
     if (clusterSuppressed.has(army.id)) continue; // folded into a cluster marker
-    const armyMotion = armyMotionInterpolator.sample(
+    const armyMotionRaw = armyMotionInterpolator.sample(
       army.id,
       army.x,
       army.z,
@@ -1241,6 +1307,20 @@ function syncArmyMarkers(
       motionNow,
       renderer.manifest?.world.width ?? 0,
     );
+    const battleAnchor = army.status === 'engaged' ? battleAnchors.get(army.id) : undefined;
+    const huddle = battleAnchor ? combatHuddleOffset({ x: army.x, z: army.z }, battleAnchor) : null;
+    // Nudge the displayed x/z (and the in-flight motion target, so a stack
+    // still easing toward a waypoint when combat starts doesn't un-huddle
+    // mid-ease) toward the shared battle anchor. remainingMs is untouched.
+    const armyMotion = huddle && (huddle.x !== 0 || huddle.z !== 0)
+      ? {
+          ...armyMotionRaw,
+          x: armyMotionRaw.x + huddle.x,
+          z: armyMotionRaw.z + huddle.z,
+          targetX: armyMotionRaw.targetX + huddle.x,
+          targetZ: armyMotionRaw.targetZ + huddle.z,
+        }
+      : armyMotionRaw;
 
     // Authoritative route polyline for the SELECTED own army only (move = cream,
     // attack = red, retreating = amber). Other armies' routes stay hidden so the
@@ -1512,6 +1592,31 @@ function syncArmyMarkers(
       const CW = 14;
       emitRally(cbx + CW * (rx * C - rz * S), cbz + CW * (rx * S + rz * C), cbx, cbz, 1);
       emitRally(cbx + CW * (rx * C + rz * S), cbz + CW * (-rx * S + rz * C), cbx, cbz, 1);
+    }
+  }
+  // Missile Site range ring(s) — reuses the exact selected-artillery range-ring
+  // mechanism (marker state 3, b.x = radius) while the player is aiming a
+  // strategic strike, or has a friendly Missile Site province selected.
+  const showMissileRange = targetingMode === 'strike'
+    || (selectedProvinceId !== null && session.ownsProvince(selectedProvinceId)
+      && (session.state.provinceBuildings[selectedProvinceId]?.missileSite ?? 0) > 0);
+  if (showMissileRange) {
+    const ownColor = packRgb(session.ownCountry.color);
+    for (const [pidRaw, buildings] of Object.entries(session.state.provinceBuildings)) {
+      if (count >= 1_024) break;
+      if (!buildings.missileSite) continue;
+      const pid = Number(pidRaw);
+      if (session.state.provinceOwners[pid] !== session.playerCountryId) continue;
+      const center = renderer.provinceCenter(pid);
+      if (!center) continue;
+      armyMarkerScratch.fill(0, cursor, cursor + 28);
+      armyMarkerScratch[cursor] = center[0];
+      armyMarkerScratch[cursor + 1] = center[1];
+      armyMarkerScratch[cursor + 2] = ownColor;
+      armyMarkerScratch[cursor + 3] = 3;
+      armyMarkerScratch[cursor + 4] = MISSILE_RANGE;
+      cursor += 28;
+      count += 1;
     }
   }
   renderer.setArmyMarkers(armyMarkerScratch, count, armyPickScratch, armyModelScratch, modelCount);
@@ -1966,11 +2071,15 @@ function refreshSelectedArmy(
       // 'strike' is a nation-level order, not an army targeting mode — the army
       // card never reflects it.
       targetingMode: view.own && targetingMode !== 'strike' ? targetingMode : null,
-      canMove: view.own && view.status !== 'engaged' && view.status !== 'retreating',
-      canAttack: view.own && view.status !== 'engaged' && view.status !== 'retreating',
+      canMove: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+        && !NAVAL_TRANSIT_STATUSES.has(view.status),
+      canAttack: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+        && !NAVAL_TRANSIT_STATUSES.has(view.status),
       canRetreat: view.own && view.status === 'engaged' && Boolean(view.legalRetreatExits?.length),
-      canSplit: view.own && view.status !== 'engaged' && view.status !== 'retreating',
+      canSplit: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+        && !NAVAL_TRANSIT_STATUSES.has(view.status),
       canStop: view.own && view.status !== 'engaged' && view.status !== 'retreating'
+        && !NAVAL_TRANSIT_STATUSES.has(view.status)
         && (Boolean(view.moveOrder) || view.status === 'extracting' || targetingMode !== null),
       legalRetreatExits: view.legalRetreatExits,
       battleFronts: view.battleFronts,
@@ -2073,6 +2182,84 @@ function syncCombatMarkers(session: RemoteGameSession): void {
   combatEffects.syncBattles([...seen.values()]);
 }
 
+/** Per-front cooldowns for the continuous fight FX below. */
+const lastBattleGunfireAt = new Map<string, number>();
+const lastBattleSmokeAt = new Map<string, number>();
+/** Per-province cooldown for the "city under siege" fire/smoke overlay. */
+const lastCityFireAt = new Map<number, number>();
+
+/**
+ * While a battle front is live, spawn continuous gunshot + smoke FX at its
+ * cluster centroid (the same authoritative-front grouping and point the
+ * huddle above pulls every side toward — see groupEngagedByFront) every HUD
+ * tick (called from the same 400ms timer as syncCombatMarkers), instead of
+ * the single one-shot spawnVolley() the 'engaged'/'combatPulse' server events
+ * already trigger. The smoke reuses the same EFFECT_KIND.smoke WGSL
+ * composition as the nuke's smoke stalk, just smaller and spawned
+ * continuously rather than one large mushroom.
+ *
+ * If the fight's centroid sits inside a province that has buildings, this
+ * also lays a couple of fire/smoke puffs near the fight to read as "the city
+ * is burning." This never touches provinceBuildings or any other game-state
+ * field — purely client-side VFX that stops the moment the front resolves.
+ */
+function spawnOngoingBattleFx(session: RemoteGameSession, renderer: WorldRenderer): void {
+  if (effectDensityForDistance(lastCombatCameraDistance) <= 0) return;
+  const now = Date.now();
+  const clusters = groupEngagedByFront(
+    Object.values(session.state.armies)
+      .filter((a) => a.status === 'engaged')
+      .map((a) => ({
+        id: a.id, x: a.x, z: a.z, ownerCountryId: a.ownerCountryId,
+        frontIds: (a.battleFronts ?? []).map((f) => f.id),
+      })),
+  );
+  const activeFronts = new Set<string>();
+  const activeProvinces = new Set<number>();
+  for (const [frontId, cluster] of clusters) {
+    // No owner-diversity check needed: a cluster only exists because some
+    // fully-visible army reported this front id, and a front id only exists
+    // because the sim built a real two-sided fight — so this is always a
+    // genuine clash, even when the other side is only fog-obscured (a
+    // 'contact' stack never reports engaged/battleFronts, so it can't be a
+    // cluster member, but the player's own engaged army still deserves FX).
+    activeFronts.add(frontId);
+    const jitter = (spread: number): number => (Math.random() - 0.5) * spread;
+
+    if (now - (lastBattleGunfireAt.get(frontId) ?? 0) >= 420) {
+      lastBattleGunfireAt.set(frontId, now);
+      combatEffects.spawnVolley('infantry', cluster.x, cluster.z, Math.random() * Math.PI * 2, { now });
+    }
+    if (now - (lastBattleSmokeAt.get(frontId) ?? 0) >= 1_100) {
+      lastBattleSmokeAt.set(frontId, now);
+      combatEffects.spawn(EFFECT_KIND.smoke, cluster.x + jitter(26), cluster.z + jitter(26),
+        { now, scale: 0.9 + Math.random() * 0.4, lifetimeMs: 2_400 });
+    }
+
+    const provinceId = renderer.provinceIdAtWorld(cluster.x, cluster.z);
+    if (provinceId < 0) continue;
+    const buildings = session.state.provinceBuildings[provinceId];
+    const buildingCount = buildings
+      ? buildings.barracks + buildings.tankPlant + buildings.ordnance + buildings.missileSite
+      : 0;
+    if (buildingCount <= 0) continue;
+    activeProvinces.add(provinceId);
+    if (now - (lastCityFireAt.get(provinceId) ?? 0) < 1_600) continue;
+    lastCityFireAt.set(provinceId, now);
+    for (let i = 0; i < 2; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const radius = 30 + Math.random() * 90;
+      const bx = cluster.x + Math.cos(angle) * radius;
+      const bz = cluster.z + Math.sin(angle) * radius;
+      combatEffects.spawn(EFFECT_KIND.smoke, bx, bz, { now, scale: 1.1, lifetimeMs: 3_200 });
+      combatEffects.spawn(EFFECT_KIND.explosion, bx, bz, { now, scale: 0.55, lifetimeMs: 480 });
+    }
+  }
+  for (const id of [...lastBattleGunfireAt.keys()]) if (!activeFronts.has(id)) lastBattleGunfireAt.delete(id);
+  for (const id of [...lastBattleSmokeAt.keys()]) if (!activeFronts.has(id)) lastBattleSmokeAt.delete(id);
+  for (const id of [...lastCityFireAt.keys()]) if (!activeProvinces.has(id)) lastCityFireAt.delete(id);
+}
+
 let campaignOutcomeShown = false;
 /** Enemy country ids whose "take their capital" war-aim has been announced. */
 const announcedWarAims = new Set<number>();
@@ -2140,51 +2327,99 @@ function drainSessionEvents(session: RemoteGameSession): void {
       // and core fireball, a shockwave of dust racing outward along the ground,
       // a stalk of smoke climbing from the impact point (smoke rises with age,
       // so older puffs sit higher), then a slow mushroom cap and lingering haze.
-      combatEffects.spawn(EFFECT_KIND.targetFlash, sx, sz, { scale: 3.0 });
-      combatEffects.spawn(EFFECT_KIND.explosion, sx, sz, { scale: 2.8 });
-      for (let ring = 0; ring < 3; ring += 1) {
-        window.setTimeout(() => {
-          const rad = 40 + ring * 70;
-          for (let k = 0; k < 8; k += 1) {
-            const ang = (k / 8) * Math.PI * 2 + ring * 0.4;
-            combatEffects.spawn(EFFECT_KIND.dust, sx + Math.cos(ang) * rad, sz + Math.sin(ang) * rad,
-              { scale: 1.6 - ring * 0.3, lifetimeMs: 1_600 });
-          }
-        }, 40 + ring * 130);
-      }
-      for (let step = 0; step < 6; step += 1) {
-        window.setTimeout(() => {
-          const jitter = (step % 2 === 0 ? 1 : -1) * (6 + step * 3);
-          combatEffects.spawn(EFFECT_KIND.smoke, sx + jitter, sz - jitter * 0.5,
-            { scale: 1.6 + step * 0.35, lifetimeMs: 6_500 });
-          if (step === 2 || step === 4) {
-            combatEffects.spawn(EFFECT_KIND.explosion, sx + jitter, sz + jitter, { scale: 1.4 });
-          }
-        }, 120 + step * 140);
-      }
-      window.setTimeout(() => {
-        combatEffects.spawn(EFFECT_KIND.smoke, sx, sz, { scale: 4.2, lifetimeMs: 8_000 });
-        for (let k = 0; k < 4; k += 1) {
-          const ang = (k / 4) * Math.PI * 2;
-          combatEffects.spawn(EFFECT_KIND.smoke, sx + Math.cos(ang) * 34, sz + Math.sin(ang) * 34,
-            { scale: 3.0, lifetimeMs: 7_000 });
+      // Held in a closure and fired either immediately or after the travelling
+      // warhead below reaches the target, so the strike reads as something that
+      // actually flew in rather than an instant flash at the target.
+      const detonate = (): void => {
+        combatEffects.spawn(EFFECT_KIND.targetFlash, sx, sz, { scale: 3.0 });
+        combatEffects.spawn(EFFECT_KIND.explosion, sx, sz, { scale: 2.8 });
+        for (let ring = 0; ring < 3; ring += 1) {
+          window.setTimeout(() => {
+            const rad = 40 + ring * 70;
+            for (let k = 0; k < 8; k += 1) {
+              const ang = (k / 8) * Math.PI * 2 + ring * 0.4;
+              combatEffects.spawn(EFFECT_KIND.dust, sx + Math.cos(ang) * rad, sz + Math.sin(ang) * rad,
+                { scale: 1.6 - ring * 0.3, lifetimeMs: 1_600 });
+            }
+          }, 40 + ring * 130);
         }
-      }, 900);
-      // The province keeps smouldering: a lazy plume every few seconds for ~45s
-      // so a freshly struck city reads as devastated well after the blast.
-      for (let wisp = 0; wisp < 9; wisp += 1) {
+        for (let step = 0; step < 6; step += 1) {
+          window.setTimeout(() => {
+            const jitter = (step % 2 === 0 ? 1 : -1) * (6 + step * 3);
+            combatEffects.spawn(EFFECT_KIND.smoke, sx + jitter, sz - jitter * 0.5,
+              { scale: 1.6 + step * 0.35, lifetimeMs: 6_500 });
+            if (step === 2 || step === 4) {
+              combatEffects.spawn(EFFECT_KIND.explosion, sx + jitter, sz + jitter, { scale: 1.4 });
+            }
+          }, 120 + step * 140);
+        }
         window.setTimeout(() => {
-          const drift = (Math.random() - 0.5) * 40;
-          combatEffects.spawn(EFFECT_KIND.smoke, sx + drift, sz + (Math.random() - 0.5) * 40,
-            { scale: 2.0 + Math.random() * 1.4, lifetimeMs: 5_500 });
-        }, 2_500 + wisp * 4_800);
+          combatEffects.spawn(EFFECT_KIND.smoke, sx, sz, { scale: 4.2, lifetimeMs: 8_000 });
+          for (let k = 0; k < 4; k += 1) {
+            const ang = (k / 4) * Math.PI * 2;
+            combatEffects.spawn(EFFECT_KIND.smoke, sx + Math.cos(ang) * 34, sz + Math.sin(ang) * 34,
+              { scale: 3.0, lifetimeMs: 7_000 });
+          }
+        }, 900);
+        // The province keeps smouldering: a lazy plume every few seconds for ~45s
+        // so a freshly struck city reads as devastated well after the blast.
+        for (let wisp = 0; wisp < 9; wisp += 1) {
+          window.setTimeout(() => {
+            const drift = (Math.random() - 0.5) * 40;
+            combatEffects.spawn(EFFECT_KIND.smoke, sx + drift, sz + (Math.random() - 0.5) * 40,
+              { scale: 2.0 + Math.random() * 1.4, lifetimeMs: 5_500 });
+          }, 2_500 + wisp * 4_800);
+        }
+        pushNotification('combat',
+          mine ? 'Strategic strike on our soil' : 'Strategic strike lands',
+          mine ? 'An enemy warhead has devastated one of your provinces.'
+            : 'Your warhead has devastated the target province.',
+          { focus: { x: sx, z: sz } });
+        maybePlayCombatAlert();
+      };
+      // Client-only visual: find the launching country's nearest Missile Site
+      // to the target so the warhead has a place to visibly fly from. Purely
+      // cosmetic re-derivation — the server (src/game/strike.ts) already
+      // validated a real site was in range when it resolved the strike.
+      let launchX: number | undefined;
+      let launchZ: number | undefined;
+      let bestDist = Infinity;
+      const worldWidth = activeRenderer?.manifest?.world.width ?? 0;
+      for (const [pidRaw, buildings] of Object.entries(session.state.provinceBuildings)) {
+        if (!buildings.missileSite) continue;
+        const pid = Number(pidRaw);
+        if (session.state.provinceOwners[pid] !== ev.attacker) continue;
+        const center = activeRenderer?.provinceCenter(pid);
+        if (!center) continue;
+        const d = wrappedDistance(center[0], center[1], sx, sz, worldWidth);
+        if (d < bestDist) { bestDist = d; launchX = center[0]; launchZ = center[1]; }
       }
-      pushNotification('combat',
-        mine ? 'Strategic strike on our soil' : 'Strategic strike lands',
-        mine ? 'An enemy warhead has devastated one of your provinces.'
-          : 'Your warhead has devastated the target province.',
-        { focus: { x: sx, z: sz } });
-      maybePlayCombatAlert();
+      if (launchX !== undefined && launchZ !== undefined) {
+        // A visible warhead travels from the launch site to the target over a
+        // few seconds before the detonation choreography above plays.
+        const travelMs = 2_800;
+        const start = performance.now();
+        const lx = launchX;
+        const lz = launchZ;
+        // Shortest signed X delta, not a raw subtraction — the map wraps
+        // horizontally, and a site near one edge can legitimately be in range
+        // of a target near the other.
+        const dx = wrappedDeltaX(lx, sx, worldWidth);
+        const dz = sz - lz;
+        const dir = Math.atan2(dz, dx);
+        combatEffects.spawn(EFFECT_KIND.muzzleFlash, lx, lz, { dir, scale: 1.4 });
+        const step = (): void => {
+          const t = Math.min(1, (performance.now() - start) / travelMs);
+          const px = lx + dx * t;
+          const pz = lz + dz * t;
+          combatEffects.spawn(EFFECT_KIND.projectile, px, pz, { dir, scale: 1.6, lifetimeMs: 260 });
+          if (t < 1) window.setTimeout(step, 70);
+          else detonate();
+        };
+        step();
+      } else {
+        detonate();
+      }
       continue;
     }
     // World-space visuals for the same event, near-camera only (LOD gated).
@@ -2498,6 +2733,8 @@ function playerResourceLines(session: RemoteGameSession): ResourceLine[] {
     line('stone', 'Stone', s.stone, ext.stone ?? 0),
     line('metal', 'Metal', s.metal, ext.metal ?? 0),
     line('oil', 'Oil', s.oil, ext.oil ?? 0),
+    // Live military headcount — not a stockpile, no rate.
+    line('army', 'Army', session.armySize),
   ];
   // Only surfaced once a warhead is ready — a rare mechanic, not permanent
   // clutter. The chip is the discovery hook for the N-to-strike order.

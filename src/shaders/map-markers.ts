@@ -57,11 +57,20 @@ fn mapMarkerVertex(
   // Keep deposit markers legible through normal gameplay zoom; only fade them
   // approaching strategic altitude so the overview map stays clean.
   let rangeFade = 1.0 - smoothstep(3800.0, 4900.0, zoom);
+  // Deposits are the "send my army here" resource cue — hold them visible much
+  // further out than the generic marker fade so they stay readable while
+  // planning a march from strategic zoom.
+  let depositRangeFade = 1.0 - smoothstep(8200.0, 9800.0, zoom);
   let zoomScale = mix(0.85, 1.15, smoothstep(3600.0, 1000.0, zoom));
 
   var sizePx = 0.0;
   if (kind < 2.5) {
-    sizePx = mix(15.0, 24.0, clamp(richness, 0.0, 1.0));   // stone / metal / oil
+    sizePx = mix(20.0, 32.0, clamp(richness, 0.0, 1.0));   // stone / metal / oil
+    // Gentle per-marker pulse (phased by world position so a field of deposits
+    // doesn't breathe in lockstep) makes them read as "something is here"
+    // rather than a static icon.
+    let pulsePhase = noiseHash(worldXZ) * 6.2831853;
+    sizePx = sizePx * (1.0 + 0.10 * sin(uniforms.sunTime.w * 1.6 + pulsePhase));
   } else if (kind < 3.5) {
     sizePx = 5.5;                                           // road junction dot
   } else {
@@ -72,7 +81,7 @@ fn mapMarkerVertex(
   var output: MarkerOutput;
   output.uv = corner;
   output.kind = kind;
-  output.alpha = rangeFade * (1.0 - horizontalWorldFog(worldPos.x));
+  output.alpha = select(rangeFade, depositRangeFade, kind < 2.5) * (1.0 - horizontalWorldFog(worldPos.x));
   if (clip.w <= 0.0001) {
     output.position = vec4f(0.0, 0.0, -10.0, 1.0);
     output.alpha = 0.0;

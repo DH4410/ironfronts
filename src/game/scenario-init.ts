@@ -28,14 +28,17 @@ import { bootstrapResources, type ResourceBootstrapResult } from './resource-boo
  *
  * Deliberately lean: the opening economy should force real choices (build vs.
  * mobilise vs. bank) in the first weeks rather than letting a player queue
- * everything at once. Roughly a third of the earlier prototype values. Sandbox
- * keeps its own huge stockpile below.
+ * everything at once. Sized against unit-catalog.ts costs so a fresh country
+ * can field a handful of infantry (funds/manpower/food) or, if it saves
+ * everything instead, a single light tank (funds/food, plus metal/oil to
+ * spare) — never a horde, never a dozen tanks. Sandbox keeps its own huge
+ * stockpile below.
  */
 export const SELECTABLE_START_STOCKPILE = {
-  funds: 650, manpower: 450, food: 300, stone: 110, metal: 150, oil: 90,
+  funds: 1_100, manpower: 350, food: 320, stone: 90, metal: 120, oil: 70,
 };
 export const MINOR_START_STOCKPILE = {
-  funds: 400, manpower: 300, food: 220, stone: 75, metal: 95, oil: 55,
+  funds: 700, manpower: 260, food: 220, stone: 70, metal: 85, oil: 55,
 };
 const SANDBOX_STOCKPILE = {
   funds: 99_999, manpower: 99_999, food: 99_999, stone: 99_999, metal: 99_999, oil: 99_999,
