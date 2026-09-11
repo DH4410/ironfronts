@@ -31,6 +31,8 @@ import type { SessionResponse } from '@ironfronts/protocol';
 import { buildArmyCompositionRows, buildArmyFormation } from './army-map-presentation';
 import { ArmyMotionInterpolator } from './army-motion';
 import { buildBattleAnchors, combatHuddleOffset, groupEngagedByFront } from './combat-huddle';
+import { MISSILE_RANGE } from './game/strike';
+import { wrappedDistance, wrappedDeltaX } from './game/geometry';
 
 type BuildingId = 'barracks' | 'tankPlant' | 'ordnance';
 
@@ -1592,6 +1594,31 @@ function syncArmyMarkers(
       emitRally(cbx + CW * (rx * C + rz * S), cbz + CW * (-rx * S + rz * C), cbx, cbz, 1);
     }
   }
+  // Missile Site range ring(s) — reuses the exact selected-artillery range-ring
+  // mechanism (marker state 3, b.x = radius) while the player is aiming a
+  // strategic strike, or has a friendly Missile Site province selected.
+  const showMissileRange = targetingMode === 'strike'
+    || (selectedProvinceId !== null && session.ownsProvince(selectedProvinceId)
+      && (session.state.provinceBuildings[selectedProvinceId]?.missileSite ?? 0) > 0);
+  if (showMissileRange) {
+    const ownColor = packRgb(session.ownCountry.color);
+    for (const [pidRaw, buildings] of Object.entries(session.state.provinceBuildings)) {
+      if (count >= 1_024) break;
+      if (!buildings.missileSite) continue;
+      const pid = Number(pidRaw);
+      if (session.state.provinceOwners[pid] !== session.playerCountryId) continue;
+      const center = renderer.provinceCenter(pid);
+      if (!center) continue;
+      armyMarkerScratch.fill(0, cursor, cursor + 28);
+      armyMarkerScratch[cursor] = center[0];
+      armyMarkerScratch[cursor + 1] = center[1];
+      armyMarkerScratch[cursor + 2] = ownColor;
+      armyMarkerScratch[cursor + 3] = 3;
+      armyMarkerScratch[cursor + 4] = MISSILE_RANGE;
+      cursor += 28;
+      count += 1;
+    }
+  }
   renderer.setArmyMarkers(armyMarkerScratch, count, armyPickScratch, armyModelScratch, modelCount);
   renderer.setOrderRoutes(routeScratch, routeCount);
 }
@@ -2300,51 +2327,99 @@ function drainSessionEvents(session: RemoteGameSession): void {
       // and core fireball, a shockwave of dust racing outward along the ground,
       // a stalk of smoke climbing from the impact point (smoke rises with age,
       // so older puffs sit higher), then a slow mushroom cap and lingering haze.
-      combatEffects.spawn(EFFECT_KIND.targetFlash, sx, sz, { scale: 3.0 });
-      combatEffects.spawn(EFFECT_KIND.explosion, sx, sz, { scale: 2.8 });
-      for (let ring = 0; ring < 3; ring += 1) {
-        window.setTimeout(() => {
-          const rad = 40 + ring * 70;
-          for (let k = 0; k < 8; k += 1) {
-            const ang = (k / 8) * Math.PI * 2 + ring * 0.4;
-            combatEffects.spawn(EFFECT_KIND.dust, sx + Math.cos(ang) * rad, sz + Math.sin(ang) * rad,
-              { scale: 1.6 - ring * 0.3, lifetimeMs: 1_600 });
-          }
-        }, 40 + ring * 130);
-      }
-      for (let step = 0; step < 6; step += 1) {
-        window.setTimeout(() => {
-          const jitter = (step % 2 === 0 ? 1 : -1) * (6 + step * 3);
-          combatEffects.spawn(EFFECT_KIND.smoke, sx + jitter, sz - jitter * 0.5,
-            { scale: 1.6 + step * 0.35, lifetimeMs: 6_500 });
-          if (step === 2 || step === 4) {
-            combatEffects.spawn(EFFECT_KIND.explosion, sx + jitter, sz + jitter, { scale: 1.4 });
-          }
-        }, 120 + step * 140);
-      }
-      window.setTimeout(() => {
-        combatEffects.spawn(EFFECT_KIND.smoke, sx, sz, { scale: 4.2, lifetimeMs: 8_000 });
-        for (let k = 0; k < 4; k += 1) {
-          const ang = (k / 4) * Math.PI * 2;
-          combatEffects.spawn(EFFECT_KIND.smoke, sx + Math.cos(ang) * 34, sz + Math.sin(ang) * 34,
-            { scale: 3.0, lifetimeMs: 7_000 });
+      // Held in a closure and fired either immediately or after the travelling
+      // warhead below reaches the target, so the strike reads as something that
+      // actually flew in rather than an instant flash at the target.
+      const detonate = (): void => {
+        combatEffects.spawn(EFFECT_KIND.targetFlash, sx, sz, { scale: 3.0 });
+        combatEffects.spawn(EFFECT_KIND.explosion, sx, sz, { scale: 2.8 });
+        for (let ring = 0; ring < 3; ring += 1) {
+          window.setTimeout(() => {
+            const rad = 40 + ring * 70;
+            for (let k = 0; k < 8; k += 1) {
+              const ang = (k / 8) * Math.PI * 2 + ring * 0.4;
+              combatEffects.spawn(EFFECT_KIND.dust, sx + Math.cos(ang) * rad, sz + Math.sin(ang) * rad,
+                { scale: 1.6 - ring * 0.3, lifetimeMs: 1_600 });
+            }
+          }, 40 + ring * 130);
         }
-      }, 900);
-      // The province keeps smouldering: a lazy plume every few seconds for ~45s
-      // so a freshly struck city reads as devastated well after the blast.
-      for (let wisp = 0; wisp < 9; wisp += 1) {
+        for (let step = 0; step < 6; step += 1) {
+          window.setTimeout(() => {
+            const jitter = (step % 2 === 0 ? 1 : -1) * (6 + step * 3);
+            combatEffects.spawn(EFFECT_KIND.smoke, sx + jitter, sz - jitter * 0.5,
+              { scale: 1.6 + step * 0.35, lifetimeMs: 6_500 });
+            if (step === 2 || step === 4) {
+              combatEffects.spawn(EFFECT_KIND.explosion, sx + jitter, sz + jitter, { scale: 1.4 });
+            }
+          }, 120 + step * 140);
+        }
         window.setTimeout(() => {
-          const drift = (Math.random() - 0.5) * 40;
-          combatEffects.spawn(EFFECT_KIND.smoke, sx + drift, sz + (Math.random() - 0.5) * 40,
-            { scale: 2.0 + Math.random() * 1.4, lifetimeMs: 5_500 });
-        }, 2_500 + wisp * 4_800);
+          combatEffects.spawn(EFFECT_KIND.smoke, sx, sz, { scale: 4.2, lifetimeMs: 8_000 });
+          for (let k = 0; k < 4; k += 1) {
+            const ang = (k / 4) * Math.PI * 2;
+            combatEffects.spawn(EFFECT_KIND.smoke, sx + Math.cos(ang) * 34, sz + Math.sin(ang) * 34,
+              { scale: 3.0, lifetimeMs: 7_000 });
+          }
+        }, 900);
+        // The province keeps smouldering: a lazy plume every few seconds for ~45s
+        // so a freshly struck city reads as devastated well after the blast.
+        for (let wisp = 0; wisp < 9; wisp += 1) {
+          window.setTimeout(() => {
+            const drift = (Math.random() - 0.5) * 40;
+            combatEffects.spawn(EFFECT_KIND.smoke, sx + drift, sz + (Math.random() - 0.5) * 40,
+              { scale: 2.0 + Math.random() * 1.4, lifetimeMs: 5_500 });
+          }, 2_500 + wisp * 4_800);
+        }
+        pushNotification('combat',
+          mine ? 'Strategic strike on our soil' : 'Strategic strike lands',
+          mine ? 'An enemy warhead has devastated one of your provinces.'
+            : 'Your warhead has devastated the target province.',
+          { focus: { x: sx, z: sz } });
+        maybePlayCombatAlert();
+      };
+      // Client-only visual: find the launching country's nearest Missile Site
+      // to the target so the warhead has a place to visibly fly from. Purely
+      // cosmetic re-derivation — the server (src/game/strike.ts) already
+      // validated a real site was in range when it resolved the strike.
+      let launchX: number | undefined;
+      let launchZ: number | undefined;
+      let bestDist = Infinity;
+      const worldWidth = activeRenderer?.manifest?.world.width ?? 0;
+      for (const [pidRaw, buildings] of Object.entries(session.state.provinceBuildings)) {
+        if (!buildings.missileSite) continue;
+        const pid = Number(pidRaw);
+        if (session.state.provinceOwners[pid] !== ev.attacker) continue;
+        const center = activeRenderer?.provinceCenter(pid);
+        if (!center) continue;
+        const d = wrappedDistance(center[0], center[1], sx, sz, worldWidth);
+        if (d < bestDist) { bestDist = d; launchX = center[0]; launchZ = center[1]; }
       }
-      pushNotification('combat',
-        mine ? 'Strategic strike on our soil' : 'Strategic strike lands',
-        mine ? 'An enemy warhead has devastated one of your provinces.'
-          : 'Your warhead has devastated the target province.',
-        { focus: { x: sx, z: sz } });
-      maybePlayCombatAlert();
+      if (launchX !== undefined && launchZ !== undefined) {
+        // A visible warhead travels from the launch site to the target over a
+        // few seconds before the detonation choreography above plays.
+        const travelMs = 2_800;
+        const start = performance.now();
+        const lx = launchX;
+        const lz = launchZ;
+        // Shortest signed X delta, not a raw subtraction — the map wraps
+        // horizontally, and a site near one edge can legitimately be in range
+        // of a target near the other.
+        const dx = wrappedDeltaX(lx, sx, worldWidth);
+        const dz = sz - lz;
+        const dir = Math.atan2(dz, dx);
+        combatEffects.spawn(EFFECT_KIND.muzzleFlash, lx, lz, { dir, scale: 1.4 });
+        const step = (): void => {
+          const t = Math.min(1, (performance.now() - start) / travelMs);
+          const px = lx + dx * t;
+          const pz = lz + dz * t;
+          combatEffects.spawn(EFFECT_KIND.projectile, px, pz, { dir, scale: 1.6, lifetimeMs: 260 });
+          if (t < 1) window.setTimeout(step, 70);
+          else detonate();
+        };
+        step();
+      } else {
+        detonate();
+      }
       continue;
     }
     // World-space visuals for the same event, near-camera only (LOD gated).
