@@ -32,7 +32,7 @@ describe('camera + order controls', () => {
     expect(main).not.toMatch(/renderer\.focus\(x, z, distance\)\s*;/);
   });
 
-  it('right-click orders the selected army (attack visible hostile, else move)', () => {
+  it('right-click orders the selected army (attack detected hostile, else move)', () => {
     expect(renderer).toContain('onMapCommand?: (clientX: number, clientY: number) => boolean');
     expect(renderer).toMatch(/addEventListener\('contextmenu'[\s\S]{0,120}onMapCommand\?\.\(/);
     const start = main.indexOf('function handleMapCommand(');

@@ -15,6 +15,13 @@ describe('attack-order feedback', () => {
     expect(fn).toContain('cursor-no.png');
   });
 
+  it('lets armed attack mode pass contact-only army targets to the server', () => {
+    const branch = main.slice(main.indexOf("targetingMode === 'attack' && selectedArmyId"), main.indexOf("targetingMode === 'retreat'", main.indexOf("targetingMode === 'attack' && selectedArmyId")));
+    expect(branch).toContain('session.orderAttackArmy(selectedArmyId, targetArmyId, acknowledgeAttack)');
+    expect(branch).not.toContain("pickedTarget.contact !== 'visible'");
+    expect(branch).not.toContain('Only a force in direct view can be attacked');
+  });
+
   it('drives distinct world cursors for rally placement and ground-order aiming', () => {
     const fn = main.slice(main.indexOf('const updateWorldCursor ='), main.indexOf('canvas.addEventListener(\'pointermove\''));
     expect(fn).toContain('cursors/cursor-rally.png');

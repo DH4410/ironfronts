@@ -1822,13 +1822,6 @@ function handleMapClick(
   if (targetingMode === 'attack' && selectedArmyId && session.ownsArmy(selectedArmyId)) {
     const targetArmyId = renderer.pickArmyAt(clientX, clientY);
     const pickedTarget = targetArmyId && targetArmyId !== selectedArmyId ? session.army(targetArmyId) : null;
-    if (pickedTarget && !pickedTarget.own && pickedTarget.contact !== 'visible') {
-      pushNotification('warning', 'Target not identified',
-        'Only a force in direct view can be attacked. Move a unit into contact first.');
-      targetingMode = null;
-      refreshSelectedArmy(session);
-      return true;
-    }
     // Fired once the server accepts the order — which is *after* any "Declare
     // war?" confirmation but still before combat opens. Do not run it
     // before acceptance: a cancelled war declaration must not leave the player
@@ -1925,7 +1918,7 @@ function describeOrderFailure(reason: string): { title: string; body?: string } 
 }
 
 /**
- * Right-click order for the selected army: attack a visible hostile army under
+ * Right-click order for the selected army: attack a detected hostile army under
  * the cursor, otherwise move to the ground point. War confirmation and routing
  * rules are the same ones the armed Move/Attack buttons use — this is just a
  * faster way to reach them.
@@ -1952,13 +1945,6 @@ function handleMapCommand(
       if (!result.ok) orderFeedback(result.reason ?? 'Invalid target.');
       refreshSelectedArmy(session);
       if (activeRenderer) syncArmyMarkers(session, activeRenderer);
-      return true;
-    }
-    if (target && !target.own) {
-      // An unidentified contact: don't strike it (that would confirm its exact
-      // position) and don't silently march onto it either.
-      pushNotification('warning', 'Target not identified',
-        'Only a force in direct view can be attacked. Move a unit into contact first.');
       return true;
     }
   }
