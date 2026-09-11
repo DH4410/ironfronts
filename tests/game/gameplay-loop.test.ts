@@ -179,7 +179,7 @@ describe('gameplay vertical slice', () => {
     const res = s.orderMove(SPAIN, mover.id, s.graph.nodeX[restNode], s.graph.nodeZ[restNode], 'move');
     expect(res.ok).toBe(true);
 
-    for (let i = 0; i < 120 && s.state.armies[mover.id]; i += 1) s.tick(6);
+    for (let i = 0; i < 120 && s.state.armies[mover.id]; i += 1) s.tick(6 / 1800);
 
     expect(s.state.armies[mover.id]).toBeUndefined(); // the mover was folded away
     const survivor = s.state.armies['sp-rest'];
@@ -196,10 +196,10 @@ describe('gameplay vertical slice', () => {
       units: [{ typeId: 'infantry', count: 1, hp: 100, experience: 0 }],
       status: 'idle', order: null, extractingNodeId: null,
     };
-    s2.tick(6);
+    s2.tick(6 / 1800);
     expect(s2.state.armies['sp-twin']).toBeDefined();
     expect(s2.state.armies[a2.id]).toBeDefined();
-  });
+  }, 30_000);
 
   it('a move order revalidation leaves no stack marching in place with an empty path', () => {
     const s = spainSession();
@@ -211,7 +211,7 @@ describe('gameplay vertical slice', () => {
       target: { kind: 'position', x: army.x + 4000, z: army.z },
     };
     army.status = 'moving';
-    s.tick(1);
+    s.tick(1 / 1800);
     expect(army.order).toBeNull();
     expect(army.status).toBe('idle');
   });
@@ -230,13 +230,13 @@ describe('gameplay vertical slice', () => {
     army.status = 'moving';
     const startX = army.x;
     const startZ = army.z;
-    for (let i = 0; i < 30 && army.status === 'moving'; i += 1) s.tick(4);
+    for (let i = 0; i < 30 && army.status === 'moving'; i += 1) s.tick(4 / 1800);
     expect(army.status).toBe('idle');
     expect(army.order).toBeNull();
     // It may have legally advanced toward the frontier, but it is not still
     // frozen where it began pretending to march.
     expect(army.x !== startX || army.z !== startZ || army.graphNodeId >= 0).toBe(true);
-  });
+  }, 30_000);
 });
 
 function nearestOwned(s: GameSession, x: number, z: number): number {

@@ -23,7 +23,7 @@ import type { BuildingId } from './units/unit-types';
 interface BuildingDef {
   readonly label: string;
   readonly cost: Partial<Stockpile>;
-  /** Real build time in game-hours; divided by BUILD_TIME_SCALE in play. */
+  /** Final build duration on the authoritative game-hours timeline. */
   readonly buildTimeHours: number;
 }
 

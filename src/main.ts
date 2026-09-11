@@ -46,9 +46,7 @@ const buildingCostLabel = (id: BuildingId): string => Object.entries((activeSess
   .map(([k, v]) => `${v} ${k}`).join(' · ');
 const orderPercent = (o: { progressHours: number; totalHours: number }): number =>
   o.totalHours > 0 ? Math.min(99, Math.floor((o.progressHours / o.totalHours) * 100)) : 0;
-/** Simulation runs at a fixed 0.05 game-hour / 100ms tick — 0.5 game-hours
- *  per real second at normal (1x, production) speed. Dev-only sim speed-ups
- *  are server-side and invisible here, so this is a normal-play estimate. */
+/** At normal speed one real second advances one authoritative game second. */
 const GAME_HOURS_PER_REAL_SECOND = 1 / 3_600;
 const orderEtaSeconds = (o: { progressHours: number; totalHours: number }): number =>
   activeSession?.devSimSpeed === 0 ? Infinity

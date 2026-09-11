@@ -56,6 +56,13 @@ export function parseGameState(input: unknown, initialEpochMs = INITIAL_GAME_EPO
     for (const country of Object.values(parsed.countries)) {
       for (const key of Object.keys(country.income) as Array<keyof typeof country.income>) country.income[key] *= PROTOTYPE_HOURS_PER_HOUR;
     }
+    for (const provinceId of Object.keys(parsed.provinceDevastation)) {
+      parsed.provinceDevastation[provinceId] /= PROTOTYPE_HOURS_PER_HOUR;
+    }
+    if (parsed.outcome) parsed.outcome.atGameHours /= PROTOTYPE_HOURS_PER_HOUR;
+    for (const army of Object.values(parsed.armies)) {
+      if (army.navalCrossing) army.navalCrossing.hoursRemaining /= PROTOTYPE_HOURS_PER_HOUR;
+    }
   }
   parsed.clock.initialEpochMs ??= initialEpochMs;
   parsed.clock.generation ??= 0;

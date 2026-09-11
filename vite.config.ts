@@ -7,6 +7,9 @@ export default defineConfig({
   test: {
     testTimeout: 15_000,
     hookTimeout: 60_000,
+    // Full-world simulation cases are CPU-heavy and synchronous. A small pool
+    // prevents worker RPC heartbeats from being starved under local contention.
+    maxWorkers: 4,
   },
   publicDir: false,
   plugins: [viteStaticCopy({ targets: [

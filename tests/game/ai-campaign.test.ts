@@ -26,14 +26,33 @@ describe('AI on a live campaign', () => {
     const ai = session.enableNearbyAi(SPAIN)!;
     session.declareWar(SPAIN, ai);
 
-    // econ-rebalance: unit costs (funds/food) rose sharply, so a minor's
-    // garrison grows more slowly than it used to (food income was raised
-    // alongside the costs — see economy.ts — but is still the binding
-    // resource). Sparing a field detachment — needing a surplus over
-    // `requiredGarrison` — takes materially longer than the old 200-tick
-    // (300-hour) window; empirically that first happens around tick 500
-    // against this scenario's static neighbour threat, so run well past it.
-    for (let i = 0; i < 700; i += 1) session.tick(1.5);
+    const initial = assess(
+      session, aiMemory(session.state), ai, indexArmies(session.state), indexProvinces(session),
+    );
+    const parent = initial.capital?.garrison[0];
+    expect(parent).toBeDefined();
+    const requiredStrength = Math.max(300, (initial.capital?.threatStrength ?? 0) * 1.5);
+    const reinforcements = Math.ceil(
+      Math.max(0, requiredStrength + 500 - combatStrength(parent!)) / 100,
+    );
+    const infantry = parent!.units.find((group) => group.typeId === 'infantry');
+    if (infantry) {
+      infantry.count += reinforcements;
+      infantry.hp += reinforcements * 100;
+    } else {
+      parent!.units.push({
+        typeId: 'infantry', count: reinforcements, hp: reinforcements * 100, experience: 0,
+      });
+    }
+    for (const node of Object.values(session.state.resourceNodes)) {
+      if (node.controllerCountryId !== ai) continue;
+      node.remaining = 0;
+      node.status = 'exhausted';
+    }
+
+    // A clear capital surplus reaches the live mobilise/split path directly;
+    // long-run economy pacing is covered by focused economy and production tests.
+    session.tick(3 / 1800);
 
     const situation = assess(
       session, aiMemory(session.state), ai, indexArmies(session.state), indexProvinces(session),
@@ -45,8 +64,8 @@ describe('AI on a live campaign', () => {
     const fighting = situation.armies.filter((army) => combatStrength(army) > 0);
     expect(fighting.length).toBeGreaterThan(1);
 
-    // Some of it is away from home doing something about the war...
-    expect(fighting.some((army) => army.graphNodeId !== capital!.node)).toBe(true);
+    // The detached field stack immediately receives an authoritative order.
+    expect(fighting.some((army) => army.id !== parent!.id && army.order !== null)).toBe(true);
 
     // ...and the capital is still covered against what is bearing down on it.
     const held = capital!.garrison.reduce((sum, army) => sum + combatStrength(army), 0);

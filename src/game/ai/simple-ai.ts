@@ -33,6 +33,7 @@ import {
   CONTACT_RADIUS, aiMemory, assess, combatStrength, indexArmies, indexProvinces,
   provinceNode, strengthNear, type AiMemory, type Assessment, type CityStatus,
 } from './assessment';
+import { PROTOTYPE_HOURS_PER_HOUR } from '../time';
 
 /** A threatened city keeps this much more weight than is bearing down on it. */
 const DEFENCE_MARGIN = 1.5;
@@ -63,10 +64,10 @@ const OBJECTIVE_TRIES = 3;
  * deliberately module-private — keep the two in step if that one is retuned.
  */
 const MISSILE_RANGE = 3200;
-/** At most one strike per country per ~10 game-days. */
-const STRIKE_COOLDOWN_HOURS = 240;
-/** At most one peace offer per country per ~2 game-weeks. */
-const PEACE_OFFER_COOLDOWN_HOURS = 336;
+/** Preserve the prototype's ten-day strike pacing on the 1:1 timeline. */
+const STRIKE_COOLDOWN_HOURS = 240 / PROTOTYPE_HOURS_PER_HOUR;
+/** Preserve the prototype's two-week peace-offer pacing on the 1:1 timeline. */
+const PEACE_OFFER_COOLDOWN_HOURS = 336 / PROTOTYPE_HOURS_PER_HOUR;
 /** Wars being fought at once before peace looks better than pride. */
 const MULTI_FRONT_WARS = 3;
 

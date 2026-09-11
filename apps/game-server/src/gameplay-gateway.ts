@@ -74,6 +74,7 @@ export class GameplayGateway {
 
   closeAll(code = 1001, reason = 'Server shutting down'): void {
     for (const socket of this.sockets.clients) socket.close(code, reason);
+    this.sockets.close();
   }
 
   private sendSocket(socket: WebSocket, message: ServerMessage): boolean {

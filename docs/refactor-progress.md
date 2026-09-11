@@ -36,8 +36,8 @@ Scope: approved audit items 1–28. This code pass is complete. It deliberately 
 
 - Server scheduling and projection publication are separate from process composition.
 - Combat is divided into damage, fronts, retreat, artillery, capture, constants, and event types.
-- Movement is divided into orders, policy, position, speed, contact, pursuit, retreat, heap routing, and spatial indexing.
-- Client army presentation and CPU picking, UI queue rendering, and renderer road-junction generation are separate modules. Architecture tests reject cycles and presentation dependencies in the authoritative game layer.
+- Movement is divided into orders, policy, position, speed, contact, pursuit, naval transit, retreat, heap routing, and spatial indexing.
+- CPU picking, queue grouping, and renderer road-junction generation are separate modules. Architecture tests reject cycles and presentation dependencies in the authoritative game layer.
 - Superseded overloads, local rule duplication, obsolete audit artifacts, and the protocol-v2 document were removed. Current protocol, simulation, persistence, architecture, deployment, and validation docs describe the resulting behavior.
 
 ## Compatibility and validation
@@ -46,8 +46,8 @@ Protocol and game-state versions are 3; the game ruleset is `world-at-war@3`. Sa
 
 Final code validation:
 
-- `npm run check`: workspace/root TypeScript, script lint, architecture checks, and 420 tests across 77 files passed.
-- `npx vite build`: production client build passed.
+- `npm run check`: workspace/root TypeScript, script lint, architecture checks, and 550 tests across 90 files passed.
+- `npm run build`: generated-world, workspace TypeScript, and production client builds passed.
 - `git diff --check`: passed; only configured LF-to-CRLF working-tree notices were emitted.
 
 No visual tests, deployment, manual live-save edits, or army model asset changes were performed.

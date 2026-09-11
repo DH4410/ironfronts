@@ -58,7 +58,7 @@ export interface UnitType {
   /** Engagement radius for ranged support units; melee units use 0 (artillery). */
   readonly engagementRange: number;
   readonly cost: ResourceCost;
-  /** Build time in game-hours at a level-1 building (uses accelerated values). */
+  /** Build time in authoritative game-hours at a level-1 building. */
   readonly buildTimeHours: number;
   readonly requiredBuilding: BuildingId;
   /** Relative signature weight for "strongest unit on the stack" selection. */
