@@ -707,8 +707,10 @@ async function startGame(token: number): Promise<void> {
     }
     // Prefer authoritative, fog-aware GameState detail once the session exists.
     const session = activeSession;
+    const isNewProvinceSelection = info.id !== selectedProvinceId;
     if (session) {
-      if (info.id !== selectedProvinceId) awaitingRallyTarget = false;
+      if (isNewProvinceSelection) awaitingRallyTarget = false;
+      if (isNewProvinceSelection) void audio.playUiCue('select');
       selectedProvinceId = info.id;
       selectedProvinceName = info.name;
       selectedProvinceTerrain = info.terrain;

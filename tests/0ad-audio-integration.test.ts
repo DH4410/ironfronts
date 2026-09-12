@@ -15,6 +15,13 @@ describe('0 A.D. audio integration', () => {
     expect(main).toContain("audio.playUiCue('move')");
   });
 
+  it('plays the selection cue when a newly selected city changes', () => {
+    const start = main.indexOf('renderer.onProvinceSelected');
+    const provinceSelection = main.slice(start, main.indexOf('renderer.onTimeOfDayChange', start));
+
+    expect(provinceSelection).toContain('const isNewProvinceSelection = info.id !== selectedProvinceId;');
+    expect(provinceSelection).toContain("if (isNewProvinceSelection) void audio.playUiCue('select');");
+  });
   it('plays licensed end-state and close-battle cues through the SFX bus', () => {
     expect(audio).toContain("victory: { url: '/audio/sfx/0ad-victory.ogg'");
     expect(audio).toContain("defeat: { url: '/audio/sfx/0ad-defeat.ogg'");
