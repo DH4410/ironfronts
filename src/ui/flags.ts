@@ -5,8 +5,8 @@
  * entries point at historically appropriate art for that date, not modern flags:
  *  - Sovereign belligerents get their 1939 flag (the Kingdom of Italy, the
  *    1935-1945 German flag, imperial Persia's Lion and Sun, and so on).
- *  - Real colonies / mandates resolve to the flag of the power that actually
- *    administered them in 1939 (French, British, Belgian, Portuguese, Italian).
+ *  - Real 1939 states/protectorates use period art where reliable art exists.
+ *    Colonies without a distinct period flag use the administering power's flag.
  *  - Fictional gameplay subdivisions (US states, Brazilian regions, Soviet
  *    oblasts, warlord cliques) intentionally resolve to `null` and render a
  *    colour *standard* — a deliberate scenario fallback, never an invented flag.
@@ -30,7 +30,7 @@ const COUNTRY_FLAG: Record<string, string> = {
   // --- sovereign belligerents, 1939 flags ---
   Germany: 'de-1935-1945',
   Italy: 'it-1861-1946',
-  Spain: 'es', // Nationalist state flag (1938-45) still to be vendored — see docs/flags.md
+  Spain: 'es-1938-1945',
   Greece: 'gr-1935-1970',
   Yugoslavia: 'yu-1918-1941',
   Romania: 'ro', // civil tricolour; royal-arms variant not yet vendored
@@ -49,7 +49,7 @@ const COUNTRY_FLAG: Record<string, string> = {
   Japan: 'jp',
   Sweden: 'se',
   'New Zealand': 'nz',
-  'Saudi Arabia': 'sa',
+  'Saudi Arabia': 'sa', // TODO: exact 1938-1973 calligraphy variant remains a follow-up
   Portugal: 'pt',
   Belgium: 'be',
   Netherlands: 'nl',
@@ -62,9 +62,30 @@ const COUNTRY_FLAG: Record<string, string> = {
   Iceland: 'is',
   Bulgaria: 'bg',
   Czechoslovakia: 'cz',
+  Lithuania: 'lt-1918-1940',
+  Panama: 'pa',
+  Venezuela: 've-1930-2006',
+  Colombia: 'co',
+  Ecuador: 'ec',
+  Peru: 'pe-civil',
+  Uruguay: 'uy',
+  Chile: 'cl',
+  Bolivia: 'bo-1851',
+  Morocco: 'ma',
+  Tunisia: 'tn',
+  Liberia: 'lr',
+  Afghanistan: 'af-1931-1973',
+  Nepal: 'np-pre1962',
+  Siam: 'th',
+  Oman: 'om-muscat',
+  Syria: 'sy-1930-1958',
+  Tibet: 'tibet-1916-1951',
+  Philippines: 'ph-1936-1985',
+  Brunei: 'brunei-1906-1959',
 
-  // --- puppet state ---
+  // --- puppet / collaboration states ---
   Manchukuo: 'manchukuo',
+  Mengjiang: 'mengjiang-1939-1945',
 
   // --- real 1939 colonies / mandates: administering power's flag ---
   Libya: 'it-1861-1946',
@@ -76,7 +97,6 @@ const COUNTRY_FLAG: Record<string, string> = {
   'Upper Volta': 'fr',
   'Equatorial Gabon': 'fr',
   Madagascar: 'fr',
-  Syria: 'fr',
   Indochina: 'fr',
   Nigeria: 'gb',
   Bechuanaland: 'gb',
@@ -88,6 +108,42 @@ const COUNTRY_FLAG: Record<string, string> = {
   'British Odisha': 'gb',
   'North Sudan': 'gb',
   'South Sudan': 'gb',
+
+  // --- additional 1939 colonial / territorial administration markers ---
+  Guyana: 'gb', // British Guiana
+  'Río de Oro': 'es-1938-1945', // Spanish Sahara
+  'Portuguese Guinea': 'pt',
+  'French Niger': 'fr',
+  Cameroon: 'fr', // this map entity is primarily French Cameroun
+  'Equatorial Chad': 'fr',
+  'South West Africa': 'za-1928-1994',
+  'Saint Helena': 'gb',
+  Mozambique: 'pt',
+  'Northern Rhodesia': 'gb',
+  Kenya: 'gb',
+  Somalia: 'it-1861-1946',
+  Eritrea: 'it-1861-1946',
+  Bangladesh: 'gb', // British India / Bengal gameplay region
+  'Papua New Guinea': 'au',
+  Sumatra: 'nl',
+  'Nusa Tenggara': 'nl',
+  Greenland: 'dk',
+  Falkland: 'gb',
+  'New Foundland': 'gb',
+  'Galápagos': 'ec',
+  Tahiti: 'fr',
+  Malta: 'gb',
+  Malaysia: 'gb',
+  Palau: 'jp',
+  Mariana: 'jp',
+  Micronesia: 'jp',
+  'New Caledonia': 'fr',
+  Fiji: 'gb',
+  Samoa: 'nz',
+  Solomon: 'gb',
+  Okinawa: 'jp',
+  Kuril: 'jp',
+  Ceylon: 'gb',
 };
 
 export function resolveFlagUrl(country: string | null | undefined): string | null {
