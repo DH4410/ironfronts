@@ -24,6 +24,7 @@ function pointProvince(ids, x, y) {
 const ARCHETYPE_FOOTPRINT_HALF = {
   0: { x: 0.56, z: 0.56 }, 1: { x: 0.62, z: 0.56 }, 2: { x: 0.56, z: 0.56 },
   3: { x: 0.7, z: 0.5 }, 4: { x: 0.5, z: 0.5 },
+  5: { x: 0.46, z: 0.6 }, 6: { x: 0.66, z: 0.52 }, 7: { x: 0.5, z: 0.5 },
 };
 const LARGE_ARCHETYPE_COAST_SETBACK = 3.0;
 const SMALL_ARCHETYPE_COAST_SETBACK = 0.75;
@@ -78,7 +79,7 @@ function pickTreePalette(rng, visual, isPlain) {
   return rng() < 0.48 ? 1 : 0;
 }
 
-export function buildInstances(provinces, geometryById, provinceIds, areaCounts, roadClearance, cityPlans) {
+export function buildInstances(provinces, geometryById, provinceIds, areaCounts, roadClearance, cityPlans, capitalProvinceIds = new Set()) {
   const trees = [];
   const buildings = [];
   let rejectedCoastalFootprints = 0;
@@ -122,12 +123,28 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
 
     if (province.terrain_type_id !== 14) continue;
     const populationScale = Math.log10(Math.max(1_000, province.population ?? 1_000));
+    const isCapital = capitalProvinceIds.has(province.province_id);
     // Keep map-scale towns readable while giving their street plans a little
     // more life. Small provinces (islands like Taiwan) still scale down hard.
+    // A capital gets a straightforward density boost — both a higher count
+    // ceiling and a slightly wider placement radius, since raising the count
+    // alone would just burn placement attempts against the existing radius
+    // and land close to the same number of buildings.
     const areaFactor = clamp(Math.sqrt(area) / 24, 0.3, 1);
-    const target = Math.max(3, Math.round(clamp(Math.round((populationScale - 3) * 11.2), 6, 34) * areaFactor));
+    const capitalBonus = isCapital ? 1.6 : 1;
+    const target = Math.max(3, Math.round(
+      clamp(Math.round((populationScale - 3) * 11.2), 6, isCapital ? 50 : 34) * areaFactor * capitalBonus,
+    ));
     const plan = cityPlans.get(province.province_id);
-    const radius = plan?.radius ?? clamp(Math.sqrt(Math.max(30, area)) * 1.7, 7, 30);
+    const baseRadius = plan?.radius ?? clamp(Math.sqrt(Math.max(30, area)) * 1.7, 7, 30);
+    const radius = isCapital ? baseRadius * 1.25 : baseRadius;
+    // Per-city cosmetic identity, drawn once per province (not per building)
+    // so neighbouring cities of the same biome still look different from
+    // each other — one town leans industrial, another leans war-damaged —
+    // without needing any per-city metadata beyond this province's own seed.
+    const industrialBias = rng();
+    const ruinBias = rng();
+    const churchBias = rng();
     const placedBuildings = [];
     for (let attempt = 0, placed = 0; attempt < target * 90 && placed < target; attempt += 1) {
       const street = plan?.streets[Math.floor(rng() * plan.streets.length)];
@@ -157,12 +174,18 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
       if (roadClearance[roadIndex] > 178) continue;
       const centerBias = 1 - distance / radius;
       let archetype;
-      if (placed === 0 && populationScale > 5.35) archetype = 4;
+      // A capital always gets its civic landmark on the first building placed,
+      // regardless of population — otherwise a modest-population capital
+      // could end up with no landmark at all.
+      if (placed === 0 && (isCapital || populationScale > 5.35)) archetype = 4;
+      else if (rng() < 0.04 + churchBias * 0.05) archetype = 5;
+      else if (rng() < 0.08 + industrialBias * 0.22) archetype = 6;
+      else if (rng() < 0.05 + ruinBias * 0.18) archetype = 7;
       else if (rng() < 0.10) archetype = 3;
       else if (visual === 'Desert' || visual === 'Sand Dunes' || visual === 'Mediterranean') archetype = rng() < 0.72 ? 2 : 1;
       else archetype = rng() < 0.46 ? 0 : rng() < 0.72 ? 1 : 2;
-      const sx = archetype === 3 ? 5.4 + rng() * 5.2 : 2.5 + rng() * 5.6;
-      const sz = archetype === 3 ? 4.8 + rng() * 5.8 : 2.5 + rng() * 5.8;
+      const sx = archetype === 3 ? 5.4 + rng() * 5.2 : archetype === 6 ? 4.5 + rng() * 5.0 : 2.5 + rng() * 5.6;
+      const sz = archetype === 3 ? 4.8 + rng() * 5.8 : archetype === 6 ? 3.8 + rng() * 4.5 : 2.5 + rng() * 5.8;
       // Real gap between buildings instead of near-overlap, so the cluster
       // reads as spaced structures rather than one merged mass.
       if (placedBuildings.some((other) => Math.hypot(other.x - x, other.y - y) < (other.radius + Math.max(sx, sz)) * 0.62)) continue;
@@ -174,6 +197,15 @@ export function buildInstances(provinces, geometryById, provinceIds, areaCounts,
       let sy = 4.2 + rng() * 7.5 + Math.max(0, centerBias) * Math.max(0, populationScale - 4) * 3.6;
       if (archetype === 4) sy *= 1.55;
       if (archetype === 3) sy *= 0.68;
+      // Church spire: a modest boost on top of the mesh's own tall local
+      // extent so it reads as a distinct town landmark (~45-50px tall at
+      // minimum camera zoom, vs ~25px for an ordinary building) without
+      // competing with the capital's archetype-4 landmark (~60px+). Factory
+      // (6) and ruins (7) get no multiplier here — their silhouette comes
+      // from the mesh shape itself (see scene-meshes.ts); stacking another
+      // height multiplier on top of the shared map-scale compression was
+      // tried for ruins and worked out to a few pixels, i.e. invisible.
+      if (archetype === 5) sy *= 1.15;
       const palette = visual === 'Desert' || visual === 'Sand Dunes' ? 1 : visual === 'Mediterranean' ? 2 : visual === 'Boreal' || visual === 'Tundra' ? 3 : 0;
       buildings.push(x, y, sx, sy, sz, angle + (rng() - 0.5) * 0.08, palette + 0.72 + rng() * 0.24, archetype);
       placedBuildings.push({ x, y, radius: Math.max(sx, sz) });

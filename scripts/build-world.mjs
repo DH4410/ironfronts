@@ -296,10 +296,14 @@ async function main() {
   for (let index = 0; index < placementClearance.length; index += 1) {
     placementClearance[index] = Math.max(placementClearance[index], waterways.clearance[index], visualRivers.clearance[index]);
   }
-  const generatedInstances = buildInstances(metadata.provinces, geometryById, provinceIds, areaCounts, placementClearance, infrastructure.cityPlans);
+  const capitalProvinceIds = new Set(countries.map((country) => country.capitalProvinceId));
+  console.log(`Marking ${capitalProvinceIds.size} capital provinces for a building-density boost.`);
+  const generatedInstances = buildInstances(
+    metadata.provinces, geometryById, provinceIds, areaCounts, placementClearance, infrastructure.cityPlans, capitalProvinceIds,
+  );
   console.log(`Rejected ${generatedInstances.audit.rejectedCoastalFootprints} building footprints overlapping open water across ${generatedInstances.audit.coastalProvincesAffected} coastal provinces.`);
   const treeChunks = chunkInstanceRecords(generatedInstances.trees, (data, offset) => data[offset + 3] === 2 ? 1 : 0, 2);
-  const buildingChunks = chunkInstanceRecords(generatedInstances.buildings, (data, offset) => Math.round(data[offset + 7]), 5);
+  const buildingChunks = chunkInstanceRecords(generatedInstances.buildings, (data, offset) => Math.round(data[offset + 7]), 8);
   const lampChunks = chunkInstanceRecords(infrastructure.lamps);
   const barrierChunks = chunkInstanceRecords(infrastructure.barriers);
   const signChunks = chunkInstanceRecords(infrastructure.signs);

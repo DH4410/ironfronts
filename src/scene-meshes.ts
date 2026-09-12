@@ -84,7 +84,7 @@ export function createBuildingArchetypeMesh(device: GPUDevice, archetype: number
     builder.addBox(-0.56, 0, -0.42, 0.56, 1.02, 0.42, 0);
     builder.addGableRoof(-0.62, 1.02, -0.48, 0.62, lod === 0 ? 1.28 : 1.2, 0.48, 1);
     if (lod === 0) builder.addBox(-0.7, 0, -0.36, 0.7, 0.4, 0.36, 2, 2);
-  } else {
+  } else if (archetype === 4) {
     // Landmark archetype: this one gets much less of the map-scale shrink
     // (see BUILDING_FOOTPRINT_SCALE in shaders/props.ts), so it needs to read
     // as a substantial civic building, not just a tall narrow spire — a wide
@@ -98,6 +98,42 @@ export function createBuildingArchetypeMesh(device: GPUDevice, archetype: number
     builder.addBox(-0.58, 0, -0.5, 0.58, 1.05, 0.5, 0);
     builder.addGableRoof(-0.64, 1.05, -0.56, 0.64, lod === 0 ? 1.4 : 1.32, 0.56, 1);
     if (lod === 0) builder.addBox(-0.15, 1.4, -0.15, 0.15, 1.8, 0.15, 3, 3);
+  } else if (archetype === 5) {
+    // Chapel/church: a war-torn European town's most recognisable landmark
+    // after the capital's civic building. Only materials 0 (wall) and 1
+    // (roof) are used, same as every other non-4/non-3 archetype, so no
+    // shader gating changes are needed. The spire is the whole point of this
+    // archetype — at this game's fixed strategic camera a building's fine
+    // detail never reads (verified: ~15-40px tall on screen even at minimum
+    // zoom), so the differentiator has to be silhouette height, not geometry
+    // count. instances.mjs gives this archetype a modest sy boost (1.15x) on
+    // top of the spire's own tall local extent so it actually reads taller
+    // than an ordinary building rather than blending in.
+    builder.addBox(-0.32, 0, -0.46, 0.32, 1.05, 0.46, 0);
+    builder.addGableRoof(-0.38, 1.05, -0.52, 0.38, lod === 0 ? 1.35 : 1.26, 0.52, 1);
+    if (lod === 0) builder.addCone(0, 1.35, -0.30, 0.15, 2.0, 6, 1);
+  } else if (archetype === 6) {
+    // Industrial hall: wide, low, flat-roofed, with one or two chimneys — a
+    // war-economy factory silhouette. No extra sy multiplier in
+    // instances.mjs; the low wide box plus thin chimney pokes create the
+    // distinct shape without fighting BUILDING_HEIGHT_SCALE.
+    builder.addBox(-0.56, 0, -0.42, 0.56, 0.62, 0.42, 0);
+    builder.addBox(-0.58, 0.62, -0.44, 0.58, 0.70, 0.44, 1, 1);
+    if (lod === 0) {
+      builder.addCone(-0.30, 0.70, 0.10, 0.05, 1.15, 8, 1);
+      builder.addCone(0.15, 0.70, -0.10, 0.06, 1.32, 8, 1);
+    }
+  } else {
+    // Ruins (archetype 7, final catch-all): a bombed-out shell — flat-topped,
+    // roofless main block plus one asymmetric surviving wall stub, instead of
+    // a clean gable. No extra sy multiplier: an earlier draft shrank this
+    // archetype's height on top of the shared BUILDING_HEIGHT_SCALE
+    // compression and worked out to a ~5px sliver at the game's minimum
+    // camera distance — invisible, not "ruined". Keeping full height and
+    // relying on the missing-roof/asymmetric-stub shape is what actually
+    // reads at this scale.
+    builder.addBox(-0.42, 0, -0.42, 0.42, 0.68, 0.42, 0);
+    builder.addBox(-0.16, 0.68, -0.38, 0.20, 1.05, -0.10, 0);
   }
   return uploadMesh(device, `building archetype ${archetype} lod ${lod}`, new Float32Array(builder.vertices), new Uint16Array(builder.indices));
 }

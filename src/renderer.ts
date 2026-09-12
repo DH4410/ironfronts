@@ -616,7 +616,10 @@ export class WorldRenderer {
       waterwayIndexBuffer, this.manifest.buffers.waterwayIndices.count);
     this.treeMeshes = (['broadleaf', 'conifer'] as const).map((family) =>
       [0, 1, 2].map((lod) => createTreeFamilyMesh(this.device, family, lod as 0 | 1 | 2)));
-    this.buildingMeshes = Array.from({ length: 5 }, (_, archetype) =>
+    // Must match the archetype bin count scripts/build-world.mjs's
+    // chunkInstanceRecords call for buildings uses — see
+    // tests/building-archetype-count.test.ts.
+    this.buildingMeshes = Array.from({ length: 8 }, (_, archetype) =>
       [0, 1].map((lod) => createBuildingArchetypeMesh(this.device, archetype, lod as 0 | 1)));
     this.lampMesh = createLampMesh(this.device);
     this.barrierMesh = createBarrierMesh(this.device);
