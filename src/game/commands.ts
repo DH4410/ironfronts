@@ -18,7 +18,7 @@ import type { CommandResult, GameCommand } from './commands/types';
 export type {
   AttackCommand, AttackTarget, BuildCommand, CommandResult, ExtractCommand,
   GameCommand, GameCommandType, MoveArmyCommand, ProduceCommand, RallyCommand,
-  RetreatArmyCommand, SplitArmyCommand, StopArmyCommand, DeclareWarCommand,
+  RetreatArmyCommand, SplitArmyCommand, StopArmyCommand, SetStanceCommand, DeclareWarCommand,
   EndAllianceCommand, ProposeDiplomacyCommand, RespondDiplomacyCommand,
   SendDiplomaticMessageCommand, StrikeCommand,
 } from './commands/types';
@@ -47,6 +47,9 @@ export function applyCommand(ctx: SimContext, command: GameCommand): CommandResu
     case 'stopArmy':
       return issueStop(ctx, command.armyId)
         ? { ok: true } : { ok: false, reason: 'Army cannot stop now.' };
+    case 'setStance':
+      ctx.state.armies[command.armyId]!.stance = command.stance;
+      return { ok: true };
     case 'extract':
       return issueExtract(ctx, command.armyId);
     case 'produce':

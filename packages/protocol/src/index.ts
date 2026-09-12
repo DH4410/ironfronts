@@ -23,6 +23,10 @@ export const commandPayloadSchema = z.discriminatedUnion('type', [
     x: z.number().finite(), z: z.number().finite(), confirmedWarCountryIds: confirmedWars,
   }),
   z.object({ type: z.literal('stopArmy'), armyId: z.string() }),
+  z.object({
+    type: z.literal('setStance'), armyId: z.string(),
+    stance: z.enum(['attack', 'attack-defend', 'defend', 'defend-retreat', 'retreat']),
+  }),
   z.object({ type: z.literal('extract'), armyId: z.string() }),
   z.object({ type: z.literal('produce'), provinceId: z.number().int().nonnegative(), unitTypeId: z.string() }),
   z.object({ type: z.literal('build'), provinceId: z.number().int().nonnegative(), buildingId: z.enum(['barracks', 'tankPlant', 'ordnance', 'missileSite']) }),
@@ -118,6 +122,14 @@ export interface ProjectedArmy {
   composition: null | {
     unitCount: number;
     health: number;
+    /** Organization/readiness, 0..1 of max — separate from health. */
+    organization: number;
+    /** Entrenchment, 0..1 of max. */
+    entrenchment: number;
+    /** Combat posture; see game/units/army.ts ArmyStance. */
+    stance: 'attack' | 'attack-defend' | 'defend' | 'defend-retreat' | 'retreat';
+    /** Within reach of the owner's own territory. */
+    inSupply: boolean;
     speed: number;
     groups: ReadonlyArray<{ typeId: string; count: number; health: number }>;
   };
@@ -171,6 +183,9 @@ export interface PlayerProjection {
     construction: ReadonlyArray<{ buildingId: 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite'; available: boolean; affordable: boolean; reason?: string }>;
     canSetRally: boolean;
     rallyReason?: string;
+    /** Held by someone other than its original owner — produces less (see
+     *  game/economy.ts's OCCUPIED_INCOME_MULTIPLIER). */
+    occupied: boolean;
   }>;
   productionQueues: Record<number, unknown[]>;
   constructionQueues: Record<number, unknown[]>;

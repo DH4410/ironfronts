@@ -1,7 +1,7 @@
 import {
   extractionEligibility, movementEdgeAllowed, computeArmyVisibility, projectArmyView, visibleResourceNodes,
   currentMovementLeg, legalRetreatPaths, stackExtractionRate, nearestNode, findPath,
-  UNIT_TYPES, BUILDINGS, buildOptions, producibleUnits,
+  UNIT_TYPES, BUILDINGS, buildOptions, producibleUnits, BUILDING_REQUIRED_PHASE, PHASE_LABELS,
   type GameState, type LandGraph, type WorldData,
 } from '@ironfronts/game-core';
 import type { PlayerProjection, ProjectionDelta, PublicCountry } from '@ironfronts/protocol';
@@ -98,10 +98,16 @@ export function projectFor(
       construction: Object.keys(BUILDINGS).map((buildingId) => {
         const id = buildingId as keyof typeof BUILDINGS;
         const option = constructionOptions.get(id);
+        const phaseLocked = !option && (own?.phase ?? 1) < BUILDING_REQUIRED_PHASE[id];
         return { buildingId: id, available: Boolean(option), affordable: option?.affordable ?? false,
-          ...(!option ? { reason: 'Already built, queued, or unavailable here.' } : !option.affordable ? { reason: 'Insufficient resources.' } : {}) };
+          ...(phaseLocked ? { reason: `Requires ${PHASE_LABELS[BUILDING_REQUIRED_PHASE[id]]}.` }
+            : !option ? { reason: 'Already built, queued, or unavailable here.' }
+            : !option.affordable ? { reason: 'Insufficient resources.' } : {}) };
       }),
       canSetRally: Boolean(graph), ...(!graph ? { rallyReason: 'Movement network unavailable.' } : {}),
+      // Anti-snowball economy penalty (see economy.ts) — surfaced here so the
+      // player can see *why* a captured city's output is discounted.
+      occupied: world.provinceOwner(province.id) !== 0 && world.provinceOwner(province.id) !== viewerCountryId,
     }];
   }));
   const capitalId = world.countries.find((country) => country.id === viewerCountryId)?.capitalProvinceId;
@@ -144,6 +150,7 @@ export function projectFor(
       stockpile: { ...own.stockpile }, income: { ...own.income }, industryCapacity: own.industryCapacity,
       extraction,
       warheads: Math.floor(own.warheads ?? 0),
+      phase: own.phase ?? 1,
     } : null,
     relations: { ...state.relations },
     diplomacy,

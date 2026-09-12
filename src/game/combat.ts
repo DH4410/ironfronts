@@ -6,6 +6,8 @@ import { initializeState, detectEngagements, sideArmies, removeArmyFromAllFronts
 import { DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER } from './combat/constants';
 import { autoRetreat } from './combat/retreat';
 import { stepArtillery } from './combat/artillery';
+import { drainOrganizationFromCombat } from './combat/organization';
+import { terrainDefenseMultiplier } from './combat/terrain';
 import type { CombatEvent } from './combat/events';
 export type { CombatEvent } from './combat/events';
 export { COMBAT_FRONTAGE } from './combat/constants';
@@ -41,16 +43,23 @@ export function stepCombat(session: SimContext, dtHours: number): CombatEvent[] 
     const b = sideArmies(session, front.sideB);
     const devastationMultiplier = isDevastated(session, front.provinceId)
       ? DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER : 1;
+    // Terrain protects whichever side is defending at this front by cutting
+    // the damage that lands on it — the mirror image of devastation, which
+    // instead cuts a devastated defender's own output.
+    const terrainMultiplier = terrainDefenseMultiplier(session.world, front.x, front.z);
     addDamage(pending, scaledDamage(
       calculateDamage(a, front.sideA.role, b, dtHours),
-      front.sideA.role === 'defense' ? devastationMultiplier : 1,
+      (front.sideA.role === 'defense' ? devastationMultiplier : 1)
+        * (front.sideB.role === 'defense' ? terrainMultiplier : 1),
     ));
     addDamage(pending, scaledDamage(
       calculateDamage(b, front.sideB.role, a, dtHours),
-      front.sideB.role === 'defense' ? devastationMultiplier : 1,
+      (front.sideB.role === 'defense' ? devastationMultiplier : 1)
+        * (front.sideA.role === 'defense' ? terrainMultiplier : 1),
     ));
   }
   applyPendingDamage(pending);
+  drainOrganizationFromCombat(session, pending, dtHours);
   if (session.state.simulationTick % 10 === 0) {
     for (const front of activeFronts) {
       events.push({

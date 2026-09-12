@@ -24,6 +24,7 @@ import { buildLandGraph, nearestNode, type LandGraph } from './movement/graph';
 import { wrappedDistance } from './geometry';
 import { mulberry32, hashString } from './rng';
 import { bootstrapResources, type ResourceBootstrapResult } from './resource-bootstrap';
+import { qualifyingPhaseFromBuildings } from './phase';
 
 /**
  * Every selectable (five-city) country starts on this identical footing.
@@ -154,6 +155,10 @@ function spawnArmy(
     order: null,
     extractingNodeId: null,
     navalCrossing: null,
+    organization: 100,
+    entrenchment: 0,
+    stance: 'attack-defend',
+    inSupply: true,
   };
 }
 
@@ -331,6 +336,13 @@ export function initGameState(
     nextOrderId: 1,
     nextEventId: 1,
   };
+  // Set once up front from the buildings just assigned above, rather than
+  // left absent for parseGameState's migration to fill in later — the two
+  // must agree, or a freshly-initialised game and the same game reloaded
+  // from disk would disagree about a country's phase.
+  for (const country of Object.values(state.countries)) {
+    country.phase = qualifyingPhaseFromBuildings(state, country.id);
+  }
 
   const startCamera = computeStartCamera(
     world, playerProvinces, playerComponent, graph, capitalProvince,

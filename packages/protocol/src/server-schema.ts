@@ -21,7 +21,9 @@ const army = point.extend({
   id: z.string(), name: z.string(), ownerCountryId: integer, ownerName: z.string(), ownerColor: z.string(), own: z.boolean(),
   contact: z.enum(['contact', 'visible']), status: z.enum(['idle', 'moving', 'extracting', 'engaged', 'retreating', 'embarking', 'atSea', 'disembarking', 'unknown']),
   graphNodeId: integer.optional(),
-  composition: z.object({ unitCount: integer, health: nonnegative.max(1), speed: nonnegative,
+  composition: z.object({ unitCount: integer, health: nonnegative.max(1),
+    organization: nonnegative.max(1), entrenchment: nonnegative.max(1),
+    stance: z.enum(['attack', 'attack-defend', 'defend', 'defend-retreat', 'retreat']), inSupply: z.boolean(), speed: nonnegative,
     groups: z.array(z.object({ typeId: z.string(), count: integer, health: nonnegative.max(1) })) }).nullable(),
   moveOrder: point.nullable(), moveRoute: z.array(point).optional(), moveIntent: z.enum(['move', 'attack']).optional(),
   motion: z.object({ targetX: finite, targetZ: finite, durationMs: nonnegative, route: z.array(point).optional(), sampledAtEpochMs: finite.optional(), generation: integer.optional() }).optional(),
@@ -34,7 +36,7 @@ const army = point.extend({
 });
 const timeline = z.object({ elapsedSeconds: nonnegative, speed: nonnegative.max(32), movementSpeed: nonnegative.max(32), sampledAtEpochMs: finite, generation: integer });
 const ownCountry = z.object({ id: integer, name: z.string(), color: z.string(), controller: z.enum(['player', 'ai', 'neutral']),
-  stockpile, income: stockpile, industryCapacity: nonnegative, warheads: nonnegative.optional(),
+  stockpile, income: stockpile, industryCapacity: nonnegative, warheads: nonnegative.optional(), phase: integer.optional(),
   extraction: z.object({ stone: nonnegative, metal: nonnegative, oil: nonnegative }).optional() });
 const diplomacyMessage = z.object({ id: z.string(), fromCountryId: integer, toCountryId: integer, body: z.string(), sentAtTick: integer });
 const diplomacyProposal = z.object({ id: z.string(), fromCountryId: integer, toCountryId: integer,
@@ -46,7 +48,7 @@ export const projectionSchema = z.object({ simulationTick: integer, timeline: ti
   provinceBuildings: record(buildings), provinceActions: record(z.object({
     production: z.array(z.object({ unitTypeId: z.string(), available: z.boolean(), affordable: z.boolean(), reason: z.string().optional() })),
     construction: z.array(z.object({ buildingId, available: z.boolean(), affordable: z.boolean(), reason: z.string().optional() })),
-    canSetRally: z.boolean(), rallyReason: z.string().optional(),
+    canSetRally: z.boolean(), rallyReason: z.string().optional(), occupied: z.boolean(),
   })), productionQueues: record(z.array(unitQueue)), constructionQueues: record(z.array(buildingQueue)),
   rallyPoints: record(point.extend({ route: z.array(point).optional() })), armies: record(army), resourceNodes: record(resource),
   ownCountry: ownCountry.nullable(), relations: record(z.enum(['peace', 'allied', 'war'])),

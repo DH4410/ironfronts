@@ -369,8 +369,43 @@ Lanczos-downscaled with Pillow — portraits to 384 px, icons to 256 px
 | `src/ui/assets/icons/ironfronts/ordnance.png` | Detailed ordnance art | legacy; replaced in Build row by the compact generated icon above |
 | `src/ui/assets/icons/ironfronts/fortress.png` | `structure-fortress` | reserved — no fortress building exists yet |
 | `src/ui/assets/icons/ironfronts/settlement.png` | `structure-city` (walled town) | reserved — no city/settlement icon slot yet |
-| `src/ui/assets/icons/ironfronts/stance-attack.png` | `stance-attack` (three swords) | reserved — no army-stance system |
-| `src/ui/assets/icons/ironfronts/stance-attack-defend.png` | `stance-attack-defend` (crossed swords + shield) | reserved |
-| `src/ui/assets/icons/ironfronts/stance-defend.png` | `stance-defend` (shield + planted spears) | reserved |
-| `src/ui/assets/icons/ironfronts/stance-retreat.png` | `stance-retreat` (soldier + fall-back arrow) | reserved |
-| `src/ui/assets/icons/ironfronts/stance-defend-retreat.png` | `stance-defend-retreat` (double shield + fall-back arrow) | reserved |
+| `src/ui/assets/icons/ironfronts/stance-attack.png` | `stance-attack` (three swords) | yes — army-panel stance row (2026-09-12) |
+| `src/ui/assets/icons/ironfronts/stance-attack-defend.png` | `stance-attack-defend` (crossed swords + shield) | yes — balanced/default stance |
+| `src/ui/assets/icons/ironfronts/stance-defend.png` | `stance-defend` (shield + planted spears) | yes |
+| `src/ui/assets/icons/ironfronts/stance-retreat.png` | `stance-retreat` (soldier + fall-back arrow) | yes |
+| `src/ui/assets/icons/ironfronts/stance-defend-retreat.png` | `stance-defend-retreat` (double shield + fall-back arrow) | yes |
+
+---
+
+## Sourcing lead: better close-LOD building models (not yet integrated)
+
+**Status: identified, not wired into the current renderer.** The handoff's
+ask to replace the current procedural/placeholder building geometry needs
+real 3D assets and a renderer integration pass with working visual
+verification — neither was safe to do blind this session (no working
+screenshot capture against the current build), so this is left for a
+session where that verification is available.
+
+**Lead found:** an abandoned `feature/in-game-ui-world-polish` branch
+(2026-08-26, superseded by later painterly-art and simulation-refactor work —
+see `HANDOFF.md`) had already wired a close-LOD building loader against:
+
+**Project:** Kenney's CC0 "City Kit (Suburban)" — mirrored at
+<https://github.com/petroulacl/fps-buildings-env-kit> (`buildings/kenney-city-kit-suburban/`).
+**Licence:** CC0 (public domain) — Kenney's asset packs are CC0 by default;
+this specific mirror repo's own licence should still be double-checked before
+vendoring, since it is a third-party re-host rather than kenney.nl itself.
+
+The old branch's loader (`src/external-models.ts` in that commit history, now
+gone from `main`) fetched five `.obj` building variants
+(`building-type-{a,g,i,q,t}.obj`) from that mirror at runtime and parsed them
+client-side. That runtime-fetch approach is worth reconsidering — vendoring
+the `.obj`/texture files locally (matching how every other asset in this file
+is handled) would be more robust than a live fetch to a third-party mirror
+that could disappear or rate-limit. Whoever picks this up next should:
+1. Verify the mirror repo's own licence terms for redistribution.
+2. Vendor the needed files locally rather than fetching them live.
+3. Check current close-LOD building rendering (the code this would replace
+   has moved since August — re-locate it rather than assuming the old
+   integration points still exist) and confirm the visual result in a live
+   browser session before committing.

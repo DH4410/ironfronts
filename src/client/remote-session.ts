@@ -5,6 +5,7 @@ import { GameConnection } from './game-connection';
 import type { GameClockReading } from './game-clock';
 
 type BuildingId = 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite';
+type ArmyStance = 'attack' | 'attack-defend' | 'defend' | 'defend-retreat' | 'retreat';
 
 interface Stockpile { funds: number; manpower: number; food: number; stone: number; metal: number; oil: number }
 interface OwnCountry {
@@ -14,6 +15,8 @@ interface OwnCountry {
   extraction?: { stone: number; metal: number; oil: number };
   /** Ready strategic warheads (whole count). Absent on pre-strike projections. */
   warheads?: number;
+  /** Progression tier — 1, 2, or 3. See game/phase.ts. */
+  phase?: number;
 }
 export class RemoteGameSession extends EventTarget {
   state: PlayerProjection;
@@ -245,6 +248,10 @@ export class RemoteGameSession extends EventTarget {
     return this.send({ type: 'splitArmy', armyId, groups: [...groups], x, z });
   }
   orderStop(armyId: string): boolean { this.send({ type: 'stopArmy', armyId }); return true; }
+  orderStance(armyId: string, stance: ArmyStance): boolean {
+    this.send({ type: 'setStance', armyId, stance });
+    return true;
+  }
   orderExtract(armyId: string) { return this.send({ type: 'extract', armyId }); }
   produce(provinceId: number, unitTypeId: string) { return this.send({ type: 'produce', provinceId, unitTypeId }); }
   build(provinceId: number, buildingId: BuildingId, onAccepted?: () => void) {
@@ -257,10 +264,9 @@ export class RemoteGameSession extends EventTarget {
   }
 
   productionOptions(provinceId: number) { return this.state.provinceActions[provinceId]?.production ?? []; }
-  buildable(provinceId: number): Array<{ id: BuildingId; affordable: boolean }> {
+  buildable(provinceId: number): Array<{ id: BuildingId; available: boolean; affordable: boolean; reason?: string }> {
     return (this.state.provinceActions[provinceId]?.construction ?? [])
-      .filter((option) => option.available)
-      .map((option) => ({ id: option.buildingId, affordable: option.affordable }));
+      .map((option) => ({ id: option.buildingId, available: option.available, affordable: option.affordable, reason: option.reason }));
   }
   canSetRally(provinceId: number): boolean { return this.state.provinceActions[provinceId]?.canSetRally ?? false; }
   extractableNodeAt(armyId: string): number | null {
@@ -283,6 +289,10 @@ export class RemoteGameSession extends EventTarget {
       controlled ||= node.controllerCountryId === ownerId;
       extracting ||= node.status === 'extracting';
     }
-    return { ownerId, ownerName: owner?.name ?? `Country ${ownerId}`, ownerColor: owner?.color ?? '#888888', isOwn, resources: any ? totals : null, controlled, extracting };
+    const occupied = isOwn && (this.state.provinceActions[provinceId]?.occupied ?? false);
+    return {
+      ownerId, ownerName: owner?.name ?? `Country ${ownerId}`, ownerColor: owner?.color ?? '#888888', isOwn,
+      resources: any ? totals : null, controlled, extracting, occupied,
+    };
   }
 }

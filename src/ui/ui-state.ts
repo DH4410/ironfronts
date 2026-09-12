@@ -21,7 +21,7 @@ export interface PlayerCountry {
   readonly color: string;
 }
 
-export type ResourceId = 'money' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil' | 'warheads' | 'army';
+export type ResourceId = 'money' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil' | 'warheads';
 
 export interface ResourceLine {
   readonly id: ResourceId;
@@ -92,6 +92,8 @@ export interface SelectedProvince {
   readonly resources: ProvinceResourceTotals | null;
   /** True when the player commands this province — unlocks full detail. */
   readonly isOwn?: boolean;
+  /** Held by this player but not its original owner — produces less. */
+  readonly occupied?: boolean;
   /** Province has sea access (drives the water / naval marker). */
   readonly coastal?: boolean;
   /** Production facilities standing in this province (own provinces only). */
@@ -106,24 +108,30 @@ export interface SelectedProvince {
     readonly controlled: boolean;
     readonly extracting: boolean;
   } | null;
-  /** Units this province can build right now (own + has the building). */
+  /** Units this province could ever build here. Locked ones (missing building)
+   *  and unaffordable ones are both included (rendered disabled) so the
+   *  player can see what exists and why it's out of reach right now. */
   readonly producible?: readonly {
     readonly id: string;
     readonly name: string;
     readonly costLabel: string;
     readonly affordable: boolean;
+    readonly available: boolean;
     readonly reason?: string;
   }[];
   /** Current production queue, own provinces only. Only the head order (index
    *  0) is actively being worked and carries live progress/eta. */
   readonly queue?: readonly QueueItem[];
-  /** Buildings this own urban province could still take. Unaffordable ones are
-   *  included (rendered disabled) so the cost is visible before it can be met. */
+  /** Buildings this own urban province could ever take. Locked ones (already
+   *  built/queued/unavailable here) and unaffordable ones are both included
+   *  (rendered disabled) so the cost/reason is visible before it can be met. */
   readonly buildable?: readonly {
     readonly id: string;
     readonly name: string;
     readonly costLabel: string;
     readonly affordable: boolean;
+    readonly available: boolean;
+    readonly reason?: string;
   }[];
   /** Buildings currently under construction here, own provinces only. Only the
    *  head order (index 0) is actively being worked. */
@@ -228,6 +236,15 @@ export interface ArmyStackView {
   readonly strength: number;
   /** 0..1 */
   readonly health: number;
+  /** 0..1. Organization/readiness — separate from health; low organization
+   *  can force a retreat well before the stack is destroyed. */
+  readonly organization?: number;
+  /** 0..1. Grows while the stack holds ground; reduces incoming damage. */
+  readonly entrenchment?: number;
+  /** Combat posture; see game/units/army.ts ArmyStance. Own armies only. */
+  readonly stance?: 'attack' | 'attack-defend' | 'defend' | 'defend-retreat' | 'retreat';
+  /** Within reach of the owner's own territory. */
+  readonly inSupply?: boolean;
   readonly selected: boolean;
   readonly combat: CombatStatus;
   /**
@@ -294,6 +311,10 @@ export interface StrategicUiState {
   readonly resourceOverlay: boolean;
   /** Whether the debug/world-inspector affordances are exposed at all. */
   readonly debugEnabled: boolean;
+  /** Progression tier — 1, 2, or 3. See game/phase.ts. Not to be confused
+   *  with `phase` above (lobby/loading/in-game) — named distinctly for that
+   *  reason. */
+  readonly countryPhase?: number;
 }
 
 /** Resources are declared up-front so the top bar has stable slots. */
@@ -304,9 +325,6 @@ export const DEFAULT_RESOURCES: readonly ResourceLine[] = [
   { id: 'stone', label: 'Stone', value: null },
   { id: 'metal', label: 'Metal', value: null },
   { id: 'oil', label: 'Oil', value: null },
-  // Live headcount of the player's own army (infantry + tanks + everything
-  // else with a unit count) — NOT a national population figure.
-  { id: 'army', label: 'Army', value: null },
 ];
 
 export function createInitialState(overrides: Partial<StrategicUiState> = {}): StrategicUiState {

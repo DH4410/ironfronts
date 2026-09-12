@@ -8,7 +8,7 @@ and reverified on 2026-09-08.
 - Published branch: `feat/rts-icon-controls`
 - Canonical base/tracking ref: `upstream/main`
 - Upstream base at final verification: `d64ec60`
-- Do not merge `origin/main` blindly; it was a divergent fork while this work was developed.
+- (2026-09-12) No longer true: `upstream/main` is now a strict ancestor of `origin/main` — the two lines were reconciled after this was written, so there is nothing divergent left to worry about here.
 
 ## Delivered
 

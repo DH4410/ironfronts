@@ -8,6 +8,7 @@ import { wrappedDistance } from '../geometry';
 import { COMBAT_SNAP } from './constants';
 import { provinceAtNode } from './location';
 import type { CombatEvent } from './events';
+import { stanceModifiers } from './stance';
 
 export function initializeState(session: SimContext): void {
   session.state.simulationTick ??= 0;
@@ -31,6 +32,23 @@ export function sideHp(session: SimContext, side: BattleFrontSideState): number 
 
 export function sideBaseline(side: BattleFrontSideState): number {
   return Object.values(side.entryMaxHpByArmy).reduce((sum, hp) => sum + hp, 0);
+}
+
+/** Average organization (0..1 of max) across a side's armies — armies with no
+ *  runtime state yet (should not happen post-initializeState) default to full. */
+export function sideOrganizationFraction(session: SimContext, side: BattleFrontSideState): number {
+  const armies = sideArmies(session, side);
+  if (armies.length === 0) return 1;
+  return armies.reduce((sum, army) => sum + (army.organization ?? 100), 0) / (armies.length * 100);
+}
+
+/** Average stance retreat-threshold multiplier across a side's armies — a
+ *  mixed-stance force averages out rather than one holdout dragging the
+ *  whole side either way. */
+export function sideRetreatThresholdMultiplier(session: SimContext, side: BattleFrontSideState): number {
+  const armies = sideArmies(session, side);
+  if (armies.length === 0) return 1;
+  return armies.reduce((sum, army) => sum + stanceModifiers(army.stance).retreatThreshold, 0) / armies.length;
 }
 
 function directionOf(army: ArmyStack): number {

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { GameState } from './game-state';
 import { INITIAL_GAME_EPOCH_MS, PROTOTYPE_HOURS_PER_HOUR } from './time';
 import { UNIT_TYPE_BY_ID } from './units/unit-catalog';
+import { qualifyingPhaseFromBuildings } from './phase';
 
 const number = z.number().finite();
 const positive = number.nonnegative();
@@ -20,7 +21,7 @@ const queue = z.object({ id: z.string(), ownerCountryId: id, progressHours: posi
 const stateSchema = z.object({ version: z.union([z.literal(2), z.literal(3)]), seed: number, scenarioId: z.string(), mode: z.enum(['campaign', 'sandbox']),
   fogOfWar: z.boolean(), economyEnabled: z.boolean(),
   clock: z.object({ gameTimeHours: positive, startDate: z.string(), initialEpochMs: number.min(-8.64e15).max(8.64e15).optional(), generation: id.optional(), pendingHours: positive.optional() }), simulationTick: id,
-  countries: record(z.object({ id, name: z.string(), color: z.string(), controller: z.enum(['player', 'ai', 'neutral']), stockpile, income: stockpile, industryCapacity: positive, warheads: positive.default(0) })),
+  countries: record(z.object({ id, name: z.string(), color: z.string(), controller: z.enum(['player', 'ai', 'neutral']), stockpile, income: stockpile, industryCapacity: positive, warheads: positive.default(0), phase: id.optional() })),
   provinceOwners: record(id), provinceBuildings: record(z.object({ barracks: id, tankPlant: id, ordnance: id, missileSite: id.default(0) })),
   productionQueues: record(z.array(queue.extend({ unitTypeId: unit }))), constructionQueues: record(z.array(queue.extend({ buildingId: building }))), rallyPoints: record(point),
   armies: record(point.extend({ id: z.string(), ownerCountryId: id, name: z.string(), graphNodeId: id,
@@ -29,7 +30,10 @@ const stateSchema = z.object({ version: z.union([z.literal(2), z.literal(3)]), s
     lastGraphNodeId: id.nullable().optional(), suspendedOrder: order.nullable().optional(), battleFrontIds: z.array(z.string()).optional(),
     retreat: z.object({ destinationProvinceId: id, protectedUntilNodeId: id, protected: z.boolean() }).nullable().optional(),
     artillery: z.object({ targetArmyId: z.string().nullable(), manualTarget: z.boolean() }).optional(),
-    navalCrossing: z.object({ fromNodeId: id, toNodeId: id, hoursRemaining: positive }).nullable().default(null) })),
+    navalCrossing: z.object({ fromNodeId: id, toNodeId: id, hoursRemaining: positive }).nullable().default(null),
+    organization: positive.optional(), entrenchment: positive.optional(),
+    stance: z.enum(['attack', 'attack-defend', 'defend', 'defend-retreat', 'retreat']).optional(),
+    inSupply: z.boolean().optional() })),
   battles: record(z.object({ id: z.string(), frontIds: z.array(z.string()) })),
   battleFronts: record(point.extend({ id: z.string(), battleId: z.string(), anchorNodeId: id, kind: z.enum(['road', 'province']), provinceId: id.nullable(), sideA: side, sideB: side })),
   resourceNodes: record(point.extend({ id, kind: z.enum(['stone', 'metal', 'oil']), remaining: positive, initialAmount: positive, controllerCountryId: id,
@@ -71,7 +75,13 @@ export function parseGameState(input: unknown, initialEpochMs = INITIAL_GAME_EPO
   parsed.diplomacyMessages ??= {};
   parsed.diplomacyProposals ??= {};
   parsed.nextDiplomacyId ??= 1;
-  for (const country of Object.values(parsed.countries)) country.warheads ??= 0;
+  for (const country of Object.values(parsed.countries)) {
+    country.warheads ??= 0;
+    // Computed from buildings already owned, not defaulted to 1 — an existing
+    // save with an Ordnance Workshop or Missile Site must not be retroactively
+    // locked out of what it already has.
+    country.phase ??= qualifyingPhaseFromBuildings(parsed as unknown as GameState, country.id);
+  }
   for (const buildings of Object.values(parsed.provinceBuildings)) buildings.missileSite ??= 0;
   for (const army of Object.values(parsed.armies)) {
     if (parsed.version === 2) {
@@ -79,6 +89,10 @@ export function parseGameState(input: unknown, initialEpochMs = INITIAL_GAME_EPO
     army.retreat ??= null; army.artillery ??= { targetArmyId: null, manualTarget: false };
     }
     army.navalCrossing ??= null;
+    army.organization ??= 100;
+    army.entrenchment ??= 0;
+    army.stance ??= 'attack-defend';
+    army.inSupply ??= true;
     const types = new Set<string>();
     for (const group of army.units) {
       if (!group.count || !group.hp || group.hp > group.count * UNIT_TYPE_BY_ID.get(group.typeId)!.maxHp + 1e-6 || types.has(group.typeId)) throw new Error('Invalid army composition.');

@@ -29,8 +29,10 @@ function state(): GameState {
     fogOfWar: false, economyEnabled: false,
     clock: { gameTimeHours: 0, startDate: 'x' }, simulationTick: 0,
     countries: {
-      1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: { ...emptyStockpile(), funds: 5000, stone: 5000, metal: 5000 }, income: emptyStockpile(), industryCapacity: 1 },
-      2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
+      // phase: 3 — this file tests affordability/dedup/ownership gating on
+      // buildOptions, not phase progression (see phase.test.ts for that).
+      1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: { ...emptyStockpile(), funds: 5000, stone: 5000, metal: 5000 }, income: emptyStockpile(), industryCapacity: 1, phase: 3 },
+      2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1, phase: 3 },
     },
     provinceOwners: { 10: 1 },
     provinceBuildings: {},

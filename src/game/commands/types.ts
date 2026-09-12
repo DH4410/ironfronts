@@ -1,4 +1,5 @@
 import type { BuildingId } from '../units/unit-types';
+import type { ArmyStance } from '../units/army';
 
 export interface MoveArmyCommand {
   readonly type: 'moveArmy';
@@ -43,6 +44,13 @@ export interface StopArmyCommand {
   readonly type: 'stopArmy';
   readonly countryId: number;
   readonly armyId: string;
+}
+
+export interface SetStanceCommand {
+  readonly type: 'setStance';
+  readonly countryId: number;
+  readonly armyId: string;
+  readonly stance: ArmyStance;
 }
 
 export interface ExtractCommand {
@@ -107,7 +115,7 @@ export interface EndAllianceCommand {
 
 export type GameCommand =
   | MoveArmyCommand | AttackCommand | RetreatArmyCommand | SplitArmyCommand
-  | StopArmyCommand | ExtractCommand | ProduceCommand | BuildCommand | RallyCommand
+  | StopArmyCommand | SetStanceCommand | ExtractCommand | ProduceCommand | BuildCommand | RallyCommand
   | SendDiplomaticMessageCommand | ProposeDiplomacyCommand | RespondDiplomacyCommand
   | DeclareWarCommand | EndAllianceCommand | StrikeCommand;
 

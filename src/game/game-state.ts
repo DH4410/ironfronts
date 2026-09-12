@@ -47,6 +47,16 @@ export interface CountryState {
    * bump — the save gate checks version/id, not shape).
    */
   warheads?: number;
+  /**
+   * Progression tier — 1 (Local Command), 2 (Industrial Mobilization), or 3
+   * (Total War). Gates the more advanced buildings (see phase.ts); advances
+   * automatically as the country invests in industry or as time passes, never
+   * by manual player action, so it can't get permanently stuck. Optional and
+   * defaulted on load (see state-schema.ts, computed from buildings already
+   * owned so no existing save is retroactively locked out of anything it has
+   * already built) — no GAME_VERSION bump.
+   */
+  phase?: number;
 }
 
 /** Terminal state of a campaign, from the human player's point of view. */

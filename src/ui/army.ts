@@ -24,11 +24,10 @@ const COMBAT_LABEL: Record<CombatStatus, string> = {
 
 function formatDamageRate(value: number): string {
   if (!Number.isFinite(value)) return '--';
-  // Stored as a fraction of a target stack removed per game hour; a bare
-  // "0.0077" is unreadable at a glance, so show it as a rounded percentage.
-  const pct = value * 100;
-  if (pct <= 0) return '0';
-  return pct < 10 ? `${pct.toFixed(1)}%` : `${Math.round(pct)}%`;
+  // Absolute damage-per-hour dealt to a target stack (see COMBAT_DAMAGE_SCALE
+  // in game/combat/constants.ts) — not a 0..1 fraction, so no percentage sign.
+  if (value <= 0) return '0';
+  return value < 10 ? value.toFixed(1) : String(Math.round(value));
 }
 
 /**
@@ -79,7 +78,16 @@ export function describeArmy(army: ArmyStackView): Array<[string, string]> {
 }
 
 export type ArmyPanelCommand =
-  | 'move' | 'attack' | 'retreat' | 'split' | 'stop' | 'extract' | 'deselect';
+  | 'move' | 'attack' | 'retreat' | 'split' | 'stop' | 'extract' | 'deselect'
+  | 'stance-attack' | 'stance-attack-defend' | 'stance-defend' | 'stance-defend-retreat' | 'stance-retreat';
+
+const STANCE_OPTIONS: ReadonlyArray<{ command: ArmyPanelCommand; icon: IconName; label: string; description: string }> = [
+  { command: 'stance-attack', icon: 'stance-attack', label: 'Attack', description: 'Hits harder; never digs in; holds the assault until organization nearly breaks.' },
+  { command: 'stance-attack-defend', icon: 'stance-attack-defend', label: 'Balanced', description: 'No bonus or penalty either way — the default posture.' },
+  { command: 'stance-defend', icon: 'stance-defend', label: 'Defend', description: 'Takes less damage and digs in fast; holds the line at all costs.' },
+  { command: 'stance-defend-retreat', icon: 'stance-defend-retreat', label: 'Defensive', description: 'Some defensive bonus, but pulls back early to preserve the force.' },
+  { command: 'stance-retreat', icon: 'stance-retreat', label: 'Cautious', description: 'No combat bonus; breaks off at the first real pressure.' },
+];
 
 function node<K extends keyof HTMLElementTagNameMap>(
   tag: K, className?: string, text?: string,
@@ -124,7 +132,18 @@ export function renderSelectedArmyPanel(
     const healthFill = node('i', 'ifg-army-panel__health-fill');
     healthFill.style.width = `${healthPercent}%`;
     healthTrack.append(healthFill);
-    health.append(healthTrack, node('span', 'ifg-army-panel__health-caption', `${healthPercent} / 100 readiness`));
+    // Organization is a real, separate stat from health (see
+    // game/combat/organization.ts) — a battered-but-intact stack can still be
+    // forced to retreat once this collapses. Entrenchment only shows once it's
+    // actually built up, so a freshly-arrived stack's caption stays uncluttered.
+    const orgPercent = Math.round((army.organization ?? army.health) * 100);
+    const entrenchPercent = Math.round((army.entrenchment ?? 0) * 100);
+    const captionParts = [`${orgPercent} / 100 organization`];
+    if (entrenchPercent > 0) captionParts.push(`${entrenchPercent}% entrenched`);
+    if (army.own && army.inSupply === false) captionParts.push('out of supply');
+    const captionEl = node('span', 'ifg-army-panel__health-caption', captionParts.join(' · '));
+    if (army.own && army.inSupply === false) captionEl.classList.add('is-warning');
+    health.append(healthTrack, captionEl);
   }
 
   const stats = node('section', 'ifg-army-panel__stats');
@@ -161,6 +180,23 @@ export function renderSelectedArmyPanel(
     metric('Troops', 'stat-troops', army.identified === false ? '--' : String(army.unitCount)),
   );
   stats.append(statTable, statMeta);
+  if (army.own) {
+    const stanceRow = node('div', 'ifg-army-panel__stances');
+    stanceRow.setAttribute('role', 'group');
+    stanceRow.setAttribute('aria-label', 'Combat stance');
+    for (const option of STANCE_OPTIONS) {
+      const btn = node('button', 'ifg-army-panel__stance');
+      btn.type = 'button';
+      const active = (army.stance ?? 'attack-defend') === option.command.slice('stance-'.length);
+      btn.classList.toggle('is-active', active);
+      btn.setAttribute('aria-label', option.label);
+      btn.append(createIcon(option.icon, 'ifg-army-panel__stance-icon'));
+      bindTooltip(btn, () => ({ title: option.label, description: option.description }));
+      btn.addEventListener('click', () => onCommand(option.command));
+      stanceRow.append(btn);
+    }
+    stats.append(stanceRow);
+  }
   const summary = node('div', 'ifg-army-panel__summary');
   summary.append(health, stats);
 

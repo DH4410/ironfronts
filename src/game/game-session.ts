@@ -27,6 +27,10 @@ import { stepExtraction } from './extraction';
 import { stepProduction, type UnitCompletion } from './production';
 import { stepConstruction, type BuildingCompletion } from './construction';
 import { stepCombat, stepCapture, type CaptureEvent, type CombatEvent } from './combat';
+import { stepEntrenchment } from './combat/entrenchment';
+import { regenOrganization } from './combat/organization';
+import { stepSupply } from './combat/supply';
+import { stepPhaseProgression } from './phase';
 import { stepWarheads } from './strike';
 import { stepVictory } from './victory';
 import { stepAi } from './ai/simple-ai';
@@ -42,6 +46,9 @@ const MAX_TICK_HOURS = FIXED_STEP_HOURS;
 const INCOME_RECOMPUTE_INTERVAL = 1 / PROTOTYPE_HOURS_PER_HOUR;
 /** AI re-plans on this game-hour cadence (cheap, not per tick). */
 const AI_INTERVAL = 2 / PROTOTYPE_HOURS_PER_HOUR;
+/** Supply reach is recomputed on this game-hour cadence — a straight-line
+ *  distance scan per army, cheap but no reason to pay it every tick. */
+const SUPPLY_INTERVAL = 1 / PROTOTYPE_HOURS_PER_HOUR;
 
 export class GameSession {
   readonly state: GameState;
@@ -115,12 +122,18 @@ export class GameSession {
     if (this.state.economyEnabled) {
       if (this.state.simulationTick % Math.round(INCOME_RECOMPUTE_INTERVAL / FIXED_STEP_HOURS) === 0) {
         recomputeIncome(this.state, this.world);
+        stepPhaseProgression(this);
       }
       applyIncome(this.state, dtHours);
     }
 
     // --- gameplay systems, fixed order ------------------------------
     stepMovement(this, dtHours);
+    if (this.state.simulationTick % Math.round(SUPPLY_INTERVAL / FIXED_STEP_HOURS) === 0) {
+      stepSupply(this);
+    }
+    stepEntrenchment(this, dtHours);
+    regenOrganization(this, dtHours);
     stepExtraction(this, dtHours);
     for (const b of stepConstruction(this, dtHours)) this.pendingBuildings.push(b);
     stepWarheads(this, dtHours);

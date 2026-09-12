@@ -24,11 +24,12 @@ import {
 } from './visibility';
 import type { GameState, ResourceNodeState } from './game-state';
 import type { WorldData } from './world-data';
-import type { ArmyStack, ArmyStatus } from './units/army';
+import type { ArmyStack, ArmyStatus, ArmyStance } from './units/army';
 import {
   stackBaseSpeed, stackHealthFraction, stackHp, stackUnitCount,
 } from './units/army';
 import { unitType } from './units/unit-catalog';
+import { ORGANIZATION_MAX, ENTRENCHMENT_MAX } from './combat/constants';
 
 export interface ProjectedGroup {
   readonly typeId: string;
@@ -58,6 +59,15 @@ export interface PlayerArmyView {
   readonly composition: {
     readonly unitCount: number;
     readonly health: number;
+    /** Organization/readiness, 0..1 of max — separate from health; see
+     *  game/combat/organization.ts. */
+    readonly organization: number;
+    /** Entrenchment, 0..1 of max — see game/combat/entrenchment.ts. */
+    readonly entrenchment: number;
+    /** Combat posture — see units/army.ts ArmyStance. */
+    readonly stance: ArmyStance;
+    /** Within reach of the owner's own territory — see combat/supply.ts. */
+    readonly inSupply: boolean;
     readonly speed: number;
     readonly groups: readonly ProjectedGroup[];
   } | null;
@@ -107,6 +117,10 @@ function composition(army: ArmyStack): PlayerArmyView['composition'] {
   return {
     unitCount: stackUnitCount(army),
     health: stackHealthFraction(army),
+    organization: (army.organization ?? 100) / ORGANIZATION_MAX,
+    entrenchment: (army.entrenchment ?? 0) / ENTRENCHMENT_MAX,
+    stance: army.stance ?? 'attack-defend',
+    inSupply: army.inSupply ?? true,
     speed: Math.round(stackBaseSpeed(army)),
     groups: army.units.map((g) => ({
       typeId: g.typeId,

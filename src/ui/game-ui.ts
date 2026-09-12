@@ -81,6 +81,10 @@ const RESOURCE_CHIPS: ReadonlyArray<{ key: keyof ProvinceResourceTotals; label: 
 
 const PROVINCE_ACTIONS = ['Build', 'Produce', 'Rally', 'Inspect'] as const;
 
+/** Mirrors game/phase.ts's PHASE_LABELS — kept local rather than imported
+ *  since the UI only ever sees the projected tier number, never game-core. */
+const COUNTRY_PHASE_LABELS: Record<number, string> = { 1: 'Phase I', 2: 'Phase II', 3: 'Phase III' };
+
 /** Real, always-available province fields (populated per selection). */
 const PROVINCE_FIELDS = ['Allegiance', 'Terrain', 'Deposits', 'Extraction'] as const;
 type ProvinceFieldKey = (typeof PROVINCE_FIELDS)[number];
@@ -279,7 +283,21 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   const resourceIcon: Partial<Record<string, IconName>> = {
     money: 'funds', manpower: 'manpower', food: 'food',
     stone: 'node-stone', metal: 'metal', oil: 'oil',
-    warheads: 'structure-ordnance', army: 'stat-troops',
+    warheads: 'structure-ordnance',
+  };
+  // What each resource is for and how it's obtained, for the resource-chip
+  // tooltip. Money/manpower/food accrue passively (scale with owned
+  // territory/population); stone/metal/oil only accrue while a stack is
+  // actively extracting a deposit; warheads accrue from Ordnance Workshops
+  // and Missile Sites over time.
+  const RESOURCE_DESCRIPTION: Partial<Record<string, string>> = {
+    money: 'Funds war spending; passive income from owned territory.',
+    manpower: 'Fuels recruitment; passive income from population.',
+    food: 'Feeds your population; passive income from territory.',
+    stone: 'Builds structures; only while a stack extracts a deposit.',
+    metal: 'Arms production; only while a stack extracts a deposit.',
+    oil: 'Fuels vehicles; only while a stack extracts a deposit.',
+    warheads: 'Strike ordnance; accrues from Ordnance Workshops/Missile Sites.',
   };
 
   const clockBlock = el('div', 'ifg-topbar__clock');
@@ -498,7 +516,8 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   // BUILD — construct a production building in an owned urban province.
   const pvBuild = el('div', 'ifg-card__resources');
   pvBuild.hidden = true;
-  pvBuild.append(el('small', 'ifg-card__restitle', 'Build'));
+  const pvBuildTitle = el('small', 'ifg-card__restitle', 'Build');
+  pvBuild.append(pvBuildTitle);
   const pvBuildList = el('div', 'ifg-card__prodlist ifg-card__prodlist--buildings');
   pvBuild.append(pvBuildList);
   const pvConstruction = el('div', 'ifg-queue ifg-queue--construction');
@@ -699,10 +718,12 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         rateEl.classList.toggle('is-positive', rounded > 0);
         rateEl.classList.toggle('is-negative', rounded < 0);
       }
+      const description = RESOURCE_DESCRIPTION[line.id];
       chip.title = pending
         ? `${line.label} — economy not implemented yet`
         : `${line.label}${line.demo ? ' (demo)' : ''}${
-          rate === null || rate === undefined ? '' : ` · ${Number(rate.toFixed(1))} per game hour`}`;
+          rate === null || rate === undefined ? '' : ` · ${Number(rate.toFixed(1))} per game hour`}${
+          description ? ` — ${description}` : ''}`;
     }
 
     // Clock + weather.
@@ -761,7 +782,8 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       const depositKinds = province.resources
         ? (['stone', 'metal', 'oil'] as const).filter((k) => province.resources![k] > 0)
         : [];
-      pvFieldValue.get('Allegiance')!.textContent = province.isOwn === true ? 'Your command'
+      pvFieldValue.get('Allegiance')!.textContent = province.isOwn === true
+        ? (province.occupied ? 'Your command (occupied)' : 'Your command')
         : province.isOwn === false ? province.owner : '—';
       pvFieldValue.get('Terrain')!.textContent = province.terrain || '—';
       pvFieldValue.get('Deposits')!.textContent = depositKinds.length
@@ -790,9 +812,9 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         province.coastal ? 'c' : '',
         dep ? `${dep.controlled ? 'C' : ''}${dep.extracting ? 'E' : ''}` : '',
         province.isOwn,
-        (province.producible ?? []).map((u) => `${u.id}:${u.affordable}`).join(','),
+        (province.producible ?? []).map((u) => `${u.id}:${u.available}:${u.affordable}`).join(','),
         (province.queue ?? []).map((q) => `${q.id}:${Math.round(q.progress * 100)}:${Math.round(q.etaSeconds)}`).join(','),
-        (province.buildable ?? []).map((b) => `${b.id}${b.affordable ? '+' : '-'}`).join(','),
+        (province.buildable ?? []).map((b) => `${b.id}:${b.available}${b.affordable ? '+' : '-'}`).join(','),
         (province.construction ?? []).map((q) => `${q.id}:${Math.round(q.progress * 100)}:${Math.round(q.etaSeconds)}`).join(','),
         province.rally ? `${Math.round(province.rally.x)},${Math.round(province.rally.z)}` : '-',
         province.awaitingRallyTarget ? 'arm' : '',
@@ -829,7 +851,8 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
             const thumb = productionIcon
               ? createIcon(productionIcon, 'ifg-buildbtn__thumb')
               : createUnitPortrait(u.id, u.name);
-            b.disabled = province.commandPending === true || !u.affordable;
+            b.disabled = province.commandPending === true || !u.affordable || !u.available;
+            b.classList.toggle('is-locked', !u.available);
             thumb.classList.add('ifg-buildbtn__thumb');
             b.append(thumb);
             b.setAttribute('aria-label', `${u.name} — ${u.costLabel}`);
@@ -839,7 +862,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
               cost: u.costLabel,
               disabledReason: u.reason,
             }));
-            if (u.affordable) b.addEventListener('click', () => actions.produceUnit(province.id, u.id));
+            if (u.affordable && u.available) b.addEventListener('click', () => actions.produceUnit(province.id, u.id));
             return b;
           }));
           // Rally point: where finished units march. Placed by a map click.
@@ -868,6 +891,8 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         const construction = province.construction ?? [];
         pvBuild.hidden = !province.isOwn || (buildable.length === 0 && construction.length === 0);
         if (!pvBuild.hidden) {
+          const phaseLabel = state.countryPhase ? COUNTRY_PHASE_LABELS[state.countryPhase] : undefined;
+          pvBuildTitle.textContent = phaseLabel ? `Build — ${phaseLabel}` : 'Build';
           pvBuildList.replaceChildren(...buildable.map((b) => {
             // Large, text-free facility tile. Unaffordable buildings stay on
             // the list with name, cost, and reason available on hover/focus.
@@ -875,15 +900,18 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
             btn.type = 'button';
             const icon = FACILITY_ICON[b.id];
             if (icon) btn.append(createIcon(icon, 'ifg-buildbtn__thumb'));
-            btn.disabled = !b.affordable || province.commandPending === true;
+            btn.disabled = !b.available || !b.affordable || province.commandPending === true;
+            btn.classList.toggle('is-locked', !b.available);
             btn.setAttribute('aria-label', `${b.name} — ${b.costLabel}`);
             bindTooltip(btn, () => ({
               title: b.name,
               description: FACILITY_NOTE[b.id],
               cost: b.costLabel,
-              disabledReason: b.affordable ? undefined : `Not enough resources — needs ${b.costLabel}.`,
+              disabledReason: !b.available
+                ? b.reason
+                : b.affordable ? undefined : `Not enough resources — needs ${b.costLabel}.`,
             }));
-            if (b.affordable) {
+            if (b.available && b.affordable) {
               btn.addEventListener('click', () => actions.buildStructure(province.id, b.id));
             }
             return btn;

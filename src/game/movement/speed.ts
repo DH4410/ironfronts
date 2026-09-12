@@ -3,6 +3,7 @@ import type { ArmyStack } from '../units/army';
 import { stackBaseSpeed } from '../units/army';
 import { TERRAIN_CLASS } from '../world-data';
 import { wrappedDistance } from '../geometry';
+import { OUT_OF_SUPPLY_SPEED_MULTIPLIER } from '../combat/constants';
 
 export const TERRAIN_SPEED: Record<number, number> = {
   [TERRAIN_CLASS.plain]: 1,
@@ -42,7 +43,8 @@ export function currentMovementLeg(session: SimContext, army: ArmyStack): Curren
     ? ROAD_BONUS
     : (TERRAIN_SPEED[session.world.terrainClassAt(army.x, army.z)] ?? 0.9) * ROAD_BONUS;
   const worldUnitsPerGameHour = stackBaseSpeed(army) * STRATEGIC_MOVEMENT_SCALE * terrainScale
-    * (army.status === 'retreating' ? 3 : 1) * (session.movementSpeedMultiplier ?? 1);
+    * (army.status === 'retreating' ? 3 : 1) * (session.movementSpeedMultiplier ?? 1)
+    * (army.inSupply === false ? OUT_OF_SUPPLY_SPEED_MULTIPLIER : 1);
   return {
     targetX,
     targetZ,

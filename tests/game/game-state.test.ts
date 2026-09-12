@@ -17,7 +17,7 @@ function minimalState(): GameState {
       24: {
         id: 24, name: 'Spain', color: '#8EB0BB', controller: 'player',
         stockpile: { ...emptyStockpile(), funds: 100 },
-        income: emptyStockpile(), industryCapacity: 10, warheads: 0,
+        income: emptyStockpile(), industryCapacity: 10, warheads: 0, phase: 2,
       },
     },
     provinceOwners: { 294: 24, 295: 0 },
@@ -27,7 +27,7 @@ function minimalState(): GameState {
       'army-1': {
         id: 'army-1', ownerCountryId: 24, name: '1st Army', x: 100, z: 200,
         graphNodeId: 5, status: 'idle', order: null, extractingNodeId: null,
-        navalCrossing: null,
+        navalCrossing: null, organization: 100, entrenchment: 0, stance: 'attack-defend', inSupply: true,
         units: [{ typeId: 'infantry', count: 4, hp: 400, experience: 0 }],
       },
     },

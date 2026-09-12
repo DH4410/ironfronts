@@ -8,14 +8,17 @@ const audioManager = readFileSync(
 );
 
 describe('war-room UI audio profile', () => {
-  it('keeps hover, selection, and operation confirmation off bright sampled chirps', () => {
+  // 'select' gained a purpose-built army-select sample in a later, deliberate
+  // pass ("feat(audio): add 0ad tactical sound cues") — a real RTS
+  // unit-selection bark, not the generic bright menu chirp this test was
+  // originally guarding against. Hover and confirm still hold the line.
+  it('keeps hover and operation confirmation off bright sampled chirps', () => {
     const mappings = audioManager.slice(
       audioManager.indexOf('const UI_SAMPLE_URLS'),
       audioManager.indexOf('const AMBIENCE_CONFIG'),
     );
 
     expect(mappings).not.toContain("hover:");
-    expect(mappings).not.toContain("select:");
     expect(mappings).not.toContain("confirm:");
   });
 

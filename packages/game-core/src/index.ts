@@ -14,6 +14,7 @@ export { currentMovementLeg } from '../../../src/game/units/movement';
 export { BUILDINGS } from '../../../src/game/construction';
 export { buildOptions } from '../../../src/game/construction';
 export { producibleUnits } from '../../../src/game/production';
+export { BUILDING_REQUIRED_PHASE, PHASE_LABELS, PHASE_MAX } from '../../../src/game/phase';
 export {
   declareWar, endAlliance, proposeDiplomacy, respondDiplomacy, sendDiplomaticMessage,
 } from '../../../src/game/diplomacy';

@@ -39,6 +39,7 @@ function world(): WorldData {
     ],
     provinceOwner: () => 2,
     provinceAt: () => 5,
+    terrainClassAt: () => 0,
     connections: new Float32Array(0),
     resourceNodes: [],
   } as unknown as WorldData;

@@ -28,6 +28,15 @@ const MANPOWER_PER_100K = 0.5;
 // near-instant old cadence.
 const FOOD_PER_PROVINCE = 0.4;
 const URBAN_FUNDS_BONUS = 4;
+/**
+ * Anti-snowball: a province held by anyone other than its original owner
+ * produces less — partisan friction, unfamiliar administration, redirected
+ * output. Applies to passive income only (extraction is a separate,
+ * army-driven system and is not discounted here). A province that started
+ * unowned (world.provinceOwner === 0) isn't "occupied" when claimed — that's
+ * ordinary expansion into unclaimed ground, not conquest.
+ */
+const OCCUPIED_INCOME_MULTIPLIER = 0.5;
 
 export function recomputeIncome(state: GameState, world: WorldData): void {
   const income = new Map<number, Stockpile>();
@@ -39,10 +48,13 @@ export function recomputeIncome(state: GameState, world: WorldData): void {
     if (!owner) continue;
     const line = income.get(owner);
     if (!line) continue;
-    line.funds += (province.population / 100_000) * FUNDS_PER_100K;
-    line.manpower += (province.population / 100_000) * MANPOWER_PER_100K;
-    line.food += FOOD_PER_PROVINCE;
-    if (province.urban) line.funds += URBAN_FUNDS_BONUS;
+    const originalOwner = world.provinceOwner(province.id);
+    const occupied = originalOwner !== 0 && originalOwner !== owner;
+    const multiplier = occupied ? OCCUPIED_INCOME_MULTIPLIER : 1;
+    line.funds += (province.population / 100_000) * FUNDS_PER_100K * multiplier;
+    line.manpower += (province.population / 100_000) * MANPOWER_PER_100K * multiplier;
+    line.food += FOOD_PER_PROVINCE * multiplier;
+    if (province.urban) line.funds += URBAN_FUNDS_BONUS * multiplier;
   }
   for (const [countryId, line] of income) {
     const country = state.countries[countryId];

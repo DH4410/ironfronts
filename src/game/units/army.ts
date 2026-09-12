@@ -9,6 +9,13 @@
 import type { UnitType } from './unit-types';
 import { unitType } from './unit-catalog';
 
+/**
+ * Combat posture — see combat/stance.ts for what each one actually does.
+ * Names match the existing `stance-*` icon set 1:1 so the UI needs no mapping
+ * layer. 'attack-defend' (balanced) is the default: no modifiers either way.
+ */
+export type ArmyStance = 'attack' | 'attack-defend' | 'defend' | 'defend-retreat' | 'retreat';
+
 export type ArmyStatus =
   | 'idle'
   | 'moving'
@@ -88,6 +95,26 @@ export interface ArmyStack {
      *  (that phase instead consumes the normal movement distance budget). */
     hoursRemaining: number;
   } | null;
+  /**
+   * Organization/readiness, 0..100. Separate from HP: drains while engaged in
+   * combat, recovers passively while not. A stack can be forced to retreat by
+   * low organization well before its HP pool is exhausted (see
+   * combat/organization.ts) — this is what lets an offensive be repelled
+   * without annihilating the defender first.
+   */
+  organization?: number;
+  /**
+   * Entrenchment, 0..100. Grows while the stack is stationary and not engaged
+   * (see combat/entrenchment.ts); clears the moment it takes a move order.
+   * Reduces incoming damage while defending in place.
+   */
+  entrenchment?: number;
+  /** Combat posture; see ArmyStance. Defaults to 'attack-defend' (balanced). */
+  stance?: ArmyStance;
+  /** Within reach of the owner's own territory — see combat/supply.ts. An
+   *  out-of-supply stack fights, holds, and moves worse. Recomputed on a
+   *  slow cadence, not every tick. */
+  inSupply?: boolean;
 }
 
 export function groupMaxHp(group: UnitGroup): number {
@@ -106,6 +133,10 @@ export function ensureArmyRuntimeState(stack: ArmyStack): void {
   stack.retreat ??= null;
   stack.artillery ??= { targetArmyId: null, manualTarget: false };
   stack.navalCrossing ??= null;
+  stack.organization ??= 100;
+  stack.entrenchment ??= 0;
+  stack.stance ??= 'attack-defend';
+  stack.inSupply ??= true;
 }
 
 export function stackUnitCount(stack: ArmyStack): number {

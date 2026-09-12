@@ -4,7 +4,10 @@ import type { BattleFrontSideState, BattleFrontState } from '../game-state';
 import type { SimContext } from '../sim-context';
 import type { ArmyStack } from '../units/army';
 import { issueRetreatOrder, retreatPaths, type RetreatPath } from '../units/movement';
-import { sideArmies, sideHp, sideBaseline, removeArmyFromAllFronts } from './fronts';
+import {
+  sideArmies, sideHp, sideBaseline, sideOrganizationFraction, sideRetreatThresholdMultiplier, removeArmyFromAllFronts,
+} from './fronts';
+import { ORGANIZATION_RETREAT_THRESHOLD } from './constants';
 
 function legalFirstNodes(session: SimContext, army: ArmyStack, front: BattleFrontState): number[] {
   const edge = occupiedEdge(session, army);
@@ -86,7 +89,14 @@ export function issueManualRetreat(
 
 export function autoRetreat(session: SimContext, front: BattleFrontState, side: BattleFrontSideState): boolean {
   const armies = sideArmies(session, side);
-  if (armies.length === 0 || sideHp(session, side) >= sideBaseline(side) * 0.1) return false;
+  if (armies.length === 0) return false;
+  // Near-annihilation still forces a retreat outright; a broken-but-largely-
+  // intact force is also pulled back once its organization collapses, so a
+  // battle can be lost without the loser being wiped out first.
+  const nearlyDestroyed = sideHp(session, side) < sideBaseline(side) * 0.1;
+  const threshold = ORGANIZATION_RETREAT_THRESHOLD * sideRetreatThresholdMultiplier(session, side);
+  const brokenOrganization = sideOrganizationFraction(session, side) < threshold;
+  if (!nearlyDestroyed && !brokenOrganization) return false;
   const routes = armies.map((army) => retreatPaths(
     session, army, legalFirstNodes(session, army, front),
   )[0]);

@@ -1070,6 +1070,7 @@ async function bootstrapGameSession(
     playerCountry: { name: player.name, color: player.color },
     resources: playerResourceLines(session),
     resourceOverlay: false,
+    countryPhase: session.ownCountry.phase,
   });
 
   // Initial marker upload (before the first sim tick) so armies show at once.
@@ -1093,7 +1094,7 @@ async function bootstrapGameSession(
   const hudTimer = window.setInterval(() => {
     // Fog visibility is O(foreignArmies × visionSources); compute it once per
     // HUD tick and share it between the marker upload and the selection card.
-    uiStore.patch({ resources: playerResourceLines(session) });
+    uiStore.patch({ resources: playerResourceLines(session), countryPhase: session.ownCountry.phase });
     syncArmyMarkers(session, renderer);
     syncCombatMarkers(session);
     spawnOngoingBattleFx(session, renderer);
@@ -2034,6 +2035,11 @@ function handleArmyCommand(command: ArmyPanelCommand): void {
     if (!result.ok) pushNotification('warning', 'Extract', result.reason ?? 'Cannot extract here.');
     else pushNotification('information', 'Extraction started', 'Deposit is now feeding your stockpile.');
     refreshSelectedArmy(session);
+    return;
+  }
+  if (command.startsWith('stance-')) {
+    session.orderStance(selectedArmyId, command.slice('stance-'.length) as Parameters<typeof session.orderStance>[1]);
+    refreshSelectedArmy(session);
   }
 }
 
@@ -2065,6 +2071,10 @@ function refreshSelectedArmy(
       unitCount: comp?.unitCount ?? 0,
       strength: comp ? Math.min(1, comp.unitCount / 12) : 0,
       health: comp?.health ?? 0,
+      organization: comp?.organization,
+      entrenchment: comp?.entrenchment,
+      stance: comp?.stance,
+      inSupply: comp?.inSupply,
       selected: true,
       combat,
       moveOrder: view.moveOrder,
@@ -2110,6 +2120,7 @@ function projectSelectedProvince(
     terrain: selectedProvinceTerrain,
     resources: summary.resources,
     isOwn: summary.isOwn,
+    occupied: summary.occupied,
     coastal: false,
     buildings: summary.isOwn
       ? ((session.state.provinceBuildings[provinceId] as {
@@ -2120,9 +2131,9 @@ function projectSelectedProvince(
       ? { controlled: summary.controlled, extracting: summary.extracting }
       : null,
     producible: summary.isOwn
-      ? session.productionOptions(provinceId).filter((option) => option.available).map((option) => ({
+      ? session.productionOptions(provinceId).map((option) => ({
           id: option.unitTypeId, name: gameUnitLabel(option.unitTypeId), costLabel: unitCostLabel(option.unitTypeId),
-          affordable: option.affordable, reason: option.reason,
+          affordable: option.affordable, available: option.available, reason: option.reason,
         }))
       : [],
     // Only the head order is being worked; it carries live progress/eta.
@@ -2133,8 +2144,8 @@ function projectSelectedProvince(
         }))
       : [],
     buildable: summary.isOwn
-      ? session.buildable(provinceId).map(({ id, affordable }) => ({
-          id, name: buildingLabel(id), costLabel: buildingCostLabel(id), affordable,
+      ? session.buildable(provinceId).map(({ id, available, affordable, reason }) => ({
+          id, name: buildingLabel(id), costLabel: buildingCostLabel(id), affordable, available, reason,
         }))
       : [],
     construction: summary.isOwn
@@ -2743,8 +2754,6 @@ function playerResourceLines(session: RemoteGameSession): ResourceLine[] {
     line('stone', 'Stone', s.stone, ext.stone ?? 0),
     line('metal', 'Metal', s.metal, ext.metal ?? 0),
     line('oil', 'Oil', s.oil, ext.oil ?? 0),
-    // Live military headcount — not a stockpile, no rate.
-    line('army', 'Army', session.armySize),
   ];
   // Only surfaced once a warhead is ready — a rare mechanic, not permanent
   // clutter. The chip is the discovery hook for the N-to-strike order.

@@ -160,10 +160,20 @@ fn combatEffectFragment(input: EffectOut) -> @location(0) vec4f {
     let f = clamp(core + spikes * 0.5, 0.0, 1.0);
     rgb = mix(vec3f(1.0, 0.86, 0.45), vec3f(1.0, 1.0, 0.95), core);
     a = f;
-  } else if (kind == 1) {                 // tracer — streak along local x
+  } else if (kind == 1) {
+    // Tracer — thin streak with a white-hot core cooling to amber at both
+    // tips. This billboard is screen-aligned, not rotated to travel dir
+    // (see the vertex stage above), so a one-sided bright-head/dim-tail
+    // gradient would point the wrong way whenever the camera is rotated off
+    // the firing direction. A center-hot, symmetric gradient instead reads
+    // as "a glowing round in flight" from any camera angle, distinguishing
+    // it from the flat-colored bar it used to be and from the plain dot used
+    // for kind 2 (projectile).
     let d = abs(uv.y) + max(0.0, abs(uv.x) - 0.85) * 4.0;
-    a = clamp(1.0 - d * 3.0, 0.0, 1.0) * (0.6 + 0.4 * input.seed);
-    rgb = vec3f(1.0, 0.82, 0.42);
+    let envelope = clamp(1.0 - d * 3.0, 0.0, 1.0);
+    let heat = 1.0 - smoothstep(0.0, 0.8, abs(uv.x)); // hottest at center, cooling toward both tips
+    a = envelope * (0.6 + 0.4 * input.seed) * mix(0.88, 1.0, heat);
+    rgb = mix(vec3f(1.0, 0.78, 0.35), vec3f(1.0, 0.97, 0.85), heat);
   } else if (kind == 2) {                 // projectile — bright dot + tail
     a = softDisc(uv * 1.4, 0.0);
     rgb = vec3f(1.0, 0.9, 0.7);

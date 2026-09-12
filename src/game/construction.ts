@@ -18,6 +18,7 @@ import { PROTOTYPE_HOURS_PER_HOUR } from './time';
 import type { SimContext } from './sim-context';
 import type { ConstructionOrder, ProvinceBuildings, Stockpile } from './game-state';
 import type { BuildingId } from './units/unit-types';
+import { BUILDING_REQUIRED_PHASE } from './phase';
 
 
 interface BuildingDef {
@@ -80,6 +81,7 @@ export function buildOptions(
   for (const id of Object.keys(BUILDINGS) as BuildingId[]) {
     if (levelOf(ctx, provinceId, id) >= 1) continue;
     if (queuedAlready(ctx, provinceId, id)) continue;
+    if ((country.phase ?? 1) < BUILDING_REQUIRED_PHASE[id]) continue;
     out.push({ id, affordable: affordable(country.stockpile, BUILDINGS[id].cost) });
   }
   return out;
