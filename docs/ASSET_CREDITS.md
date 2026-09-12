@@ -423,26 +423,83 @@ DevTools Protocol screenshot capture was flaky/timing out for stretches, for
 reasons unrelated to this codebase) — left for whenever that's reliably
 available.
 
-**Lead found:** an abandoned `feature/in-game-ui-world-polish` branch
-(2026-08-26, superseded by later painterly-art and simulation-refactor work —
-see `HANDOFF.md`) had already wired a close-LOD building loader against:
+### Original lead (2026-08-26 abandoned branch)
 
-**Project:** Kenney's CC0 "City Kit (Suburban)" — mirrored at
-<https://github.com/petroulacl/fps-buildings-env-kit> (`buildings/kenney-city-kit-suburban/`).
-**Licence:** CC0 (public domain) — Kenney's asset packs are CC0 by default;
-this specific mirror repo's own licence should still be double-checked before
-vendoring, since it is a third-party re-host rather than kenney.nl itself.
+An abandoned `feature/in-game-ui-world-polish` branch (superseded by later
+painterly-art and simulation-refactor work — see `HANDOFF.md`) had wired a
+close-LOD building loader against Kenney's CC0 "City Kit (Suburban)",
+mirrored at <https://github.com/petroulacl/fps-buildings-env-kit>
+(`buildings/kenney-city-kit-suburban/`). The old loader
+(`src/external-models.ts` in that commit history, now gone from `main`)
+fetched five `.obj` variants from that mirror at runtime. Superseded by the
+survey below — Kenney's kit turned out not to be the best style fit anyway
+(see "Style fit is the real bottleneck").
 
-The old branch's loader (`src/external-models.ts` in that commit history, now
-gone from `main`) fetched five `.obj` building variants
-(`building-type-{a,g,i,q,t}.obj`) from that mirror at runtime and parsed them
-client-side. That runtime-fetch approach is worth reconsidering — vendoring
-the `.obj`/texture files locally (matching how every other asset in this file
-is handled) would be more robust than a live fetch to a third-party mirror
-that could disappear or rate-limit. Whoever picks this up next should:
-1. Verify the mirror repo's own licence terms for redistribution.
-2. Vendor the needed files locally rather than fetching them live.
-3. Check current close-LOD building rendering (the code this would replace
-   has moved since August — re-locate it rather than assuming the old
-   integration points still exist) and confirm the visual result in a live
-   browser session before committing.
+### Sourcing survey (2026-09-12)
+
+Searched for a ready-made, licence-clean, low-poly building kit to replace
+the procedural boxes above. Style fit turned out to be the real obstacle,
+not availability — most freely-licensed, batch-ready building kits are built
+for cheerful city-builders, not somber 1930s-40s war games, and the ones
+with a better tonal fit have licence terms too vague to vendor into this
+(public) repo. None of the following were vendored; this is a survey to
+save the next pass from re-treading the same searches.
+
+**Purpose-built low-poly kits (technically ideal, wrong tone) — confirmed CC0:**
+- Kenney "City Kit (Suburban)" v2 — <https://kenney.nl/assets/city-kit-suburban> — CC0,
+  but the current v2 release ("completely remade") no longer matches the
+  filenames (`building-type-{a,g,i,q,t}.obj`) the 2026-08-26 branch fetched
+  from the GitHub mirror above, so that specific integration path is stale
+  regardless. Visual style reads as cartoonish/stylized, not war-appropriate.
+- Quaternius "LowPoly Buildings Pack" (aka Ultimate Textured Building Pack) —
+  <https://opengameart.org/content/lowpoly-buildings-pack> — CC0, FBX/OBJ/Blend,
+  modular with swappable palettes. Style is explicitly "Earthbound-inspired"
+  (cute, colourful SNES-JRPG look) — a poor fit.
+
+**Best style fit found — licence too vague to vendor as-is:**
+- "Industrial Low Poly City" by Voloshka —
+  <https://viravoloshyn.itch.io/low-poly-city-asset-pack> — 526 free modular
+  FBX prefabs (walls, doors, windows, roofs) in 10 palettes including
+  **Khaki, Charcoal, Steel Blue, Navy** — genuinely muted/industrial, not
+  cartoonish, and even ships lit/unlit/partially-lit window variants that
+  would slot straight into this game's existing night-window emissive
+  system. The page states prefabs are "100% free to download and use in
+  your personal or commercial projects" but never says CC0 or addresses
+  redistributing the raw source files (as opposed to using them inside a
+  built game) — not the same guarantee as this file's other CC0/CC-BY
+  entries. **Before vendoring: message the creator (itch.io has a built-in
+  contact/comment system) asking explicitly whether the free files may be
+  committed to a public source repository, and get that in writing before
+  adding files here.** If confirmed, this is the strongest candidate found.
+
+**War-thematic props (not town buildings, but worth remembering) — no usable licence found:**
+- "3D Trench Warfare Low Poly" by nuclearwinter94 —
+  <https://nuclearwinter94.itch.io/tre> — bunker, trench sections, sandbags,
+  barbed wire, Czech hedgehogs, in `.obj`/`.fbx`/`.glb`/`.blend`, explicitly
+  aimed at "strategy games, historical simulations." **No licence text of any
+  kind on the page** — under default copyright this is not usable without
+  contacting the creator, however good the fit.
+
+**Confirmed CC0 but the wrong kind of content:**
+- "LowPoly Modular Assets" (bunker interior) by Nailfighter —
+  <https://nailfighter.itch.io/low-poly-bunker-modular-assets> — explicitly
+  linked CC0 v1.0 Universal license, FBX, muted industrial style. Contents
+  are bunker-interior primitives (brick wall sections in two sizes, a door,
+  a pillar, crates, tiles) rather than complete exterior town buildings —
+  possibly useful as raw material to compose simple exteriors from (same
+  spirit as this project's own procedural `MeshBuilder` boxes-and-roofs
+  approach), but that's a modelling exercise, not a drop-in replacement.
+- Poly Haven (<https://polyhaven.com>) — the one unambiguously-CC0-everything
+  source checked — has no building/structure models at all; it's a
+  photoreal PBR prop/texture/HDRI library, not a game-ready building kit.
+
+**Recommendation for whoever picks this up:** contact Voloshka about
+redistribution terms first — it's the only candidate that is both licensable
+(pending confirmation) and stylistically right. If that falls through, the
+Nailfighter CC0 primitives are the fallback raw material, at the cost of
+someone doing real modelling work to assemble them into buildings. Either
+path is a genuinely separate task from the procedural-geometry tuning above:
+it needs an FBX or OBJ import path (neither exists in the client today — the
+2026-08-26 branch's OBJ parser was deleted), a way to feed imported geometry
+into the same instanced-rendering pipeline `scene-meshes.ts`/`props.ts`
+currently drive from pure code, and a live-browser verification pass.
