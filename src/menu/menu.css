@@ -562,7 +562,12 @@
 .ifm__country-row.is-selected { background: rgba(81,124,68,.28); color: var(--hud-gold-bright); }
 .ifm__country-row:disabled { color: var(--hud-text-dim); cursor: default; opacity: .55; }
 .ifm__country-swatch {
-  flex: 0 0 auto; width: 13px; height: 9px; border: 1px solid rgba(0,0,0,.55);
+  flex: 0 0 auto; width: 24px; height: 15px; overflow: hidden;
+  border: 1px solid rgba(0,0,0,.65); background: #5c5f5b;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.05);
+}
+.ifm__country-swatch img {
+  display: block; width: 100%; height: 100%; object-fit: cover;
 }
 .ifm__country-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ifm__country-meta {
