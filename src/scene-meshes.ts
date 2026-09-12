@@ -55,14 +55,37 @@ export function createTreeFamilyMesh(device: GPUDevice, family: 'broadleaf' | 'c
   return uploadMesh(device, `${family} tree lod ${lod}`, new Float32Array(builder.vertices), new Uint16Array(builder.indices));
 }
 
+/**
+ * Each archetype gets a genuinely different footprint and height, not just a
+ * different roof. From the game's high strategic camera, roof shape alone
+ * reads as near-identical silhouettes at this scale; footprint and height
+ * variety is what actually differentiates buildings from that angle.
+ */
 export function createBuildingArchetypeMesh(device: GPUDevice, archetype: number, lod: 0 | 1): Mesh {
   const builder = new MeshBuilder();
-  builder.addBox(-0.5, 0, -0.5, 0.5, 1, 0.5, 0);
-  if (archetype === 1) builder.addHipRoof(0, 1, 0, 0.62, 1.24, 4);
-  else if (archetype === 2) builder.addBox(-0.54, 1, -0.54, 0.54, 1.055, 0.54, 5, 5);
-  else builder.addGableRoof(-0.56, 1, -0.56, 0.56, lod === 0 ? 1.24 : 1.18, 0.56, 1);
-  if (lod === 0 && archetype === 3) builder.addBox(-0.68, 0, -0.38, 0.68, 0.42, 0.38, 2, 2);
-  if (lod === 0 && archetype === 4) builder.addBox(-0.18, 1, -0.18, 0.18, 1.52, 0.18, 3, 3);
+  if (archetype === 0) {
+    // Small square cottage.
+    builder.addBox(-0.42, 0, -0.42, 0.42, 0.82, 0.42, 0);
+    builder.addGableRoof(-0.48, 0.82, -0.48, 0.48, lod === 0 ? 1.18 : 1.12, 0.48, 1);
+  } else if (archetype === 1) {
+    // Tall, narrow townhouse.
+    builder.addBox(-0.34, 0, -0.44, 0.34, 1.32, 0.44, 0);
+    builder.addHipRoof(0, 1.32, 0, 0.5, 1.62, 4);
+  } else if (archetype === 2) {
+    // Wide, low shop or warehouse with a flat roof and a slight parapet.
+    builder.addBox(-0.66, 0, -0.4, 0.66, 0.68, 0.4, 0);
+    builder.addBox(-0.7, 0.68, -0.44, 0.7, 0.74, 0.44, 5, 5);
+  } else if (archetype === 3) {
+    // Larger building with a lean-to porch along one side.
+    builder.addBox(-0.56, 0, -0.42, 0.56, 1.02, 0.42, 0);
+    builder.addGableRoof(-0.62, 1.02, -0.48, 0.62, lod === 0 ? 1.28 : 1.2, 0.48, 1);
+    if (lod === 0) builder.addBox(-0.7, 0, -0.36, 0.7, 0.4, 0.36, 2, 2);
+  } else {
+    // Tallest archetype, topped with a chimney/tower.
+    builder.addBox(-0.46, 0, -0.46, 0.46, 1.55, 0.46, 0);
+    builder.addGableRoof(-0.52, 1.55, -0.52, 0.52, lod === 0 ? 1.85 : 1.78, 0.52, 1);
+    if (lod === 0) builder.addBox(-0.16, 1.85, -0.16, 0.16, 2.2, 0.16, 3, 3);
+  }
   return uploadMesh(device, `building archetype ${archetype} lod ${lod}`, new Float32Array(builder.vertices), new Uint16Array(builder.indices));
 }
 

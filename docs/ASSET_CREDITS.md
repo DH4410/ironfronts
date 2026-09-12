@@ -379,12 +379,26 @@ Lanczos-downscaled with Pillow — portraits to 384 px, icons to 256 px
 
 ## Sourcing lead: better close-LOD building models (not yet integrated)
 
-**Status: identified, not wired into the current renderer.** The handoff's
-ask to replace the current procedural/placeholder building geometry needs
-real 3D assets and a renderer integration pass with working visual
-verification — neither was safe to do blind this session (no working
-screenshot capture against the current build), so this is left for a
-session where that verification is available.
+**Status: procedural variety improved (2026-09-12); real sourced 3D models
+still not integrated.** `src/scene-meshes.ts`'s `createBuildingArchetypeMesh`
+previously gave all 5 building archetypes the *same* footprint and height,
+varying only roof shape — from the game's high strategic camera, roof shape
+alone reads as near-identical boxes. Each archetype now has a genuinely
+different footprint, height, and roofline (small cottage, tall townhouse,
+wide low shop/warehouse, larger building with a porch, tallest with a
+chimney/tower), verified visually in a live session. This is a same-session,
+zero-risk change (pure client-side mesh generation, no world rebuild, no new
+asset pipeline) — it does not touch `scripts/build-world.mjs`'s per-instance
+archetype/scale assignment, which is a separate, riskier surface (a world
+rebuild there was what caused the coastal resource-node drift repaired this
+session — see the game.json backups in `data/`).
+
+Replacing the procedural boxes with real sourced 3D models is a larger,
+separate task that needs a renderer integration pass with working visual
+verification, which was intermittently unavailable this session (Chrome
+DevTools Protocol screenshot capture was flaky/timing out for stretches, for
+reasons unrelated to this codebase) — left for whenever that's reliably
+available.
 
 **Lead found:** an abandoned `feature/in-game-ui-world-polish` branch
 (2026-08-26, superseded by later painterly-art and simulation-refactor work —

@@ -44,6 +44,25 @@ describe('bounded authoritative army presentation', () => {
     motion.clear();
     expect(motion.sample('a',200,0,{targetX:300,targetZ:0,durationMs:1000,generation:1},500,1000).x).toBe(200);
   });
+  it('a pursuit repath that reverses target direction shows the real position, never a wild extrapolation', () => {
+    // Mirrors src/game/movement/pursuit.ts's revalidateOrder: a chased target
+    // moves and the chaser's whole path (and therefore targetX/targetZ) is
+    // replaced, possibly to somewhere behind where it was just heading. The
+    // interpolator must not invent a diagonal cut through unverified ground —
+    // it should fall back to the exact authoritative sample.
+    const motion = new ArmyMotionInterpolator();
+    motion.sample('a', 0, 0, { targetX: 100, targetZ: 0, durationMs: 1000, sampledAtEpochMs: 0 }, 0, 1000);
+    // Barely any time has passed (50ms) when the repath reverses the target
+    // entirely — the worst case for "stutter".
+    const reversed = motion.sample(
+      'a', 5, 0, { targetX: -100, targetZ: 0, durationMs: 1000, sampledAtEpochMs: 50 }, 250, 1000,
+    );
+    // Whatever it shows, it must be the real reported position (5,0) — not a
+    // point extrapolated past it in either the old or new direction.
+    expect(reversed.x).toBeCloseTo(5);
+    expect(reversed.z).toBeCloseTo(0);
+  });
+
   it('uses the presented marker position for CPU picking', () => {
     const picker = new ArmyPicker();
     picker.update([{ id:'a',x:0,z:0,targetX:100,targetZ:0,remainingMs:1000 }],0);
