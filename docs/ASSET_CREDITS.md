@@ -385,13 +385,36 @@ previously gave all 5 building archetypes the *same* footprint and height,
 varying only roof shape — from the game's high strategic camera, roof shape
 alone reads as near-identical boxes. Each archetype now has a genuinely
 different footprint, height, and roofline (small cottage, tall townhouse,
-wide low shop/warehouse, larger building with a porch, tallest with a
-chimney/tower), verified visually in a live session. This is a same-session,
-zero-risk change (pure client-side mesh generation, no world rebuild, no new
-asset pipeline) — it does not touch `scripts/build-world.mjs`'s per-instance
-archetype/scale assignment, which is a separate, riskier surface (a world
-rebuild there was what caused the coastal resource-node drift repaired this
-session — see the game.json backups in `data/`).
+wide low shop/warehouse, larger building with a porch, and a landmark
+archetype redesigned from a thin spire into a wide civic-building base with
+a modest clock-tower flourish so it reads as an imposing capital building
+rather than just "the tall one"), verified visually in a live session at
+both day and night lighting. This is a same-session, zero-risk change (pure
+client-side mesh generation, no world rebuild, no new asset pipeline) — it
+does not touch `scripts/build-world.mjs`'s per-instance archetype/scale
+assignment, which is a separate, riskier surface (a world rebuild there was
+what caused the coastal resource-node drift repaired this session — see the
+game.json backups in `data/`).
+
+Two things worth knowing if this gets touched again:
+- **Footprint ceiling.** `scripts/world/instances.mjs`'s `ARCHETYPE_FOOTPRINT_HALF`
+  bakes in an assumed footprint half-extent per archetype for its coastal
+  water-clearance check, run once at world-build time against the *already
+  baked* `data/game.json`/`public/world` — going wider than that without also
+  rebuilding the world risks a building's corner rendering into open water at
+  some unlucky coastal placements (archetype 2 briefly did before being
+  trimmed back; see the comments in `createBuildingArchetypeMesh`). Archetype
+  4 has a generous 3.0-world-unit safety margin there and can safely go
+  wider; the others have only a 0.75-unit margin.
+- **Material index is not decorative — it's a visibility switch.** The
+  fragment shader in `src/shaders/props.ts` hides materials 2/3/4/5 for every
+  archetype except the one each is hardcoded to (porch=3-only-for-3,
+  tower=4-only-for-4, hip-roof=4-only-for-1(!), flat-roof=5-only-for-2), and
+  additionally hides material 1 (gable roof) specifically for archetypes 1
+  and 2. Using the wrong material index for an archetype doesn't error — the
+  geometry just renders invisible. `tests/building-archetype-materials.test.ts`
+  is a GPU-free regression test against exactly this mistake (which this
+  session nearly shipped while widening the landmark archetype).
 
 Replacing the procedural boxes with real sourced 3D models is a larger,
 separate task that needs a renderer integration pass with working visual
