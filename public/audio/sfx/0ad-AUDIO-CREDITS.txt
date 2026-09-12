@@ -1,0 +1,20 @@
+0 A.D. audio used by Ironfronts
+
+Copyright (C) 2009 Wildfire Games.
+
+The following sound files were copied unmodified from the 0 A.D. public audio
+tree, branch main:
+
+  0ad-army-select.ogg  interface/select/building/sel_universal_1.ogg
+  0ad-move-order.ogg   interface/ui/rally_click_01.ogg
+  0ad-victory.ogg      interface/alarm/alarmvictory_1.ogg
+  0ad-defeat.ogg       interface/alarm/alarmdefeat_1.ogg
+  0ad-close-battle.ogg attack/weapon/sword_attack_08.ogg
+
+Source: https://gitea.wildfiregames.com/0ad/0ad/src/branch/main/binaries/data/mods/public/audio
+Original author: Wildfire Games (https://www.wildfiregames.com/)
+Licence: Creative Commons Attribution-ShareAlike 3.0
+https://creativecommons.org/licenses/by-sa/3.0/
+
+The upstream licence text is included alongside these files as
+0ad-AUDIO-LICENSE.txt.

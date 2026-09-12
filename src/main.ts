@@ -1810,6 +1810,8 @@ function handleMapClick(
       if (!result.ok) {
         const { title, body } = describeOrderFailure(result.reason ?? 'No route.');
         pushNotification('warning', targetingMode === 'split' ? 'Split failed' : title, body);
+      } else {
+        void audio.playUiCue('move');
       }
       awaitingMoveTarget = false;
       targetingMode = null;
@@ -1873,6 +1875,7 @@ function handleMapClick(
     const ground = renderer.groundPointAt(clientX, clientY);
     if (ground) {
       session.setRally(selectedProvinceId, ground[0], ground[1]);
+      void audio.playUiCue('move');
       awaitingRallyTarget = false;
       pushNotification('information', 'Rally point set', 'New units from here will march to it.');
       refreshSelectedProvince(session);
@@ -1956,12 +1959,14 @@ function handleMapCommand(
   }
   const result = session.orderMove(selectedArmyId, ground[0], ground[1], 'move');
   if (!result.ok) orderFeedback(result.reason ?? 'No route.');
+  else void audio.playUiCue('move');
   refreshSelectedArmy(session);
   if (activeRenderer) syncArmyMarkers(session, activeRenderer);
   return true;
 }
 
 function selectArmy(session: RemoteGameSession, armyId: string): void {
+  void audio.playUiCue('select');
   selectedArmyId = armyId;
   awaitingMoveTarget = false;
   targetingMode = null;
@@ -2218,6 +2223,13 @@ function spawnOngoingBattleFx(session: RemoteGameSession, renderer: WorldRendere
         frontIds: (a.battleFronts ?? []).map((f) => f.id),
       })),
   );
+  const worldWidth = renderer.manifest?.world.width ?? 0;
+  const closeBattle = lastCombatCameraDistance <= 1_400
+    && worldWidth > 0
+    && [...clusters.values()].some((cluster) => wrappedDistance(
+      renderer.camera.target[0], renderer.camera.target[2], cluster.x, cluster.z, worldWidth,
+    ) <= 700);
+  if (closeBattle) void audio.playEffectCue('close-battle');
   const activeFronts = new Set<string>();
   const activeProvinces = new Set<number>();
   for (const [frontId, cluster] of clusters) {
@@ -2284,6 +2296,7 @@ function drainSessionEvents(session: RemoteGameSession): void {
       { sticky: true });
     uiStore.patch({ paused: true });
     void music.setState(won ? 'victory' : 'peace');
+    void audio.playEffectCue(won ? 'victory' : 'defeat');
   }
 
   for (const done of session.pendingCompletions.splice(0)) {

@@ -7,16 +7,25 @@ import {
   clampVolume,
 } from './audio-preferences';
 
-export type UiAudioCue = 'hover' | 'select' | 'dossier-open' | 'dossier-close' | 'confirm' | 'back';
+export type UiAudioCue = 'hover' | 'select' | 'move' | 'dossier-open' | 'dossier-close' | 'confirm' | 'back';
+export type EffectAudioCue = 'victory' | 'defeat' | 'close-battle';
 
 type GainMap = Record<AudioBus, GainNode>;
 type AudioContextConstructor = new () => AudioContext;
 type AmbienceKey = 'rain' | 'wind' | 'ocean';
 
 const UI_SAMPLE_URLS: Partial<Record<UiAudioCue, string>> = {
+  select: '/audio/sfx/0ad-army-select.ogg',
+  move: '/audio/sfx/0ad-move-order.ogg',
   'dossier-open': '/audio/sfx/dossier-open.wav',
   'dossier-close': '/audio/sfx/dossier-close.wav',
   back: '/audio/sfx/ui-switch.wav',
+};
+
+const EFFECT_SAMPLE_CONFIG: Record<EffectAudioCue, { url: string; volume: number; minimumGap: number }> = {
+  victory: { url: '/audio/sfx/0ad-victory.ogg', volume: 0.74, minimumGap: 2_000 },
+  defeat: { url: '/audio/sfx/0ad-defeat.ogg', volume: 0.72, minimumGap: 2_000 },
+  'close-battle': { url: '/audio/sfx/0ad-close-battle.ogg', volume: 0.32, minimumGap: 1_100 },
 };
 
 const AMBIENCE_CONFIG: Record<AmbienceKey, { url: string; volume: number; fadeSeconds: number }> = {
@@ -63,6 +72,8 @@ export class AudioManager {
   private readonly preparedMusic = new Map<string, PreparedMusic>();
   private readonly pendingUiCues = new Set<UiAudioCue>();
   private readonly uiCueTimes = new Map<UiAudioCue, number>();
+  private readonly pendingEffectCues = new Set<EffectAudioCue>();
+  private readonly effectCueTimes = new Map<EffectAudioCue, number>();
   private readonly ambience = new Map<AmbienceKey, LoopingAmbience>();
   private readonly requestedAmbience = new Set<AmbienceKey>();
   private visibilityCleanup?: () => void;
@@ -208,7 +219,7 @@ export class AudioManager {
         const sampled = await this.playSample(
           sample,
           uiGain,
-          cue === 'hover' ? 0.34 : cue === 'confirm' ? 0.64 : 0.58,
+          cue === 'hover' ? 0.34 : cue === 'move' ? 0.54 : cue === 'confirm' ? 0.64 : 0.58,
         );
         if (sampled) {
           if (cue === 'confirm') {
@@ -232,6 +243,9 @@ export class AudioManager {
           // Campaign selection: one low, dry mechanical thunk. No sampled
           // chirp and no per-click noise-buffer allocation.
           this.playTone(uiGain, 118, 76, 0.060, 0.040, 'triangle');
+          break;
+        case 'move':
+          this.playTone(uiGain, 156, 110, 0.070, 0.044, 'triangle');
           break;
         case 'dossier-open':
           this.playNoise(uiGain, 0.16, 0.026, 850, 3600);
@@ -259,6 +273,35 @@ export class AudioManager {
     }
   }
 
+  /**
+   * One-shot campaign and battle effects. These use the SFX bus so their
+   * volume is independent from music and interface clicks. Continuous battle
+   * callers may invoke this often; the cue-specific gap keeps it atmospheric.
+   */
+  async playEffectCue(cue: EffectAudioCue): Promise<boolean> {
+    // Do not repeatedly attempt to wake an autoplay-blocked context from a
+    // passive HUD timer. Victory/defeat may still use the player's prior input.
+    if (cue === 'close-battle' && !this.unlocked) return false;
+
+    const config = EFFECT_SAMPLE_CONFIG[cue];
+    const now = typeof performance === 'undefined' ? Date.now() : performance.now();
+    if (now - (this.effectCueTimes.get(cue) ?? -Infinity) < config.minimumGap) return false;
+    if (this.pendingEffectCues.has(cue)) return false;
+
+    this.effectCueTimes.set(cue, now);
+    this.pendingEffectCues.add(cue);
+    try {
+      if (!await this.unlock()) return false;
+      const effectsGain = this.gains?.effects;
+      if (!effectsGain) return false;
+      return this.playSample(config.url, effectsGain, config.volume);
+    } catch (error) {
+      console.warn(`Effect audio cue "${cue}" failed and was ignored.`, error);
+      return false;
+    } finally {
+      this.pendingEffectCues.delete(cue);
+    }
+  }
   setRainEnabled(enabled: boolean): Promise<void> {
     return this.setAmbienceEnabled('rain', enabled);
   }
@@ -446,6 +489,8 @@ export class AudioManager {
     this.preparedMusic.clear();
     this.pendingUiCues.clear();
     this.uiCueTimes.clear();
+    this.pendingEffectCues.clear();
+    this.effectCueTimes.clear();
 
     this.context = undefined;
     this.gains = undefined;
