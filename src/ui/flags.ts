@@ -23,8 +23,8 @@ const flagUrls = import.meta.glob('./assets/flags/*.svg', {
  *
  * A bare ISO code is a flag-icons file (MIT) whose modern art is unchanged
  * since 1939 (plain tricolours, Nordic crosses, the Hinomaru, the Union Jack).
- * A dated / descriptive stem is a period flag vendored from Wikimedia Commons
- * (all PD-old) specifically for this scenario — see docs/flags.md.
+ * A dated / descriptive stem is period art from Wikimedia Commons or another
+ * reusable source (public-domain or attributed as required) — see docs/flags.md.
  */
 const COUNTRY_FLAG: Record<string, string> = {
   // --- sovereign belligerents, 1939 flags ---

@@ -22,7 +22,7 @@ They continue to render a colour standard.
 
 ## Existing core period flags
 
-These were already present before this expansion: Germany 1935–1945, Kingdom of
+These were already present before this expansion: `de-1935-1945.svg` for Germany 1935–1945, Kingdom of
 Italy, Soviet Union 1936–1955, Kingdom of Greece, Kingdom of Yugoslavia, Kingdom
 of Egypt, Kingdom of Iraq, imperial Persia/Iran, Union of South Africa,
 Ethiopian Empire, Republic of China and Manchukuo.
