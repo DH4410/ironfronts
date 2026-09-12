@@ -35,6 +35,14 @@ form.addEventListener('submit', async (event) => {
   status.textContent = '';
   try {
     await (mode === 'login' ? login(username.value, password.value) : register(username.value, password.value));
+    const stage = document.querySelector<HTMLElement>('.login-stage');
+    if (stage && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      stage.classList.add('is-success');
+      await Promise.race([
+        new Promise((resolve) => stage.addEventListener('animationend', resolve, { once: true })),
+        new Promise((resolve) => setTimeout(resolve, 700)),
+      ]);
+    }
     window.location.replace('/');
   } catch (error) {
     status.textContent = error instanceof Error ? error.message : 'Unable to sign in.';

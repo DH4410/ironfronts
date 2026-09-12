@@ -9,6 +9,12 @@
   --login-ink: #161912;
   --login-paper: #d8caa8;
   --login-ease: cubic-bezier(.22, .76, .19, 1);
+  /* The header's padding-right must always clear the seal image's actual
+     footprint (right offset + width), or the heading text can render under
+     it. Derived with calc() below instead of a separately-tuned pixel value
+     per breakpoint, so the two can't drift out of sync again. */
+  --login-seal-right: clamp(22px, 3vw, 36px);
+  --login-seal-width: clamp(48px, 5.4vw, 68px);
 }
 
 * { box-sizing: border-box; }
@@ -111,8 +117,8 @@ input { font: inherit; }
   position: absolute;
   z-index: 2;
   top: clamp(21px, 3vw, 35px);
-  right: clamp(22px, 3vw, 36px);
-  width: clamp(48px, 5.4vw, 68px);
+  right: var(--login-seal-right);
+  width: var(--login-seal-width);
   height: auto;
   transform: rotate(8deg);
   filter: drop-shadow(1px 5px 5px rgba(39, 21, 11, .3));
@@ -122,7 +128,7 @@ input { font: inherit; }
 .login-tabs,
 #login-form { position: relative; z-index: 2; }
 
-.login-header { padding-right: 70px; }
+.login-header { padding-right: calc(var(--login-seal-right) + var(--login-seal-width) + 14px); }
 
 .login-logo {
   display: block;
@@ -314,6 +320,21 @@ input:focus {
 
 @keyframes login-spinner { to { transform: rotate(1turn); } }
 
+/* Played on the whole stage right before navigating away on a successful
+   sign-in — see login.ts, which waits for this animation (or a short
+   timeout fallback) before replacing the page. Skipped entirely under
+   prefers-reduced-motion (checked in JS, so the navigation isn't delayed). */
+.login-stage.is-success {
+  animation: login-success-exit .55s var(--login-ease) forwards;
+  pointer-events: none;
+}
+
+@keyframes login-success-exit {
+  0% { opacity: 1; transform: scale(1); filter: brightness(1); }
+  35% { opacity: 1; transform: scale(1.015); filter: brightness(1.2); }
+  100% { opacity: 0; transform: scale(1.03); filter: brightness(1.35); }
+}
+
 @media (max-width: 760px) {
   body { overflow: auto; }
   .login-scene__desk { inset: -18vmax; background-position: 58% center; }
@@ -324,9 +345,8 @@ input:focus {
 
 @media (min-width: 761px) and (max-height: 760px) {
   .login-stage { padding-block: 20px; }
-  .login-card { padding: 24px 31px 22px; }
-  .login-card__seal { top: 18px; right: 25px; width: 52px; }
-  .login-header { padding-right: 54px; }
+  .login-card { padding: 24px 31px 22px; --login-seal-right: 25px; --login-seal-width: 52px; }
+  .login-card__seal { top: 18px; }
   .login-logo { width: 230px; margin-bottom: 16px; }
   .login-heading { padding-bottom: 13px; }
   h1 { margin-bottom: 5px; font-size: 34px; }
@@ -340,9 +360,8 @@ input:focus {
 
 @media (max-width: 430px) {
   .login-stage { padding: 15px 10px; }
-  .login-card { padding: 25px 21px 22px; }
-  .login-card__seal { top: 19px; right: 18px; width: 48px; }
-  .login-header { padding-right: 47px; }
+  .login-card { padding: 25px 21px 22px; --login-seal-right: 18px; --login-seal-width: 48px; }
+  .login-card__seal { top: 19px; }
   .login-logo { width: 230px; margin-bottom: 20px; }
   h1 { font-size: 30px; }
   .login-heading p { font-size: 14px; }
