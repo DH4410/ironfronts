@@ -7,20 +7,68 @@
     <title>Ironfronts — Sign in</title>
   </head>
   <body class="login-page">
-    <main class="login-card">
-      <p class="login-eyebrow">Strategic Command</p>
-      <h1>IRONFRONTS</h1>
-      <p class="login-intro">Sign in to receive your field assignment.</p>
-      <div class="login-tabs" role="tablist" aria-label="Account action">
-        <button type="button" data-mode="login" aria-selected="true">Sign in</button>
-        <button type="button" data-mode="register" aria-selected="false">Create account</button>
-      </div>
-      <form id="login-form">
-        <label>Username<input id="username" name="username" autocomplete="username" minlength="3" maxlength="32" required /></label>
-        <label>Password<input id="password" name="password" type="password" autocomplete="current-password" minlength="8" maxlength="256" required /></label>
-        <button class="login-submit" type="submit">Sign in</button>
-        <p id="login-status" role="alert" aria-live="polite"></p>
-      </form>
+    <div class="login-scene" aria-hidden="true">
+      <div class="login-scene__desk"></div>
+      <div class="login-scene__wash"></div>
+      <div class="login-scene__vignette"></div>
+    </div>
+    <main class="login-stage">
+      <section class="login-card" aria-labelledby="login-title">
+        <span class="login-card__edge login-card__edge--top" aria-hidden="true"></span>
+        <span class="login-card__edge login-card__edge--bottom" aria-hidden="true"></span>
+        <span class="login-card__corner login-card__corner--tl" aria-hidden="true"></span>
+        <span class="login-card__corner login-card__corner--tr" aria-hidden="true"></span>
+        <span class="login-card__corner login-card__corner--bl" aria-hidden="true"></span>
+        <span class="login-card__corner login-card__corner--br" aria-hidden="true"></span>
+        <img class="login-card__seal" src="/menu/login/command-seal.png" alt="" />
+
+        <header class="login-header">
+          <img class="login-logo" src="/menu/title.png" alt="Ironfronts" />
+          <div class="login-heading">
+            <h1 id="login-title">Command access</h1>
+            <p id="login-intro">Identify yourself to receive your field assignment.</p>
+          </div>
+        </header>
+
+        <div class="login-tabs" role="tablist" aria-label="Account action">
+          <button id="login-tab" type="button" role="tab" aria-controls="login-form" data-mode="login" aria-selected="true">Sign in</button>
+          <button id="register-tab" type="button" role="tab" aria-controls="login-form" data-mode="register" aria-selected="false">Create account</button>
+        </div>
+
+        <form id="login-form" aria-labelledby="login-title">
+          <label for="username">Username</label>
+          <input id="username" name="username" autocomplete="username" minlength="3" maxlength="32" required />
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" minlength="8" maxlength="256" required />
+          <button class="login-submit" type="submit"><span>Sign in</span></button>
+          <p id="login-status" role="alert" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <aside class="login-briefing" aria-labelledby="campaign-briefing-title">
+        <div class="login-briefing__heading">
+          <p class="login-briefing__eyebrow">High command · campaign briefing</p>
+          <h2 id="campaign-briefing-title">The world<br />is waiting.</h2>
+          <p>Claim a country, issue your orders, and turn a local advantage into a global campaign.</p>
+        </div>
+
+        <dl class="login-briefing__facts">
+          <div>
+            <dt>Campaign map</dt>
+            <dd>200 countries</dd>
+          </div>
+          <div>
+            <dt>First objective</dt>
+            <dd>Claim your nation</dd>
+          </div>
+          <div>
+            <dt>Command desk</dt>
+            <dd>Orders &amp; diplomacy</dd>
+          </div>
+        </dl>
+
+        <p class="login-briefing__note"><span aria-hidden="true"></span>Your country assignment is kept with your account between sessions.</p>
+      </aside>
     </main>
     <script type="module" src="/apps/client/src/login.ts"></script>
   </body>

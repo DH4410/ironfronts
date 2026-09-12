@@ -4,12 +4,7 @@ Ironfronts resolves a flag per in-game country through `src/ui/flags.ts`
 (`resolveFlagUrl(name)` / `createFlag(...)`). This document records what art each
 entity gets and why.
 
-The game partitions the 1939 world into ~100 selectable "countries". Only some
-are sovereign 1939 belligerents; many are fictional gameplay subdivisions
-(US/Brazilian/Australian states, Soviet oblast-sized regions, Chinese warlord
-cliques) that never had a national flag. Every unmapped entity renders a **colour
-standard** (a plain chit tinted with the country colour) — a deliberate scenario
-fallback, never an invented or anachronistic flag.
+The game partitions the 1939 world into 200 selectable countries. Only some are sovereign 1939 belligerents; many are gameplay subdivisions (US, Brazilian, and Australian states; Soviet regions; and Chinese cliques) that never had a separate national flag. **Every country has a flag chit.** A subdivision uses the flag of its historical sovereign or administering power, so it is identifiable without claiming it had an independent flag.
 
 ## Resolution rules
 
@@ -17,7 +12,8 @@ fallback, never an invented or anachronistic flag.
 |---|---|
 | Sovereign belligerent | Its own 1939 flag |
 | Real colony / mandate / protectorate | Flag of the power that administered it in 1939 |
-| Fictional subdivision, or unresolved | Colour standard (`resolveFlagUrl` returns `null`) |
+| Gameplay subdivision | Flag of its historical sovereign or administering power |
+| Unknown input (not a country in this scenario) | Colour standard |
 
 ## Vendored period flags
 
@@ -41,37 +37,21 @@ the file. Retrieved 2026-08-30 via `commons.wikimedia.org/wiki/Special:FilePath/
 | `cn-roc.svg` | Nationalist China | Republic of China, "Blue Sky with a White Sun" | `File:Flag of the Republic of China.svg` |
 | `manchukuo.svg` | Manchukuo | Japanese puppet state 1932–1945 | `File:Flag of Manchukuo.svg` |
 
-Unchanged since 1939 and already vendored as flag-icons (MIT — see
-`ASSET_CREDITS.md`): `fi pl fr gb tr jp se nz sa pt be nl lu ch at dk no ie is bg cz`.
-These are period-correct plain tricolours / Nordic crosses / the Hinomaru / the
-Union Jack.
+The project also vendors flat SVG country art from [flag-icons](https://github.com/lipis/flag-icons), version 7.5.0, under its MIT licence. The licence text is included as src/ui/assets/flags/FLAG-ICONS-LICENSE.txt. The existing period-specific art remains preferred for historical entities. The remaining flat flag-icons art is a compact visual identifier; small emblems and star counts can differ from the period version at the icon sizes used by the UI.
 
-## Colonies → administering power (1939)
+## Country coverage
 
-`France (fr)`: Algeria, Mauritania, French Sudan, Upper Volta, Equatorial Gabon,
-Madagascar, Syria (mandate), Indochina.
-`United Kingdom (gb)`: Nigeria, Bechuanaland, Tanganyika, Burma, "Pakistan",
-North/South India, British Odisha, North/South Sudan (Anglo-Egyptian).
-`Belgium (be)`: Belgian Congo. `Portugal (pt)`: Angola. `Italy`: Libya.
+France: Algeria, Tunisia, French West/Central African regions, Madagascar, Syria, Indochina, Tahiti, and New Caledonia.
+United Kingdom: British African, Indian, South-East Asian, and Pacific territories. Belgium: Belgian Congo. Portugal: Portuguese African territories. Italy: Libya, Somalia, and Eritrea. US, Canadian, Brazilian, Argentine, Australian, Japanese, Dutch East Indies, and Soviet regional entries use their corresponding national flag.
 
-## Known gaps (fall back to colour standard or modern art)
-
-| Entity | Current | Correct target, not yet vendored |
-|---|---|---|
-| Spain | modern `es.svg` | Nationalist state flag 1938–1945 (Commons file is a 500 KB detailed-eagle SVG; needs a lightweight redraw before vendoring) |
-| Romania | modern `ro.svg` | 1922–1947 flag with royal coat of arms (plain civil tricolour is visually close; low priority) |
-| Mongolia | colour standard | `File:Flag of the Mongolian People's Republic (1924–1940).svg` |
-| Venezuela, Colombia, Peru, Bolivia | colour standard | modern tricolours are ~period-correct; add `ve/co/pe/bo` flag-icons files |
-| Tibet, Communist China, warlord cliques (Ma-Clique, Sichuan, Xinjiang) | colour standard | flag usage genuinely disputed for 1939 — Codex flagged these for human review; leaving them as standards is the honest choice |
-| Korea | colour standard | under Japanese rule; using the Hinomaru here is politically loaded — left unmapped deliberately |
-| Philippines, Papua New Guinea | colour standard | Commonwealth of the Philippines flag / Australian flag — add if `ph`/`au` art is vendored |
+There are no scenario-country gaps: the test suite checks every name in the authoritative 200-country world roster has both a mapping and a vendored SVG.
 
 ## Research provenance
 
 The entity categorisation (sovereign / colony / fictional) and candidate flags
 were produced by a Codex (`gpt-5.3-codex`, medium effort, read-only) research
-pass over the exact 102-entity list, then spot-checked against Wikimedia Commons
+pass over the exact 200-country roster, then spot-checked against Wikimedia Commons and the bundled Flag Icons source
 before vendoring. Notable corrections during review: Codex's Ethiopia and
 Romania Commons links pointed at modern files; the period files above were used
-instead. Codex's own low-confidence rows (Communist China, the cliques, Tibet,
-Syria, Burma) are the gaps left unmapped above.
+instead. Low-confidence rows (Communist China, the cliques, Tibet, Syria, and
+Burma) now use the parent flag stated in the country coverage rule above.

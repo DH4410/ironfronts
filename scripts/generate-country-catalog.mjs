@@ -14,6 +14,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { COUNTRY_FLAG } from './flag-registry.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const WORLD_JSON = path.join(ROOT, 'public/world/world.json');
@@ -22,15 +23,8 @@ const PROVINCE_DETAILS = path.join(ROOT, 'public/world/province-details.json');
 const SURFACE = path.join(ROOT, 'public/world/surface.rgba8');
 const OUT = path.join(ROOT, 'src/game/data/countries.generated.ts');
 
-/** 2-letter flag codes for countries that have art in src/ui/assets/flags/. */
-export const FLAG_CODES = {
-  Germany: 'de', Spain: 'es', France: 'fr', Turkey: 'tr', Italy: 'it', Poland: 'pl',
-  Egypt: 'eg', 'South Africa': 'za', 'Saudi Arabia': 'sa', Persia: 'ir', Ireland: 'ie',
-  Greece: 'gr', Bulgaria: 'bg', Romania: 'ro', Netherlands: 'nl', Belgium: 'be',
-  Denmark: 'dk', Norway: 'no', Sweden: 'se', Finland: 'fi', Iceland: 'is', Austria: 'at',
-  Switzerland: 'ch', Portugal: 'pt', Japan: 'jp', Luxembourg: 'lu', Czechia: 'cz',
-  Ethiopia: 'et', 'New Zealand': 'nz',
-};
+/** Flag asset stems for every country in the current scenario. */
+export const FLAG_CODES = COUNTRY_FLAG;
 
 /** Derive the catalogue rows from already-parsed world data. Shared with the test. */
 export function deriveCatalogCountries(worldJson, ownersU32, provinceDetailsJson, surfaceRgba8) {
@@ -67,7 +61,7 @@ export function deriveCatalogCountries(worldJson, ownersU32, provinceDetailsJson
       capitalProvinceId: country.capitalProvinceId,
       provinceCount: provinceCount.get(country.id) ?? 0,
       cityCount: cityCount.get(country.id) ?? 0,
-      flag: FLAG_CODES[country.name] ?? null,
+      flag: FLAG_CODES[country.name],
     }))
     .filter((country) => country.provinceCount > 0)
     .sort((a, b) => a.id - b.id);
@@ -91,8 +85,8 @@ export interface CatalogCountry {
   readonly provinceCount: number;
   /** Urban provinces owned at game start. */
   readonly cityCount: number;
-  /** 2-letter code for src/ui/assets/flags/<code>.svg, or null when no flag art exists. */
-  readonly flag: string | null;
+  /** Asset stem for src/ui/assets/flags/<stem>.svg. */
+  readonly flag: string;
 }
 
 export const CATALOG_COUNTRIES: readonly CatalogCountry[] = [
