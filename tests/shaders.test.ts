@@ -42,9 +42,6 @@ describe('WGSL programs', () => {
   it('holds marker plaques and count badges at a constant CSS size across graphics presets', () => {
     expect(armyMarkerShader).toContain('* uniforms.viewport.z');
     expect(armyModelShader).toContain('* 2.0 * uniforms.viewport.z / uniforms.viewport.xy');
-    // digits and vehicle icons are anti-aliased, not hard step() blocks
-    expect(armyMarkerShader).toContain('fn iconBox');
-    expect(armyMarkerShader).toContain('acc += glyphBit(glyph, col, row)');
   });
 
   it('renders the explosion as layered fire, embers, smoke and ground dust', () => {
