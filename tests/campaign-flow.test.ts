@@ -75,6 +75,14 @@ describe('campaign flow — dossier then nation overlay', () => {
     expect(esc).toContain('if (pickerOpen) { closeNationPicker(); return; }');
   });
 
+  it('shows real historical flags in the country roster with a colour fallback', () => {
+    expect(menu).toContain('const flagUrl = resolveFlagUrl(country.name)');
+    expect(menu).toContain("const flag = document.createElement('img')");
+    expect(menu).toContain('swatch.append(flag)');
+    expect(menu).toContain('swatch.style.background = country.color');
+    expect(css).toMatch(/\.ifm__country-swatch img\s*\{[^}]*object-fit:\s*cover/);
+  });
+
   it('loads the map lazily and only launches from the Join control', () => {
     expect(menu).toMatch(/function openNationPicker\(\)[\s\S]{0,500}mountCampaignMap\(/);
     expect(menu).toMatch(/confirmNation\?\.addEventListener\('click',[\s\S]{0,120}deployFromPicker\(selectedCountryId\)/);
