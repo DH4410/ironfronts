@@ -170,6 +170,26 @@ describe('strategic AI: concentration', () => {
 
     expect(c.state.rallyPoints[10]).toEqual({ x: 500, z: 100 });
   });
+
+  it('does not let a still-scattered stack assault alone while concentration is under way', () => {
+    // Three equally strong detachments start scattered on the same rear
+    // city. `concentrate` only issues STAGING_ORDERS_PER_PASS (2) moves this
+    // pass, so one is still standing off-staging — it must wait its turn to
+    // march there, not get thrown solo at the (much weaker) rival, which is
+    // what used to read as the AI "spamming" small attacks instead of
+    // massing before committing.
+    const a = stack('ai-a', 1, 1, 20);
+    const b = stack('ai-b', 1, 1, 20);
+    const leftBehind = stack('ai-c', 1, 1, 20);
+    const c = makeCtx([a, b, leftBehind, stack('en-weak', 2, 3, 2)]);
+
+    stepAi(c, 2);
+
+    expect(a.order?.intent).toBe('move');
+    expect(b.order?.intent).toBe('move');
+    expect(leftBehind.order).toBeNull();
+    expect(leftBehind.status).toBe('idle');
+  });
 });
 
 describe('strategic AI: lost territory', () => {

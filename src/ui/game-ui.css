@@ -697,7 +697,11 @@
   left: 50%;
   bottom: 18px;
   width: min(480px, calc(100vw - 48px));
-  height: clamp(238px, 31dvh, 340px);
+  /* Grow to fit whatever Facilities/Produce/Build actually need — the fixed
+     238-340px band forced an internal scrollbar on any city with a full
+     production list. max-height stays as a safety net for short viewports
+     only; it should not engage in the ordinary case. */
+  height: fit-content;
   max-height: calc(100dvh - 82px);
   min-height: 0;
   padding: 10px 14px 12px 14px;
@@ -711,7 +715,7 @@
   transform: translate(-50%, 14px);
   transition: transform 0.18s var(--ifg-ease), opacity 0.14s ease;
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
   overflow: hidden;
 }
 .ifg-card:not([hidden]) { transform: translate(-50%, 0); opacity: 1; }
@@ -758,23 +762,26 @@
 }
 .ifg-card__details {
   min-height: 0;
+  /* A safety valve for a pathologically short viewport only — with the card
+     now sized to fit its content (see .ifg-card height above) this should
+     never actually need to engage. */
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   padding-right: 3px;
 }
-/* Province card: wider, not longer — Facilities/Deposits and Produce/Build
-   sit side by side instead of stacking into one long scroll. */
-.ifg-card--province { width: min(700px, calc(100vw - 48px)); }
+/* Province card: wide enough that Deposits/Produce/Build never need to wrap
+   their icon rows onto a second line, each stacked full-width so a short
+   section (Deposits) never leaves a tall empty column beside a long one
+   (Produce) — see .ifg-card__facilities for the same reasoning. */
+.ifg-card--province { width: min(860px, calc(100vw - 48px)); }
 .ifg-card--province .ifg-card__details {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  column-gap: 18px;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 @media (max-width: 720px) {
   .ifg-card__grid { grid-template-columns: 1fr 1fr; }
-  .ifg-card--province .ifg-card__details { grid-template-columns: 1fr; }
 }
 .ifg-field { display: flex; flex-direction: column; gap: 2px; line-height: 1.2; min-width: 0; }
 .ifg-field small { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ifg-dim); }

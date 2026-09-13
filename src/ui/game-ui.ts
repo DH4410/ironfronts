@@ -537,8 +537,11 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     pvActions.append(b);
   }
   const pvDetails = el('div', 'ifg-card__details');
-  pvDetails.append(pvFacilities, pvResources, pvProduce, pvBuild);
-  provinceCard.append(pvHead, pvGrid, pvDetails, pvActions);
+  pvDetails.append(pvResources, pvProduce, pvBuild);
+  // Facilities is a slim inline strip, not its own details column — with only
+  // ever a couple of chips it left a tall, mostly-empty column beside the
+  // taller Produce/Build ones.
+  provinceCard.append(pvHead, pvGrid, pvFacilities, pvDetails, pvActions);
 
   // ---------------- centered selected-army command overlay ----------------
   const armyCard = el('section', 'ifg-army-panel');
