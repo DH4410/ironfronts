@@ -708,6 +708,8 @@ async function startGame(token: number): Promise<void> {
       Date.now(),
       { x: stats.camera[0], z: stats.camera[1] },
       renderer.combatEffectMaxDistance,
+      undefined,
+      (x, z) => renderer.isWorldPointVisible(x, z, 160),
     );
     renderer.setCombatEffects(packed.floats, packed.count);
     if (!diagnostics.hidden) updateDiagnostics(stats);
@@ -2288,6 +2290,9 @@ const lastCityFireAt = new Map<number, number>();
  * front. All effects stay inside CombatEffectPool's hard instance cap.
  */
 function spawnOngoingBattleFx(session: RemoteGameSession, renderer: WorldRenderer): void {
+  // The renderer already suspends GPU frames for hidden tabs; also stop creating
+  // cosmetic battle records so background play costs essentially nothing here.
+  if (document.hidden) return;
   const density = effectDensityForDistance(lastCombatCameraDistance);
   if (density <= 0) return;
   const now = Date.now();
@@ -2311,6 +2316,9 @@ function spawnOngoingBattleFx(session: RemoteGameSession, renderer: WorldRendere
   const activeProvinces = new Set<number>();
   for (const [frontId, cluster] of clusters) {
     activeFronts.add(frontId);
+    // Distance alone is not enough: a close battle can still be behind or
+    // beside the camera. Do no cosmetic spawning unless it can enter the view.
+    if (!renderer.isWorldPointVisible(cluster.x, cluster.z, 220)) continue;
     const jitter = (spread: number): number => (Math.random() - 0.5) * spread;
     const members = cluster.memberIds.flatMap((id) => {
       const army = session.state.armies[id];
@@ -2338,14 +2346,14 @@ function spawnOngoingBattleFx(session: RemoteGameSession, renderer: WorldRendere
       combatEffects.spawnVolley('infantry', cluster.x, cluster.z, Math.random() * Math.PI * 2, { now });
     }
     if (armorShooter
-      && now - (lastBattleArmorAt.get(frontId) ?? 0) >= 1_550
+      && now - (lastBattleArmorAt.get(frontId) ?? 0) >= 10_000
       && Math.random() <= density) {
       lastBattleArmorAt.set(frontId, now);
       const target = targetFor(armorShooter);
       combatEffects.spawnTankShot(armorShooter.x, armorShooter.z, target.x, target.z, { now });
     }
     if (artilleryShooter
-      && now - (lastBattleArtilleryAt.get(frontId) ?? 0) >= 2_600
+      && now - (lastBattleArtilleryAt.get(frontId) ?? 0) >= 12_000
       && Math.random() <= density) {
       lastBattleArtilleryAt.set(frontId, now);
       const target = targetFor(artilleryShooter);
@@ -2365,7 +2373,7 @@ function spawnOngoingBattleFx(session: RemoteGameSession, renderer: WorldRendere
       : 0;
     if (buildingCount <= 0) continue;
     activeProvinces.add(provinceId);
-    if (now - (lastCityFireAt.get(provinceId) ?? 0) < 1_600) continue;
+    if (now - (lastCityFireAt.get(provinceId) ?? 0) < 6_000) continue;
     lastCityFireAt.set(provinceId, now);
     for (let i = 0; i < 2; i += 1) {
       const angle = Math.random() * Math.PI * 2;
