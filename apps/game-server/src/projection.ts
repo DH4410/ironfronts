@@ -11,7 +11,7 @@ import type { PlayerProjection, ProjectionDelta, PublicCountry } from '@ironfron
 
 export function projectFor(
   state: GameState, world: WorldData, graph: LandGraph, viewerCountryId: number,
-  gameHoursPerRealSecond = 1 / 3_600, movementSpeedMultiplier = 1, sampledAtEpochMs = Date.now(),
+  gameHoursPerRealSecond = 1 / 3_600, sampledAtEpochMs = Date.now(),
   debugPotential = false,
 ): PlayerProjection {
   const aliveCountries = new Set(Object.values(state.provinceOwners));
@@ -61,7 +61,7 @@ export function projectFor(
     }
     if (graph && army.status !== 'unknown' && gameHoursPerRealSecond > 0) {
       const source = state.armies[army.id];
-      const leg = source ? currentMovementLeg({ state, world, graph, movementSpeedMultiplier }, source) : null;
+      const leg = source ? currentMovementLeg({ state, world, graph }, source) : null;
       if (leg && leg.worldUnitsPerGameHour > 0) {
         const route = source!.order ? orderRouteForClient(source!.order, graph, source!.x, source!.z) ?? undefined : undefined;
         projected = {
@@ -135,7 +135,7 @@ export function projectFor(
   }));
   return structuredClone({
     timeline: { elapsedSeconds: state.clock.gameTimeHours * 3_600, speed: gameHoursPerRealSecond * 3_600,
-      movementSpeed: movementSpeedMultiplier, sampledAtEpochMs, generation: state.clock.generation ?? 0 },
+      sampledAtEpochMs, generation: state.clock.generation ?? 0 },
     simulationTick: state.simulationTick,
     viewerCountryId,
     startCamera: homelandCamera(
@@ -317,7 +317,7 @@ export function diffProjection(previous: PlayerProjection, next: PlayerProjectio
   const delta: ProjectionDelta = { changed: {}, upserts: {}, removals: {}, redactions: [] };
   if (previous.simulationTick !== next.simulationTick) delta.changed.simulationTick = next.simulationTick;
   if (previous.simulationTick !== next.simulationTick || previous.timeline?.speed !== next.timeline?.speed
-    || previous.timeline?.movementSpeed !== next.timeline?.movementSpeed || previous.timeline?.generation !== next.timeline?.generation) {
+    || previous.timeline?.generation !== next.timeline?.generation) {
     delta.changed.timeline = next.timeline;
   }
   if (!same(previous.ownCountry, next.ownCountry)) delta.changed.ownCountry = next.ownCountry;

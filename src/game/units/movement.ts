@@ -11,6 +11,7 @@ import { beginNavalCrossing, isNavalStatus, isSeaEdge, stepNavalCrossing } from 
 import { wrappedDistance } from '../geometry';
 import { computeArmyVisibility } from '../visibility';
 import { relationOf } from '../game-state';
+import { GAME_PACE } from '../pacing';
 export { currentMovementLeg, type CurrentMovementLeg } from '../movement/speed';
 export { movementEdgeAllowed, warsRequiredForPath } from '../movement/policy';
 export { issueMoveOrder, issueStop, type MoveOrderResult } from '../movement/orders';
@@ -63,7 +64,7 @@ export function stepMovement(session: SimContext, dtHours: number): void {
     }
     revalidateOrder(session, army, order, visibility);
     let budget = stackBaseSpeed(army) * dtHours * STRATEGIC_MOVEMENT_SCALE
-      * (army.status === 'retreating' ? 3 : 1) * (session.movementSpeedMultiplier ?? 1)
+      * (army.status === 'retreating' ? GAME_PACE.movement.retreatMultiplier : 1)
       * (army.inSupply === false ? OUT_OF_SUPPLY_SPEED_MULTIPLIER : 1);
 
     while (budget > 0 && order.path.length > 0) {

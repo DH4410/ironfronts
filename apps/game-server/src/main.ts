@@ -8,7 +8,7 @@ import { ProjectionPublisher } from './publisher';
 import { SimulationScheduler } from './scheduler';
 import { AuthoritativeGameClock } from './game-clock';
 import {
-  CLOCK_SYNC_INTERVAL_MS, SIMULATION_INTERVAL_MS, clampSimSpeed,
+  CLOCK_SYNC_INTERVAL_MS, SIMULATION_INTERVAL_MS, clampSimSpeed, offlineSimulationHours,
 } from './timing';
 import { GamePersistence, type PersistedGame } from './persistence';
 import { createInternalApiServer } from './internal-api';
@@ -53,7 +53,20 @@ try {
   persisted = null;
   runtime = buildRuntime(undefined);
 }
-const gameClock = new AuthoritativeGameClock(() => runtime.session.state, () => simSpeedMultiplier);
+let offlineCatchupHours = 0;
+if (persisted) {
+  offlineCatchupHours = offlineSimulationHours(persisted.savedAtEpochMs);
+  if (offlineCatchupHours > 0) {
+    runtime.tick(offlineCatchupHours);
+    runtime.session.pendingCompletions.length = 0;
+    runtime.session.pendingBuildings.length = 0;
+    runtime.session.pendingCaptures.length = 0;
+    runtime.session.pendingCombat.length = 0;
+    runtime.session.pendingOutcome.length = 0;
+    log('info', 'offline_simulation_caught_up', { offlineHours: offlineCatchupHours });
+  }
+}
+const gameClock = new AuthoritativeGameClock(() => runtime.session.state);
 const scheduler = new SimulationScheduler((hours) => runtime.tick(hours));
 
 function persistedGame(): PersistedGame {
@@ -74,7 +87,7 @@ function saveGameInBackground(): void {
     message: error instanceof Error ? error.message : String(error),
   }));
 }
-if (!persisted) await saveGame();
+if (!persisted || offlineCatchupHours > 0) await saveGame();
 
 const server = createInternalApiServer({
   runtime,
@@ -92,7 +105,7 @@ const server = createInternalApiServer({
 const devControlsEnabled = config.debugControlsEnabled;
 let simSpeedMultiplier = config.devSimSpeed;
 if (simSpeedMultiplier !== 1) log('warn', 'dev_sim_speed_active', { multiplier: simSpeedMultiplier });
-/** Clamped (see clampSimSpeed; 0 = paused). No-op outside dev, no matter who calls it. */
+/** Clamped to 1–10000x. No-op outside dev, no matter who calls it. */
 function setDevSimSpeed(multiplier: number): void {
   if (!devControlsEnabled) return;
   simSpeedMultiplier = clampSimSpeed(multiplier);
@@ -100,17 +113,13 @@ function setDevSimSpeed(multiplier: number): void {
 }
 
 // Same one-value-for-the-whole-process model as devSimSpeed above: a debug
-// weather/time change from any connected player is visible to all of them,
+// weather change from any connected player is visible to all of them,
 // not a per-player preference.
-let devTimeOfDayHours: number | null = null;
 let devRaining = false;
-function setDevEnvironment(next: { timeOfDayHours?: number; raining?: boolean }): void {
+function setDevEnvironment(next: { raining?: boolean }): void {
   if (!devControlsEnabled) return;
-  if (next.timeOfDayHours !== undefined) {
-    devTimeOfDayHours = Math.max(0, Math.min(24, next.timeOfDayHours));
-  }
   if (next.raining !== undefined) devRaining = next.raining;
-  log('info', 'dev_environment_changed', { timeOfDayHours: devTimeOfDayHours, raining: devRaining });
+  log('info', 'dev_environment_changed', { raining: devRaining });
 }
 
 const gateway: GameplayGateway = new GameplayGateway({
@@ -127,7 +136,7 @@ const gateway: GameplayGateway = new GameplayGateway({
   beforeDebugChange: () => scheduler.pump(simSpeedMultiplier),
   devSimSpeed: { get: () => simSpeedMultiplier, set: setDevSimSpeed, enabled: devControlsEnabled },
   devEnvironment: {
-    get: () => ({ timeOfDayHours: devTimeOfDayHours, raining: devRaining }),
+    get: () => ({ raining: devRaining }),
     set: setDevEnvironment,
     enabled: devControlsEnabled,
   },
@@ -141,8 +150,8 @@ const simulationTimer = setInterval(
   SIMULATION_INTERVAL_MS,
 );
 const persistenceTimer = setInterval(saveGameInBackground, 5_000);
-// Civil time is derived from simulation state. This sparse sample corrects
-// client interpolation drift between authoritative projection updates.
+// Visual world time is independent of simulation time. Sparse samples correct
+// client interpolation drift and preserve manual/timezone-linked settings.
 const clockSyncTimer = setInterval(() => {
   const clock = gameClock.snapshot();
   gateway.broadcast({ type: 'clockSync', clock });

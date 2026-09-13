@@ -15,6 +15,7 @@
 import type { GameState } from './game-state';
 import type { SimContext } from './sim-context';
 import type { MilitaryBuildingId } from './units/unit-types';
+import { GAME_PACE } from './pacing';
 
 export const PHASE_MAX = 3;
 
@@ -37,8 +38,8 @@ export const BUILDING_REQUIRED_PHASE: Record<MilitaryBuildingId, number> = {
 /** Game-hours before Phase II / III unlock on their own even without the
  *  qualifying industry, so a country that never builds heavy industry isn't
  *  permanently stuck at Phase I. ~30 and ~90 game-days. */
-const PHASE_2_TIME_HOURS = 72;
-const PHASE_3_TIME_HOURS = 168;
+const PHASE_2_TIME_HOURS = GAME_PACE.strategic.phase2FallbackHours;
+const PHASE_3_TIME_HOURS = GAME_PACE.strategic.phase3FallbackHours;
 
 /** The phase a country's own buildings already qualify it for, independent of
  *  elapsed time — used both to migrate existing saves and, every tick, to let

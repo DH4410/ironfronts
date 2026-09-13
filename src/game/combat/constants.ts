@@ -1,9 +1,11 @@
+import { GAME_PACE } from '../pacing';
+
 /** Directional combat tuning; damage is integrated continuously. */
 export const COMBAT_FRONTAGE = 10;
 export const COMBAT_SNAP = 26;
 /** A city's shattered defences retain only 40% of their normal combat output. */
 export const DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER = 0.4;
-export const COMBAT_DAMAGE_SCALE = 9.6;
+export const COMBAT_DAMAGE_SCALE = GAME_PACE.combat.damageScale;
 export const MIN_COMBAT_EFFECTIVENESS = 0.25;
 
 /** Organization/readiness cap. Separate stat from HP — see organization.ts. */
@@ -12,14 +14,14 @@ export const ORGANIZATION_MAX = 100;
  *  independent of casualties (the stress of being under fire at all).
  *  Calibrated so a short, decisive skirmish (a couple of hours) barely dents
  *  it, while a siege lasting days grinds a holding force down. */
-export const ORGANIZATION_DRAIN_PER_HOUR = 1.5;
+export const ORGANIZATION_DRAIN_PER_HOUR = GAME_PACE.combat.organizationDrainPerHour;
 /** Extra drain per full fractional-stack casualty taken this tick — a badly
  *  mauled stack breaks faster than one merely under pressure. Kept small
  *  relative to the per-hour term so it does not dominate fast fights. */
 export const ORGANIZATION_DRAIN_PER_CASUALTY_FRACTION = 6;
 /** Recovery per game-hour once clear of combat (~25 game-hours to fully
  *  recover from zero). */
-export const ORGANIZATION_REGEN_PER_HOUR = 4;
+export const ORGANIZATION_REGEN_PER_HOUR = GAME_PACE.combat.organizationRegenPerHour;
 /** A side is pulled back once its average organization falls below this
  *  fraction of max, even with most of its HP pool intact — see autoRetreat. */
 export const ORGANIZATION_RETREAT_THRESHOLD = 0.25;
@@ -30,7 +32,7 @@ export const MIN_ORGANIZATION_EFFECTIVENESS = 0.35;
 /** Entrenchment cap. Separate stat from organization — see entrenchment.ts. */
 export const ENTRENCHMENT_MAX = 100;
 /** Game-hours of continuous holding to reach full entrenchment (~2 days). */
-export const HOURS_TO_FULL_ENTRENCHMENT = 48;
+export const HOURS_TO_FULL_ENTRENCHMENT = GAME_PACE.combat.hoursToFullEntrenchment;
 export const ENTRENCHMENT_GAIN_PER_HOUR = ENTRENCHMENT_MAX / HOURS_TO_FULL_ENTRENCHMENT;
 /** Incoming-damage reduction per entrenchment point, capped so a dug-in stack
  *  is tougher but never invulnerable. */

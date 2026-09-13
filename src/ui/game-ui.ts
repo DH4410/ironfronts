@@ -770,8 +770,10 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       secondHand.style.transform = `translateX(-50%) rotate(${secondAngle}deg)`;
       const wholeSecond = Math.floor(clock.second);
       const accessibleTime = `${String(clock.hour).padStart(2, '0')}:${String(clock.minute).padStart(2, '0')}:${String(wholeSecond).padStart(2, '0')}`;
-      clockFace.setAttribute('aria-label', `Day ${clock.day}, ${accessibleTime}, GMT+2`);
-      clockZone.textContent = `GMT${clock.utcOffsetMinutes >= 0 ? '+' : '-'}${Math.abs(clock.utcOffsetMinutes / 60)}`;
+      const offsetHours = Math.abs(clock.utcOffsetMinutes / 60);
+      const zone = `GMT${clock.utcOffsetMinutes >= 0 ? '+' : '-'}${offsetHours}`;
+      clockFace.setAttribute('aria-label', `Day ${clock.day}, ${accessibleTime}, ${zone}`);
+      clockZone.textContent = zone;
     } else {
       clockFace.setAttribute('aria-label', 'Game clock unavailable');
     }

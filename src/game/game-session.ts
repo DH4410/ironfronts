@@ -13,7 +13,8 @@
 
 import { parseGameState } from './state-schema';
 import { validateWorldState } from './state-invariants';
-import { FIXED_STEP_HOURS, PROTOTYPE_HOURS_PER_HOUR } from './time';
+import { MAX_SIMULATION_STEP_HOURS } from './time';
+import { GAME_PACE } from './pacing';
 import type { GameOutcome, GameState, PhysicalResource } from './game-state';
 import { cloneGameState, relationOf, serializeGameState, setRelation } from './game-state';
 import type { LandGraph } from './movement/graph';
@@ -39,22 +40,20 @@ import { wrappedDistance } from './geometry';
 
 /** Longest game-time step a single `tick` will integrate; larger dt is accumulated
  *  so a stall can't teleport armies through provinces. */
-const MAX_TICK_HOURS = FIXED_STEP_HOURS;
+const MAX_TICK_HOURS = MAX_SIMULATION_STEP_HOURS;
 /** Income is recomputed on this game-hour cadence, not every tick. */
-const INCOME_RECOMPUTE_INTERVAL = 1 / 60;
+const INCOME_RECOMPUTE_INTERVAL = GAME_PACE.clock.incomeRefreshHours;
 /** AI re-plans on this game-hour cadence (cheap, not per tick). */
-const AI_INTERVAL = 0.25;
+const AI_INTERVAL = GAME_PACE.clock.aiPlanningHours;
 /** Supply reach is recomputed on this game-hour cadence — a straight-line
  *  distance scan per army, cheap but no reason to pay it every tick. */
-const SUPPLY_INTERVAL = 1 / PROTOTYPE_HOURS_PER_HOUR;
+const SUPPLY_INTERVAL = GAME_PACE.clock.supplyRefreshHours;
 
 export class GameSession {
   readonly state: GameState;
   readonly graph: LandGraph;
   readonly world: WorldData;
   readonly diagnostics: InitResult['diagnostics'];
-
-  movementSpeedMultiplier = 1;
 
   /** Drained by `main.ts` each frame for HUD notifications. */
   readonly pendingCompletions: UnitCompletion[] = [];
@@ -103,9 +102,11 @@ export class GameSession {
     if (!Number.isFinite(dtHours)) throw new Error('Simulation duration must be finite.');
     if (!(dtHours > 0)) return;
     this.state.clock.pendingHours = (this.state.clock.pendingHours ?? 0) + dtHours;
-    while (this.state.clock.pendingHours + 1e-12 >= MAX_TICK_HOURS) {
-      this.step(MAX_TICK_HOURS);
-      this.state.clock.pendingHours = Math.max(0, this.state.clock.pendingHours - MAX_TICK_HOURS);
+    while ((this.state.clock.pendingHours ?? 0) > 1e-12) {
+      if (this.state.outcome) { this.state.clock.pendingHours = 0; break; }
+      const stepHours = Math.min(MAX_TICK_HOURS, this.state.clock.pendingHours ?? 0);
+      this.step(stepHours);
+      this.state.clock.pendingHours = Math.max(0, (this.state.clock.pendingHours ?? 0) - stepHours);
     }
   }
 
@@ -116,9 +117,15 @@ export class GameSession {
     // Campaign already decided — freeze the simulation, keep serving state.
     if (this.state.outcome) return;
 
+    const cadence = this.state.clock.cadence ??= { incomeHours: 0, supplyHours: 0, aiHours: 0 };
+    cadence.incomeHours += dtHours;
+    cadence.supplyHours += dtHours;
+    cadence.aiHours += dtHours;
+
     // --- economy -------------------------------------------------
     if (this.state.economyEnabled) {
-      if (this.state.simulationTick % Math.round(INCOME_RECOMPUTE_INTERVAL / FIXED_STEP_HOURS) === 0) {
+      if (cadence.incomeHours + 1e-12 >= INCOME_RECOMPUTE_INTERVAL) {
+        cadence.incomeHours %= INCOME_RECOMPUTE_INTERVAL;
         recomputeIncome(this.state, this.world, this.graph);
         stepPhaseProgression(this);
       }
@@ -127,7 +134,8 @@ export class GameSession {
 
     // --- gameplay systems, fixed order ------------------------------
     stepMovement(this, dtHours);
-    if (this.state.simulationTick % Math.round(SUPPLY_INTERVAL / FIXED_STEP_HOURS) === 0) {
+    if (cadence.supplyHours + 1e-12 >= SUPPLY_INTERVAL) {
+      cadence.supplyHours %= SUPPLY_INTERVAL;
       stepSupply(this);
     }
     stepEntrenchment(this, dtHours);
@@ -142,8 +150,10 @@ export class GameSession {
     if (outcome) this.pendingOutcome.push(outcome);
 
     // --- simple defensive AI (slow cadence) -----------------------
-    if (this.state.simulationTick % Math.round(AI_INTERVAL / FIXED_STEP_HOURS) === 0) {
-      stepAi(this, AI_INTERVAL);
+    if (cadence.aiHours + 1e-12 >= AI_INTERVAL) {
+      const elapsedAiHours = cadence.aiHours;
+      cadence.aiHours %= AI_INTERVAL;
+      stepAi(this, elapsedAiHours);
     }
   }
 

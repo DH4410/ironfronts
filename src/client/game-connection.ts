@@ -20,10 +20,8 @@ export class GameConnection extends EventTarget {
   /** Granted by the authenticated server handshake for this connection. */
   debugEnabled = false;
   devSimSpeed = 1;
-  devMovementSpeed = 1;
   devSimSpeedEnabled = false;
-  /** Server-wide debug time-of-day/rain override, or null for no override. */
-  devTimeOfDayHours: number | null = null;
+  /** Server-wide debug weather override. */
   devRaining = false;
   devEnvironmentEnabled = false;
   private readonly gameClock = new InterpolatedGameClock();
@@ -140,11 +138,10 @@ export class GameConnection extends EventTarget {
           this.serverEpochMs = message.serverEpochMs + Math.max(0, now - message.sentAt) / 2;
           this.serverSampleAt = now;
         } else if (message.type === 'devSimSpeed') {
-          this.devSimSpeed = message.multiplier; this.devMovementSpeed = message.movementMultiplier ?? 1;
+          this.devSimSpeed = message.multiplier;
           this.devSimSpeedEnabled = message.devControlsEnabled;
           this.dispatchEvent(new Event('dev-sim-speed'));
         } else if (message.type === 'devEnvironment') {
-          this.devTimeOfDayHours = message.timeOfDayHours;
           this.devRaining = message.raining;
           this.devEnvironmentEnabled = message.devControlsEnabled;
           this.dispatchEvent(new Event('dev-environment'));
@@ -212,9 +209,11 @@ export class GameConnection extends EventTarget {
   readEpochMs(): number { return this.gameClock.readEpochMs(); }
   readClock(): GameClockReading { return this.gameClock.read(); }
   setDevSimSpeed(multiplier: number): void { this.send({ type: 'devSetSimSpeed', multiplier }); }
-  setDevMovementSpeed(multiplier: number): void { this.send({ type: 'devSetMovementSpeed', multiplier }); }
   setDevClock(epochMs: number): void { this.send({ type: 'devSetClock', epochMs }); }
-  setDevEnvironment(next: { timeOfDayHours?: number; raining?: boolean }): void {
+  linkDevClockToTimezone(utcOffsetMinutes: number): void {
+    this.send({ type: 'devLinkClockTimezone', utcOffsetMinutes });
+  }
+  setDevEnvironment(next: { raining?: boolean }): void {
     this.send({ type: 'devSetEnvironment', ...next });
   }
   private failPending(reason: string): void {

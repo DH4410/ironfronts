@@ -34,9 +34,9 @@ export const config = {
    * DEV / TESTING ONLY. Multiplies simulation time (movement, production,
    * combat, clock all scale together — it just advances game-time faster).
    * Deterministic; touches no balance constant. Ignored in production and
-   * clamped to [0.25, 8]. Set IRONFRONTS_DEV_SIM_SPEED=4 to fast-forward.
+   * clamped to [1, 10000]. Set IRONFRONTS_DEV_SIM_SPEED=100 to fast-forward.
    */
   devSimSpeed: !debugControlsEnabled
     ? 1
-    : Math.max(0.25, Math.min(8, Number(process.env.IRONFRONTS_DEV_SIM_SPEED ?? 1) || 1)),
+    : Math.max(1, Math.min(10_000, Number(process.env.IRONFRONTS_DEV_SIM_SPEED ?? 1) || 1)),
 } as const;

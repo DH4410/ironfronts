@@ -263,24 +263,23 @@
             <button type="button" data-debug-time="12">Noon</button>
             <button type="button" data-debug-time="18">Sunset</button>
             <button type="button" data-debug-time="0">Night</button>
-            <button id="debug-time-unlink" type="button" aria-pressed="false" title="Unlink lighting from the real-life clock">Unlink</button>
+            <button id="debug-time-unlink" type="button" aria-pressed="false" title="Link the world clock to this browser's timezone">Link timezone</button>
           </div>
-          <label class="time-controls__speed" for="debug-time-multiplier">Cycle multiplier
-            <span><input id="debug-time-multiplier" type="number" value="1.0" min="0" max="999.9" step="0.1" inputmode="decimal" /><b>×</b></span>
-          </label>
-          <small>Sun, sky and shadows only &mdash; unlink to use the manual clock and cycle multiplier. The game clock, movement, combat and economy are unaffected. 1.0× = a full day in 10 min; 0.0× freezes the light.</small>
+          <small>This persistent world clock controls sunlight only. Set any time manually or link it to your timezone; gameplay always uses the separate simulation clock.</small>
         </div>
         <div class="diagnostics__group sim-speed-controls">
           <div class="time-controls__heading"><strong>SIMULATION SPEED &mdash; DEV ONLY</strong><output id="debug-sim-speed-state">1&times;</output></div>
+          <label for="debug-sim-speed">Unified multiplier
+            <input id="debug-sim-speed" type="range" min="1" max="10000" step="1" value="1" />
+          </label>
           <div class="sim-speed-controls__buttons" role="group" aria-label="Simulation speed">
-            <button type="button" data-sim-speed="0">Pause</button>
             <button type="button" data-sim-speed="1" aria-pressed="true">1&times;</button>
-            <button type="button" data-sim-speed="2">2&times;</button>
-            <button type="button" data-sim-speed="4">4&times;</button>
-            <button type="button" data-sim-speed="8">8&times;</button>
-            <button type="button" data-sim-speed="16">16&times;</button>
+            <button type="button" data-sim-speed="10">10&times;</button>
+            <button type="button" data-sim-speed="100">100&times;</button>
+            <button type="button" data-sim-speed="1000">1,000&times;</button>
+            <button type="button" data-sim-speed="10000">10,000&times;</button>
           </div>
-          <small>Server-authoritative: movement, production, construction, combat and game time all scale together for every player on this server. Not available against a production server. Separate from the lighting clock above, which is visual only.</small>
+          <small>Server-authoritative: movement, battles, AI, economy, shortages, production, construction, phases and strategic systems all use this one multiplier. The visual clock above is intentionally separate.</small>
         </div>
         <div class="diagnostics__group weather-controls">
           <strong>WEATHER</strong>

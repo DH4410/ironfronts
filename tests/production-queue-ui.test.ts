@@ -41,9 +41,9 @@ describe('0 A.D.-style production/construction queue', () => {
     expect(gameUi).toContain('${q.id}:${Math.round(q.progress * 100)}:${Math.round(q.etaSeconds)}');
   });
 
-  it('computes eta from the fixed normal-speed simulation rate, not a fabricated countdown', () => {
-    expect(mainTs).toContain('const GAME_HOURS_PER_REAL_SECOND = 1 / 3_600;');
-    expect(mainTs).toContain('(o.totalHours - o.progressHours) / (GAME_HOURS_PER_REAL_SECOND * (activeSession?.devSimSpeed ?? 1))');
+  it('computes eta from the centralized simulation rate and unified multiplier', () => {
+    expect(mainTs).toContain('GAME_PACE.clock.simulationHoursPerRealSecond');
+    expect(mainTs).toContain('(activeSession?.devSimSpeed ?? 1)');
   });
 
   it('disables province actions while intent is pending and uses server affordability', () => {

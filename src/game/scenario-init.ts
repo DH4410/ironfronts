@@ -314,7 +314,11 @@ export function initGameState(
     mode: scenario.mode,
     fogOfWar: scenario.fogOfWar && !sandbox,
     economyEnabled: scenario.economyEnabled && !sandbox,
-    clock: { gameTimeHours: 0, startDate: selection.startDate, initialEpochMs: INITIAL_GAME_EPOCH_MS, generation: 0 },
+    clock: {
+      gameTimeHours: 0, startDate: selection.startDate,
+      initialEpochMs: INITIAL_GAME_EPOCH_MS, generation: 0, visualGeneration: 0,
+      cadence: { incomeHours: 0, supplyHours: 0, aiHours: 0 },
+    },
     simulationTick: 0,
     countries,
     provinceOwners,

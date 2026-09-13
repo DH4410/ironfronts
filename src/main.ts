@@ -34,6 +34,7 @@ import { buildArmyCompositionRows, buildArmyFormation } from './army-map-present
 import { ArmyMotionInterpolator, type ArmyPickEntry } from './army-motion';
 import { buildBattleAnchors, combatHuddleOffset, groupEngagedByFront } from './combat-huddle';
 import { MISSILE_RANGE } from './game/strike';
+import { GAME_PACE } from './game/pacing';
 import { wrappedDistance, wrappedDeltaX } from './game/geometry';
 
 type BuildingId = 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite' | 'fields' | 'quarry' | 'mine' | 'oilPump';
@@ -56,12 +57,10 @@ const orderPercent = (o: WorkOrderView): number => {
   const total = o.totalWork ?? o.totalHours ?? 0;
   return total > 0 ? Math.min(99, Math.floor((progress / total) * 100)) : 0;
 };
-/** At normal speed one real second advances one authoritative game second. */
-const GAME_HOURS_PER_REAL_SECOND = 1 / 3_600;
-const orderEtaSeconds = (o: WorkOrderView): number => activeSession?.devSimSpeed === 0 ? Infinity
-  : Math.max(0, ((o.totalWork ?? o.totalHours ?? 0) - (o.progressWork ?? o.progressHours ?? 0))
+const orderEtaSeconds = (o: WorkOrderView): number => Math.max(0,
+  ((o.totalWork ?? o.totalHours ?? 0) - (o.progressWork ?? o.progressHours ?? 0))
     / Math.max(0.01, o.workRate ?? 1)
-    / (GAME_HOURS_PER_REAL_SECOND * (activeSession?.devSimSpeed ?? 1)));
+    / (GAME_PACE.clock.simulationHoursPerRealSecond * (activeSession?.devSimSpeed ?? 1)));
 
 /** Player queues a unit from the selected-province PRODUCE panel. */
 function handleProduce(provinceId: number, unitTypeId: string): void {
@@ -134,12 +133,12 @@ const diagnosticsStats = required<HTMLElement>('diagnostics-stats');
 const diagnosticsPerformance = required<HTMLElement>('diagnostics-performance');
 const debugTime = required<HTMLInputElement>('debug-time');
 const debugTimeState = required<HTMLOutputElement>('debug-time-state');
-const debugTimeMultiplier = required<HTMLInputElement>('debug-time-multiplier');
 const debugTimeUnlink = required<HTMLButtonElement>('debug-time-unlink');
 const debugTimePresets = [...document.querySelectorAll<HTMLButtonElement>('[data-debug-time]')];
 const debugRain = required<HTMLInputElement>('debug-rain');
 const debugThunder = required<HTMLButtonElement>('debug-thunder');
 const debugSimSpeedState = required<HTMLOutputElement>('debug-sim-speed-state');
+const debugSimSpeedInput = required<HTMLInputElement>('debug-sim-speed');
 const debugSimSpeedButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-sim-speed]')];
 const debugView = required<HTMLSelectElement>('debug-view');
 const debugConnections = required<HTMLInputElement>('debug-connections');
@@ -159,12 +158,10 @@ const debugPlayerCountry = required<HTMLElement>('debug-player-country');
 const debugCountryFlag = required<HTMLElement>('debug-country-flag');
 const debugPlayerForm = required<HTMLFormElement>('debug-player-form');
 
-let lightingClockUnlinked = false;
-let unlinkedLightingMultiplier = 1;
 /** Last server devEnvironment applied locally, so the 400ms HUD poll only
  *  touches the renderer/audio when a broadcast actually changed something —
  *  including when this client itself is the one that just sent it. */
-let lastAppliedDevEnvironment: { timeOfDayHours: number | null; raining: boolean } | null = null;
+let lastAppliedDevEnvironment: { raining: boolean } | null = null;
 /** Mirrors units/movement.ts's NAVAL_STATUSES — a stack mid sea-crossing
  *  can't be moved, attacked with, split, or stopped from the HUD. */
 const NAVAL_TRANSIT_STATUSES = new Set(['embarking', 'atSea', 'disembarking']);
@@ -786,49 +783,31 @@ async function startGame(token: number): Promise<void> {
     updateTimeControls(state);
   };
 
-  const setLightingClockUnlinked = (unlinked: boolean): void => {
-    lightingClockUnlinked = unlinked;
-    debugTimeUnlink.setAttribute('aria-pressed', String(unlinked));
-    debugTimeUnlink.textContent = unlinked ? 'Relink' : 'Unlink';
-    debugTimeUnlink.title = unlinked
-      ? 'Relink lighting to the real-life clock'
-      : 'Unlink lighting from the real-life clock';
-    const multiplier = renderer.setTimeMultiplier(unlinked ? unlinkedLightingMultiplier : 0);
-    if (unlinked) unlinkedLightingMultiplier = multiplier;
-  };
-  lightingClockUnlinked = false;
-  unlinkedLightingMultiplier = 1;
-  debugTimeMultiplier.value = unlinkedLightingMultiplier.toFixed(1);
-  setLightingClockUnlinked(false);
   debugTimeUnlink.addEventListener('click', () => {
-    setLightingClockUnlinked(!lightingClockUnlinked);
+    session.linkDevClockToTimezone(-new Date().getTimezoneOffset());
   }, attemptListener);
+
+  const setVisualHour = (hour: number): void => {
+    const reading = session.readClock();
+    const offsetMs = reading.utcOffsetMinutes * 60_000;
+    const shifted = new Date(session.readEpochMs() + offsetMs);
+    const wholeHour = Math.floor(hour);
+    shifted.setUTCHours(wholeHour, Math.round((hour - wholeHour) * 60), 0, 0);
+    session.setDevClock(shifted.getTime() - offsetMs);
+  };
 
   debugTime.addEventListener('change', () => {
     const hour = parseClock(debugTime.value);
     if (hour !== undefined) {
-      setLightingClockUnlinked(true);
-      renderer.setTimeOfDay(hour);
-      session.setDevEnvironment({ timeOfDayHours: hour });
+      setVisualHour(hour);
     }
   }, attemptListener);
   for (const preset of debugTimePresets) {
     preset.addEventListener('click', () => {
-      setLightingClockUnlinked(true);
       const hour = Number(preset.dataset.debugTime);
-      renderer.setTimeOfDay(hour);
-      session.setDevEnvironment({ timeOfDayHours: hour });
+      setVisualHour(hour);
     }, attemptListener);
   }
-  const applyTimeMultiplier = () => {
-    if (debugTimeMultiplier.value === '') return;
-    const requestedMultiplier = Number(debugTimeMultiplier.value);
-    unlinkedLightingMultiplier = requestedMultiplier;
-    setLightingClockUnlinked(true);
-    debugTimeMultiplier.value = unlinkedLightingMultiplier.toFixed(1);
-  };
-  debugTimeMultiplier.addEventListener('change', applyTimeMultiplier, attemptListener);
-  debugTimeMultiplier.addEventListener('blur', applyTimeMultiplier, attemptListener);
   debugRain.addEventListener('change', () => {
     renderer.setRainEnabled(debugRain.checked);
     void audio.setRainEnabled(debugRain.checked);
@@ -990,9 +969,6 @@ async function startGame(token: number): Promise<void> {
 function updateTimeControls(state: TimeOfDayState): void {
   debugTimeState.textContent = `${state.stage} · ${state.clock}`;
   if (document.activeElement !== debugTime) debugTime.value = state.clock;
-  if (lightingClockUnlinked && document.activeElement !== debugTimeMultiplier) {
-    debugTimeMultiplier.value = state.multiplier.toFixed(1);
-  }
 }
 
 const simSpeedGroup = debugSimSpeedButtons[0]?.closest<HTMLElement>('.sim-speed-controls');
@@ -1009,11 +985,16 @@ function syncSimSpeedUi(): void {
   const session = activeSession;
   if (simSpeedGroup) simSpeedGroup.hidden = !session || !session.devSimSpeedEnabled;
   if (!session) return;
-  debugSimSpeedState.textContent = session.devSimSpeed === 0 ? 'Paused' : `${session.devSimSpeed}×`;
+  debugSimSpeedState.textContent = `${session.devSimSpeed.toLocaleString()}×`;
+  if (document.activeElement !== debugSimSpeedInput) debugSimSpeedInput.value = String(session.devSimSpeed);
   for (const button of debugSimSpeedButtons) {
     button.setAttribute('aria-pressed', String(Number(button.dataset.simSpeed) === session.devSimSpeed));
   }
 }
+debugSimSpeedInput.addEventListener('change', () => {
+  const multiplier = Math.max(1, Math.min(10_000, Number(debugSimSpeedInput.value) || 1));
+  activeSession?.setDevSimSpeed(multiplier);
+});
 for (const button of debugSimSpeedButtons) {
   // Module-level, one-time wiring (unlike the per-launch listeners above,
   // these static buttons and activeSession outlive any single game attempt).
@@ -1030,23 +1011,10 @@ for (const button of debugSimSpeedButtons) {
  * no-op for a server with no active override (the common case).
  */
 function syncDevEnvironmentUi(session: RemoteGameSession, renderer: WorldRenderer): void {
-  const next = { timeOfDayHours: session.devTimeOfDayHours, raining: session.devRaining };
+  const next = { raining: session.devRaining };
   if (lastAppliedDevEnvironment
-    && lastAppliedDevEnvironment.timeOfDayHours === next.timeOfDayHours
     && lastAppliedDevEnvironment.raining === next.raining) return;
   lastAppliedDevEnvironment = next;
-  if (next.timeOfDayHours !== null) {
-    // Inline equivalent of the per-launch setLightingClockUnlinked(true) — that
-    // closure lives inside startGame and isn't reachable from this
-    // module-level function, so mirror its effect directly on the same
-    // module-level state (lightingClockUnlinked, debugTimeUnlink, etc.).
-    lightingClockUnlinked = true;
-    debugTimeUnlink.setAttribute('aria-pressed', 'true');
-    debugTimeUnlink.textContent = 'Relink';
-    debugTimeUnlink.title = 'Relink lighting to the real-life clock';
-    renderer.setTimeMultiplier(unlinkedLightingMultiplier);
-    renderer.setTimeOfDay(next.timeOfDayHours);
-  }
   renderer.setRainEnabled(next.raining);
   void audio.setRainEnabled(next.raining);
   debugRain.checked = next.raining;
@@ -1132,16 +1100,15 @@ async function bootstrapGameSession(
   // Initial marker upload (before the first sim tick) so armies show at once.
   syncArmyMarkers(session, renderer);
 
-  // Civil time is sparse server state, interpolated locally at 1:1 speed. It
-  // drives lighting and the analogue HUD, but never changes gameplay dt: the
-  // server retains its existing 10 Hz / 0.05-hour simulation ticks.
+  // Persistent visual world time is interpolated locally at real 1x. It only
+  // drives sunlight and the analogue HUD; gameplay uses simulation elapsed time.
   renderer.setTimeMultiplier(0);
   const updateCivilClock = (): void => {
     const clock = session.readClock();
     uiStore.patch({ clock });
-    if (!lightingClockUnlinked) {
-      renderer.setTimeOfDay(clock.hour + clock.minute / 60 + clock.second / 3_600);
-    }
+    renderer.setTimeOfDay(clock.hour + clock.minute / 60 + clock.second / 3_600);
+    debugTimeUnlink.setAttribute('aria-pressed', String(clock.timezoneLinked));
+    debugTimeUnlink.textContent = clock.timezoneLinked ? 'Timezone linked' : 'Link timezone';
   };
   updateCivilClock();
   const civilClockTimer = window.setInterval(updateCivilClock, 250);

@@ -38,7 +38,13 @@ export type { WorldData } from '../../../src/game/world-data';
 export type { LandGraph } from '../../../src/game/movement/graph';
 export type { PlayerArmyView } from '../../../src/game/player-view';
 
-export { FIXED_STEP_SECONDS, FIXED_STEP_HOURS, gameEpochMs, INITIAL_GAME_EPOCH_MS } from '../../../src/game/time';
+export {
+  FIXED_STEP_SECONDS, FIXED_STEP_HOURS, MAX_SIMULATION_STEP_SECONDS,
+  MAX_SIMULATION_STEP_HOURS, gameEpochMs, INITIAL_GAME_EPOCH_MS,
+} from '../../../src/game/time';
+export {
+  GAME_PACE, NORMAL_GAME_SPEED, MIN_DEBUG_GAME_SPEED, MAX_DEBUG_GAME_SPEED,
+} from '../../../src/game/pacing';
 export { extractionEligibility } from '../../../src/game/extraction';
 export { movementEdgeAllowed } from '../../../src/game/units/movement';
 export { parseGameState } from '../../../src/game/state-schema';

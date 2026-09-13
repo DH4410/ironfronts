@@ -44,7 +44,7 @@ const army = point.extend({
   legalRetreatExits: z.array(point.extend({ firstNodeId: integer, destinationProvinceId: integer, bearing: z.string().optional() })).optional(),
   artillery: z.object({ range: nonnegative, targetArmyId: z.string().nullable(), manualTarget: z.boolean() }).nullable().optional(),
 });
-const timeline = z.object({ elapsedSeconds: nonnegative, speed: nonnegative.max(32), movementSpeed: nonnegative.max(32), sampledAtEpochMs: finite, generation: integer });
+const timeline = z.object({ elapsedSeconds: nonnegative, speed: finite.min(1).max(10_000), sampledAtEpochMs: finite, generation: integer });
 const ownCountry = z.object({ id: integer, name: z.string(), color: z.string(), controller: z.enum(['player', 'ai', 'neutral']),
   stockpile, income: stockpile, industryCapacity: nonnegative, warheads: nonnegative.optional(), phase: integer.optional(),
   upkeep: stockpile.optional(), netIncome: stockpile.optional(), coverage: z.record(z.string(), nonnegative).optional(),
@@ -91,7 +91,11 @@ const event = z.discriminatedUnion('kind', [
   z.object({ ...locatedEvent, ...combatCountries, kind: z.literal('bombardment'), armyId: z.string(), targetArmyId: z.string() }),
   z.object({ ...locatedEvent, ...combatCountries, kind: z.literal('strike'), provinceId: integer }),
 ]);
-const clock = z.object({ gameStartedAtEpochMs: finite, gameEpochMs: finite, serverEpochMs: finite, speed: nonnegative.max(32), generation: integer, utcOffsetMinutes: z.number().int() });
+const clock = z.object({
+  gameStartedAtEpochMs: finite, gameEpochMs: finite, campaignElapsedSeconds: nonnegative.default(0),
+  serverEpochMs: finite, speed: z.literal(1), generation: integer,
+  utcOffsetMinutes: z.number().int().min(-840).max(840), timezoneLinked: z.boolean().default(false),
+});
 export const serverMessageSchema: z.ZodType<ServerMessage> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('hello'), gameId: z.string(), gameVersion: z.string(), protocolVersion: z.literal(4), capabilities: z.array(z.string()),
     world: z.object({ version: z.string(), hash: z.string().regex(/^[a-f0-9]{64}$/), assetBaseUrl: z.url(),
@@ -103,6 +107,6 @@ export const serverMessageSchema: z.ZodType<ServerMessage> = z.discriminatedUnio
   z.object({ type: z.literal('event'), event }),
   z.object({ type: z.literal('pong'), sentAt: finite, serverEpochMs: finite }),
   z.object({ type: z.literal('error'), code: z.string(), message: z.string(), retryable: z.boolean().optional() }),
-  z.object({ type: z.literal('devSimSpeed'), multiplier: nonnegative.max(32), devControlsEnabled: z.boolean(), movementMultiplier: nonnegative.max(32).optional() }),
-  z.object({ type: z.literal('devEnvironment'), timeOfDayHours: finite.min(0).max(24).nullable(), raining: z.boolean(), devControlsEnabled: z.boolean() }),
+  z.object({ type: z.literal('devSimSpeed'), multiplier: finite.min(1).max(10_000), devControlsEnabled: z.boolean() }),
+  z.object({ type: z.literal('devEnvironment'), raining: z.boolean(), devControlsEnabled: z.boolean() }),
 ]);

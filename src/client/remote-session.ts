@@ -109,10 +109,9 @@ export class RemoteGameSession extends EventTarget {
   setDevSimSpeed(multiplier: number): void { this.connection.setDevSimSpeed(multiplier); }
 
   /** Dev/test only. See GameConnection.setDevEnvironment. */
-  get devTimeOfDayHours(): number | null { return this.connection.devTimeOfDayHours; }
   get devRaining(): boolean { return this.connection.devRaining; }
   get devEnvironmentEnabled(): boolean { return this.connection.devEnvironmentEnabled; }
-  setDevEnvironment(next: { timeOfDayHours?: number; raining?: boolean }): void {
+  setDevEnvironment(next: { raining?: boolean }): void {
     this.connection.setDevEnvironment(next);
   }
 
@@ -228,9 +227,10 @@ export class RemoteGameSession extends EventTarget {
   get fresh(): boolean { return this.connection.fresh; }
   get baselineGeneration(): number { return this.connection.baselineGeneration; }
   serverNow(): number { return this.connection.serverNow(); }
-  get devMovementSpeed(): number { return this.connection.devMovementSpeed; }
-  setDevMovementSpeed(multiplier: number): void { this.connection.setDevMovementSpeed(multiplier); }
   setDevClock(epochMs: number): void { this.connection.setDevClock(epochMs); }
+  linkDevClockToTimezone(utcOffsetMinutes: number): void {
+    this.connection.linkDevClockToTimezone(utcOffsetMinutes);
+  }
   dispose(): void { this.listeners.abort(); this.pendingCommands.clear(); }
   pendingForArmy(armyId: string): boolean { return [...this.pendingCommands.values()].some(({ command }) => 'armyId' in command && command.armyId === armyId); }
   pendingForProvince(provinceId: number): boolean {

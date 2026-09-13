@@ -4,6 +4,7 @@ import { stackBaseSpeed } from '../units/army';
 import { TERRAIN_CLASS } from '../world-data';
 import { wrappedDistance } from '../geometry';
 import { OUT_OF_SUPPLY_SPEED_MULTIPLIER } from '../combat/constants';
+import { GAME_PACE } from '../pacing';
 
 export const TERRAIN_SPEED: Record<number, number> = {
   [TERRAIN_CLASS.plain]: 1,
@@ -12,7 +13,7 @@ export const TERRAIN_SPEED: Record<number, number> = {
   [TERRAIN_CLASS.forest]: 0.8,
   [TERRAIN_CLASS.urban]: 0.9,
 };
-export const ROAD_BONUS = 1.35;
+export const ROAD_BONUS = GAME_PACE.movement.roadMultiplier;
 /**
  * Global pacing multiplier on how far a stack travels per simulation hour.
  * Tuned purely for feel (strategic movement across a country, not units
@@ -20,7 +21,7 @@ export const ROAD_BONUS = 1.35;
  * terrain ordering (plain > hill > mountain) and the road bonus are unchanged.
  * Does NOT touch the simulation tick.
  */
-export const STRATEGIC_MOVEMENT_SCALE = 0.30;
+export const STRATEGIC_MOVEMENT_SCALE = GAME_PACE.movement.scale;
 export interface CurrentMovementLeg {
   readonly targetX: number;
   readonly targetZ: number;
@@ -43,7 +44,7 @@ export function currentMovementLeg(session: SimContext, army: ArmyStack): Curren
     ? ROAD_BONUS
     : (TERRAIN_SPEED[session.world.terrainClassAt(army.x, army.z)] ?? 0.9) * ROAD_BONUS;
   const worldUnitsPerGameHour = stackBaseSpeed(army) * STRATEGIC_MOVEMENT_SCALE * terrainScale
-    * (army.status === 'retreating' ? 3 : 1) * (session.movementSpeedMultiplier ?? 1)
+    * (army.status === 'retreating' ? GAME_PACE.movement.retreatMultiplier : 1)
     * (army.inSupply === false ? OUT_OF_SUPPLY_SPEED_MULTIPLIER : 1);
   return {
     targetX,

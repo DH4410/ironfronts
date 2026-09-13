@@ -91,7 +91,7 @@ export class GameRuntime {
     const gameHoursPerRealSecond = SIMULATION_TICK_HOURS * 1_000 / SIMULATION_INTERVAL_MS
       * simulationSpeedMultiplier;
     return projectFor(this.session.state, this.world, this.session.graph, countryId,
-      gameHoursPerRealSecond, this.session.movementSpeedMultiplier, Date.now(), debugPotential);
+      gameHoursPerRealSecond, Date.now(), debugPotential);
   }
 
   command(countryId: number, payload: CommandPayload) {

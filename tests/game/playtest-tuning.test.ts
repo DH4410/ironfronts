@@ -94,11 +94,8 @@ describe('opening economy is lean but non-zero', () => {
 describe('strategic movement pacing', () => {
   const src = ['src/game/movement/speed.ts','src/game/units/movement.ts'].map(file => readFileSync(path.join(root,file),'utf8')).join('\n');
 
-  it('applies a single global sub-1 pacing scale to the travel budget', () => {
-    expect(src).toMatch(/const STRATEGIC_MOVEMENT_SCALE = 0?\.[0-9]+;/);
-    const value = Number(src.match(/STRATEGIC_MOVEMENT_SCALE = (0?\.[0-9]+)/)![1]);
-    expect(value).toBeGreaterThan(0.2);
-    expect(value).toBeLessThan(1);
+  it('uses the centralized 1x pacing scale in the travel budget', () => {
+    expect(src).toContain('STRATEGIC_MOVEMENT_SCALE = GAME_PACE.movement.scale');
     expect(src).toMatch(/budget = stackBaseSpeed\(army\) \* dtHours \* STRATEGIC_MOVEMENT_SCALE/);
   });
 

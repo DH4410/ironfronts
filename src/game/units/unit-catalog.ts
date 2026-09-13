@@ -9,11 +9,11 @@
  *  - Medium Tank: expensive frontline armour, slower, heavy metal/oil use.
  *  - Artillery: slow ranged support (engagementRange > 0), no extraction.
  *
- * Speeds are world-units per authoritative timeline hour. The prototype values
- * are converted below so normal-speed real movement pacing stays unchanged.
+ * Speeds are world-units per authoritative simulation hour. Their shared 1x
+ * balance lives in pacing.ts; debug speed is applied only by the server clock.
  */
 
-import { PROTOTYPE_HOURS_PER_HOUR } from '../time';
+import { GAME_PACE } from '../pacing';
 import { COMBAT_DAMAGE_SCALE } from '../combat/constants';
 import type { DamageProfile, UnitType } from './unit-types';
 
@@ -34,12 +34,12 @@ export const UNIT_TYPES: readonly UnitType[] = [
     armorClass: 'soft',
     icon: 'unit-infantry',
     maxHp: 100,
-    speed: 90 * PROTOTYPE_HOURS_PER_HOUR,
+    speed: GAME_PACE.movement.unitWorldUnitsPerHour.infantry,
     attack: damagePerHour(8, 4.4, 2.4),
     defense: damagePerHour(6, 3.3, 1.8),
     visionOuter: 180,
     visionInner: 90,
-    extractionRate: 0.4 * PROTOTYPE_HOURS_PER_HOUR,
+    extractionRate: 0,
     engagementRange: 0,
     buildCost: { funds: 350, manpower: 45, food: 35 },
     buildWork: 2,
@@ -60,12 +60,12 @@ export const UNIT_TYPES: readonly UnitType[] = [
     armorClass: 'soft',
     icon: 'unit-engineer',
     maxHp: 80,
-    speed: 85 * PROTOTYPE_HOURS_PER_HOUR,
+    speed: GAME_PACE.movement.unitWorldUnitsPerHour.engineer,
     attack: damagePerHour(1.8, 0.9, 0.45),
     defense: damagePerHour(2.4, 1.2, 0.6),
     visionOuter: 160,
     visionInner: 80,
-    extractionRate: 2.0 * PROTOTYPE_HOURS_PER_HOUR,
+    extractionRate: 0.75,
     engagementRange: 0,
     buildCost: { funds: 450, manpower: 35, food: 30, metal: 10 },
     buildWork: 3,
@@ -87,12 +87,12 @@ export const UNIT_TYPES: readonly UnitType[] = [
     armorClass: 'light',
     icon: 'unit-armored-car',
     maxHp: 90,
-    speed: 190 * PROTOTYPE_HOURS_PER_HOUR,
+    speed: GAME_PACE.movement.unitWorldUnitsPerHour['armored-car'],
     attack: damagePerHour(6.6, 4.2, 2.1),
     defense: damagePerHour(7.7, 4.9, 2.45),
     visionOuter: 300,
     visionInner: 160,
-    extractionRate: 0 * PROTOTYPE_HOURS_PER_HOUR,
+    extractionRate: 0,
     engagementRange: 0,
     buildCost: { funds: 650, manpower: 20, metal: 70, oil: 25 },
     buildWork: 4,
@@ -115,12 +115,12 @@ export const UNIT_TYPES: readonly UnitType[] = [
     armorClass: 'light',
     icon: 'unit-light-tank',
     maxHp: 130,
-    speed: 150 * PROTOTYPE_HOURS_PER_HOUR,
+    speed: GAME_PACE.movement.unitWorldUnitsPerHour['light-tank'],
     attack: damagePerHour(16.8, 14.7, 9.8),
     defense: damagePerHour(14.4, 12.6, 8.4),
     visionOuter: 220,
     visionInner: 110,
-    extractionRate: 0 * PROTOTYPE_HOURS_PER_HOUR,
+    extractionRate: 0,
     engagementRange: 0,
     buildCost: { funds: 1100, manpower: 30, metal: 140, oil: 55 },
     buildWork: 6,
@@ -142,12 +142,12 @@ export const UNIT_TYPES: readonly UnitType[] = [
     armorClass: 'heavy',
     icon: 'unit-medium-tank',
     maxHp: 190,
-    speed: 110 * PROTOTYPE_HOURS_PER_HOUR,
+    speed: GAME_PACE.movement.unitWorldUnitsPerHour['medium-tank'],
     attack: damagePerHour(26.4, 23.1, 15.4),
     defense: damagePerHour(24, 21, 14),
     visionOuter: 200,
     visionInner: 100,
-    extractionRate: 0 * PROTOTYPE_HOURS_PER_HOUR,
+    extractionRate: 0,
     engagementRange: 0,
     buildCost: { funds: 2000, manpower: 45, metal: 260, oil: 110 },
     buildWork: 11,
@@ -169,12 +169,12 @@ export const UNIT_TYPES: readonly UnitType[] = [
     armorClass: 'soft',
     icon: 'unit-artillery',
     maxHp: 70,
-    speed: 70 * PROTOTYPE_HOURS_PER_HOUR,
+    speed: GAME_PACE.movement.unitWorldUnitsPerHour.artillery,
     attack: damagePerHour(29.9, 23.4, 32.5),
     defense: damagePerHour(3.45, 2.7, 3.75),
     visionOuter: 170,
     visionInner: 70,
-    extractionRate: 0 * PROTOTYPE_HOURS_PER_HOUR,
+    extractionRate: 0,
     engagementRange: 140,
     buildCost: { funds: 1400, manpower: 35, food: 15, metal: 180, oil: 20 },
     buildWork: 8,

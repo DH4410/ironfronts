@@ -219,13 +219,21 @@ export interface BattleState {
 }
 
 export interface GameClock {
-  /** Epoch origin; debug clock changes adjust this without changing elapsed simulation. */
+  /** Scenario epoch retained for campaign metadata, not sunlight progression. */
   initialEpochMs?: number;
   generation?: number;
   pendingHours?: number;
-  /** Monotonic game-time in hours since scenario start. Drives every system. */
+  /** Persisted cadence debt keeps slow systems stable across saves/restarts. */
+  cadence?: { incomeHours: number; supplyHours: number; aiHours: number };
+  /** Monotonic simulation time in hours since scenario start. Drives gameplay. */
   gameTimeHours: number;
   readonly startDate: string;
+  /** Visual world clock anchor. It advances at real 1x even while servers are down. */
+  visualEpochMs?: number;
+  visualAnchorRealEpochMs?: number;
+  visualUtcOffsetMinutes?: number;
+  visualTimezoneLinked?: boolean;
+  visualGeneration?: number;
 }
 
 export interface GameState {

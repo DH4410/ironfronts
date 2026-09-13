@@ -3,11 +3,11 @@ import type { ArmyStack, ArmyStatus, MoveOrder } from '../units/army';
 import { stackBaseSpeed } from '../units/army';
 import { wrappedDistance } from '../geometry';
 import type { LandGraph } from './graph';
-import { PROTOTYPE_HOURS_PER_HOUR } from '../time';
+import { GAME_PACE } from '../pacing';
 import { ROAD_BONUS, STRATEGIC_MOVEMENT_SCALE } from './speed';
 
-/** Twenty real minutes on the authoritative 1:1 game-hours timeline. */
-export const NAVAL_DWELL_HOURS = 600 / PROTOTYPE_HOURS_PER_HOUR;
+/** Six hours each to embark and disembark on the authoritative 1x timeline. */
+export const NAVAL_DWELL_HOURS = GAME_PACE.movement.navalDwellHours;
 
 const combinedGraphCache = new WeakMap<LandGraph, LandGraph>();
 
@@ -82,8 +82,7 @@ export function stepNavalCrossing(
     const remaining = wrappedDistance(
       army.x, army.z, targetX, targetZ, session.world.width,
     );
-    const advance = stackBaseSpeed(army) * dtHours * STRATEGIC_MOVEMENT_SCALE * ROAD_BONUS
-      * (session.movementSpeedMultiplier ?? 1);
+    const advance = stackBaseSpeed(army) * dtHours * STRATEGIC_MOVEMENT_SCALE * ROAD_BONUS;
     if (remaining <= 1e-9 || advance >= remaining) {
       army.x = targetX;
       army.z = targetZ;

@@ -64,15 +64,14 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   // the whole server's simulation pace for every connected player, so it is
   // never wrapped in the commandId-acked command envelope above.
   z.object({ type: z.literal('devSetClock'), epochMs: z.number().finite().min(-8.64e15).max(8.64e15) }),
-  z.object({ type: z.literal('devSetMovementSpeed'), multiplier: z.number().finite().min(0).max(32) }),
   z.object({ type: z.literal('ping'), sentAt: z.number().finite() }),
-  z.object({ type: z.literal('devSetSimSpeed'), multiplier: z.number().finite().min(0).max(32) }),
+  z.object({ type: z.literal('devSetSimSpeed'), multiplier: z.number().finite().min(1).max(10_000) }),
+  z.object({ type: z.literal('devLinkClockTimezone'), utcOffsetMinutes: z.number().int().min(-840).max(840) }),
   // Same dev/test-only, server-wide semantics as devSetSimSpeed above: applies
   // to every connected player, ignored in production. Fields are independently
   // optional so a caller can change just the clock or just the rain.
   z.object({
     type: z.literal('devSetEnvironment'),
-    timeOfDayHours: z.number().finite().min(0).max(24).optional(),
     raining: z.boolean().optional(),
   }),
 ]);
@@ -196,7 +195,7 @@ export interface ProjectedArmy {
 
 export interface PlayerProjection {
   simulationTick: number;
-  timeline?: { elapsedSeconds: number; speed: number; movementSpeed: number; sampledAtEpochMs: number; generation: number };
+  timeline?: { elapsedSeconds: number; speed: number; sampledAtEpochMs: number; generation: number };
   viewerCountryId: number;
   startCamera: { x: number; z: number; distance: number };
   countries: Record<number, PublicCountry>;
@@ -236,17 +235,18 @@ export interface PlayerProjection {
 }
 
 /**
- * Sparse authoritative civil-clock sample. Clients advance `serverEpochMs`
- * locally at one second per real second and use later samples only to correct
- * drift. The offset is deliberately fixed rather than taken from the host OS.
+ * Sparse visual-world-clock sample. Clients advance it at one second per real
+ * second. Campaign elapsed time is carried separately for the day counter.
  */
 export interface GameClockSync {
   gameStartedAtEpochMs: number;
   gameEpochMs: number;
+  campaignElapsedSeconds?: number;
   speed: number;
   generation: number;
   serverEpochMs: number;
   utcOffsetMinutes: number;
+  timezoneLinked?: boolean;
 }
 
 export interface PresentationCatalogs {
@@ -282,12 +282,11 @@ export type ServerMessage =
   // `devControlsEnabled: false` in production — the server ignores
   // devSetSimSpeed there regardless, but the client uses this to hide the
   // control entirely rather than offer a lever that silently does nothing.
-  | { type: 'devSimSpeed'; multiplier: number; devControlsEnabled: boolean; movementMultiplier?: number }
-  // Sent right after `baseline` and again whenever a devSetEnvironment message
-  // changes it. `timeOfDayHours: null` means "no override" — the client keeps
-  // deriving lighting from the civil clock as usual.
+  | { type: 'devSimSpeed'; multiplier: number; devControlsEnabled: boolean }
+  // Sent right after `baseline` and whenever debug weather changes. Visual
+  // time is synchronized independently through GameClockSync.
   | {
-    type: 'devEnvironment'; timeOfDayHours: number | null; raining: boolean;
+    type: 'devEnvironment'; raining: boolean;
     devControlsEnabled: boolean;
   };
 

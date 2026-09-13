@@ -67,15 +67,16 @@ describe('game tickets and command wire schema', () => {
     })).toThrow();
   });
 
-  it('accepts devSetEnvironment with either field optional, and its devEnvironment broadcast', () => {
-    expect(clientMessageSchema.parse({ type: 'devSetEnvironment', timeOfDayHours: 13.5 }))
-      .toEqual({ type: 'devSetEnvironment', timeOfDayHours: 13.5 });
+  it('keeps visual-clock controls separate from debug weather', () => {
+    expect(clientMessageSchema.parse({ type: 'devSetClock', epochMs: 13.5 }))
+      .toEqual({ type: 'devSetClock', epochMs: 13.5 });
+    expect(clientMessageSchema.parse({ type: 'devLinkClockTimezone', utcOffsetMinutes: 120 }))
+      .toEqual({ type: 'devLinkClockTimezone', utcOffsetMinutes: 120 });
     expect(clientMessageSchema.parse({ type: 'devSetEnvironment', raining: true }))
       .toEqual({ type: 'devSetEnvironment', raining: true });
-    expect(() => clientMessageSchema.parse({ type: 'devSetEnvironment', timeOfDayHours: 30 })).toThrow();
     expect(serverMessageSchema.parse({
-      type: 'devEnvironment', timeOfDayHours: null, raining: false, devControlsEnabled: true,
-    })).toMatchObject({ type: 'devEnvironment', timeOfDayHours: null, raining: false });
+      type: 'devEnvironment', raining: false, devControlsEnabled: true,
+    })).toMatchObject({ type: 'devEnvironment', raining: false });
   });
 
   it('requires kind-specific event identity and ownership fields', () => {

@@ -12,7 +12,7 @@ import type { AuthoritativeGameClock } from './game-clock';
 import { TicketNonceStore } from './ticket-nonces';
 
 const DEBUG_MESSAGE_TYPES = new Set([
-  'devSetSimSpeed', 'devSetClock', 'devSetMovementSpeed', 'devSetEnvironment',
+  'devSetSimSpeed', 'devSetClock', 'devLinkClockTimezone', 'devSetEnvironment',
   'devSetRelation', 'devInspectState', 'devGetFullState',
 ]);
 
@@ -45,8 +45,8 @@ export interface GameplayGatewayOptions {
   readonly saveGameInBackground: () => void;
   readonly devSimSpeed: { get(): number; set(multiplier: number): void; enabled: boolean };
   readonly devEnvironment: {
-    get(): { timeOfDayHours: number | null; raining: boolean };
-    set(next: { timeOfDayHours?: number; raining?: boolean }): void;
+    get(): { raining: boolean };
+    set(next: { raining?: boolean }): void;
     enabled: boolean;
   };
   readonly log: (
@@ -89,7 +89,6 @@ export class GameplayGateway {
     this.send(connection, {
       type: 'devSimSpeed', multiplier: this.options.devSimSpeed.get(),
       devControlsEnabled: connection.debugEnabled,
-      movementMultiplier: this.options.runtime.session.movementSpeedMultiplier,
     });
     this.send(connection, {
       type: 'devEnvironment', ...this.options.devEnvironment.get(),
@@ -195,7 +194,7 @@ export class GameplayGateway {
         if (message.type === 'ping') {
           this.sendSocket(socket, { type: 'pong', sentAt: message.sentAt, serverEpochMs: Date.now() }); return;
         }
-        if (message.type === 'devSetSimSpeed' || message.type === 'devSetClock' || message.type === 'devSetMovementSpeed') {
+        if (message.type === 'devSetSimSpeed' || message.type === 'devSetClock' || message.type === 'devLinkClockTimezone') {
           if (!connection.debugEnabled) {
             this.sendSocket(socket, {
               type: 'error', code: 'unauthorized_debug',
@@ -206,7 +205,7 @@ export class GameplayGateway {
           this.options.beforeDebugChange();
           if (message.type === 'devSetSimSpeed') this.options.devSimSpeed.set(message.multiplier);
           else if (message.type === 'devSetClock') this.options.clock.setEpoch(message.epochMs);
-          else this.options.runtime.session.movementSpeedMultiplier = message.multiplier;
+          else this.options.clock.linkTimezone(message.utcOffsetMinutes);
           this.options.publishNow();
           this.broadcast({ type: 'clockSync', clock: this.options.clock.snapshot() });
           this.options.saveGameInBackground();

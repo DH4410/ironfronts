@@ -1,7 +1,8 @@
-import { FIXED_STEP_SECONDS } from '@ironfronts/game-core';
+import { MAX_SIMULATION_STEP_SECONDS } from '@ironfronts/game-core';
 
-/** Retains simulation debt while limiting each callback's work. Speed changes
- * affect newly elapsed time only, and never enlarge a simulation step. */
+/** Retains elapsed simulation debt while limiting each callback's work.
+ * At 1x it dispatches the live wall-clock delta. Extreme fast-forward is
+ * chunked into bounded game-time slices instead of millions of 100ms steps. */
 export class SimulationScheduler {
   private previousMs: number;
   private debtSeconds = 0;
@@ -16,9 +17,10 @@ export class SimulationScheduler {
     this.debtSeconds += Math.max(0, now - this.previousMs) / 1_000 * speed;
     this.previousMs = now;
     let steps = 0;
-    while (this.debtSeconds + 1e-9 >= FIXED_STEP_SECONDS && steps < this.maxStepsPerPump) {
-      this.step(FIXED_STEP_SECONDS / 3_600);
-      this.debtSeconds = Math.max(0, this.debtSeconds - FIXED_STEP_SECONDS);
+    while (this.debtSeconds > 1e-9 && steps < this.maxStepsPerPump) {
+      const seconds = Math.min(this.debtSeconds, MAX_SIMULATION_STEP_SECONDS);
+      this.step(seconds / 3_600);
+      this.debtSeconds = Math.max(0, this.debtSeconds - seconds);
       steps++;
     }
     return steps;

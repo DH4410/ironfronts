@@ -10,6 +10,7 @@ export interface GameClockReading {
   /** Fractional seconds allow the analogue second hand to move smoothly. */
   readonly second: number;
   readonly utcOffsetMinutes: number;
+  readonly timezoneLinked: boolean;
 }
 
 /**
@@ -22,8 +23,9 @@ export class InterpolatedGameClock {
   private speed = 1;
   private generation = -1;
   private fresh = true;
-  private gameStartedAtEpochMs = 0;
   private utcOffsetMinutes = 120;
+  private timezoneLinked = false;
+  private campaignElapsedSeconds = 0;
   private targetEpochMs = 0;
   private targetAtMonotonicMs = 0;
   private displayedEpochMs = 0;
@@ -39,8 +41,9 @@ export class InterpolatedGameClock {
       this.displayedEpochMs = sync.gameEpochMs;
       this.displayedAtMonotonicMs = now;
     }
-    this.gameStartedAtEpochMs = sync.gameStartedAtEpochMs;
     this.utcOffsetMinutes = sync.utcOffsetMinutes;
+    this.timezoneLinked = sync.timezoneLinked ?? false;
+    this.campaignElapsedSeconds = sync.campaignElapsedSeconds ?? 0;
     this.targetEpochMs = sync.gameEpochMs;
     this.speed = sync.speed;
     this.generation = sync.generation;
@@ -57,14 +60,14 @@ export class InterpolatedGameClock {
     const epochMs = this.advance(this.monotonicNow());
     const offsetMs = this.utcOffsetMinutes * 60_000;
     const shiftedEpochMs = epochMs + offsetMs;
-    const shiftedStartMs = this.gameStartedAtEpochMs + offsetMs;
     const date = new Date(shiftedEpochMs);
     return {
-      day: Math.max(1, Math.floor(shiftedEpochMs / DAY_MS) - Math.floor(shiftedStartMs / DAY_MS) + 1),
+      day: Math.max(1, Math.floor(this.campaignElapsedSeconds * 1_000 / DAY_MS) + 1),
       hour: date.getUTCHours(),
       minute: date.getUTCMinutes(),
       second: date.getUTCSeconds() + date.getUTCMilliseconds() / 1_000,
       utcOffsetMinutes: this.utcOffsetMinutes,
+      timezoneLinked: this.timezoneLinked,
     };
   }
 
