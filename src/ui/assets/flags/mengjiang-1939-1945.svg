@@ -1,0 +1,8 @@
+<!-- Source: https://commons.wikimedia.org/wiki/File:Flag_of_the_Mengjiang.svg
+     Licence: Public domain. Flag adopted 1 September 1939. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 450 300">
+  <path fill="#f7d117" d="M0 0h450v300H0z"/>
+  <path fill="#3b6da8" d="M0 75h450v150H0z"/>
+  <path fill="#fff" d="M0 100h450v100H0z"/>
+  <path fill="#c83b36" d="M0 125h450v50H0z"/>
+</svg>
