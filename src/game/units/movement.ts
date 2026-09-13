@@ -17,6 +17,14 @@ export { issueMoveOrder, issueStop, type MoveOrderResult } from '../movement/ord
 export { retreatPaths, issueRetreatOrder, type RetreatPath } from '../movement/retreat';
 export { NAVAL_DWELL_HOURS } from '../movement/naval';
 
+// revalidateOrder()/targetPoint() only ever read visibility for an
+// order.target.kind === 'army' pursuit; every other order (the overwhelming
+// majority — plain point/province moves) never touches it. Stand in with an
+// empty map for those so stepMovement doesn't pay for a fog-of-war
+// recomputation (one per distinct owning country, every fixed-step tick) it
+// will never use.
+const EMPTY_VISIBILITY: ReturnType<typeof computeArmyVisibility> = new Map();
+
 function mergeArrivedStacks(session: SimContext, arrivedIds: ReadonlySet<string>): void {
   for (const armyId of arrivedIds) {
     const army = session.state.armies[armyId];
@@ -47,9 +55,12 @@ export function stepMovement(session: SimContext, dtHours: number): void {
       positions.update(army);
       continue;
     }
-    const visibility = visibilityByCountry.get(army.ownerCountryId)
-      ?? computeArmyVisibility(session.state, world, army.ownerCountryId);
-    visibilityByCountry.set(army.ownerCountryId, visibility);
+    let visibility = EMPTY_VISIBILITY;
+    if (order.target?.kind === 'army') {
+      visibility = visibilityByCountry.get(army.ownerCountryId)
+        ?? computeArmyVisibility(session.state, world, army.ownerCountryId);
+      visibilityByCountry.set(army.ownerCountryId, visibility);
+    }
     revalidateOrder(session, army, order, visibility);
     let budget = stackBaseSpeed(army) * dtHours * STRATEGIC_MOVEMENT_SCALE
       * (army.status === 'retreating' ? 3 : 1) * (session.movementSpeedMultiplier ?? 1)
