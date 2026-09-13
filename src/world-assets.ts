@@ -5,9 +5,11 @@ import type { WorldManifest } from './types';
 let assetBaseUrl = '/world';
 let expectedHashes: Record<string, string> = {};
 const verifiedBuffers = new Map<string, Promise<ArrayBuffer>>();
+let chunkIndex: Promise<Record<string, string[]> | null> | undefined;
 
 export function configureWorldAssetBase(url: string, hashes: Record<string, string> = {}): void {
   expectedHashes = hashes; verifiedBuffers.clear();
+  chunkIndex = undefined;
   assetBaseUrl = url.replace(/\/$/, '');
 }
 
@@ -87,13 +89,37 @@ export function fetchWorldBinary(name: string): Promise<ArrayBuffer> {
   let pending = verifiedBuffers.get(key);
   if (!pending) {
     const expected = expectedHashes[key];
-    pending = fetchBinary(worldAssetUrl(name)).then(async (buffer) => {
+    pending = fetchChunkIndex().then(async (parts) => {
+      if (!parts?.[key]) return fetchBinary(worldAssetUrl(name));
+      const buffers = await Promise.all(parts[key].map((part) => fetchBinary(worldAssetUrl(part))));
+      const size = buffers.reduce((total, buffer) => total + buffer.byteLength, 0);
+      const combined = new Uint8Array(size);
+      let offset = 0;
+      for (const buffer of buffers) {
+        combined.set(new Uint8Array(buffer), offset);
+        offset += buffer.byteLength;
+      }
+      return combined.buffer;
+    }).then(async (buffer) => {
       if (expected && hex(await crypto.subtle.digest('SHA-256', buffer)) !== expected) throw new Error(`World artifact mismatch: ${key}`);
       return buffer;
     });
     verifiedBuffers.set(key, pending);
   }
   return pending;
+}
+
+async function fetchChunkIndex(): Promise<Record<string, string[]> | null> {
+  if (!chunkIndex) {
+    chunkIndex = fetch(worldAssetUrl('world-chunks.json'), { cache: 'force-cache' }).then(async (response) => {
+      if (response.status === 404) return null;
+      if (!response.ok) throw new Error(`Unable to load world chunk index: ${response.status}`);
+      const data = await response.json() as { version?: number; chunks?: Record<string, { files: string[] }> };
+      if (data.version !== 1 || !data.chunks) throw new Error('World chunk index is invalid.');
+      return Object.fromEntries(Object.entries(data.chunks).map(([name, entry]) => [name, entry.files]));
+    });
+  }
+  return chunkIndex;
 }
 export async function fetchWorldJson<T>(name: string): Promise<T> {
   return JSON.parse(new TextDecoder().decode(await fetchWorldBinary(name))) as T;

@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
+import { splitCloudflareWorld } from './scripts/split-cloudflare-assets.mjs';
 import { resolve } from 'node:path';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 
@@ -19,7 +20,13 @@ export default defineConfig({
     { src: 'public/textures', dest: '.' },
     { src: 'public/ui', dest: '.' },
     { src: 'public/world', dest: '.' },
-  ] })],
+  ] }), {
+    name: 'split-cloudflare-world-assets',
+    apply: 'build',
+    async closeBundle() {
+      await splitCloudflareWorld(resolve(__dirname, 'dist/world'));
+    },
+  }],
   build: {
     rollupOptions: {
       input: {

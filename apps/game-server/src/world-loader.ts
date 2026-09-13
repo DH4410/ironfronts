@@ -24,11 +24,10 @@ export async function loadWorld(directory: string): Promise<{ world: WorldData; 
     throw new Error('World manifest points gameplay data outside its identified package.');
   }
   const details = JSON.parse(await readFile(path.join(directory, 'province-details.json'), 'utf8')).provinces;
-  const [owners, ids, surface, height, connections] = await Promise.all([
+  const [owners, ids, surface, connections] = await Promise.all([
     arrayBuffer(directory, 'province-owners.u32'),
     arrayBuffer(directory, 'province-ids.u16'),
     arrayBuffer(directory, 'surface.rgba8'),
-    arrayBuffer(directory, 'height.f32'),
     arrayBuffer(directory, 'connections.f32'),
   ]);
   const artifactNames = ['world.json', 'province-details.json', 'province-owners.u32', 'province-ids.u16', 'surface.rgba8', 'height.f32', 'connections.f32'];
