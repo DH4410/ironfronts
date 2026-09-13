@@ -26,5 +26,24 @@ export class ArmyPicker {
     return best;
   }
 
+  /** Every stack within `radius`, nearest first — lets the caller cycle
+   *  through co-located stacks (e.g. the two sides of a battle) instead of
+   *  only ever reaching whichever one `pick` ranks first. */
+  pickAll(x: number, z: number, radius: number, worldWidth: number, nowSeconds: number): string[] {
+    const radiusSq = radius * radius;
+    const elapsedMs = Math.max(0, nowSeconds - this.sampledAtSeconds) * 1_000;
+    const hits: Array<{ id: string; distanceSq: number }> = [];
+    for (const entry of this.entries) {
+      const point = presentedArmyPosition(entry, elapsedMs);
+      let dx = point.x - x;
+      if (dx > worldWidth / 2) dx -= worldWidth;
+      else if (dx < -worldWidth / 2) dx += worldWidth;
+      const dz = point.z - z;
+      const distanceSq = dx * dx + dz * dz;
+      if (distanceSq < radiusSq) hits.push({ id: entry.id, distanceSq });
+    }
+    return hits.sort((a, b) => a.distanceSq - b.distanceSq).map((hit) => hit.id);
+  }
+
   clear(): void { this.entries = []; }
 }

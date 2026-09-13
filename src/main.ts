@@ -1903,11 +1903,18 @@ function handleMapClick(
   // 2. Army pick. Clicking a different army selects it. Clicking the army that
   //    is already selected drops it and falls through to the province beneath —
   //    so a city with a garrison sitting on it is still selectable to queue
-  //    production or start a building.
+  //    production or start a building. Unless another stack is co-located
+  //    (e.g. the two sides of a battle occupying the same node), in which
+  //    case the repeat click cycles to that other stack instead of dropping
+  //    the selection — otherwise the opposing force is never reachable.
   const hit = renderer.pickArmyAt(clientX, clientY);
   if (hit && hit !== selectedArmyId) {
     selectArmy(session, hit);
     return true;
+  }
+  if (hit && hit === selectedArmyId) {
+    const other = renderer.pickArmiesAt(clientX, clientY).find((id) => id !== hit);
+    if (other) { selectArmy(session, other); return true; }
   }
   // 3. Nothing new picked — drop any army selection and let province
   //    selection proceed on this same click.

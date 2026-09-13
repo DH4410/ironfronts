@@ -1362,6 +1362,16 @@ export class WorldRenderer {
     return this.armyPicker.pick(ground[0], ground[1], radius, this.manifest.world.width, this.elapsed);
   }
 
+  /** Every stack under a screen coordinate, nearest first — e.g. both sides
+   *  of a battle occupying the same node. */
+  pickArmiesAt(clientX: number, clientY: number): string[] {
+    if (this.camera.distance >= 5_000) return [];
+    const ground = this.groundPointAt(clientX, clientY);
+    if (!ground) return [];
+    const radius = Math.max(28, this.camera.distance * 0.045);
+    return this.armyPicker.pickAll(ground[0], ground[1], radius, this.manifest.world.width, this.elapsed);
+  }
+
   /**
    * Classify vertices of the movement/road graph by degree. Degree >= 3 is a
    * crossroads; a deterministic subset of degree >= 4 vertices is promoted to
