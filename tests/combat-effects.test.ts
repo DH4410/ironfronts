@@ -79,6 +79,46 @@ describe('CombatEffectPool lifecycle', () => {
     expect(art.liveTransients(0)).toBeLessThan(12);
   });
 
+  it('does not count future-scheduled layers as live before their birth time', () => {
+    const pool = new CombatEffectPool();
+    pool.spawn(EFFECT_KIND.smoke, 0, 0, { now: 2_000, lifetimeMs: 1_000 });
+    expect(pool.liveTransients(1_000)).toBe(0);
+    expect(pool.collect(1_000, CAM, 999).count).toBe(0);
+    expect(pool.liveTransients(2_100)).toBe(1);
+  });
+
+  it('spawnTankShot choreographs muzzle, travel, impact, debris and smoke without timers', () => {
+    const pool = new CombatEffectPool(64);
+    pool.spawnTankShot(0, 0, 60, 0, { now: 1_000 });
+
+    const initial = pool.collect(1_000, CAM, 1e6);
+    const initialKinds = Array.from({ length: initial.count },
+      (_, i) => initial.floats[i * EFFECT_STRIDE + 2]);
+    expect(initialKinds).toContain(EFFECT_KIND.muzzleFlash);
+    expect(initialKinds).not.toContain(EFFECT_KIND.explosion);
+
+    const impact = pool.collect(1_220, CAM, 1e6);
+    const impactKinds = Array.from({ length: impact.count },
+      (_, i) => impact.floats[i * EFFECT_STRIDE + 2]);
+    expect(impactKinds).toContain(EFFECT_KIND.explosion);
+    expect(impactKinds).toContain(EFFECT_KIND.impact);
+    expect(impactKinds).toContain(EFFECT_KIND.debris);
+    expect(impact.count).toBeLessThanOrEqual(24);
+  });
+
+  it('spawnArtilleryShot stays a bounded strategic effect, not a particle flood', () => {
+    const pool = new CombatEffectPool(64);
+    pool.spawnArtilleryShot(0, 0, 120, 0, { now: 0 });
+    expect(pool.liveTransients(0)).toBeLessThan(8); // only launch layers are born immediately
+
+    const impact = pool.collect(1_100, CAM, 1e6);
+    const kinds = Array.from({ length: impact.count },
+      (_, i) => impact.floats[i * EFFECT_STRIDE + 2]);
+    expect(kinds).toContain(EFFECT_KIND.explosion);
+    expect(kinds).toContain(EFFECT_KIND.debris);
+    expect(impact.count).toBeLessThanOrEqual(32);
+  });
+
   it('clear() drops everything', () => {
     const pool = new CombatEffectPool();
     pool.spawn(EFFECT_KIND.impact, 0, 0, { now: 0 });
