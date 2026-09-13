@@ -10,6 +10,7 @@ import type { SimContext } from '../../src/game/sim-context';
 import type { WorldData, WorldProvince } from '../../src/game/world-data';
 import { issueManualRetreat, legalRetreatPaths, stepCombat } from '../../src/game/combat';
 import type { ArmyStack } from '../../src/game/units/army';
+import { retreatPaths } from '../../src/game/movement/retreat';
 
 function prov(id: number, x: number, z: number): WorldProvince {
   return { id, center: [x, z], terrainId: 0, population: 100, coastal: false, urban: false };
@@ -144,6 +145,55 @@ describe('retreat', () => {
     expect(routes).toHaveLength(1);
     expect(routes[0].firstNodeId).toBe(1);
     expect(routes[0].destinationProvinceId).toBe(20);
+  });
+
+  it('does not duplicate the leading node when turning back mid-edge (partial return)', () => {
+    // Node 0 is the battle site; the army is mid-transit toward node 1 (the
+    // enemy-ward edge) when it breaks, so it must turn back through node 0
+    // toward the safe rear province at node 2. `retreatPaths` used to prepend
+    // `army.graphNodeId` even though the partial-return route already starts
+    // there (edge.from === graphNodeId), producing a path like [0, 0, ...]
+    // whose second hop then failed the server's mid-edge order validation.
+    const threeNodeGraph = buildLandGraph(new Float32Array([
+      100, 100, 300, 100, 1, 0, 0, 0,
+      100, 100, 900, 100, 1, 0, 0, 0,
+    ]), 10_000, 5_000);
+    const provinces = [prov(10, 100, 100), prov(20, 900, 100)];
+    const world: WorldData = {
+      width: 10_000, height: 5_000, provinces,
+      countries: [
+        { id: 1, name: 'A', color: '#fff', capitalProvinceId: 10 },
+        { id: 2, name: 'B', color: '#000', capitalProvinceId: 20 },
+      ],
+      provinceOwner: () => 0, provinceAt: () => -1, terrainClassAt: () => 0,
+      connections: new Float32Array(0), resourceNodes: [],
+    };
+    const state: GameState = {
+      version: GAME_STATE_VERSION, seed: 1, scenarioId: 'OP-1939-01', mode: 'campaign',
+      fogOfWar: false, economyEnabled: false,
+      clock: { gameTimeHours: 0, startDate: 'x' }, simulationTick: 0,
+      countries: {
+        2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
+      },
+      provinceOwners: { 20: 2 },
+      provinceBuildings: {}, productionQueues: {}, constructionQueues: {}, rallyPoints: {},
+      armies: {
+        weak: {
+          id: 'weak', ownerCountryId: 2, name: 'Militia', x: 150, z: 100, graphNodeId: 0,
+          edge: { from: 0, to: 1 },
+          units: [{ typeId: 'infantry', count: 3, hp: 300, experience: 0 }],
+          status: 'engaged', order: null, extractingNodeId: null,
+        } satisfies ArmyStack,
+      },
+      resourceNodes: {}, relations: {}, battles: {}, battleFronts: {},
+      nextArmyId: 1, nextBattleId: 1, nextOrderId: 1, nextEventId: 1,
+    };
+    const c: SimContext = { state, graph: threeNodeGraph, world };
+    const routes = retreatPaths(c, c.state.armies.weak, [0]);
+    expect(routes).toHaveLength(1);
+    expect(routes[0].path[0]).toBe(0);
+    expect(routes[0].path[1]).not.toBe(0);
+    expect(routes[0].path[routes[0].path.length - 1]).toBe(2);
   });
 
   it('fights to the end when there is nowhere to retreat', () => {

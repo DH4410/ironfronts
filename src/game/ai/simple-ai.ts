@@ -106,7 +106,7 @@ export function stepAi(session: SimContext, _dtHours: number): void {
       continue;
     }
     concentrate(session, memory, situation);
-    assault(session, situation);
+    assault(session, memory, situation);
     strategicStrike(session, memory, situation);
     negotiate(session, memory, situation);
   }
@@ -529,9 +529,22 @@ function concentrate(session: SimContext, memory: AiMemory, situation: Assessmen
   }
 }
 
-/** 7. Commit the massed stack — an isolated enemy first, then enemy ground. */
-function assault(session: SimContext, situation: Assessment): void {
+/**
+ * 7. Commit the massed stack — an isolated enemy first, then enemy ground.
+ *
+ * The candidate pool used to be every available stack anywhere, so a single
+ * freshly-idle detachment on the frontier could get thrown in solo the moment
+ * it crossed MIN_ASSAULT_STRENGTH, before `concentrate` had a chance to gather
+ * it with the rest of the army — reading as small, repeated attacks ("spam")
+ * instead of one committed force. Once a staging point exists, only stacks
+ * that have actually arrived there are eligible, so this only ever fires the
+ * fist `concentrate` built.
+ */
+function assault(session: SimContext, memory: AiMemory, situation: Assessment): void {
+  const staging = situation.staging;
+  const stagingNode = staging ? provinceNode(session, memory, staging) : null;
   const spearhead = availableStacks(situation)
+    .filter((army) => stagingNode === null || army.graphNodeId === stagingNode)
     .sort((a, b) => combatStrength(b) - combatStrength(a))[0];
   if (!spearhead) return;
   const strength = combatStrength(spearhead);

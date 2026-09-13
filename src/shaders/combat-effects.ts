@@ -9,7 +9,8 @@ import { commonWgsl } from './common';
  *   b = (seed, scale, intensity, dir)   dir in radians, -999 = none
  *
  * kind: 0 muzzle flash, 1 tracer, 2 projectile, 3 impact, 4 dust, 5 smoke,
- *       6 explosion, 7 target flash, 8 battle marker (age01 = pulse phase).
+ *       6 explosion, 7 target flash, 8 battle marker (age01 = pulse phase),
+ *       9 debris.
  *
  * Alpha-blended (same as every other overlay pipeline) — "heat" comes from
  * bright cores and soft edges, not additive accumulation, so an effect over
@@ -43,6 +44,7 @@ fn effectPixelSize(kind: i32) -> f32 {
     case 5: { return 44.0; }   // smoke
     case 6: { return 52.0; }   // explosion
     case 7: { return 30.0; }   // target flash
+    case 9: { return 8.0; }    // debris
     default: { return 32.0; }  // battle marker
   }
 }
@@ -71,9 +73,16 @@ fn combatEffectVertex(
     let travel = select(150.0, 60.0, kind == 1) * age;
     worldXZ += vec2f(cos(dir), sin(dir)) * travel;
   }
+  if (kind == 9 && dir > -900.0) {
+    // Tiny ballistic debris: cheap horizontal scatter plus a single parabolic
+    // lift. No physics objects, collision bodies, or per-particle CPU updates.
+    let travel = 58.0 * age;
+    worldXZ += vec2f(cos(dir), sin(dir)) * travel;
+  }
   let uvGround = worldXZ / uniforms.map.xy;
   let ground = heightAt(uvGround);
-  let rise = select(0.0, age * 26.0, kind == 4 || kind == 5); // dust / smoke drift up
+  var rise = select(0.0, age * 26.0, kind == 4 || kind == 5); // dust / smoke drift up
+  if (kind == 9) { rise = max(0.0, sin(age * 3.14159265) * 34.0 - age * 5.0); }
   let worldPos = vec3f(worldXZ.x + copyOffset, ground + 6.0 + rise, worldXZ.y);
   let clip = uniforms.viewProjection * vec4f(worldPos, 1.0);
 
@@ -115,7 +124,28 @@ fn combatEffectVertex(
     output.alpha = 0.0;
     return output;
   }
-  let pixelOffset = corner * half * 2.0 / uniforms.viewport.xy;
+  var pixelOffset = corner * half * 2.0 / uniforms.viewport.xy;
+  if (kind == 1 && dir > -900.0) {
+    // Orient the tracer in the actual projected world-space firing direction.
+    // The previous effect was always horizontal in screen space, which made a
+    // diagonal or vertical shot look detached from the combatants.
+    let aheadWorld = vec3f(
+      worldPos.x + cos(dir) * 24.0,
+      worldPos.y,
+      worldPos.z + sin(dir) * 24.0,
+    );
+    let aheadClip = uniforms.viewProjection * vec4f(aheadWorld, 1.0);
+    if (aheadClip.w > 0.0001) {
+      let deltaPx = (aheadClip.xy / aheadClip.w - clip.xy / clip.w) * uniforms.viewport.xy * 0.5;
+      let deltaLen = length(deltaPx);
+      if (deltaLen > 0.01) {
+        let axis = deltaPx / deltaLen;
+        let normal = vec2f(-axis.y, axis.x);
+        let orientedPx = axis * (corner.x * half * 1.75) + normal * (corner.y * half * 0.20);
+        pixelOffset = orientedPx * 2.0 / uniforms.viewport.xy;
+      }
+    }
+  }
   output.position = clip + vec4f(pixelOffset * clip.w, 0.0, 0.0);
   return output;
 }
@@ -237,6 +267,14 @@ fn combatEffectFragment(input: EffectOut) -> @location(0) vec4f {
     );
     a = clamp(ring(uv, 0.78, 0.05) + cross, 0.0, 1.0);
     rgb = vec3f(0.95, 0.28, 0.20);
+  } else if (kind == 9) {                 // debris — a few tumbling dark fragments
+    let spin = input.age * 9.0 + input.seed * 6.2831853;
+    let cs = cos(spin);
+    let sn = sin(spin);
+    let p = vec2f(cs * uv.x - sn * uv.y, sn * uv.x + cs * uv.y);
+    let box = max(abs(p.x) * 0.85, abs(p.y) * 2.2);
+    a = 1.0 - smoothstep(0.45, 0.82, box);
+    rgb = mix(vec3f(0.12, 0.105, 0.085), vec3f(0.28, 0.22, 0.15), input.seed);
   } else {                                // battle marker — a smouldering smoke plume, no ring or cross
     // A pulsing ring / crossed-blades "X" both read as HUD chrome. A turbulent
     // dark smoke puff with a flickering ember core reads as "fighting here"

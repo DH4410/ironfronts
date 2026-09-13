@@ -26,6 +26,7 @@ export const EFFECT_KIND = {
   explosion: 6,
   targetFlash: 7,
   battleMarker: 8,
+  debris: 9,
 } as const;
 export type EffectKind = (typeof EFFECT_KIND)[keyof typeof EFFECT_KIND];
 
@@ -42,6 +43,7 @@ const DEFAULT_LIFETIME_MS: Record<number, number> = {
   [EFFECT_KIND.explosion]: 720,
   [EFFECT_KIND.targetFlash]: 520,
   [EFFECT_KIND.battleMarker]: Number.POSITIVE_INFINITY,
+  [EFFECT_KIND.debris]: 900,
 };
 
 interface Transient {
@@ -160,6 +162,145 @@ export class CombatEffectPool {
     }
   }
 
+  /**
+   * One complete tank firing cue, scheduled entirely inside the fixed-capacity
+   * pool. Future-birth records stay invisible until their start time, avoiding
+   * DOM timers while still giving the shot readable choreography:
+   * recoil/muzzle cue -> shell -> layered impact -> dust/debris -> smoke.
+   */
+  spawnTankShot(
+    sourceX: number, sourceZ: number, targetX: number, targetZ: number,
+    options: SpawnOptions = {},
+  ): void {
+    const now = options.now ?? Date.now();
+    const dx = targetX - sourceX;
+    const dz = targetZ - sourceZ;
+    const distance = Math.hypot(dx, dz);
+    if (!Number.isFinite(distance) || distance < 0.001) return;
+    const dir = Math.atan2(dz, dx);
+    const travelMs = Math.max(180, Math.min(520, distance * 3.0));
+    const impactAt = now + 35 + travelMs * 0.88;
+    const jitter = (spread: number): number => (this.random() - 0.5) * spread;
+
+    this.spawn(EFFECT_KIND.muzzleFlash, sourceX, sourceZ, {
+      now, dir, scale: 1.25, intensity: 1.25, lifetimeMs: 150,
+    });
+    this.spawn(EFFECT_KIND.smoke, sourceX - Math.cos(dir) * 5, sourceZ - Math.sin(dir) * 5, {
+      now: now + 45, scale: 0.55, intensity: 0.75, lifetimeMs: 1_450,
+    });
+    this.spawn(EFFECT_KIND.projectile, sourceX, sourceZ, {
+      now: now + 35, dir, scale: 1.0, intensity: 1.2, lifetimeMs: travelMs,
+    });
+
+    this.spawn(EFFECT_KIND.impact, targetX, targetZ, {
+      now: impactAt, scale: 1.15, intensity: 1.2, lifetimeMs: 420,
+    });
+    this.spawn(EFFECT_KIND.explosion, targetX, targetZ, {
+      now: impactAt, scale: 1.2, intensity: 1.35, lifetimeMs: 820,
+    });
+    this.spawn(EFFECT_KIND.explosion, targetX + jitter(10), targetZ + jitter(10), {
+      now: impactAt + 55, scale: 0.72, intensity: 0.9, lifetimeMs: 620,
+    });
+
+    for (let i = 0; i < 5; i += 1) {
+      const angle = (i / 5) * Math.PI * 2 + this.random() * 0.7;
+      const radius = 10 + this.random() * 24;
+      this.spawn(EFFECT_KIND.dust,
+        targetX + Math.cos(angle) * radius,
+        targetZ + Math.sin(angle) * radius, {
+          now: impactAt + 30 + i * 18,
+          scale: 0.65 + this.random() * 0.45,
+          intensity: 0.8,
+          lifetimeMs: 1_450,
+        });
+    }
+    for (let i = 0; i < 4; i += 1) {
+      const angle = this.random() * Math.PI * 2;
+      this.spawn(EFFECT_KIND.debris, targetX + jitter(7), targetZ + jitter(7), {
+        now: impactAt + i * 12,
+        dir: angle,
+        scale: 0.65 + this.random() * 0.5,
+        intensity: 0.8,
+        lifetimeMs: 720 + Math.round(this.random() * 260),
+      });
+    }
+    for (let i = 0; i < 4; i += 1) {
+      this.spawn(EFFECT_KIND.smoke, targetX + jitter(18), targetZ + jitter(18), {
+        now: impactAt + 130 + i * 95,
+        scale: 0.8 + i * 0.16 + this.random() * 0.18,
+        intensity: 0.85,
+        lifetimeMs: 2_800 + i * 260,
+      });
+    }
+  }
+
+  /** Heavier, slower layered artillery cue; still a small bounded instance set. */
+  spawnArtilleryShot(
+    sourceX: number, sourceZ: number, targetX: number, targetZ: number,
+    options: SpawnOptions = {},
+  ): void {
+    const now = options.now ?? Date.now();
+    const dx = targetX - sourceX;
+    const dz = targetZ - sourceZ;
+    const distance = Math.hypot(dx, dz);
+    if (!Number.isFinite(distance) || distance < 0.001) return;
+    const dir = Math.atan2(dz, dx);
+    const travelMs = Math.max(420, Math.min(1_050, distance * 4.2));
+    const impactAt = now + 70 + travelMs * 0.9;
+    const jitter = (spread: number): number => (this.random() - 0.5) * spread;
+
+    this.spawn(EFFECT_KIND.muzzleFlash, sourceX, sourceZ, {
+      now, dir, scale: 1.45, intensity: 1.35, lifetimeMs: 180,
+    });
+    this.spawn(EFFECT_KIND.dust, sourceX + jitter(12), sourceZ + jitter(12), {
+      now: now + 35, scale: 1.0, intensity: 0.8, lifetimeMs: 1_500,
+    });
+    this.spawn(EFFECT_KIND.projectile, sourceX, sourceZ, {
+      now: now + 70, dir, scale: 1.25, intensity: 1.1, lifetimeMs: travelMs,
+    });
+
+    this.spawn(EFFECT_KIND.impact, targetX, targetZ, {
+      now: impactAt, scale: 1.55, intensity: 1.3, lifetimeMs: 500,
+    });
+    for (let i = 0; i < 3; i += 1) {
+      this.spawn(EFFECT_KIND.explosion, targetX + jitter(18), targetZ + jitter(18), {
+        now: impactAt + i * 45,
+        scale: 1.45 - i * 0.16,
+        intensity: 1.35 - i * 0.12,
+        lifetimeMs: 900 - i * 80,
+      });
+    }
+    for (let i = 0; i < 7; i += 1) {
+      const angle = (i / 7) * Math.PI * 2 + this.random() * 0.5;
+      const radius = 18 + this.random() * 42;
+      this.spawn(EFFECT_KIND.dust,
+        targetX + Math.cos(angle) * radius,
+        targetZ + Math.sin(angle) * radius, {
+          now: impactAt + 40 + i * 22,
+          scale: 0.9 + this.random() * 0.6,
+          intensity: 0.9,
+          lifetimeMs: 1_650,
+        });
+    }
+    for (let i = 0; i < 5; i += 1) {
+      this.spawn(EFFECT_KIND.debris, targetX + jitter(10), targetZ + jitter(10), {
+        now: impactAt + i * 14,
+        dir: this.random() * Math.PI * 2,
+        scale: 0.7 + this.random() * 0.6,
+        intensity: 0.9,
+        lifetimeMs: 850 + Math.round(this.random() * 280),
+      });
+    }
+    for (let i = 0; i < 5; i += 1) {
+      this.spawn(EFFECT_KIND.smoke, targetX + jitter(26), targetZ + jitter(26), {
+        now: impactAt + 150 + i * 120,
+        scale: 1.05 + i * 0.2 + this.random() * 0.2,
+        intensity: 0.9,
+        lifetimeMs: 3_200 + i * 320,
+      });
+    }
+  }
+
   /** Insert or refresh the persistent marker for a live battle. */
   setBattle(id: string, x: number, z: number, intensity = 1, dir = Number.NaN): void {
     const existing = this.battles.get(id);
@@ -190,7 +331,10 @@ export class CombatEffectPool {
   /** Count of transients not yet expired at `now`. */
   liveTransients(now: number): number {
     let n = 0;
-    for (const r of this.ring) if (now - r.birth < r.lifetime) n += 1;
+    for (const r of this.ring) {
+      const age = now - r.birth;
+      if (age >= 0 && age < r.lifetime) n += 1;
+    }
     return n;
   }
 
@@ -206,6 +350,7 @@ export class CombatEffectPool {
     camera: { x: number; z: number },
     maxDistance: number,
     budget = this.capacity,
+    isVisible?: (x: number, z: number) => boolean,
   ): CollectResult {
     const cap = Math.min(budget, this.capacity);
     const out = this.packed;
@@ -223,6 +368,7 @@ export class CombatEffectPool {
 
     for (const b of this.battles.values()) {
       if (count >= cap) break;
+      if (isVisible && !isVisible(b.x, b.z)) continue;
       // A gentle pulse so the marker breathes; the shader reads age01 as phase.
       const phase = ((now * 0.001) % 2) / 2;
       write(EFFECT_KIND.battleMarker, b.x, b.z, phase, b.seed, 1, b.intensity, b.dir);
@@ -236,6 +382,7 @@ export class CombatEffectPool {
       const dx = r.x - camera.x;
       const dz = r.z - camera.z;
       if (dx * dx + dz * dz > maxSq) continue;
+      if (isVisible && !isVisible(r.x, r.z)) continue;
       write(r.kind, r.x, r.z, age / r.lifetime, r.seed, r.scale, r.intensity, r.dir);
     }
     return { floats: out, count };

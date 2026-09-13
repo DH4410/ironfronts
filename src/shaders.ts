@@ -7,6 +7,7 @@ export { mapMarkerShader } from './shaders/map-markers';
 export { armyMarkerShader } from './shaders/army-markers';
 export { armyModelShader } from './shaders/army-models';
 export { infantryModelShader } from './shaders/infantry-model';
+export { tankModelShader } from './shaders/tank-model';
 export { combatEffectShader } from './shaders/combat-effects';
 export { polarCapShader } from './shaders/polar-caps';
 export { propShader } from './shaders/props';

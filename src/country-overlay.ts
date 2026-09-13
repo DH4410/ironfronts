@@ -180,11 +180,17 @@ export class CountryLabelLayer {
         this.territorySampleSpacing,
       );
       if (glyphs.length) {
-        this.glyphsByCountry.set(countryId, placeCountryLabelOnTerrain(
+        const placed = placeCountryLabelOnTerrain(
           glyphs,
           this.sampleHeight,
           this.heightSampleSpacing,
-        ));
+        );
+        // c.w was reserved (always 0); stow the owning country id here so the
+        // label shader can look up its diplomacy tint per glyph.
+        for (let offset = 0; offset < placed.length; offset += LABEL_GLYPH_STRIDE) {
+          placed[offset + 11] = countryId;
+        }
+        this.glyphsByCountry.set(countryId, placed);
       }
       else this.glyphsByCountry.delete(countryId);
     } else {

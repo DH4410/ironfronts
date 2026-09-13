@@ -23,6 +23,7 @@ struct CountryLabelOutput {
   @builtin(position) position: vec4f,
   @location(0) uv: vec2f,
   @location(1) @interpolate(flat) fogVisibility: f32,
+  @location(2) @interpolate(flat) ownerId: u32,
 };
 
 @vertex
@@ -53,13 +54,20 @@ fn countryLabelVertex(
     uniforms.camera.y
   );
   output.fogVisibility = (1.0 - horizontalWorldFog(worldXZ.x)) * altitudeVisibility;
+  output.ownerId = u32(round(glyph.c.w));
   return output;
 }
 
 @fragment
 fn countryLabelFragment(input: CountryLabelOutput) -> @location(0) vec4f {
   let sampled = textureSample(countryLabelAtlas, countryLabelSampler, input.uv);
-  let readableInk = mix(sampled.rgb, vec3f(0.91, 0.91, 0.83), uniforms.lighting.z * 0.42);
+  var readableInk = mix(sampled.rgb, vec3f(0.91, 0.91, 0.83), uniforms.lighting.z * 0.42);
+  // War/allied labels borrow the same diplomacy palette used for province
+  // tinting so an enemy country's name reads as clearly hostile as its land.
+  let diplomacyColor = diplomacyColorFor(input.ownerId);
+  if (diplomacyColor.a > 0.75) {
+    readableInk = mix(readableInk, min(diplomacyColor.rgb * 1.35, vec3f(1.0)), 0.75);
+  }
   let color = vec4f(readableInk, sampled.a * input.fogVisibility);
   if (color.a < 0.01) { discard; }
   return color;

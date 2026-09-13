@@ -49,7 +49,11 @@ export function retreatPaths(
       const tail=[destination.node];
       for (let node=destination.node;parent[node]>=0;node=parent[node]) tail.push(parent[node]);
       tail.reverse();
-      const path=[army.graphNodeId,...tail];
+      // In the partial-return case `first` IS `army.graphNodeId` (edge.from),
+      // so `tail[0]` already equals it — prepending it again produced a
+      // duplicate leading node whose second hop then failed the mid-edge
+      // "next must be edge.from/edge.to" check in validateWorldState.
+      const path=partialReturn?tail:[army.graphNodeId,...tail];
       result.push({firstNodeId:first,destinationProvinceId:destination.id,path,
         length:distance[destination.node]+wrappedDistance(army.x,army.z,session.graph.nodeX[first],session.graph.nodeZ[first],session.world.width)});
     }

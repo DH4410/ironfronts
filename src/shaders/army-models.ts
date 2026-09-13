@@ -74,6 +74,18 @@ fn modelPart(kind: u32, part: u32) -> ModelPart {
       case 4u: { center = vec3f(1.44, 0.48, 0.0); halfSize = vec3f(0.32, 0.38, 1.80); shade = 0.26; }
       default: { center = vec3f(0.0, 2.02, 0.12); halfSize = vec3f(0.32, 0.16, 0.32); shade = 1.0; }
     }
+  } else if (kind == 4u) {
+    // Light tank: identical silhouette to kind 1 (armored cars still use that
+    // one) — split out so the light tank can be targeted independently of the
+    // armored car by the skinned-overlay system without changing either's look.
+    switch part {
+      case 0u: { center = vec3f(0.0, 0.72, 0.0); halfSize = vec3f(1.12, 0.46, 1.68); shade = 0.72; }
+      case 1u: { center = vec3f(0.0, 1.35, 0.0); halfSize = vec3f(0.72, 0.34, 0.86); shade = 0.92; }
+      case 2u: { center = vec3f(0.0, 1.42, -1.36); halfSize = vec3f(0.13, 0.13, 0.88); shade = 0.40; }
+      case 3u: { center = vec3f(-1.42, 0.46, 0.0); halfSize = vec3f(0.28, 0.34, 1.55); shade = 0.34; }
+      case 4u: { center = vec3f(1.42, 0.46, 0.0); halfSize = vec3f(0.28, 0.34, 1.55); shade = 0.34; }
+      default: { center = vec3f(0.0, 1.82, 0.12); halfSize = vec3f(0.28, 0.14, 0.28); shade = 1.05; }
+    }
   } else {
     // Artillery: carriage, shield, long barrel, trail and wheels.
     switch part {
@@ -100,7 +112,7 @@ fn armyModelVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_in
   let copyIndex = instanceIndex / armyModelParams.count;
   let model = armyModels[instanceIndex % armyModelParams.count];
   let copyOffset = f32(i32(copyIndex) - 1) * uniforms.map.x;
-  let kind = min(u32(model.a.w + 0.5), 3u);
+  let kind = min(u32(model.a.w + 0.5), 4u);
   let partIndex = vertexIndex / 36u;
   let cube = cubePoint(vertexIndex % 36u);
   let part = modelPart(kind, partIndex);
@@ -132,7 +144,7 @@ fn armyModelVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_in
     if (partIndex == 2u) { local.z += sin(gait) * 0.22 * scale * moveAmt; }
     if (partIndex == 3u) { local.z += sin(gait + 3.14159265) * 0.22 * scale * moveAmt; }
     if (partIndex == 4u || partIndex == 5u) { local.z += sin(gait + 3.14159265) * 0.12 * scale * moveAmt; }
-  } else if (kind == 1u || kind == 2u) {
+  } else if (kind == 1u || kind == 2u || kind == 4u) {
     local.y += sin(uniforms.sunTime.w * 3.4 + model.c.y * 0.2) * 0.05 * scale * moveAmt;
   }
 
@@ -151,9 +163,12 @@ fn armyModelVertex(@builtin(vertex_index) vertexIndex: u32, @builtin(instance_in
   output.alpha = closeFade * (1.0 - horizontalWorldFog(worldPosition.x));
   let modelFlags = u32(model.b.z + 0.5);
   if ((modelFlags & 1u) != 0u) { output.color = mix(output.color, vec3f(1.0, 0.84, 0.40), 0.24); }
-  // The skinned asset has its own indexed draw. Keep the procedural infantry
-  // only as a graceful fallback if that optional asset failed to load.
-  if (kind == 0u && armyModelParams.mode == 1u) {
+  // Each skinned asset has its own indexed draw. Keep the procedural model
+  // only as a graceful fallback for whichever kinds' optional asset failed to
+  // load — mode is a bitmask: 1 infantry, 2 light tank, 4 medium tank.
+  if ((kind == 0u && (armyModelParams.mode & 1u) != 0u)
+    || (kind == 4u && (armyModelParams.mode & 2u) != 0u)
+    || (kind == 2u && (armyModelParams.mode & 4u) != 0u)) {
     output.position = vec4f(2.0, 2.0, 2.0, 1.0);
     output.alpha = 0.0;
   }

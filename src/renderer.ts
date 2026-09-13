@@ -16,6 +16,7 @@ import { EnvironmentController, type TimeOfDayState } from './environment-contro
 import { FRAME_UNIFORM_BYTES, packFrameUniforms } from './frame-uniforms';
 import { align4, uploadMipmappedTexture, uploadTexture } from './gpu-utils';
 import { loadInfantryModel, type InfantryModel } from './infantry-model';
+import { loadTankModel, type TankModel } from './tank-model';
 import { createMaterialTexture, createTreeMaterialTexture } from './material-texture';
 import {
   createEmptyRenderWorkload, PerformanceMonitor,
@@ -93,6 +94,7 @@ export class WorldRenderer {
   private lineLayout!: GPUBindGroupLayout;
   private countryLabelLayout!: GPUBindGroupLayout;
   private infantryModelLayout!: GPUBindGroupLayout;
+  private tankModelLayout!: GPUBindGroupLayout;
   private commonBindGroup!: GPUBindGroup;
   private uniformBuffer!: GPUBuffer;
   private terrainPipeline!: GPURenderPipeline;
@@ -109,6 +111,7 @@ export class WorldRenderer {
   private armyCompositionPipeline!: GPURenderPipeline;
   private armyModelPipeline!: GPURenderPipeline;
   private infantryModelPipeline!: GPURenderPipeline;
+  private tankModelPipeline!: GPURenderPipeline;
   private combatEffectPipeline!: GPURenderPipeline;
   private countryLabelPipeline!: GPURenderPipeline;
   private countryLabelBuffer?: GPUBuffer;
@@ -170,17 +173,32 @@ export class WorldRenderer {
    *  drawn. Rewritten from authoritative GameState when the army set changes. */
   private armyMarkers?: InstanceLayer;
   private armyModels?: InstanceLayer;
+  /** Frustum-culled subset of armyModels actually drawn — see updateVisibleModelKind(null, ...). */
+  private visibleArmyModels?: InstanceLayer;
   private infantryModels?: InstanceLayer;
   private infantryModel?: InfantryModel;
+  private lightTankModels?: InstanceLayer;
+  private lightTankModel?: TankModel;
+  private mediumTankModels?: InstanceLayer;
+  private mediumTankModel?: TankModel;
+  /** Bitmask of which kinds have a loaded skinned overlay (1 infantry, 2 light
+   *  tank, 4 medium tank); carried into visibleArmyModels' params so the
+   *  procedural fallback-hide logic still works after culling. */
+  private armyModelMode = 0;
   private static readonly ARMY_MARKER_CAPACITY = 1_024;
   private static readonly ARMY_MODEL_CAPACITY = 4_096;
   private static readonly ARMY_MODEL_VERTEX_COUNT = 6 * 36;
   private readonly armyModelSource = new Float32Array(WorldRenderer.ARMY_MODEL_CAPACITY * 16);
   private armyModelSourceCount = 0;
   private armyModelSourceRevision = 0;
-  private visibleInfantrySourceRevision = -1;
-  private visibleInfantryCameraRevision = -1;
+  private readonly visibleArmyModelState = { sourceRevision: -1, cameraRevision: -1 };
+  private readonly visibleArmyModelScratch = new Float32Array(WorldRenderer.ARMY_MODEL_CAPACITY * 16);
+  private readonly visibleInfantryState = { sourceRevision: -1, cameraRevision: -1 };
   private readonly visibleInfantryScratch = new Float32Array(WorldRenderer.ARMY_MODEL_CAPACITY * 16);
+  private readonly visibleLightTankState = { sourceRevision: -1, cameraRevision: -1 };
+  private readonly visibleLightTankScratch = new Float32Array(WorldRenderer.ARMY_MODEL_CAPACITY * 16);
+  private readonly visibleMediumTankState = { sourceRevision: -1, cameraRevision: -1 };
+  private readonly visibleMediumTankScratch = new Float32Array(WorldRenderer.ARMY_MODEL_CAPACITY * 16);
   /** Base camera distance for the strategic-marker <-> 3D-model LOD swap. */
   private static readonly ARMY_MODEL_RANGE_BASE = 1_900;
   /** The ONLY resource-deposit marker layer: fed the player-visible authoritative
@@ -605,6 +623,17 @@ export class WorldRenderer {
       // The procedural infantry remains enabled as the fallback in this case.
       console.warn('Could not load the skinned infantry model; using the procedural fallback.', error);
     }
+    report('Loading tank models', 0.7);
+    try {
+      this.lightTankModel = await loadTankModel(this.device, this.tankModelLayout, '/models/tank-light.glb');
+    } catch (error) {
+      console.warn('Could not load the skinned light tank model; using the procedural fallback.', error);
+    }
+    try {
+      this.mediumTankModel = await loadTankModel(this.device, this.tankModelLayout, '/models/tank-medium.glb');
+    } catch (error) {
+      console.warn('Could not load the skinned medium tank model; using the procedural fallback.', error);
+    }
     this.terrainMeshes = [this.manifest.terrain.gridResolution, 33, 17, 9]
       .map((resolution) => createTerrainMesh(this.device, resolution, true));
     this.polarCapMesh = createTerrainMesh(this.device, 65);
@@ -936,6 +965,7 @@ export class WorldRenderer {
     this.lineLayout = layouts.lines;
     this.countryLabelLayout = layouts.countryLabels;
     this.infantryModelLayout = layouts.infantryModel;
+    this.tankModelLayout = layouts.tankModel;
   }
 
   private createPipelines(): void {
@@ -945,6 +975,7 @@ export class WorldRenderer {
       lines: this.lineLayout,
       countryLabels: this.countryLabelLayout,
       infantryModel: this.infantryModelLayout,
+      tankModel: this.tankModelLayout,
     });
     this.terrainPipeline = pipelines.terrain;
     this.polarCapPipeline = pipelines.polarCaps;
@@ -960,6 +991,7 @@ export class WorldRenderer {
     this.armyCompositionPipeline = pipelines.armyComposition;
     this.armyModelPipeline = pipelines.armyModels;
     this.infantryModelPipeline = pipelines.infantryModels;
+    this.tankModelPipeline = pipelines.tankModels;
     this.combatEffectPipeline = pipelines.combatEffects;
     this.countryLabelPipeline = pipelines.countryLabels;
   }
@@ -1079,8 +1111,17 @@ export class WorldRenderer {
     this.armyModels = this.createInstanceLayer(
       'army formation models', zeroModels.buffer as ArrayBuffer, 0, 0, this.lineLayout,
     );
+    this.visibleArmyModels = this.createInstanceLayer(
+      'visible army formation models', zeroModels.buffer as ArrayBuffer, 0, 0, this.lineLayout,
+    );
     this.infantryModels = this.createInstanceLayer(
       'visible skinned infantry models', zeroModels.buffer as ArrayBuffer, 0, 0, this.lineLayout,
+    );
+    this.lightTankModels = this.createInstanceLayer(
+      'visible skinned light tank models', zeroModels.buffer as ArrayBuffer, 0, 4, this.lineLayout,
+    );
+    this.mediumTankModels = this.createInstanceLayer(
+      'visible skinned medium tank models', zeroModels.buffer as ArrayBuffer, 0, 2, this.lineLayout,
     );
     const zeroR = new Float32Array(WorldRenderer.RESOURCE_MARKER_CAPACITY * 4);
     this.gameResourceMarkers = this.createInstanceLayer(
@@ -1219,6 +1260,22 @@ export class WorldRenderer {
   }
 
   /**
+   * True when a world-space effect around this point can actually contribute
+   * pixels to the current camera view. Horizontal world wrapping is handled by
+   * checking the previous/current/next copies, matching the renderer draw path.
+   * Hidden tabs return false so callers avoid even spawning cosmetic work.
+   */
+  isWorldPointVisible(worldX: number, worldZ: number, radius = 120): boolean {
+    if (this.renderingSuspended || !this.initialized) return false;
+    const width = this.manifest.world.width;
+    for (const copy of WORLD_COPY_INDICES) {
+      const copyX = worldX + (copy - 1) * width;
+      if (this.chunkIntersectsView(copyX, worldZ, radius)) return true;
+    }
+    return false;
+  }
+
+  /**
    * Replace the drawn order-route polylines. `records` is 8 floats per segment
    * (LineRecord: a = x0,z0,x1,z1; b = colorFlag, dim, retreatFlag, 0), where
    * colorFlag 0 = move / 1 = attack, dim > 0.5 = a non-selected army's route,
@@ -1291,14 +1348,22 @@ export class WorldRenderer {
           modelRecords.buffer as ArrayBuffer, modelRecords.byteOffset, cappedModels * 16 * 4,
         );
       }
+      // mode is a bitmask of which kinds have a loaded skinned overlay, so the
+      // procedural fallback only hides for the kinds that are actually covered.
+      const modelMode = (this.infantryModel ? 1 : 0)
+        | (this.lightTankModel ? 2 : 0)
+        | (this.mediumTankModel ? 4 : 0);
+      this.armyModelMode = modelMode;
       this.device.queue.writeBuffer(
-        this.armyModels.params, 0, new Uint32Array([Math.max(1, cappedModels), this.infantryModel ? 1 : 0, 1, 0]),
+        this.armyModels.params, 0, new Uint32Array([Math.max(1, cappedModels), modelMode, 1, 0]),
       );
       this.armyModels.count = cappedModels;
       this.armyModelSourceCount = cappedModels;
       if (cappedModels > 0) this.armyModelSource.set(modelRecords.subarray(0, cappedModels * 16));
       this.armyModelSourceRevision += 1;
-      this.visibleInfantrySourceRevision = -1;
+      this.visibleInfantryState.sourceRevision = -1;
+      this.visibleLightTankState.sourceRevision = -1;
+      this.visibleMediumTankState.sourceRevision = -1;
     }
     this.armyPicker.update(pickList, this.elapsed);
   }
@@ -1306,17 +1371,27 @@ export class WorldRenderer {
   /** Keep the high-poly skinned draw to infantry that can intersect the current
    * camera frustum. The procedural models are tiny; the imported mesh is not,
    * so submitting every army on the world map would waste millions of vertices. */
-  private updateVisibleInfantryModels(): void {
-    if (!this.infantryModel || !this.infantryModels) return;
-    if (this.visibleInfantrySourceRevision === this.armyModelSourceRevision
-      && this.visibleInfantryCameraRevision === this.camera.revision) return;
-    this.visibleInfantrySourceRevision = this.armyModelSourceRevision;
-    this.visibleInfantryCameraRevision = this.camera.revision;
+  /**
+   * Shared by every high-detail skinned overlay (infantry, light tank, medium
+   * tank): compact the shared `armyModelSource` set down to just the
+   * instances of one `kind` that intersect the camera frustum, so the costly
+   * skinned draw only ever processes what is actually on screen.
+   */
+  /** `kind: null` matches every formation regardless of its close-range model kind. */
+  private updateVisibleModelKind(
+    kind: number | null, hasModel: boolean, layer: InstanceLayer | undefined,
+    state: { sourceRevision: number; cameraRevision: number }, scratch: Float32Array, mode = 0,
+  ): void {
+    if (!hasModel || !layer) return;
+    if (state.sourceRevision === this.armyModelSourceRevision
+      && state.cameraRevision === this.camera.revision) return;
+    state.sourceRevision = this.armyModelSourceRevision;
+    state.cameraRevision = this.camera.revision;
     let visibleCount = 0;
     const worldWidth = this.manifest.world.width;
     for (let index = 0; index < this.armyModelSourceCount; index += 1) {
       const sourceOffset = index * 16;
-      if (Math.round(this.armyModelSource[sourceOffset + 3]) !== 0) continue;
+      if (kind !== null && Math.round(this.armyModelSource[sourceOffset + 3]) !== kind) continue;
       const x = this.armyModelSource[sourceOffset];
       const z = this.armyModelSource[sourceOffset + 1];
       let visible = false;
@@ -1327,27 +1402,31 @@ export class WorldRenderer {
         }
       }
       if (!visible) continue;
-      this.visibleInfantryScratch.set(
-        this.armyModelSource.subarray(sourceOffset, sourceOffset + 16),
-        visibleCount * 16,
-      );
+      scratch.set(this.armyModelSource.subarray(sourceOffset, sourceOffset + 16), visibleCount * 16);
       visibleCount += 1;
     }
     if (visibleCount > 0) {
-      this.device.queue.writeBuffer(
-        this.infantryModels.buffer,
-        0,
-        this.visibleInfantryScratch.buffer as ArrayBuffer,
-        0,
-        visibleCount * 16 * 4,
-      );
+      this.device.queue.writeBuffer(layer.buffer, 0, scratch.buffer as ArrayBuffer, 0, visibleCount * 16 * 4);
     }
-    this.device.queue.writeBuffer(
-      this.infantryModels.params,
-      0,
-      new Uint32Array([Math.max(1, visibleCount), 0, 1, 0]),
-    );
-    this.infantryModels.count = visibleCount;
+    this.device.queue.writeBuffer(layer.params, 0, new Uint32Array([Math.max(1, visibleCount), mode, 1, 0]));
+    layer.count = visibleCount;
+  }
+
+  private updateVisibleUnitModels(): void {
+    // The procedural boxes cover every kind, so every formation on the map
+    // used to be submitted whenever the camera was merely close enough
+    // (camera.distance < armyModelDrawDistance), even the ones panned off
+    // screen — frustum-cull them into their own compacted layer exactly like
+    // the skinned overlays below, carrying the real fallback-hide bitmask so
+    // kinds with a loaded skinned asset still hide correctly.
+    this.updateVisibleModelKind(null, true, this.visibleArmyModels,
+      this.visibleArmyModelState, this.visibleArmyModelScratch, this.armyModelMode);
+    this.updateVisibleModelKind(0, Boolean(this.infantryModel), this.infantryModels,
+      this.visibleInfantryState, this.visibleInfantryScratch);
+    this.updateVisibleModelKind(4, Boolean(this.lightTankModel), this.lightTankModels,
+      this.visibleLightTankState, this.visibleLightTankScratch);
+    this.updateVisibleModelKind(2, Boolean(this.mediumTankModel), this.mediumTankModels,
+      this.visibleMediumTankState, this.visibleMediumTankScratch);
   }
 
   private readonly armyPicker = new ArmyPicker();
@@ -1539,7 +1618,7 @@ export class WorldRenderer {
     this.camera.update(deltaMs / 1000);
     this.resize();
     this.updateVisibleTerrainChunks();
-    this.updateVisibleInfantryModels();
+    this.updateVisibleUnitModels();
     const cameraMs = performance.now() - phaseStarted;
 
     phaseStarted = performance.now();
@@ -1716,7 +1795,14 @@ export class WorldRenderer {
         this.drawPropChunks(pass, this.barriers, this.manifest.propChunks.barriers, [[this.barrierMesh]], 'roadFurniture', 1_900 * s, d2(1_900, 1_900));
         this.drawPropChunks(pass, this.signs, this.manifest.propChunks.signs, [[this.signMesh]], 'roadFurniture', 1_900 * s, d2(1_900, 1_900));
       }
-      if (this.performanceLayers.buildings) this.drawCityLights(pass);
+      // The shader's own opacity is strategicFade * darkness — exactly zero
+      // once both twilight and night are 0, i.e. full daylight. Skip the
+      // visibility rebuild and draw entirely rather than pay for an
+      // invisible pass every time the camera moves through the day.
+      const lighting = this.environment.lighting;
+      if (this.performanceLayers.buildings && (lighting.night > 0 || lighting.twilight > 0)) {
+        this.drawCityLights(pass);
+      }
     }
 
     this.drawRain(pass);
@@ -1729,24 +1815,18 @@ export class WorldRenderer {
     }
     if (this.showConnections && this.connections) {
       pass.setBindGroup(1, this.connections.bindGroup);
-      const instances = this.connections.count * WORLD_COPY_INDICES.length;
-      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.connections.count);
-      this.recordTriangleDraw('debugLines', instances * 2, instances);
+      this.drawWorldCopies(pass, 6, this.connections.count, 'debugLines');
     }
     if (this.showWaterwayNetwork && this.waterwayNetwork) {
       pass.setBindGroup(1, this.waterwayNetwork.bindGroup);
-      const instances = this.waterwayNetwork.count * WORLD_COPY_INDICES.length;
-      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.waterwayNetwork.count);
-      this.recordTriangleDraw('debugLines', instances * 2, instances);
+      this.drawWorldCopies(pass, 6, this.waterwayNetwork.count, 'debugLines');
     }
     // Own-army movement / attack routes: authoritative road path, terrain-draped,
     // only below strategic altitude (declutters the overview).
     if (this.routeLines && this.routeLines.count > 0
       && this.camera.distance < WorldRenderer.ROUTE_MAX_DISTANCE) {
       pass.setBindGroup(1, this.routeLines.bindGroup);
-      const instances = this.routeLines.count * WORLD_COPY_INDICES.length;
-      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.routeLines.count);
-      this.recordTriangleDraw('debugLines', instances * 2, instances);
+      this.drawWorldCopies(pass, 6, this.routeLines.count, 'debugLines');
     }
 
     // Strategic map markers. Two independent instanced draws, both projected on
@@ -1758,15 +1838,11 @@ export class WorldRenderer {
       pass.setPipeline(this.mapMarkerPipeline);
       if (this.mapMarkers && this.mapMarkers.count > 0) {
         pass.setBindGroup(1, this.mapMarkers.bindGroup);
-        const instances = this.mapMarkers.count * WORLD_COPY_INDICES.length;
-        pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.mapMarkers.count);
-        this.recordTriangleDraw('debugLines', instances * 2, instances);
+        this.drawWorldCopies(pass, 6, this.mapMarkers.count, 'debugLines');
       }
       if (this.showResourceOverlay && this.gameResourceMarkers && this.gameResourceMarkers.count > 0) {
         pass.setBindGroup(1, this.gameResourceMarkers.bindGroup);
-        const instances = this.gameResourceMarkers.count * WORLD_COPY_INDICES.length;
-        pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.gameResourceMarkers.count);
-        this.recordTriangleDraw('debugLines', instances * 2, instances);
+        this.drawWorldCopies(pass, 6, this.gameResourceMarkers.count, 'debugLines');
       }
     }
     // World-space combat effects (muzzle / tracer / impact / smoke / explosion /
@@ -1774,26 +1850,24 @@ export class WorldRenderer {
     // stack; the CPU pool already distance-culled the transients.
     if (this.combatEffects && this.combatEffects.count > 0
       && this.camera.distance < WorldRenderer.COMBAT_EFFECT_MAX_DISTANCE && this.debugView === 0) {
-      const instances = this.combatEffects.count * WORLD_COPY_INDICES.length;
       pass.setPipeline(this.combatEffectPipeline);
       pass.setBindGroup(1, this.combatEffects.bindGroup);
-      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.combatEffects.count);
-      this.recordTriangleDraw('debugLines', instances * 2, instances);
+      this.drawWorldCopies(pass, 6, this.combatEffects.count, 'debugLines');
     }
     // Army-stack markers: always on (they are gameplay, not an overlay), and
     // visible further out than the resource overlay. The shader fades the last
     // stretch before strategic altitude.
-    if (this.armyModels && this.armyModels.count > 0 && this.camera.distance < this.armyModelDrawDistance) {
-      const instances = this.armyModels.count * WORLD_COPY_INDICES.length;
+    if (this.visibleArmyModels && this.visibleArmyModels.count > 0
+      && this.camera.distance < this.armyModelDrawDistance) {
       pass.setPipeline(this.armyModelPipeline);
-      pass.setBindGroup(1, this.armyModels.bindGroup);
-      pass.draw(WorldRenderer.ARMY_MODEL_VERTEX_COUNT, instances, 0, WORLD_COPY_INDICES[0] * this.armyModels.count);
-      this.recordTriangleDraw('roadFurniture', WorldRenderer.ARMY_MODEL_VERTEX_COUNT / 3 * instances, instances);
+      pass.setBindGroup(1, this.visibleArmyModels.bindGroup);
+      this.drawWorldCopies(
+        pass, WorldRenderer.ARMY_MODEL_VERTEX_COUNT, this.visibleArmyModels.count, 'roadFurniture',
+      );
     }
     if (this.infantryModel && this.infantryModels && this.infantryModels.count > 0
       && this.camera.distance < this.armyModelDrawDistance) {
       const model = this.infantryModel;
-      const instances = this.infantryModels.count * WORLD_COPY_INDICES.length;
       pass.setPipeline(this.infantryModelPipeline);
       pass.setBindGroup(1, this.infantryModels.bindGroup);
       pass.setBindGroup(2, model.resources);
@@ -1803,20 +1877,33 @@ export class WorldRenderer {
       pass.setVertexBuffer(3, model.joints);
       pass.setVertexBuffer(4, model.weights);
       pass.setIndexBuffer(model.indices, 'uint16');
-      pass.drawIndexed(model.indexCount, instances);
-      this.recordIndexedDraw('roadFurniture', model.indexCount, instances);
+      this.drawIndexedWorldCopies(pass, model.indexCount, this.infantryModels.count, 'roadFurniture');
+    }
+    for (const tank of [
+      { model: this.lightTankModel, layer: this.lightTankModels },
+      { model: this.mediumTankModel, layer: this.mediumTankModels },
+    ]) {
+      if (!tank.model || !tank.layer || tank.layer.count === 0
+        || this.camera.distance >= this.armyModelDrawDistance) continue;
+      pass.setPipeline(this.tankModelPipeline);
+      pass.setBindGroup(1, tank.layer.bindGroup);
+      pass.setBindGroup(2, tank.model.resources);
+      pass.setVertexBuffer(0, tank.model.positions);
+      pass.setVertexBuffer(1, tank.model.normals);
+      pass.setVertexBuffer(2, tank.model.colors);
+      pass.setVertexBuffer(3, tank.model.joints);
+      pass.setVertexBuffer(4, tank.model.weights);
+      pass.setIndexBuffer(tank.model.indices, 'uint16');
+      this.drawIndexedWorldCopies(pass, tank.model.indexCount, tank.layer.count, 'roadFurniture');
     }
     if (this.armyMarkers && this.armyMarkers.count > 0 && this.camera.distance < 5_000) {
       pass.setBindGroup(1, this.armyMarkers.bindGroup);
-      const instances = this.armyMarkers.count * WORLD_COPY_INDICES.length;
       if (this.camera.distance < 1_900) {
         pass.setPipeline(this.armyCompositionPipeline);
-        pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.armyMarkers.count);
-        this.recordTriangleDraw('debugLines', instances * 2, instances);
+        this.drawWorldCopies(pass, 6, this.armyMarkers.count, 'debugLines');
       }
       pass.setPipeline(this.armyMarkerPipeline);
-      pass.draw(6, instances, 0, WORLD_COPY_INDICES[0] * this.armyMarkers.count);
-      this.recordTriangleDraw('debugLines', instances * 2, instances);
+      this.drawWorldCopies(pass, 6, this.armyMarkers.count, 'debugLines');
     }
     submitWorldFrame(
       this.device,
@@ -1927,6 +2014,61 @@ export class WorldRenderer {
     this.recordTriangleDraw('labels', instances * 2, instances);
   }
 
+  private readonly worldCopyCache: { revision: number; copies: readonly number[] } = { revision: -1, copies: WORLD_COPY_INDICES };
+
+  /**
+   * Which of the three horizontally-wrapped world copies (west/-1, center/0,
+   * east/+1) can actually land on screen right now. Every unchunked instanced
+   * layer (map/resource markers, connections, waterways, routes, combat
+   * effects, army markers/models) used to unconditionally submit all three to
+   * the GPU every frame — center is the only one usually in frame; the other
+   * two only matter when the camera is near the horizontal wrap seam or
+   * zoomed out far enough that its reach exceeds half the world width.
+   */
+  private visibleWorldCopies(): readonly number[] {
+    if (this.worldCopyCache.revision === this.camera.revision) return this.worldCopyCache.copies;
+    const width = this.manifest.world.width;
+    // Generous margin over the farthest any of these layers draws (routes /
+    // resource markers reach ~6_400) plus camera distance itself, so this
+    // never under-culls a copy that could genuinely still be in view.
+    const reach = this.camera.distance * 2.2 + 6_500;
+    let copies: readonly number[];
+    if (reach * 2 >= width) {
+      copies = WORLD_COPY_INDICES; // zoomed out far enough that all three can matter
+    } else {
+      const targetX = ((this.camera.target[0] % width) + width) % width;
+      const list: number[] = [1];
+      if (targetX - reach < 0) list.push(0);
+      if (targetX + reach > width) list.push(2);
+      copies = list;
+    }
+    this.worldCopyCache.revision = this.camera.revision;
+    this.worldCopyCache.copies = copies;
+    return copies;
+  }
+
+  /** Draws `perCopyCount` instances (vertexCount verts each) once per world
+   *  copy actually in view, instead of one draw covering all three blindly. */
+  private drawWorldCopies(
+    pass: GPURenderPassEncoder, vertexCount: number, perCopyCount: number, category: RenderCategory,
+  ): void {
+    for (const copy of this.visibleWorldCopies()) {
+      pass.draw(vertexCount, perCopyCount, 0, copy * perCopyCount);
+      this.recordTriangleDraw(category, (vertexCount / 3) * perCopyCount, perCopyCount);
+    }
+  }
+
+  /** Same as drawWorldCopies but for an indexed (skinned-mesh) draw — matters
+   *  most here, since each pruned instance also skips a full GPU skin. */
+  private drawIndexedWorldCopies(
+    pass: GPURenderPassEncoder, indexCount: number, perCopyCount: number, category: RenderCategory,
+  ): void {
+    for (const copy of this.visibleWorldCopies()) {
+      pass.drawIndexed(indexCount, perCopyCount, 0, 0, copy * perCopyCount);
+      this.recordIndexedDraw(category, indexCount, perCopyCount);
+    }
+  }
+
   private chunkIntersectsView(centerX: number, centerZ: number, radius: number): boolean {
     if (!sphereIntersectsHorizontalWorldWindow(
       centerX, radius, this.camera.target[0], this.manifest.world.width,
@@ -2007,43 +2149,65 @@ export class WorldRenderer {
     }
   }
 
+  /**
+   * The merged visible-range list only depends on the camera and the (static)
+   * chunk layout, so it used to get rebuilt — fresh arrays, a sort, a full
+   * chunk scan — every single frame regardless of whether the camera had
+   * moved. Cache it per camera revision, the same way drawPropChunks/
+   * drawCityLights already cache their visible-instance sets.
+   */
+  private readonly borderVisibleCache: {
+    revision: number;
+    visibleChunks: number;
+    perCopy: Array<{ firstInstance: number; instanceCount: number }[]>;
+  } = { revision: -1, visibleChunks: 0, perCopy: [] };
+
   private drawChunkedLines(
     pass: GPURenderPassEncoder,
     layer: InstanceLayer,
     ranges: Array<{ firstInstance: number; instanceCount: number }>,
     category: 'borders',
   ): void {
-    const chunksX = this.manifest.borderChunks.chunksX;
-    const chunksY = this.manifest.borderChunks.chunksY;
-    const chunkWidth = this.manifest.world.width / chunksX;
-    const chunkHeight = this.manifest.world.height / chunksY;
-    const chunkRadius = Math.hypot(chunkWidth, chunkHeight) * 0.62;
-    for (const copy of WORLD_COPY_INDICES) {
-      const copyOffset = (copy - 1) * this.manifest.world.width;
-      const visibleRanges: Array<{ firstInstance: number; instanceCount: number }> = [];
-      for (let chunkIndex = 0; chunkIndex < ranges.length; chunkIndex += 1) {
-        const range = ranges[chunkIndex];
-        if (!range?.instanceCount) continue;
-        const centerX = (chunkIndex % chunksX + 0.5) * chunkWidth + copyOffset;
-        const centerZ = (Math.floor(chunkIndex / chunksX) + 0.5) * chunkHeight;
-        if (!this.chunkIntersectsView(centerX, centerZ, chunkRadius)) continue;
-        visibleRanges.push(range);
-        this.frameWorkload.visibleChunks.borders += 1;
-      }
-      visibleRanges.sort((a, b) => a.firstInstance - b.firstInstance);
-      let merged: { firstInstance: number; instanceCount: number } | undefined;
-      for (const range of visibleRanges) {
-        if (merged && merged.firstInstance + merged.instanceCount === range.firstInstance) {
-          merged.instanceCount += range.instanceCount;
-          continue;
+    if (this.borderVisibleCache.revision !== this.camera.revision) {
+      const chunksX = this.manifest.borderChunks.chunksX;
+      const chunksY = this.manifest.borderChunks.chunksY;
+      const chunkWidth = this.manifest.world.width / chunksX;
+      const chunkHeight = this.manifest.world.height / chunksY;
+      const chunkRadius = Math.hypot(chunkWidth, chunkHeight) * 0.62;
+      const perCopy: Array<{ firstInstance: number; instanceCount: number }[]> = [];
+      let visibleChunks = 0;
+      for (const copy of WORLD_COPY_INDICES) {
+        const copyOffset = (copy - 1) * this.manifest.world.width;
+        const visibleRanges: Array<{ firstInstance: number; instanceCount: number }> = [];
+        for (let chunkIndex = 0; chunkIndex < ranges.length; chunkIndex += 1) {
+          const range = ranges[chunkIndex];
+          if (!range?.instanceCount) continue;
+          const centerX = (chunkIndex % chunksX + 0.5) * chunkWidth + copyOffset;
+          const centerZ = (Math.floor(chunkIndex / chunksX) + 0.5) * chunkHeight;
+          if (!this.chunkIntersectsView(centerX, centerZ, chunkRadius)) continue;
+          visibleRanges.push(range);
+          visibleChunks += 1;
         }
-        if (merged) {
-          pass.draw(6, merged.instanceCount, 0, copy * layer.count + merged.firstInstance);
-          this.recordTriangleDraw(category, merged.instanceCount * 2, merged.instanceCount);
+        visibleRanges.sort((a, b) => a.firstInstance - b.firstInstance);
+        const merged: Array<{ firstInstance: number; instanceCount: number }> = [];
+        for (const range of visibleRanges) {
+          const last = merged[merged.length - 1];
+          if (last && last.firstInstance + last.instanceCount === range.firstInstance) {
+            last.instanceCount += range.instanceCount;
+            continue;
+          }
+          merged.push({ ...range });
         }
-        merged = { ...range };
+        perCopy.push(merged);
       }
-      if (merged) {
+      this.borderVisibleCache.revision = this.camera.revision;
+      this.borderVisibleCache.visibleChunks = visibleChunks;
+      this.borderVisibleCache.perCopy = perCopy;
+    }
+    this.frameWorkload.visibleChunks.borders += this.borderVisibleCache.visibleChunks;
+    for (let i = 0; i < WORLD_COPY_INDICES.length; i += 1) {
+      const copy = WORLD_COPY_INDICES[i];
+      for (const merged of this.borderVisibleCache.perCopy[i] ?? []) {
         pass.draw(6, merged.instanceCount, 0, copy * layer.count + merged.firstInstance);
         this.recordTriangleDraw(category, merged.instanceCount * 2, merged.instanceCount);
       }

@@ -53,10 +53,20 @@ const EMPTY_DISTRIBUTION: PerformanceDistribution = {
   maximum: 0,
 };
 
+const PHASE_KEYS = ['camera', 'uniforms', 'labels', 'pickRaycast', 'hoverUi', 'render'] as const;
+
 export class PerformanceMonitor {
   private readonly samples: FramePerformanceSample[] = [];
   private readonly gpuSamples: number[] = [];
   private latestWorkload = createEmptyRenderWorkload();
+  // Rolling sums kept in lockstep with the ring buffers above so `average` is
+  // an O(1) lookup at snapshot time instead of an extra full reduce() over up
+  // to `maximumSamples` entries for each of the 8 distributions below — the
+  // sort those still need for exact percentiles is the one cost left.
+  private frameSum = 0;
+  private mainThreadSum = 0;
+  private readonly phaseSums: PerformancePhases = { camera: 0, uniforms: 0, labels: 0, pickRaycast: 0, hoverUi: 0, render: 0 };
+  private gpuSum = 0;
 
   constructor(
     private readonly gpuTimingSupported: boolean,
@@ -65,32 +75,45 @@ export class PerformanceMonitor {
 
   record(sample: FramePerformanceSample, workload: RenderWorkload): void {
     this.samples.push(sample);
-    if (this.samples.length > this.maximumSamples) this.samples.shift();
+    this.frameSum += sample.frameMs;
+    this.mainThreadSum += sample.mainThreadMs;
+    for (const phase of PHASE_KEYS) this.phaseSums[phase] += sample.phases[phase];
+    if (this.samples.length > this.maximumSamples) {
+      const removed = this.samples.shift()!;
+      this.frameSum -= removed.frameMs;
+      this.mainThreadSum -= removed.mainThreadMs;
+      for (const phase of PHASE_KEYS) this.phaseSums[phase] -= removed.phases[phase];
+    }
     this.latestWorkload = workload;
   }
 
   recordGpu(milliseconds: number): void {
     if (!Number.isFinite(milliseconds) || milliseconds < 0) return;
     this.gpuSamples.push(milliseconds);
-    if (this.gpuSamples.length > this.maximumSamples) this.gpuSamples.shift();
+    this.gpuSum += milliseconds;
+    if (this.gpuSamples.length > this.maximumSamples) this.gpuSum -= this.gpuSamples.shift()!;
   }
 
   reset(): void {
     this.samples.length = 0;
     this.gpuSamples.length = 0;
+    this.frameSum = 0;
+    this.mainThreadSum = 0;
+    this.gpuSum = 0;
+    for (const phase of PHASE_KEYS) this.phaseSums[phase] = 0;
   }
 
   snapshot(): PerformanceSnapshot {
     const phases = {} as Record<keyof PerformancePhases, PerformanceDistribution>;
-    for (const phase of ['camera', 'uniforms', 'labels', 'pickRaycast', 'hoverUi', 'render'] as const) {
-      phases[phase] = distribution(this.samples.map((sample) => sample.phases[phase]));
+    for (const phase of PHASE_KEYS) {
+      phases[phase] = distribution(this.samples.map((sample) => sample.phases[phase]), this.phaseSums[phase]);
     }
     return {
       sampleCount: this.samples.length,
-      frame: distribution(this.samples.map((sample) => sample.frameMs)),
-      mainThread: distribution(this.samples.map((sample) => sample.mainThreadMs)),
+      frame: distribution(this.samples.map((sample) => sample.frameMs), this.frameSum),
+      mainThread: distribution(this.samples.map((sample) => sample.mainThreadMs), this.mainThreadSum),
       phases,
-      gpu: this.gpuSamples.length ? distribution(this.gpuSamples) : null,
+      gpu: this.gpuSamples.length ? distribution(this.gpuSamples, this.gpuSum) : null,
       gpuSampleCount: this.gpuSamples.length,
       gpuTimingSupported: this.gpuTimingSupported,
       workload: cloneWorkload(this.latestWorkload),
@@ -124,12 +147,11 @@ export function createEmptyRenderWorkload(labels = 0): RenderWorkload {
   };
 }
 
-function distribution(values: number[]): PerformanceDistribution {
+function distribution(values: number[], sum: number): PerformanceDistribution {
   if (!values.length) return { ...EMPTY_DISTRIBUTION };
   const sorted = [...values].sort((a, b) => a - b);
-  const total = values.reduce((sum, value) => sum + value, 0);
   return {
-    average: total / values.length,
+    average: sum / values.length,
     median: percentile(sorted, 0.5),
     p95: percentile(sorted, 0.95),
     p99: percentile(sorted, 0.99),

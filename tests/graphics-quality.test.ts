@@ -23,7 +23,7 @@ describe('graphics quality presets', () => {
   it('defines all four levels with ascending, capped render scales', () => {
     expect(QUALITY_LEVELS).toEqual(['low', 'medium', 'high', 'ultra']);
     const scales = QUALITY_LEVELS.map((level) => QUALITY_PRESETS[level].renderScale);
-    expect(scales).toEqual([0.75, 1, 1.25, 1.5]);
+    expect(scales).toEqual([0.75, 1, 1, 1.35]);
     expect([...scales].sort((a, b) => a - b)).toEqual(scales);
     expect(Math.max(...scales)).toBeLessThanOrEqual(1.5);
   });
@@ -42,8 +42,8 @@ describe('graphics quality presets', () => {
   it('resolves an absolute pixel ratio clamped to [0.5, 1.5], ignoring devicePixelRatio', () => {
     expect(resolveRenderPixelRatio('low')).toBe(0.75);
     expect(resolveRenderPixelRatio('medium')).toBe(1);
-    expect(resolveRenderPixelRatio('high')).toBe(1.25);
-    expect(resolveRenderPixelRatio('ultra')).toBe(1.5);
+    expect(resolveRenderPixelRatio('high')).toBe(1);
+    expect(resolveRenderPixelRatio('ultra')).toBe(1.35);
     for (const level of QUALITY_LEVELS) {
       const ratio = resolveRenderPixelRatio(level);
       expect(ratio).toBeGreaterThanOrEqual(0.5);

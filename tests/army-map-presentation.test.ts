@@ -23,9 +23,9 @@ describe('army map presentation LOD data', () => {
     ]);
     expect(formation).toEqual([
       { kind: 0, count: 4, health: 0.875 },
-      { kind: 1, count: 7, health: 5.5 / 7 },
-      { kind: 1, count: 7, health: 5.5 / 7 },
+      { kind: 1, count: 5, health: 0.8 },
       { kind: 2, count: 1, health: 0.5 },
+      { kind: 4, count: 2, health: 0.75 },
     ]);
     expect(dominantVisualKind(buildArmyCompositionRows([
       { typeId: 'infantry', count: 3, health: 1 },
