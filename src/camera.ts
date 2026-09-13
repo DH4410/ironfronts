@@ -24,6 +24,10 @@ export class StrategyCamera {
 
   private keys = new Set<string>();
   private dragMode: 'pan' | 'orbit' | null = null;
+  /** True while the pointer is actively panning/orbiting — callers that do
+   *  expensive per-move work (picking, hover raycasts) should skip it here,
+   *  since the user is manipulating the view, not aiming at anything. */
+  get isDragging(): boolean { return this.dragMode !== null; }
   private dragPointerId: number | null = null;
   private lastPointer = [0, 0];
   private readonly activeTouches = new Map<number, { x: number; y: number }>();

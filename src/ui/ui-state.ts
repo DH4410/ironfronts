@@ -378,6 +378,33 @@ export interface UiStore {
 }
 
 /**
+ * Structural equality for the plain, JSON-shaped HUD state (resource lines,
+ * the selected army/province card, queues — never more than a few dozen
+ * fields). The 400ms HUD tick rebuilds these from scratch every time even
+ * when nothing changed, so a reference check (`Object.is`) alone always sees
+ * "changed" and defeats `patch`'s own gate below; this is what actually lets
+ * unchanged data skip the render.
+ */
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i += 1) if (!valuesEqual(a[i], b[i])) return false;
+    return true;
+  }
+  const aRecord = a as Record<string, unknown>;
+  const bRecord = b as Record<string, unknown>;
+  const aKeys = Object.keys(aRecord);
+  if (aKeys.length !== Object.keys(bRecord).length) return false;
+  for (const key of aKeys) {
+    if (!Object.prototype.hasOwnProperty.call(bRecord, key)) return false;
+    if (!valuesEqual(aRecord[key], bRecord[key])) return false;
+  }
+  return true;
+}
+
+/**
  * Minimal event-driven store. Notifications are coalesced to one microtask so
  * a burst of `patch()` calls in the same frame produces a single render. No
  * per-frame polling, no layout reads.
@@ -395,12 +422,18 @@ export function createUiStore(initial: StrategicUiState): UiStore {
   return {
     get: () => state,
     patch(update) {
-      let changed = false;
+      // Only merge keys that actually differ, and keep the existing reference
+      // for the rest — a caller that recomputes an equal-but-freshly-allocated
+      // object every tick (playerResourceLines, refreshSelectedArmy, ...) must
+      // not force a render, and downstream code that memoizes on these
+      // references stays stable too.
+      let changed: Record<string, unknown> | null = null;
       for (const key of Object.keys(update) as Array<keyof StrategicUiState>) {
-        if (!Object.is(state[key], update[key])) { changed = true; break; }
+        if (valuesEqual(state[key], update[key])) continue;
+        (changed ??= {})[key] = update[key];
       }
       if (!changed) return;
-      state = { ...state, ...update };
+      state = { ...state, ...changed } as StrategicUiState;
       if (!scheduled) {
         scheduled = true;
         queueMicrotask(flush);

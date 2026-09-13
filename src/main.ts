@@ -562,6 +562,12 @@ async function startGame(token: number): Promise<void> {
       canvas.style.cursor = '';
       return;
     }
+    // Panning/orbiting fires a pointermove per pixel of drag; the player is
+    // repositioning the view, not aiming an order, so skip the raycast +
+    // army-picker spatial query entirely rather than repeat it uselessly for
+    // every one of those moves. The cursor just holds its last state until
+    // the drag ends and a real hover position resumes driving it.
+    if (renderer.camera.isDragging) return;
     const hoveredId = renderer.pickArmyAt(clientX, clientY);
     const hovered = hoveredId && hoveredId !== selectedArmyId ? session.army(hoveredId) : null;
     const strikable = Boolean(hovered && !hovered.own);
@@ -1197,6 +1203,24 @@ async function bootstrapGameSession(
 const armyMarkerScratch = new Float32Array(28 * 1_024);
 const armyModelScratch = new Float32Array(16 * 4_096);
 const armyMotionInterpolator = new ArmyMotionInterpolator();
+/**
+ * buildArmyFormation/buildArmyCompositionRows only depend on an army's troop
+ * composition (unit types/counts/health), which changes far less often than
+ * this function runs (every ~250-400ms marker sync, driven by position and
+ * camera state that have nothing to do with composition) — rebuilding both
+ * from scratch for every army on every sync was pure waste for a stack that
+ * hasn't produced, lost, split or merged anything since the last sync.
+ */
+const armyPresentationCache = new Map<string, {
+  key: string;
+  formation: ReturnType<typeof buildArmyFormation>;
+  compositionRows: ReturnType<typeof buildArmyCompositionRows>;
+}>();
+function armyCompositionKey(groups: readonly { typeId: string; count: number; health: number }[]): string {
+  let key = '';
+  for (const group of groups) key += `${group.typeId}:${group.count}:${group.health.toFixed(3)}|`;
+  return key;
+}
 /** LineRecord (8 f32) per own-army route segment — see renderer.setOrderRoutes. */
 const routeScratch = new Float32Array(8 * 4_096);
 
@@ -1307,17 +1331,40 @@ function syncArmyMarkers(
     const mergeRadiusSq = mergeRadius * mergeRadius;
     const own = Object.values(session.state.armies)
       .filter((a) => a.own && a.contact === 'visible');
-    const groups: string[][] = [];
+    // Bucket representatives into a grid sized to the merge radius so each new
+    // stack only checks its own + neighbouring cells instead of every
+    // representative found so far — was O(n^2) against every own army with a
+    // large campaign (a full-map strategic zoom with hundreds of stacks made
+    // this the dominant cost of every marker sync).
+    const cellSize = Math.max(1, mergeRadius);
+    const cellKey = (x: number, z: number): string => `${Math.floor(x / cellSize)}:${Math.floor(z / cellSize)}`;
+    const grid = new Map<string, string[]>(); // cell key -> representative ids
+    const groupsByRep = new Map<string, string[]>(); // representative id -> member ids
     for (const a of own) {
-      let joined: string[] | undefined;
-      for (const g of groups) {
-        const rep = session.state.armies[g[0]];
-        if (rep && (rep.x - a.x) ** 2 + (rep.z - a.z) ** 2 <= mergeRadiusSq) { joined = g; break; }
+      const cx = Math.floor(a.x / cellSize);
+      const cz = Math.floor(a.z / cellSize);
+      let joinedRep: string | undefined;
+      for (let dx = -1; dx <= 1 && !joinedRep; dx += 1) {
+        for (let dz = -1; dz <= 1; dz += 1) {
+          const reps = grid.get(`${cx + dx}:${cz + dz}`);
+          if (!reps) continue;
+          for (const repId of reps) {
+            const rep = session.state.armies[repId];
+            if (rep && (rep.x - a.x) ** 2 + (rep.z - a.z) ** 2 <= mergeRadiusSq) { joinedRep = repId; break; }
+          }
+          if (joinedRep) break;
+        }
       }
-      if (joined) joined.push(a.id);
-      else groups.push([a.id]);
+      if (joinedRep) {
+        groupsByRep.get(joinedRep)!.push(a.id);
+      } else {
+        groupsByRep.set(a.id, [a.id]);
+        const key = cellKey(a.x, a.z);
+        const bucket = grid.get(key);
+        if (bucket) bucket.push(a.id); else grid.set(key, [a.id]);
+      }
     }
-    for (const ids of groups) {
+    for (const ids of groupsByRep.values()) {
       if (ids.length < 2 || (selectedArmyId !== null && ids.includes(selectedArmyId))) continue;
       let repId = ids[0];
       let repCount = -1;
@@ -1457,8 +1504,21 @@ function syncArmyMarkers(
       emitSegment(tip.x + WING * (ux * COS + uz * SIN), tip.z + WING * (-ux * SIN + uz * COS), tip.x, tip.z, 1);
     }
 
-    const formation = identified ? buildArmyFormation(army.composition?.groups ?? []) : [];
-    const compositionRows = identified ? buildArmyCompositionRows(army.composition?.groups ?? []) : [];
+    let formation: ReturnType<typeof buildArmyFormation> = [];
+    let compositionRows: ReturnType<typeof buildArmyCompositionRows> = [];
+    if (identified) {
+      const groups = army.composition?.groups ?? [];
+      const key = armyCompositionKey(groups);
+      const cached = armyPresentationCache.get(army.id);
+      if (cached && cached.key === key) {
+        formation = cached.formation;
+        compositionRows = cached.compositionRows;
+      } else {
+        formation = buildArmyFormation(groups);
+        compositionRows = buildArmyCompositionRows(groups);
+        armyPresentationCache.set(army.id, { key, formation, compositionRows });
+      }
+    }
     armyMarkerScratch.fill(0, cursor, cursor + 28);
     armyMarkerScratch[cursor] = armyMotion.x;
     armyMarkerScratch[cursor + 1] = armyMotion.z;
@@ -1597,6 +1657,9 @@ function syncArmyMarkers(
   armyMotionInterpolator.retain(activeArmyIds);
   for (const id of previousArmyHeading.keys()) {
     if (!activeArmyIds.has(id)) previousArmyHeading.delete(id);
+  }
+  for (const id of armyPresentationCache.keys()) {
+    if (!activeArmyIds.has(id)) armyPresentationCache.delete(id);
   }
   // Rally route for the selected production city only: city node -> rally point
   // along the real road network (server-derived), plus a chevron at the rally
@@ -2750,6 +2813,29 @@ function sameDiplomacyView(previous: DiplomacyView, next: DiplomacyView): boolea
     && sameCountries && sameMessages && sameProposals;
 }
 
+/**
+ * Cheap fingerprint of everything the diplomacy view actually depends on.
+ * `session.state` is a fresh `structuredClone` on every server update (see
+ * replica-store.ts), so `projection.countries`/`.relations`/`.diplomacy` never
+ * hold a stable reference to compare against even when nothing diplomatic
+ * changed — only a value-based signature can tell. Linear in country count
+ * with plain string concatenation, versus the full rebuild below which sorts
+ * the roster and, for every country, filters the messages/proposals arrays.
+ */
+let lastDiplomacySignature = '';
+function diplomacySignature(projection: RemoteGameSession['state']): string {
+  const diplomacy = projection.diplomacy ?? { messages: [], proposals: [] };
+  const relations = Object.keys(projection.relations).sort()
+    .map((key) => `${key}:${projection.relations[key]}`).join(',');
+  const messages = diplomacy.messages.map((m) => `${m.id}:${m.toCountryId}`).join(',');
+  const proposals = diplomacy.proposals.map((p) => `${p.id}:${p.status}`).join(',');
+  // name/color/controller are effectively immutable once a country exists;
+  // only id + alive (capitulation) actually needs to be tracked here.
+  let countries = '';
+  for (const country of Object.values(projection.countries)) countries += `${country.id}${country.alive ? 1 : 0}`;
+  return `${relations}|${messages}|${proposals}|${countries}`;
+}
+
 function syncDiplomacyView(session: RemoteGameSession, selectedCountryId?: number): void {
   const projection = session.state;
   const diplomacy = projection.diplomacy ?? { messages: [], proposals: [] };
@@ -2780,6 +2866,17 @@ function syncDiplomacyView(session: RemoteGameSession, selectedCountryId?: numbe
         `${projection.countries[proposal.fromCountryId]?.name ?? 'Foreign office'} sent a ${proposal.kind} proposal.`);
       announcedDiplomacyItems.add(key);
     }
+  }
+  // The explicit-selection call sites (picking a country in the panel) always
+  // need to rebuild since `target` below can change with nothing else
+  // different; the periodic/event-driven calls only need to when something
+  // diplomacy actually cares about changed.
+  if (selectedCountryId === undefined) {
+    const signature = diplomacySignature(projection);
+    if (signature === lastDiplomacySignature) return;
+    lastDiplomacySignature = signature;
+  } else {
+    lastDiplomacySignature = diplomacySignature(projection);
   }
   const current = uiStore.get().diplomacy;
   const target = selectedCountryId ?? current.selectedCountryId;

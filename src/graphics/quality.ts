@@ -77,25 +77,33 @@ export const QUALITY_PRESETS: Record<QualityLevel, QualityPreset> = {
   },
   high: {
     label: 'High',
-    blurb: 'High-quality strategic map — 1.25× render scale, road furniture on, ~60k trees / 40k buildings, full relief shading.',
-    renderScale: 1.25,
-    propDistanceScale: 1,
-    treeInstanceBudget: 60_000,
-    buildingInstanceBudget: 40_000,
+    blurb: 'High-quality strategic map — 1× render scale, road furniture on, ~40k trees / 26k buildings, full relief shading.',
+    // Was 1.25x: this is the default preset every new install lands on, so it
+    // was paying a 56% pixel-count tax (1.25^2) before a single player ever
+    // opened the settings menu. 1x is already sharp on a non-HiDPI display and
+    // exactly matches CSS pixels; Ultra remains the "spend more GPU" option.
+    renderScale: 1,
+    propDistanceScale: 0.85,
+    treeInstanceBudget: 40_000,
+    buildingInstanceBudget: 26_000,
     furniture: true,
-    terrainLodScale: 1,
-    rainScale: 1,
-    detailFactor: 0.75,
+    terrainLodScale: 0.92,
+    rainScale: 0.85,
+    detailFactor: 0.6,
   },
   ultra: {
     label: 'Ultra',
-    blurb: 'Maximum world detail — 1.5× render scale, finest terrain LOD, near-unlimited trees/buildings, every shader pass on.',
-    renderScale: 1.5,
-    propDistanceScale: 1.25,
-    treeInstanceBudget: 400_000,
-    buildingInstanceBudget: 400_000,
+    blurb: 'Maximum world detail — 1.35× render scale, finest terrain LOD, dense trees/buildings, every shader pass on.',
+    // Was 1.5x render scale with a 400k/400k prop budget — effectively
+    // unbounded, so a large campaign's full building/tree count went straight
+    // to the GPU with no ceiling at all. Still the "everything on" tier, just
+    // no longer an unbounded one.
+    renderScale: 1.35,
+    propDistanceScale: 1.15,
+    treeInstanceBudget: 120_000,
+    buildingInstanceBudget: 90_000,
     furniture: true,
-    terrainLodScale: 1.18,
+    terrainLodScale: 1.1,
     rainScale: 1,
     detailFactor: 1,
   },
