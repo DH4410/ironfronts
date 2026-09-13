@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
+import { z } from 'zod';
 import { credentialsSchema, GAME_ID, joinGameSchema, PROTOCOL_VERSION, type GameLobby, type SessionResponse } from '@ironfronts/protocol';
 import { signGameTicket } from '@ironfronts/protocol/ticket';
 import { config } from './config';
@@ -55,6 +56,21 @@ function cookie(token: string, maxAgeSeconds: number): string {
 
 function requireOrigin(request: IncomingMessage): boolean {
   return request.method === 'GET' || request.method === 'HEAD' || request.headers.origin === config.clientOrigin;
+}
+
+/** Short, field-specific copy for credentialsSchema failures; ZodError.message is raw JSON and must never reach the client. */
+function credentialsValidationMessage(error: z.ZodError): string {
+  const issue = error.issues[0];
+  const field = issue?.path[0];
+  if (field === 'username') {
+    if (issue.code === 'too_small') return 'Username must be at least 3 characters.';
+    if (issue.code === 'too_big') return 'Username must be 32 characters or fewer.';
+  }
+  if (field === 'password') {
+    if (issue.code === 'too_small') return 'Password must be at least 8 characters.';
+    if (issue.code === 'too_big') return 'Password must be 256 characters or fewer.';
+  }
+  return 'Please check your username and password and try again.';
 }
 
 function remoteKey(request: IncomingMessage): string {
@@ -154,6 +170,12 @@ const server = createServer(async (request, response) => {
     }
     sendJson(response, 404, { error: 'Not found.' });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      const message = credentialsValidationMessage(error);
+      sendJson(response, 400, { error: message });
+      log('warn', 'request_failed', { path: request.url, message: error.message });
+      return;
+    }
     const message = error instanceof Error ? error.message : 'Unexpected server error.';
     const conflict = /already|permanently|claimed/i.test(message);
     sendJson(response, conflict ? 409 : 400, { error: message });
