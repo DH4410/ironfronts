@@ -31,7 +31,28 @@ if (persisted && (
   log('warn', 'incompatible_save_archived', { archivePath, previousGameId: persisted.gameId });
   persisted = null;
 }
-const runtime = new GameRuntime(loaded.world, persisted?.runtime);
+function buildRuntime(snapshot: PersistedGame['runtime'] | undefined): GameRuntime {
+  return new GameRuntime(loaded.world, snapshot);
+}
+
+let runtime: GameRuntime;
+try {
+  runtime = buildRuntime(persisted?.runtime);
+} catch (error) {
+  if (!persisted) throw error;
+  // The outer worldHash/gameVersion check above only guards the raw geography
+  // artifacts; it can't catch drift in the game-logic that derives the
+  // movement graph or resource-node placement from them (e.g. a graph node
+  // count that shifted since this save was created). Treat any restore
+  // failure as an incompatible save rather than crashing the server.
+  const archivePath = await gamePersistence.archiveExisting();
+  log('warn', 'incompatible_save_archived', {
+    archivePath, previousGameId: persisted.gameId,
+    reason: error instanceof Error ? error.message : String(error),
+  });
+  persisted = null;
+  runtime = buildRuntime(undefined);
+}
 const gameClock = new AuthoritativeGameClock(() => runtime.session.state, () => simSpeedMultiplier);
 const scheduler = new SimulationScheduler((hours) => runtime.tick(hours));
 
