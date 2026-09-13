@@ -172,6 +172,19 @@ describe('strategic AI: concentration', () => {
   });
 });
 
+describe('strategic AI: lost territory', () => {
+  it('recaptures originally owned ground before choosing a new enemy objective', () => {
+    const spearhead = stack('ai-main', 1, 1, 8);
+    const c = makeCtx([spearhead, stack('ai-cap', 1, 0, 3)]);
+    c.state.provinceOwners[12] = 2;
+
+    stepAi(c, 2);
+
+    expect(spearhead.order?.intent).toBe('attack');
+    expect(spearhead.order?.target).toMatchObject({ kind: 'province', provinceId: 12 });
+  });
+});
+
 describe('strategic AI: defence', () => {
   it('sends the nearest spare stack home when the capital is threatened', () => {
     // Enemy raiders sit on province 11, 200 units from an ungarrisoned capital.

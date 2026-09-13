@@ -43,7 +43,7 @@ try {
   ]);
   log('authed as fixed QA account');
 
-  await page.goto(`${BASE}?debug=1`, { waitUntil: 'domcontentloaded' });
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2_000);
   const hasSeat = await page.evaluate(() => {
     const c = document.getElementById('ifm-continue');
@@ -106,7 +106,7 @@ try {
     }
 
     // ---- graphics presets -------------------------------------------------
-    // Diagnostics panel visible (?debug=1). Park the camera on the urban
+    // Authenticated debug diagnostics. Park the camera on the urban
     // showcase so props / buildings / render scale differences are in frame.
     await page.evaluate(async () => {
       const r = window.__ironfrontsRenderer;

@@ -99,6 +99,7 @@ export class RemoteGameSession extends EventTarget {
 
   /** Dev/test only. See GameConnection.setDevSimSpeed. */
   get devSimSpeed(): number { return this.connection.devSimSpeed; }
+  get debugEnabled(): boolean { return this.connection.debugEnabled; }
   get devSimSpeedEnabled(): boolean { return this.connection.devSimSpeedEnabled; }
   setDevSimSpeed(multiplier: number): void { this.connection.setDevSimSpeed(multiplier); }
 

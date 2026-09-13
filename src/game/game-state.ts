@@ -269,6 +269,11 @@ export function setRelation(state: GameState, a: number, b: number, relation: Re
   if (relation === 'peace') delete state.relations[key];
   else state.relations[key] = relation;
   if (relation === 'war') {
+    // `a` is the aggressor at every authoritative war-declaration call site.
+    // An unclaimed defender starts planning immediately instead of remaining
+    // inert for the rest of the war.
+    const defender = state.countries[b];
+    if (defender?.controller === 'neutral') defender.controller = 'ai';
     for (const proposal of Object.values(state.diplomacyProposals ?? {})) {
       if (proposal.status !== 'pending'
         || relationKey(proposal.fromCountryId, proposal.toCountryId) !== key) continue;

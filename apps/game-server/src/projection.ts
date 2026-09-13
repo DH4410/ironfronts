@@ -27,7 +27,9 @@ export function projectFor(
   ) as Record<number, T>;
   const visibility = computeArmyVisibility(state, world, viewerCountryId);
   const armies = Object.fromEntries(Object.keys(state.armies).flatMap((armyId) => {
-    const army = projectArmyView(state, world, viewerCountryId, armyId, visibility);
+    const army = projectArmyView(
+      state, world, viewerCountryId, armyId, visibility, gameHoursPerRealSecond,
+    );
     if (!army) return [];
     let projected: import('@ironfronts/protocol').ProjectedArmy = army;
     if (graph && army.own) {

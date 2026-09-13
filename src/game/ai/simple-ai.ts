@@ -51,6 +51,8 @@ const MAX_QUEUED_UNITS = 2;
 const FRONTLINE_RADIUS = 1200;
 /** Move orders spent gathering the loose stacks in one pass. */
 const STAGING_ORDERS_PER_PASS = 2;
+/** Reinforce distinct pressed fronts in one pass instead of feeding one axis. */
+const FRONT_REINFORCEMENT_ORDERS_PER_PASS = 2;
 /** Attack only with this much more weight than the local defence. */
 const COMMIT_RATIO = 1.5;
 /** ~4 infantry at full strength: below this a stack stages, it does not attack. */
@@ -89,11 +91,60 @@ export function stepAi(session: SimContext, _dtHours: number): void {
     buildIndustry(session, situation);
     if (!situation.atWar) continue;
     mobilise(session, memory, situation);
+    reinforceThreatenedFronts(session, situation);
+    const recapturing = recaptureLostTerritory(session, situation);
+    if (recapturing) {
+      strategicStrike(session, memory, situation);
+      negotiate(session, memory, situation);
+      continue;
+    }
     concentrate(session, memory, situation);
     assault(session, situation);
     strategicStrike(session, memory, situation);
     negotiate(session, memory, situation);
   }
+}
+
+/** Send one available reserve to each of the worst outmatched active fronts. */
+function reinforceThreatenedFronts(session: SimContext, situation: Assessment): void {
+  const available = availableStacks(situation);
+  let issued = 0;
+  for (const front of situation.threatenedFronts) {
+    const reserve = available
+      .sort((a, b) => wrappedDistance(a.x, a.z, front.x, front.z, session.world.width)
+        - wrappedDistance(b.x, b.z, front.x, front.z, session.world.width))[0];
+    if (!reserve) return;
+    const done = applyCommand(session, {
+      type: 'moveArmy', countryId: situation.countryId, armyId: reserve.id,
+      x: front.x, z: front.z,
+    }).ok;
+    if (!done) continue;
+    available.splice(available.indexOf(reserve), 1);
+    if ((issued += 1) >= FRONT_REINFORCEMENT_ORDERS_PER_PASS) return;
+  }
+}
+
+/** Retake national territory before extending the war into a new objective. */
+function recaptureLostTerritory(session: SimContext, situation: Assessment): boolean {
+  if (!situation.lostProvinces.length) return false;
+  const spearheads = availableStacks(situation).sort((a, b) => combatStrength(b) - combatStrength(a));
+  for (const spearhead of spearheads) {
+    const strength = combatStrength(spearhead);
+    if (strength < MIN_ASSAULT_STRENGTH) continue;
+    const objectives = situation.lostProvinces.slice().sort((a, b) => wrappedDistance(
+      spearhead.x, spearhead.z, a.center[0], a.center[1], session.world.width,
+    ) - wrappedDistance(
+      spearhead.x, spearhead.z, b.center[0], b.center[1], session.world.width,
+    ));
+    for (const province of objectives) {
+      if (strength < oppositionTo(situation, spearhead, province, session.world.width) * COMMIT_RATIO) continue;
+      if (applyCommand(session, {
+        type: 'attackArmy', countryId: situation.countryId, armyId: spearhead.id,
+        target: { kind: 'province', provinceId: province.id },
+      }).ok) return true;
+    }
+  }
+  return false;
 }
 
 /**

@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { GameLobby, LobbyCountry } from '@ironfronts/protocol';
 import { selectableCountries } from '../src/menu/lobby-state';
+import { describeOrderFailure } from '../src/ui/order-feedback';
 
 const root = process.cwd();
 
@@ -40,25 +41,20 @@ describe('campaign-map country eligibility (#3)', () => {
 describe('order failure feedback (#5)', () => {
   const main = readFileSync(path.join(root, 'src/main.ts'), 'utf8');
 
-  it('maps engine reasons to concise, specific headlines instead of "Command failed"', () => {
-    const start = main.indexOf('function describeOrderFailure(');
-    const body = main.slice(start, main.indexOf('\n}', start));
-    for (const phrase of ['not your army', 'close combat', 'retreating', 'war declaration', 'no legal route', 'separate landmass']) {
-      expect(body, phrase).toContain(phrase);
-    }
-    // The server-rejection path uses it now, not a flat string.
-    expect(main).toContain('const { title, body } = describeOrderFailure(reason)');
-    expect(main).not.toContain("pushNotification('warning', 'Command failed', reason)");
+  it.each([
+    ['Target is not reachable.', 'Target is not reachable'],
+    ['No valid hostile force.', 'No valid hostile force'],
+    ['Attack route unavailable.', 'Attack route unavailable'],
+    ['That destination is on a separate landmass.', 'Unreachable'],
+    ['No legal route to that location.', 'No route'],
+  ])('maps %s to a clear notification', (reason, title) => {
+    expect(describeOrderFailure(reason)).toMatchObject({ title });
   });
 
-  it('both the right-click and button order paths surface the reason', () => {
-    // right-click path
-    const rc = main.slice(main.indexOf('function handleMapCommand('), main.indexOf('function selectArmy('));
-    expect(rc).toContain('describeOrderFailure');
-    expect(rc).toContain("pushNotification('warning', 'No path there'");
-    // armed-button path
-    const bc = main.slice(main.indexOf('function handleMapClick('), main.indexOf('function handleMapCommand('));
-    expect(bc).toContain('describeOrderFailure');
+  it('wires the tested mapper into server, right-click, and armed-button failures', () => {
+    expect(main).toContain("import { describeOrderFailure } from './ui/order-feedback'");
+    expect(main.match(/describeOrderFailure\(/g)).toHaveLength(4);
+    expect(main).not.toContain("pushNotification('warning', 'Command failed', reason)");
   });
 
   it('the movement engine distinguishes off-map / separate-landmass / no-route', () => {

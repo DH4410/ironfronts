@@ -30,6 +30,7 @@ import {
 } from './units/army';
 import { unitType } from './units/unit-catalog';
 import { ORGANIZATION_MAX, ENTRENCHMENT_MAX } from './combat/constants';
+import { calculateFrontDamageRates, type CombatRateModifiers } from './combat';
 
 export interface ProjectedGroup {
   readonly typeId: string;
@@ -96,6 +97,14 @@ export interface PlayerArmyView {
     enemyHp: number;
     enemyBaselineHp: number;
     reinforcementCount: number;
+    outgoingDamagePerGameHour: number;
+    incomingDamagePerGameHour: number;
+    friendlyCasualties: number;
+    enemyCasualties: number;
+    estimatedGameHours: number | null;
+    estimatedRealSeconds: number | null;
+    friendlyModifiers: CombatRateModifiers;
+    enemyModifiers: CombatRateModifiers;
   }>;
   readonly legalRetreatExits?: ReadonlyArray<{
     firstNodeId: number; destinationProvinceId: number; x: number; z: number;
@@ -141,6 +150,7 @@ export function projectArmyView(
   viewerCountryId: number,
   armyId: string,
   visibility?: Map<string, ContactLevel>,
+  gameHoursPerRealSecond = 1 / 3_600,
 ): PlayerArmyView | null {
   const army = state.armies[armyId];
   if (!army) return null;
@@ -165,15 +175,39 @@ export function projectArmyView(
     );
     const baseline = (values: Record<string, number>): number => Object.values(values)
       .reduce((sum, value) => sum + value, 0);
+    const rates = calculateFrontDamageRates({ state, world }, front);
+    const friendlyIsA = friendly === front.sideA;
+    const outgoingDamagePerGameHour = friendlyIsA
+      ? rates.sideAOutgoingPerGameHour : rates.sideBOutgoingPerGameHour;
+    const incomingDamagePerGameHour = friendlyIsA
+      ? rates.sideBOutgoingPerGameHour : rates.sideAOutgoingPerGameHour;
+    const friendlyHp = hp(friendly.armyIds);
+    const enemyHp = hp(enemy.armyIds);
+    const friendlyBaselineHp = baseline(friendly.entryMaxHpByArmy);
+    const enemyBaselineHp = baseline(enemy.entryMaxHpByArmy);
+    const estimatedGameHours = Math.min(
+      outgoingDamagePerGameHour > 0 ? enemyHp / outgoingDamagePerGameHour : Infinity,
+      incomingDamagePerGameHour > 0 ? friendlyHp / incomingDamagePerGameHour : Infinity,
+    );
+    const duration = Number.isFinite(estimatedGameHours) ? estimatedGameHours : null;
     return [{
       id: front.id,
       directionNodeId: friendly.directionNodeId,
       role: friendly.role,
-      friendlyHp: hp(friendly.armyIds),
-      friendlyBaselineHp: baseline(friendly.entryMaxHpByArmy),
-      enemyHp: hp(enemy.armyIds),
-      enemyBaselineHp: baseline(enemy.entryMaxHpByArmy),
+      friendlyHp,
+      friendlyBaselineHp,
+      enemyHp,
+      enemyBaselineHp,
       reinforcementCount: Math.max(0, friendly.armyIds.length - 1),
+      outgoingDamagePerGameHour,
+      incomingDamagePerGameHour,
+      friendlyCasualties: Math.max(0, friendlyBaselineHp - friendlyHp),
+      enemyCasualties: Math.max(0, enemyBaselineHp - enemyHp),
+      estimatedGameHours: duration,
+      estimatedRealSeconds: duration !== null && gameHoursPerRealSecond > 0
+        ? duration / gameHoursPerRealSecond : null,
+      friendlyModifiers: friendlyIsA ? rates.sideAModifiers : rates.sideBModifiers,
+      enemyModifiers: friendlyIsA ? rates.sideBModifiers : rates.sideAModifiers,
     }];
   }) : undefined;
   const artilleryGroups = fullyVisible

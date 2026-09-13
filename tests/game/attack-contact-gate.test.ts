@@ -50,7 +50,7 @@ describe('direct army attack accepts any currently detected target', () => {
     const c = ctx([army('p', 1, 0, 0), army('e', 2, 5_000, 0)]);
     const result = issueAttack(c as never, { type: 'attackArmy', countryId: 1, armyId: 'p', target: { kind: 'army', armyId: 'e' } });
     expect(result.ok).toBe(false);
-    expect(result.reason).toMatch(/no longer detected/i);
+    expect(result.reason).toMatch(/no valid hostile force/i);
   });
 
   it('passes the identification gate for a target in direct view', () => {

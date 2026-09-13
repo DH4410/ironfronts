@@ -284,6 +284,17 @@ export interface ArmyStackView {
     id: string; directionNodeId: number; role: 'attack' | 'defense';
     friendlyHp: number; friendlyBaselineHp: number; enemyHp: number; enemyBaselineHp: number;
     reinforcementCount: number;
+    outgoingDamagePerGameHour: number; incomingDamagePerGameHour: number;
+    friendlyCasualties: number; enemyCasualties: number;
+    estimatedGameHours: number | null; estimatedRealSeconds: number | null;
+    friendlyModifiers: {
+      frontageUsed: number; frontageLimit: number; coordination: number; organization: number;
+      stanceOutput: number; supply: number; protection: number; terrain: number; devastation: number;
+    };
+    enemyModifiers: {
+      frontageUsed: number; frontageLimit: number; coordination: number; organization: number;
+      stanceOutput: number; supply: number; protection: number; terrain: number; devastation: number;
+    };
   }>;
   readonly artillery?: {
     range: number; targetArmyId: string | null; manualTarget: boolean;

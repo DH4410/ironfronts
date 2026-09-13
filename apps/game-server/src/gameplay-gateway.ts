@@ -11,10 +11,21 @@ import type { GameRuntime } from './runtime';
 import type { AuthoritativeGameClock } from './game-clock';
 import { TicketNonceStore } from './ticket-nonces';
 
+const DEBUG_MESSAGE_TYPES = new Set([
+  'devSetSimSpeed', 'devSetClock', 'devSetMovementSpeed', 'devSetEnvironment',
+  'devSetRelation', 'devInspectState', 'devGetFullState',
+]);
+
+function requestedMessageType(value: unknown): string | null {
+  if (!value || typeof value !== 'object' || !('type' in value)) return null;
+  return typeof value.type === 'string' ? value.type : null;
+}
+
 export interface GameplayConnection {
   readonly socket: WebSocket;
   readonly accountId: string;
   readonly countryId: number;
+  readonly debugEnabled: boolean;
   projection: PlayerProjection;
   revision: number;
 }
@@ -24,6 +35,8 @@ export interface GameplayGatewayOptions {
   readonly runtime: GameRuntime;
   readonly clientOrigin: string;
   readonly ticketSecret: string;
+  /** Explicit deployment gate; a signed account claim is still required. */
+  readonly debugControlsEnabled: boolean;
   readonly world: WorldDescriptor;
   readonly clock: AuthoritativeGameClock;
   readonly revision: () => number;
@@ -72,6 +85,22 @@ export class GameplayGateway {
     for (const connection of this.connections) this.send(connection, message);
   }
 
+  private sendDebugState(connection: GameplayConnection): void {
+    this.send(connection, {
+      type: 'devSimSpeed', multiplier: this.options.devSimSpeed.get(),
+      devControlsEnabled: connection.debugEnabled,
+      movementMultiplier: this.options.runtime.session.movementSpeedMultiplier,
+    });
+    this.send(connection, {
+      type: 'devEnvironment', ...this.options.devEnvironment.get(),
+      devControlsEnabled: connection.debugEnabled,
+    });
+  }
+
+  private broadcastDebugState(): void {
+    for (const connection of this.connections) this.sendDebugState(connection);
+  }
+
   closeAll(code = 1001, reason = 'Server shutting down'): void {
     for (const socket of this.sockets.clients) socket.close(code, reason);
     this.sockets.close();
@@ -98,7 +127,24 @@ export class GameplayGateway {
 
     socket.on('message', (data) => {
       try {
-        const message = clientMessageSchema.parse(JSON.parse(data.toString()));
+        const raw: unknown = JSON.parse(data.toString());
+        const requestedType = requestedMessageType(raw);
+        if (!connection && requestedType && DEBUG_MESSAGE_TYPES.has(requestedType)) {
+          this.sendSocket(socket, {
+            type: 'error', code: 'authentication_required',
+            message: 'Authenticate before using the game connection.',
+          });
+          return;
+        }
+        if (connection && requestedType && DEBUG_MESSAGE_TYPES.has(requestedType)
+          && !connection.debugEnabled) {
+          this.sendSocket(socket, {
+            type: 'error', code: 'unauthorized_debug',
+            message: 'This account is not authorized to use debug controls.',
+          });
+          return;
+        }
+        const message = clientMessageSchema.parse(raw);
         if (message.type === 'authenticate') {
           if (connection) throw new Error('Connection is already authenticated.');
           const claims = verifyGameTicket(message.ticket, this.options.ticketSecret);
@@ -112,8 +158,10 @@ export class GameplayGateway {
           clearTimeout(authenticationTimeout);
           const revision = this.options.revision();
           const projection = this.options.runtime.projection(claims.countryId, this.options.devSimSpeed.get());
+          const debugEnabled = claims.debugEntitled && this.options.debugControlsEnabled;
           connection = {
-            socket, accountId: claims.accountId, countryId: claims.countryId, projection, revision,
+            socket, accountId: claims.accountId, countryId: claims.countryId, debugEnabled,
+            projection, revision,
           };
           this.connections.add(connection);
           this.sendSocket(socket, {
@@ -125,29 +173,34 @@ export class GameplayGateway {
             ],
             world: this.options.world,
             countryId: claims.countryId,
+            debugEnabled,
           });
           this.sendSocket(socket, {
             type: 'baseline', revision, state: projection,
             catalogs: this.options.runtime.catalogs, clock: this.options.clock.snapshot(),
           });
-          this.sendSocket(socket, {
-            type: 'devSimSpeed', multiplier: this.options.devSimSpeed.get(),
-            devControlsEnabled: this.options.devSimSpeed.enabled,
-            movementMultiplier: this.options.runtime.session.movementSpeedMultiplier,
-          });
-          this.sendSocket(socket, {
-            type: 'devEnvironment', ...this.options.devEnvironment.get(),
-            devControlsEnabled: this.options.devEnvironment.enabled,
-          });
+          this.sendDebugState(connection);
           this.options.log('info', 'client_connected', { countryId: claims.countryId });
           return;
         }
-        if (!connection) throw new Error('Authentication required.');
+        if (!connection) {
+          this.sendSocket(socket, {
+            type: 'error', code: 'authentication_required',
+            message: 'Authenticate before using the game connection.',
+          });
+          return;
+        }
         if (message.type === 'ping') {
           this.sendSocket(socket, { type: 'pong', sentAt: message.sentAt, serverEpochMs: Date.now() }); return;
         }
         if (message.type === 'devSetSimSpeed' || message.type === 'devSetClock' || message.type === 'devSetMovementSpeed') {
-          if (!this.options.devSimSpeed.enabled) return;
+          if (!connection.debugEnabled) {
+            this.sendSocket(socket, {
+              type: 'error', code: 'unauthorized_debug',
+              message: 'This account is not authorized to use debug controls.',
+            });
+            return;
+          }
           this.options.beforeDebugChange();
           if (message.type === 'devSetSimSpeed') this.options.devSimSpeed.set(message.multiplier);
           else if (message.type === 'devSetClock') this.options.clock.setEpoch(message.epochMs);
@@ -155,19 +208,19 @@ export class GameplayGateway {
           this.options.publishNow();
           this.broadcast({ type: 'clockSync', clock: this.options.clock.snapshot() });
           this.options.saveGameInBackground();
-          this.broadcast({
-            type: 'devSimSpeed', multiplier: this.options.devSimSpeed.get(),
-            devControlsEnabled: this.options.devSimSpeed.enabled,
-            movementMultiplier: this.options.runtime.session.movementSpeedMultiplier,
-          });
+          this.broadcastDebugState();
           return;
         }
         if (message.type === 'devSetEnvironment') {
+          if (!connection.debugEnabled) {
+            this.sendSocket(socket, {
+              type: 'error', code: 'unauthorized_debug',
+              message: 'This account is not authorized to use debug controls.',
+            });
+            return;
+          }
           this.options.devEnvironment.set(message);
-          this.broadcast({
-            type: 'devEnvironment', ...this.options.devEnvironment.get(),
-            devControlsEnabled: this.options.devEnvironment.enabled,
-          });
+          this.broadcastDebugState();
           return;
         }
         if (message.type === 'resync') {

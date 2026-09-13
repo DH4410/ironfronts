@@ -17,6 +17,8 @@ export class GameConnection extends EventTarget {
   revision = 0;
   baselineGeneration = 0;
   status: ConnectionStatus = 'connecting';
+  /** Granted by the authenticated server handshake for this connection. */
+  debugEnabled = false;
   devSimSpeed = 1;
   devMovementSpeed = 1;
   devSimSpeedEnabled = false;
@@ -57,6 +59,10 @@ export class GameConnection extends EventTarget {
   private async connect(onStage?: (stage: string) => void): Promise<void> {
     if (this.closed) return;
     const attempt = ++this.attempt;
+    if (this.debugEnabled) {
+      this.debugEnabled = false;
+      this.dispatchEvent(new Event('debug-access'));
+    }
     this.setStatus('connecting');
     onStage?.('Contacting command server');
     const descriptor = await connectGame();
@@ -90,6 +96,8 @@ export class GameConnection extends EventTarget {
         this.lastMessageMs = performance.now();
         if (message.type === 'hello') {
           hello = true;
+          this.debugEnabled = message.debugEnabled;
+          this.dispatchEvent(new Event('debug-access'));
           if (this.world && this.world.hash !== message.world.hash) {
             this.setStatus('incompatible'); this.closed = true;
             this.dispatchEvent(new CustomEvent('connection-error', { detail: 'The world changed. Return to command and rejoin.' }));

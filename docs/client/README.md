@@ -155,13 +155,16 @@ Storage reads/writes are guarded so privacy modes or unavailable local storage d
 | E with an army selected | Extract |
 | Escape | Deselect army/cancel selection context |
 
-Debug controls are available only with `?debug` or the automation-only `?benchmark` query:
+Debug controls are available only after the game server authenticates the
+signed `DimaTest1` entitlement on a deployment with
+`IRONFRONTS_DEBUG_CONTROLS_ENABLED=true`:
 
 - F3 opens/closes the inspector.
 - `[` and `]` cycle renderer debug views while it is open.
 - Inspector controls toggle world layers, navigation graphs, time, rain, and local presentation diagnostics.
 
 The debug diplomacy forms manipulate renderer presentation and are not a replacement for authoritative game-server diplomacy commands.
+URL parameters and development mode do not grant debug access.
 
 ## Teardown and failure behavior
 

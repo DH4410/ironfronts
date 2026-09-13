@@ -116,6 +116,20 @@ describe('authoritative diplomacy domain', () => {
     expect(relationOf(c.state, 1, 2)).toBe('war');
   });
 
+  it('activates neutral defenders independently when a player opens simultaneous wars', () => {
+    const c = commandState();
+    c.state.countries[2].controller = 'neutral';
+    c.state.countries[4].controller = 'neutral';
+    c.state.provinceOwners[40] = 4;
+
+    expect(c.command({ type: 'declareWar', countryId: 1, targetCountryId: 2 }).ok).toBe(true);
+    expect(c.command({ type: 'declareWar', countryId: 1, targetCountryId: 4 }).ok).toBe(true);
+
+    expect(c.state.countries[1].controller).toBe('player');
+    expect(c.state.countries[2].controller).toBe('ai');
+    expect(c.state.countries[4].controller).toBe('ai');
+  });
+
   it('bounds resolved proposal history while retaining transitions', () => {
     const c = commandState();
     for (let index = 0; index < MAX_DIPLOMACY_PROPOSALS_PER_PAIR + 2; index += 1) {

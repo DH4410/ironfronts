@@ -12,6 +12,8 @@ function secret(name: string, fallback: string): string {
   return value;
 }
 
+const debugControlsEnabled = process.env.IRONFRONTS_DEBUG_CONTROLS_ENABLED === 'true';
+
 export const config = {
   port: numberEnv('GAME_PORT', 3002),
   clientOrigin: process.env.CLIENT_ORIGIN ?? 'http://127.0.0.1:5173',
@@ -26,13 +28,15 @@ export const config = {
   ),
   ticketSecret: secret('TICKET_SECRET', 'ironfronts-local-ticket-secret-change-me'),
   internalSecret: secret('INTERNAL_SERVICE_SECRET', 'ironfronts-local-service-secret-change-me'),
+  /** Explicit deployment gate layered on top of the signed account claim. */
+  debugControlsEnabled,
   /**
    * DEV / TESTING ONLY. Multiplies simulation time (movement, production,
    * combat, clock all scale together — it just advances game-time faster).
    * Deterministic; touches no balance constant. Ignored in production and
    * clamped to [0.25, 8]. Set IRONFRONTS_DEV_SIM_SPEED=4 to fast-forward.
    */
-  devSimSpeed: process.env.NODE_ENV === 'production'
+  devSimSpeed: !debugControlsEnabled
     ? 1
     : Math.max(0.25, Math.min(8, Number(process.env.IRONFRONTS_DEV_SIM_SPEED ?? 1) || 1)),
 } as const;

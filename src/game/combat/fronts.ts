@@ -20,7 +20,7 @@ export function initializeState(session: SimContext): void {
   }
 }
 
-export function sideArmies(session: SimContext, side: BattleFrontSideState): ArmyStack[] {
+export function sideArmies(session: Pick<SimContext, 'state'>, side: BattleFrontSideState): ArmyStack[] {
   return side.armyIds
     .map((id) => session.state.armies[id])
     .filter((army): army is ArmyStack => Boolean(army));
