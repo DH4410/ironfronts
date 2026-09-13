@@ -294,11 +294,15 @@ export function mountMenu(handlers: MenuHandlers): void {
   function buildNationList(): void {
     if (!countryListEl || nationListBuilt) return;
     const selectableIds = new Set(selectableCountries(handlers.lobby).map((c) => c.id));
-    const rows = [...handlers.lobby.countries].sort((a, b) => {
-      const sa = selectableIds.has(a.id) ? 0 : 1;
-      const sb = selectableIds.has(b.id) ? 0 : 1;
-      return sa - sb || a.name.localeCompare(b.name);
-    });
+    // A one-city speck clutters the list without ever being a viable command —
+    // it still exists on the map, just not as a list entry.
+    const rows = [...handlers.lobby.countries]
+      .filter((country) => country.startingCities > 1)
+      .sort((a, b) => {
+        const sa = selectableIds.has(a.id) ? 0 : 1;
+        const sb = selectableIds.has(b.id) ? 0 : 1;
+        return sa - sb || a.name.localeCompare(b.name);
+      });
     countryListEl.replaceChildren(...rows.map((country) => {
       const claimable = selectableIds.has(country.id);
       const li = document.createElement('li');
@@ -313,7 +317,13 @@ export function mountMenu(handlers: MenuHandlers): void {
       button.disabled = !claimable;
       const swatch = document.createElement('i');
       swatch.className = 'ifm__country-swatch';
-      swatch.style.background = country.color;
+      const flagUrl = resolveFlagUrl(country.name);
+      if (flagUrl) {
+        swatch.classList.add('is-flag');
+        swatch.style.backgroundImage = `url("${flagUrl}")`;
+      } else {
+        swatch.style.background = country.color;
+      }
       const name = document.createElement('span');
       name.className = 'ifm__country-name';
       name.textContent = country.name;

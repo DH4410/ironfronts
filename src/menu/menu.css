@@ -543,7 +543,16 @@
   overflow-y: auto;
   border: 1px solid var(--hud-line);
   background: rgba(0,0,0,.18);
+  scrollbar-width: thin;
+  scrollbar-color: var(--hud-gold) rgba(0,0,0,.3);
 }
+.ifm__country-list::-webkit-scrollbar { width: 8px; }
+.ifm__country-list::-webkit-scrollbar-track { background: rgba(0,0,0,.3); }
+.ifm__country-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(var(--hud-gold-bright), var(--hud-gold));
+  border: 1px solid rgba(0,0,0,.5);
+}
+.ifm__country-list::-webkit-scrollbar-thumb:hover { background: var(--hud-gold-bright); }
 .ifm__country-row {
   display: flex;
   align-items: center;
@@ -562,7 +571,13 @@
 .ifm__country-row.is-selected { background: rgba(81,124,68,.28); color: var(--hud-gold-bright); }
 .ifm__country-row:disabled { color: var(--hud-text-dim); cursor: default; opacity: .55; }
 .ifm__country-swatch {
-  flex: 0 0 auto; width: 13px; height: 9px; border: 1px solid rgba(0,0,0,.55);
+  flex: 0 0 auto; width: 18px; height: 13px; border: 1px solid rgba(0,0,0,.55);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.1);
+}
+.ifm__country-swatch.is-flag {
+  background-size: cover;
+  background-position: center;
+  filter: saturate(.86) brightness(.96);
 }
 .ifm__country-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ifm__country-meta {
