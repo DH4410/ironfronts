@@ -12,6 +12,7 @@ import type { SimContext } from '../../src/game/sim-context';
 import type { WorldData } from '../../src/game/world-data';
 import { issueAttack } from '../../src/game/commands/attack';
 import type { ArmyStack } from '../../src/game/units/army';
+import { stepCapture } from '../../src/game/combat';
 
 // A straight 3-node chain: (100,100) - (300,100) - (500,100).
 function graph(): LandGraph {
@@ -29,19 +30,23 @@ function army(id: string, owner: number, x: number, z: number, node: number): Ar
   } satisfies ArmyStack;
 }
 
-function ctx(armies: ArmyStack[], provinceOwners: Record<number, number> = {}): SimContext {
-  const g = graph();
+function ctx(
+  armies: ArmyStack[], provinceOwners: Record<number, number> = {},
+  provinceAt: (x: number, z: number) => number = (x) => x < 400 ? 10 : 20,
+  g = graph(),
+  province20Center = 500,
+): SimContext {
   const world: WorldData = {
     width: 10_000, height: 5_000,
     provinces: [
-      { id: 10, center: [500, 100], terrainId: 4, population: 400, coastal: false, urban: true },
-      { id: 20, center: [500, 100], terrainId: 4, population: 400, coastal: false, urban: true },
+      { id: 10, center: [300, 100], terrainId: 4, population: 400, coastal: false, urban: true },
+      { id: 20, center: [province20Center, 100], terrainId: 4, population: 400, coastal: false, urban: true },
     ],
     countries: [
       { id: 1, name: 'A', color: '#fff', capitalProvinceId: 10 },
       { id: 2, name: 'B', color: '#000', capitalProvinceId: 20 },
     ],
-    provinceOwner: () => 0, provinceAt: () => 10, terrainClassAt: () => 4,
+    provinceOwner: () => 0, provinceAt, terrainClassAt: () => 4,
     connections: new Float32Array(0), resourceNodes: [],
   };
   const state: GameState = {
@@ -120,5 +125,82 @@ describe('attack target validation', () => {
     const order = c.state.armies.p.order!;
     expect(order.target).toMatchObject({ kind: 'province', provinceId: 10, x: 300, z: 100 });
     expect(order.path[order.path.length - 1]).toBe(nearestNode(graph(), 300, 100));
+  });
+
+  it('routes a province attack to a reachable node inside the intended province', () => {
+    const c = ctx(
+      [army('p', 1, 100, 100, 0)], { 20: 2 },
+      (x) => Math.abs(x - 300) < 1 ? 10 : x >= 250 ? 20 : 10,
+    );
+    const result = issueAttack(c, {
+      type: 'attackArmy', countryId: 1, armyId: 'p',
+      target: { kind: 'province', provinceId: 20, x: 320, z: 100 }, confirmedWarCountryIds: [2],
+    });
+
+    expect(result.ok).toBe(true);
+    const order = c.state.armies.p.order!;
+    expect(order.path[order.path.length - 1]).toBe(nearestNode(graph(), 500, 100));
+    expect(c.world.provinceAt(order.destX, order.destZ)).toBe(20);
+    expect(order.target).toMatchObject({ kind: 'province', provinceId: 20, x: 500, z: 100 });
+  });
+
+  it('keeps the exact in-province goal when the route requires a naval link', () => {
+    const navalGraph: LandGraph = {
+      nodeX: Float64Array.from([100, 480, 500]), nodeZ: Float64Array.from([100, 100, 100]),
+      adjacency: [[1], [0], []], edgeCost: [[380], [380], []],
+      seaAdjacency: [[], [2], [1]], seaEdgeCost: [[], [20], [20]],
+      component: Int32Array.from([0, 0, 1]), componentSize: [2, 1], nodeCount: 3,
+      width: 10_000, height: 5_000,
+    };
+    const c = ctx(
+      [army('p', 1, 100, 100, 0)], { 20: 2 },
+      (x) => x === 500 ? 20 : 10, navalGraph,
+    );
+
+    expect(issueAttack(c, {
+      type: 'attackArmy', countryId: 1, armyId: 'p',
+      target: { kind: 'province', provinceId: 20 }, confirmedWarCountryIds: [2],
+    }).ok).toBe(true);
+    const order = c.state.armies.p.order!;
+    expect(order.path[order.path.length - 1]).toBe(2);
+    expect(c.world.provinceAt(order.destX, order.destZ)).toBe(20);
+  });
+
+  it('rejects a province with no road node and a disconnected attack route explicitly', () => {
+    const noNode = ctx(
+      [army('p', 1, 100, 100, 0)], { 20: 2 },
+      (x) => Math.abs(x - 350) < 1 ? 20 : 10,
+    );
+    expect(issueAttack(noNode, {
+      type: 'attackArmy', countryId: 1, armyId: 'p',
+      target: { kind: 'province', provinceId: 20, x: 350, z: 100 }, confirmedWarCountryIds: [2],
+    })).toMatchObject({ ok: false, reason: 'Target is not reachable.' });
+
+    const disconnected = buildLandGraph(new Float32Array([
+      100, 100, 500, 100, 1, 1, 0, 0,
+    ]), 10_000, 5_000);
+    const unavailable = ctx(
+      [army('p', 1, 100, 100, 0)], { 20: 2 }, (x) => x < 400 ? 10 : 20, disconnected,
+    );
+    expect(issueAttack(unavailable, {
+      type: 'attackArmy', countryId: 1, armyId: 'p',
+      target: { kind: 'province', provinceId: 20 }, confirmedWarCountryIds: [2],
+    })).toMatchObject({ ok: false, reason: 'Attack route unavailable.' });
+  });
+
+  it('reports a missing army target as no valid hostile force', () => {
+    const c = ctx([army('p', 1, 100, 100, 0)]);
+    expect(issueAttack(c, {
+      type: 'attackArmy', countryId: 1, armyId: 'p', target: { kind: 'army', armyId: 'gone' },
+    })).toMatchObject({ ok: false, reason: 'No valid hostile force.' });
+  });
+
+  it('captures from any arrival node spatially inside the intended province', () => {
+    const occupier = army('p', 1, 500, 100, nearestNode(graph(), 500, 100));
+    const c = ctx([occupier], { 20: 2 }, undefined, graph(), 450);
+    c.state.relations['1:2'] = 'war';
+
+    expect(stepCapture(c)).toEqual([{ provinceId: 20, fromCountryId: 2, toCountryId: 1 }]);
+    expect(c.state.provinceOwners[20]).toBe(1);
   });
 });

@@ -4,10 +4,40 @@ import type { SimContext } from '../sim-context';
 import { ensureArmyRuntimeState } from '../units/army';
 import { unitType } from '../units/unit-catalog';
 import { issueMoveOrder } from '../units/movement';
+import type { ExactMoveGoal } from '../movement/orders';
+import type { ArmyStack } from '../units/army';
+import type { LandGraph } from '../movement/graph';
+import { routeFromArmy } from '../movement/position';
+import { combinedGraph } from '../movement/naval';
 import { computeArmyVisibility } from '../visibility';
 import { relationOf, setRelation } from '../game-state';
 import { wrappedDistance } from '../geometry';
 import type { AttackCommand, CommandResult } from './types';
+
+function reachableProvinceNode(
+  ctx: SimContext, army: ArmyStack, provinceId: number, targetX: number, targetZ: number,
+): ({ x: number; z: number } & ExactMoveGoal) | CommandResult {
+  const nodes: number[] = [];
+  for (let node = 0; node < ctx.graph.nodeCount; node += 1) {
+    if (ctx.world.provinceAt(ctx.graph.nodeX[node], ctx.graph.nodeZ[node]) === provinceId) nodes.push(node);
+  }
+  if (!nodes.length) return { ok: false, reason: 'Target is not reachable.' };
+  nodes.sort((a, b) => wrappedDistance(
+    ctx.graph.nodeX[a], ctx.graph.nodeZ[a], targetX, targetZ, ctx.world.width,
+  ) - wrappedDistance(
+    ctx.graph.nodeX[b], ctx.graph.nodeZ[b], targetX, targetZ, ctx.world.width,
+  ) || a - b);
+  const reachableIn = (graph: LandGraph): ExactMoveGoal | null => {
+    for (const node of nodes) {
+      if (routeFromArmy(ctx, army, node, undefined, graph)) return { graph, nodeId: node };
+    }
+    return null;
+  };
+  const goal = reachableIn(ctx.graph) ?? reachableIn(combinedGraph(ctx.graph));
+  return goal === null
+    ? { ok: false, reason: 'Attack route unavailable.' }
+    : { ...goal, x: ctx.graph.nodeX[goal.nodeId], z: ctx.graph.nodeZ[goal.nodeId] };
+}
 
 export function issueAttack(ctx: SimContext, command: AttackCommand): CommandResult {
   const army = ctx.state.armies[command.armyId];
@@ -36,16 +66,19 @@ export function issueAttack(ctx: SimContext, command: AttackCommand): CommandRes
     if ((ctx.state.provinceOwners[province.id] ?? 0) === army.ownerCountryId) {
       return { ok: false, reason: 'You already hold that province — move there instead.' };
     }
+    const destination = reachableProvinceNode(ctx, army, province.id, destinationX, destinationZ);
+    if ('ok' in destination) return destination;
     return issueMoveOrder(
-      ctx, army.id, destinationX, destinationZ, 'attack',
-      { kind: 'province', provinceId: province.id, x: destinationX, z: destinationZ },
+      ctx, army.id, destination.x, destination.z, 'attack',
+      { kind: 'province', provinceId: province.id, x: destination.x, z: destination.z },
       command.confirmedWarCountryIds,
       [ctx.state.provinceOwners[province.id] ?? 0],
+      destination,
     );
   }
 
   const target = ctx.state.armies[command.target.armyId];
-  if (!target) return { ok: false, reason: 'No such target army.' };
+  if (!target) return { ok: false, reason: 'No valid hostile force.' };
   // No alliance system yet, so "friendly" is exactly "same country". A strike on
   // your own force is always rejected here regardless of what the client sent.
   if (target.ownerCountryId === army.ownerCountryId) {
@@ -54,7 +87,7 @@ export function issueAttack(ctx: SimContext, command: AttackCommand): CommandRes
   const contact = computeArmyVisibility(ctx.state, ctx.world, army.ownerCountryId).get(target.id);
   // Any currently detected contact can be targeted. Its detailed composition
   // remains redacted by the projection, but its map position is actionable.
-  if (!contact || contact === 'hidden') return { ok: false, reason: 'Target is no longer detected.' };
+  if (!contact || contact === 'hidden') return { ok: false, reason: 'No valid hostile force.' };
   const required = relationOf(ctx.state, army.ownerCountryId, target.ownerCountryId) === 'war'
     ? [] : [target.ownerCountryId];
   if (artilleryOnly) {

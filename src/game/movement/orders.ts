@@ -14,6 +14,11 @@ export interface MoveOrderResult {
   readonly requiredWarCountryIds?: readonly number[];
 }
 
+export interface ExactMoveGoal {
+  readonly graph: LandGraph;
+  readonly nodeId: number;
+}
+
 export function installOrder(
   army: ArmyStack, path: readonly number[], destX: number, destZ: number,
   intent: 'move' | 'attack', target?: MoveOrder['target'],
@@ -29,6 +34,7 @@ export function issueMoveOrder(
   intent: 'move' | 'attack' = 'move', target?: MoveOrder['target'],
   confirmedWarCountryIds: readonly number[] = [],
   forcedWarCountryIds: readonly number[] = [],
+  exactGoal?: ExactMoveGoal,
 ): MoveOrderResult {
   const army = session.state.armies[armyId];
   if (!army) return { ok: false, reason: 'No such army.' };
@@ -37,8 +43,8 @@ export function issueMoveOrder(
   if (army.status === 'retreating') return { ok: false, reason: 'Army is retreating.' };
   if (isNavalStatus(army.status)) return { ok: false, reason: 'Army is mid sea crossing.' };
 
-  let graph: LandGraph = session.graph;
-  let goal = nearestNode(
+  let graph: LandGraph = exactGoal?.graph ?? session.graph;
+  let goal = exactGoal?.nodeId ?? nearestNode(
     graph, destX, destZ, 600, graph.component[army.graphNodeId] ?? -1,
   );
   if (target?.kind === 'army' && goal === army.graphNodeId) {
@@ -47,7 +53,7 @@ export function issueMoveOrder(
   }
   let unrestricted = goal >= 0
     ? routeFromArmy(session, army, goal, undefined, graph) : null;
-  if (!unrestricted) {
+  if (!unrestricted && !exactGoal) {
     const merged = combinedGraph(session.graph);
     const mergedGoal = nearestNode(
       merged, destX, destZ, 600, merged.component[army.graphNodeId] ?? -1,
@@ -61,6 +67,7 @@ export function issueMoveOrder(
     }
   }
   if (goal < 0 || !unrestricted) {
+    if (exactGoal) return { ok: false, reason: 'No legal route to that location.' };
     const anyGoal = nearestNode(combinedGraph(session.graph), destX, destZ, 600, -1);
     return anyGoal < 0
       ? { ok: false, reason: 'That destination is off the road network; pick a spot on land.' }
