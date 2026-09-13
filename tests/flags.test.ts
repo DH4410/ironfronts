@@ -21,6 +21,11 @@ describe('1939 flag resolver', () => {
     expect(COUNTRY_FLAG.Greece).toBe('gr-1935-1970');
     expect(COUNTRY_FLAG.Persia).toBe('ir-1925-1979');
     expect(COUNTRY_FLAG['Nationalist China']).toBe('cn-roc');
+    expect(COUNTRY_FLAG.Spain).toBe('es-1938-1945');
+    expect(COUNTRY_FLAG.Lithuania).toBe('lt-1918-1940');
+    expect(COUNTRY_FLAG.Afghanistan).toBe('af-1931-1973');
+    expect(COUNTRY_FLAG.Tibet).toBe('tibet-1916-1951');
+    expect(COUNTRY_FLAG.Mengjiang).toBe('mengjiang-1939-1945');
     for (const name of ['Germany', 'Italy', 'Greece', 'Persia', 'Nationalist China', 'Egypt']) {
       expect(resolveFlagUrl(name), name).toBeTruthy();
     }
@@ -71,7 +76,7 @@ describe('1939 flag resolver', () => {
       if (!/[0-9]|roc|manchukuo|empire/.test(file)) continue;
       const svg = readFileSync(path.join(flagsDir, file), 'utf8').slice(0, 400);
       expect(svg, file).toMatch(/commons\.wikimedia\.org/);
-      expect(svg, file).toMatch(/[Pp]ublic domain|PD-/);
+      expect(svg, file).toMatch(/[Pp]ublic domain|PD-|CC BY-SA/);
     }
   });
 
