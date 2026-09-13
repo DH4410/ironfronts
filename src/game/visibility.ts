@@ -28,6 +28,7 @@ import { SpatialIndex } from './spatial-index';
 import type { GameState } from './game-state';
 import type { WorldData } from './world-data';
 import { unitType } from './units/unit-catalog';
+import { unitStatMultiplier } from './economy/shortages';
 import { wrappedDistanceSq } from './geometry';
 
 export type ContactLevel = 'hidden' | 'contact' | 'visible';
@@ -48,8 +49,14 @@ export function friendlyVisionSources(
   for (const army of Object.values(state.armies)) {
     if (army.ownerCountryId !== viewerCountryId) continue;
     const living = army.units.filter((g) => g.count > 0 && g.hp > 0);
-    const outer = Math.max(0, ...living.map((g) => unitType(g.typeId).visionOuter));
-    const inner = Math.max(0, ...living.map((g) => unitType(g.typeId).visionInner));
+    const outer = Math.max(0, ...living.map((g) => {
+      const type = unitType(g.typeId);
+      return type.visionOuter * unitStatMultiplier(type, 'visionRange', army.shortageSeverity);
+    }));
+    const inner = Math.max(0, ...living.map((g) => {
+      const type = unitType(g.typeId);
+      return type.visionInner * unitStatMultiplier(type, 'visionRange', army.shortageSeverity);
+    }));
     sources.push({ x: army.x, z: army.z, outerSq: outer * outer, innerSq: inner * inner });
   }
   return sources;

@@ -23,17 +23,23 @@
 import type { SimContext } from '../sim-context';
 import { applyCommand } from '../commands';
 import { producibleUnits } from '../production';
-import { buildableBuildings } from '../construction';
-import { canExtract, stackHealthFraction, type ArmyStack } from '../units/army';
+import { BUILDINGS, buildOptions, buildableBuildings } from '../construction';
+import { stackHealthFraction, type ArmyStack } from '../units/army';
 import { unitType } from '../units/unit-catalog';
 import type { BuildingId } from '../units/unit-types';
 import type { WorldProvince } from '../world-data';
 import { wrappedDistance } from '../geometry';
+import { nearestNode } from '../movement/graph';
+import type { CountryState, PhysicalResource, ResourceBuildingId, UpkeepResource } from '../game-state';
+import { engineersAssignedTo } from '../economy/resource-production';
+import {
+  BUILDING_FOR_RESOURCE, effectiveEngineerCount, RESOURCE_TIER_ENGINEER_CAP,
+  RESOURCE_TIER_ENGINEER_MULTIPLIER,
+} from '../economy/resources';
 import {
   CONTACT_RADIUS, aiMemory, assess, combatStrength, indexArmies, indexProvinces,
   provinceNode, strengthNear, type AiMemory, type Assessment, type CityStatus,
 } from './assessment';
-import { PROTOTYPE_HOURS_PER_HOUR } from '../time';
 
 /** A threatened city keeps this much more weight than is bearing down on it. */
 const DEFENCE_MARGIN = 1.5;
@@ -67,9 +73,9 @@ const OBJECTIVE_TRIES = 3;
  */
 const MISSILE_RANGE = 3200;
 /** Preserve the prototype's ten-day strike pacing on the 1:1 timeline. */
-const STRIKE_COOLDOWN_HOURS = 240 / PROTOTYPE_HOURS_PER_HOUR;
+const STRIKE_COOLDOWN_HOURS = 240;
 /** Preserve the prototype's two-week peace-offer pacing on the 1:1 timeline. */
-const PEACE_OFFER_COOLDOWN_HOURS = 336 / PROTOTYPE_HOURS_PER_HOUR;
+const PEACE_OFFER_COOLDOWN_HOURS = 336;
 /** Wars being fought at once before peace looks better than pride. */
 const MULTI_FRONT_WARS = 3;
 
@@ -87,6 +93,7 @@ export function stepAi(session: SimContext, _dtHours: number): void {
     retreatBrokenStack(session, situation);
     defendCities(session, situation);
     workDeposits(session, situation);
+    developResources(session, situation);
     produceUnits(session, situation);
     buildIndustry(session, situation);
     if (!situation.atWar) continue;
@@ -102,6 +109,30 @@ export function stepAi(session: SimContext, _dtHours: number): void {
     assault(session, situation);
     strategicStrike(session, memory, situation);
     negotiate(session, memory, situation);
+  }
+}
+
+interface EconomyAiSituation {
+  countryId: number;
+  armies: readonly ArmyStack[];
+  cities: ReadonlyArray<{ province: WorldProvince }>;
+}
+
+/** Lightweight economic slice of the live AI, shared with long-running
+ * balance simulations so those tests do not pay for combat-front assessment. */
+export function stepAiEconomy(session: SimContext, countryIds?: readonly number[]): void {
+  const selected = countryIds ? new Set(countryIds) : null;
+  for (const country of Object.values(session.state.countries)) {
+    if (country.controller !== 'ai' || (selected && !selected.has(country.id))) continue;
+    const situation: EconomyAiSituation = {
+      countryId: country.id,
+      armies: Object.values(session.state.armies).filter((army) => army.ownerCountryId === country.id),
+      cities: session.world.provinces.filter((province) => province.urban
+        && session.state.provinceOwners[province.id] === country.id).map((province) => ({ province })),
+    };
+    workDeposits(session, situation);
+    developResources(session, situation);
+    produceUnits(session, situation);
   }
 }
 
@@ -257,39 +288,92 @@ function defendCities(session: SimContext, situation: Assessment): void {
   }
 }
 
-/** 3. Put one idle miner on the nearest controlled deposit. */
-function workDeposits(session: SimContext, situation: Assessment): void {
-  const deposits = Object.values(session.state.resourceNodes).filter(
-    (node) => node.controllerCountryId === situation.countryId && node.remaining > 0
-      && node.accessNodeId >= 0 && node.status !== 'extracting',
-  );
-  if (deposits.length === 0) return;
+/** 3. Put one idle engineer stack on a useful renewable province resource. */
+function workDeposits(
+  session: SimContext, situation: Pick<EconomyAiSituation, 'countryId' | 'armies'>,
+): void {
+  const country = session.state.countries[situation.countryId];
+  const priorities = (['food', 'metal', 'oil', 'stone'] as PhysicalResource[]).sort((a, b) =>
+    ((country.coverage?.[a as 'food' | 'metal' | 'oil'] ?? 1) - (country.coverage?.[b as 'food' | 'metal' | 'oil'] ?? 1)));
+  const sites = session.world.provinces.flatMap((province) => {
+    if (session.state.provinceOwners[province.id] !== situation.countryId) return [];
+    const economy = session.state.provinceEconomies?.[province.id];
+    if (!economy) return [];
+    return priorities.flatMap((resource) => economy.baseProduction[resource] > 0
+      ? [{ province, resource, economy }] : []);
+  });
+  if (!sites.length) return;
   for (const army of situation.armies) {
-    if (army.order || army.status !== 'idle' || army.extractingNodeId !== null) continue;
-    if (!canExtract(army)) continue;
-    const target = deposits.reduce((best, node) => (wrappedDistance(
-      army.x, army.z, node.x, node.z, session.world.width,
-    ) < wrappedDistance(army.x, army.z, best.x, best.z, session.world.width) ? node : best));
-    applyCommand(session, army.graphNodeId === target.accessNodeId
-      ? { type: 'extract', countryId: situation.countryId, armyId: army.id }
+    if (army.order || army.status !== 'idle' || army.extractionAssignment !== null) continue;
+    if (!army.units.some((group) => group.typeId === 'engineer' && group.count > 0)) continue;
+    const incoming = army.units.find((group) => group.typeId === 'engineer')?.count ?? 0;
+    const target = sites.map((site) => {
+      const building = BUILDING_FOR_RESOURCE[site.resource];
+      const tier = site.economy.resourceBuildings[building];
+      const cap = RESOURCE_TIER_ENGINEER_CAP[tier];
+      const assigned = engineersAssignedTo(session, site.province.id, site.resource);
+      const marginal = (effectiveEngineerCount(assigned + incoming, cap) - effectiveEngineerCount(assigned, cap))
+        * RESOURCE_TIER_ENGINEER_MULTIPLIER[tier];
+      const coverage = site.resource === 'stone' ? 1 : country.coverage?.[site.resource] ?? 1;
+      const distance = wrappedDistance(army.x, army.z, site.province.center[0], site.province.center[1], session.world.width);
+      return { ...site, score: marginal * (2.2 - Math.min(1, coverage)) * (0.7 + site.economy.resourcePotential[site.resource])
+        / (1 + distance / 2_500) };
+    }).sort((a, b) => b.score - a.score)[0];
+    if (!target || target.score <= 0.01) continue;
+    const targetNode = nearestNode(session.graph, target.province.center[0], target.province.center[1]);
+    applyCommand(session, army.graphNodeId === targetNode
+      ? { type: 'extract', countryId: situation.countryId, armyId: army.id, resource: target.resource }
       : {
         type: 'moveArmy', countryId: situation.countryId, armyId: army.id,
-        x: target.x, z: target.z,
+        x: target.province.center[0], z: target.province.center[1],
       });
     return;
   }
 }
 
-/** 4. One unit order per pass, at the most pressed city that can take it. */
-function produceUnits(session: SimContext, situation: Assessment): void {
+/** Develop renewable rural sites before expanding the army. Marginal passive
+ * output, engineer headroom, pressure, work, and total recipe burden all feed
+ * the same score; queued prerequisites are already reflected by buildOptions. */
+function developResources(session: SimContext, situation: Pick<EconomyAiSituation, 'countryId'>): void {
   const country = session.state.countries[situation.countryId];
   if (!country) return;
-  const miners = situation.armies.filter(canExtract).length;
+  const candidates: Array<{ provinceId: number; buildingId: ResourceBuildingId; score: number }> = [];
+  for (const province of session.world.provinces) {
+    if (province.urban || session.state.provinceOwners[province.id] !== situation.countryId) continue;
+    if ((session.state.constructionQueues[province.id]?.length ?? 0) >= 2) continue;
+    const economy = session.state.provinceEconomies?.[province.id];
+    if (!economy) continue;
+    for (const option of buildOptions(session, province.id, situation.countryId)) {
+      if (option.reason || !option.affordable || !['fields', 'quarry', 'mine', 'oilPump'].includes(option.id)) continue;
+      const buildingId = option.id as ResourceBuildingId;
+      const resource = ({ fields: 'food', quarry: 'stone', mine: 'metal', oilPump: 'oil' } as const)[buildingId];
+      const recipe = BUILDINGS[buildingId].tiers[option.targetTier - 1];
+      if (!recipe) continue;
+      const priorPassive = [0, 2, 5, 12][option.targetTier - 1] ?? 0;
+      const nextPassive = [0, 2, 5, 12][option.targetTier] ?? priorPassive;
+      const pressure = resource === 'stone' ? 1 : 1 + (1 - (country.coverage?.[resource] ?? 1)) * 4
+        + (country.shortages?.[resource]?.severity ?? 0) / 25;
+      const costBurden = Object.values(recipe.cost).reduce((sum, value) => sum + (value ?? 0), 0) / 500;
+      const score = (nextPassive - priorPassive + option.targetTier * 0.6)
+        * (0.5 + economy.resourcePotential[resource]) * pressure / (recipe.work + costBurden);
+      candidates.push({ provinceId: province.id, buildingId, score });
+    }
+  }
+  const pick = candidates.sort((a, b) => b.score - a.score)[0];
+  if (pick) applyCommand(session, { type: 'build', countryId: situation.countryId,
+    provinceId: pick.provinceId, buildingId: pick.buildingId });
+}
+
+/** 4. One unit order per pass, at the most pressed city that can take it. */
+function produceUnits(session: SimContext, situation: EconomyAiSituation): void {
+  const country = session.state.countries[situation.countryId];
+  if (!country) return;
+  const miners = situation.armies.filter((army) => army.units.some((group) => group.typeId === 'engineer' && group.count > 0)).length;
   for (const city of situation.cities) {
     const provinceId = city.province.id;
     if ((session.state.productionQueues[provinceId]?.length ?? 0) >= MAX_QUEUED_UNITS) continue;
     const options = producibleUnits(session, provinceId, situation.countryId);
-    const pick = chooseUnit(country.stockpile, options, miners);
+    const pick = chooseUnit(country, options, miners);
     if (!pick) continue;
     const done = applyCommand(session, {
       type: 'produce', countryId: situation.countryId, provinceId, unitTypeId: pick,
@@ -308,21 +392,30 @@ function produceUnits(session: SimContext, situation: Assessment): void {
  * Metal/oil/manpower gates are untouched: those costs did not change.
  */
 function chooseUnit(
-  stockpile: { funds: number; manpower: number; food: number; metal: number; oil: number },
+  country: CountryState,
   options: readonly string[], miners: number,
 ): string | null {
+  const stockpile = country.stockpile;
+  const sustainable = (unitId: string): boolean => {
+    const upkeep = unitType(unitId).upkeep;
+    return (['funds', 'food', 'metal', 'oil'] as UpkeepResource[]).every((resource) => {
+      const projectedDemand = (country.upkeep?.[resource] ?? 0) + (upkeep[`${resource}PerHour` as keyof typeof upkeep] ?? 0);
+      const deficit = projectedDemand - (country.income[resource] ?? 0);
+      return deficit <= 0 || country.stockpile[resource] / deficit >= 72;
+    });
+  };
   if (miners < 2 && options.includes('engineer')
-    && stockpile.funds > 120 && stockpile.manpower > 80) return 'engineer';
+    && stockpile.funds > 120 && stockpile.manpower > 80 && sustainable('engineer')) return 'engineer';
   if (options.includes('medium-tank')
     && stockpile.metal > 400 && stockpile.oil > 200
-    && stockpile.funds > 3_600 && stockpile.food > 675) return 'medium-tank';
+    && stockpile.funds > 3_600 && stockpile.food > 675 && sustainable('medium-tank')) return 'medium-tank';
   if (options.includes('light-tank')
     && stockpile.metal > 220 && stockpile.oil > 120
-    && stockpile.funds > 2_000 && stockpile.food > 450) return 'light-tank';
+    && stockpile.funds > 2_000 && stockpile.food > 450 && sustainable('light-tank')) return 'light-tank';
   if (options.includes('artillery')
-    && stockpile.metal > 200 && stockpile.funds > 220) return 'artillery';
+    && stockpile.metal > 200 && stockpile.funds > 220 && sustainable('artillery')) return 'artillery';
   if (options.includes('infantry')
-    && stockpile.manpower > 120 && stockpile.funds > 400 && stockpile.food > 150) return 'infantry';
+    && stockpile.manpower > 120 && stockpile.funds > 400 && stockpile.food > 150 && sustainable('infantry')) return 'infantry';
   return null;
 }
 

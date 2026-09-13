@@ -87,10 +87,11 @@ export class GameRuntime {
   snapshot(): GameRuntimeSnapshot {
     return { version: 2, state: this.session.snapshot(), seats: [...this.seatsByAccount.entries()] };
   }
-  projection(countryId: number, simulationSpeedMultiplier = 1): PlayerProjection {
+  projection(countryId: number, simulationSpeedMultiplier = 1, debugPotential = false): PlayerProjection {
     const gameHoursPerRealSecond = SIMULATION_TICK_HOURS * 1_000 / SIMULATION_INTERVAL_MS
       * simulationSpeedMultiplier;
-    return projectFor(this.session.state, this.world, this.session.graph, countryId, gameHoursPerRealSecond, this.session.movementSpeedMultiplier);
+    return projectFor(this.session.state, this.world, this.session.graph, countryId,
+      gameHoursPerRealSecond, this.session.movementSpeedMultiplier, Date.now(), debugPotential);
   }
 
   command(countryId: number, payload: CommandPayload) {

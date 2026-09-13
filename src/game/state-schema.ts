@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { GameState } from './game-state';
-import { INITIAL_GAME_EPOCH_MS, PROTOTYPE_HOURS_PER_HOUR } from './time';
+import { INITIAL_GAME_EPOCH_MS } from './time';
 import { UNIT_TYPE_BY_ID } from './units/unit-catalog';
 import { qualifyingPhaseFromBuildings } from './phase';
 
@@ -10,23 +10,27 @@ const id = z.number().int().nonnegative();
 const record = <T extends z.ZodType>(schema: T) => z.record(z.string(), schema);
 const point = z.object({ x: number, z: number });
 const stockpile = z.object({ funds: positive, manpower: positive, food: positive, stone: positive, metal: positive, oil: positive });
+const signedStockpile = z.object({ funds: number, manpower: number, food: number, stone: number, metal: number, oil: number });
 const unit = z.string().refine((value) => UNIT_TYPE_BY_ID.has(value), 'Unknown unit type');
-const building = z.enum(['barracks', 'tankPlant', 'ordnance', 'missileSite']);
+const building = z.enum(['barracks', 'tankPlant', 'ordnance', 'missileSite', 'fields', 'quarry', 'mine', 'oilPump']);
 const order = z.object({ path: z.array(id), destX: number, destZ: number, intent: z.enum(['move', 'attack']), edgeProgress: positive,
   target: z.discriminatedUnion('kind', [point.extend({ kind: z.literal('position') }),
     z.object({ kind: z.literal('province'), provinceId: id, x: number.optional(), z: number.optional() }),
     z.object({ kind: z.literal('army'), armyId: z.string(), lastKnownX: number, lastKnownZ: number })]).optional() });
 const side = z.object({ countryId: id, directionNodeId: id, role: z.enum(['attack', 'defense']), armyIds: z.array(z.string()), entryMaxHpByArmy: record(positive) });
-const queue = z.object({ id: z.string(), ownerCountryId: id, progressHours: positive, totalHours: number.positive() });
-const stateSchema = z.object({ version: z.union([z.literal(2), z.literal(3)]), seed: number, scenarioId: z.string(), mode: z.enum(['campaign', 'sandbox']),
+const queue = z.object({ id: z.string(), ownerCountryId: id, progressWork: positive.optional(), totalWork: number.positive().optional(), progressHours: positive.optional(), totalHours: number.positive().optional(), targetTier: id.optional() });
+const shortage = z.object({ severity: positive.max(100), notifiedThreshold: z.union([z.literal(0), z.literal(25), z.literal(50), z.literal(75)]) });
+const potential = z.object({ food: positive.max(1), stone: positive.max(1), metal: positive.max(1), oil: positive.max(1) });
+const resourceBuildings = z.object({ fields: id.max(3), quarry: id.max(3), mine: id.max(3), oilPump: id.max(3) });
+const stateSchema = z.object({ version: z.literal(4), seed: number, scenarioId: z.string(), mode: z.enum(['campaign', 'sandbox']),
   fogOfWar: z.boolean(), economyEnabled: z.boolean(),
   clock: z.object({ gameTimeHours: positive, startDate: z.string(), initialEpochMs: number.min(-8.64e15).max(8.64e15).optional(), generation: id.optional(), pendingHours: positive.optional() }), simulationTick: id,
-  countries: record(z.object({ id, name: z.string(), color: z.string(), controller: z.enum(['player', 'ai', 'neutral']), stockpile, income: stockpile, industryCapacity: positive, warheads: positive.default(0), phase: id.optional() })),
+  countries: record(z.object({ id, name: z.string(), color: z.string(), controller: z.enum(['player', 'ai', 'neutral']), stockpile, income: stockpile, industryCapacity: positive, upkeep: stockpile.optional(), netIncome: signedStockpile.optional(), coverage: z.object({ funds: positive.max(1), food: positive.max(1), metal: positive.max(1), oil: positive.max(1) }).optional(), reserveHours: z.object({ funds: positive.nullable(), food: positive.nullable(), metal: positive.nullable(), oil: positive.nullable() }).optional(), shortages: z.object({ funds: shortage, food: shortage, metal: shortage, oil: shortage }).optional(), warheads: positive.default(0), phase: id.optional() })),
   provinceOwners: record(id), provinceBuildings: record(z.object({ barracks: id, tankPlant: id, ordnance: id, missileSite: id.default(0) })),
   productionQueues: record(z.array(queue.extend({ unitTypeId: unit }))), constructionQueues: record(z.array(queue.extend({ buildingId: building }))), rallyPoints: record(point),
   armies: record(point.extend({ id: z.string(), ownerCountryId: id, name: z.string(), graphNodeId: id,
     edge: z.object({ from: id, to: id }).nullable().optional(),
-    units: z.array(z.object({ typeId: unit, count: id, hp: positive, experience: positive })), status: z.enum(['idle', 'moving', 'engaged', 'retreating', 'extracting', 'embarking', 'atSea', 'disembarking']), order: order.nullable(), extractingNodeId: id.nullable(),
+    units: z.array(z.object({ typeId: unit, count: id, hp: positive, experience: positive })), status: z.enum(['idle', 'moving', 'engaged', 'retreating', 'extracting', 'embarking', 'atSea', 'disembarking']), order: order.nullable(), extractingNodeId: id.nullable(), extractionAssignment: z.object({ provinceId: id, resource: z.enum(['food', 'stone', 'metal', 'oil']) }).nullable().optional(), shortageSeverity: z.object({ funds: positive.max(100), food: positive.max(100), metal: positive.max(100), oil: positive.max(100) }).optional(),
     lastGraphNodeId: id.nullable().optional(), suspendedOrder: order.nullable().optional(), battleFrontIds: z.array(z.string()).optional(),
     retreat: z.object({ destinationProvinceId: id, protectedUntilNodeId: id, protected: z.boolean() }).nullable().optional(),
     artillery: z.object({ targetArmyId: z.string().nullable(), manualTarget: z.boolean() }).optional(),
@@ -38,6 +42,8 @@ const stateSchema = z.object({ version: z.union([z.literal(2), z.literal(3)]), s
   battleFronts: record(point.extend({ id: z.string(), battleId: z.string(), anchorNodeId: id, kind: z.enum(['road', 'province']), provinceId: id.nullable(), sideA: side, sideB: side })),
   resourceNodes: record(point.extend({ id, kind: z.enum(['stone', 'metal', 'oil']), remaining: positive, initialAmount: positive, controllerCountryId: id,
     provinceId: z.number().int(), accessNodeId: z.number().int(), extractorArmyId: z.string().nullable(), status: z.enum(['idle', 'secured', 'extracting', 'exhausted']), provenance: z.enum(['generatedNatural', 'scenarioGuarantee']) })),
+  provinceEconomies: record(z.object({ resourcePotential: potential, baseProduction: stockpile, resourceBuildings,
+    productionCapacity: number.positive(), constructionCapacity: number.positive(), normalizedOpeningSites: z.array(z.enum(['food', 'stone', 'metal', 'oil'])).optional() })).default({}),
   relations: record(z.enum(['peace', 'allied', 'war'])),
   provinceDevastation: record(positive).default({}),
   outcome: z.object({ result: z.enum(['victory', 'defeat']), reason: z.string(), atGameHours: positive }).optional(),
@@ -46,28 +52,9 @@ const stateSchema = z.object({ version: z.union([z.literal(2), z.literal(3)]), s
   nextDiplomacyId: id.default(1), nextArmyId: id, nextBattleId: id, nextFrontId: id.optional(), nextOrderId: id, nextEventId: id,
 });
 
-/** Parsing strips obsolete fields and converts v2 work-hours exactly once. */
+/** V4 is a deliberate reset; older snapshots are rejected by the ruleset gate. */
 export function parseGameState(input: unknown, initialEpochMs = INITIAL_GAME_EPOCH_MS): GameState {
   const parsed = stateSchema.parse(input);
-  if (parsed.version === 2) {
-    parsed.clock.gameTimeHours /= PROTOTYPE_HOURS_PER_HOUR;
-    for (const queues of [parsed.productionQueues, parsed.constructionQueues]) {
-      for (const queue of Object.values(queues)) for (const order of queue) {
-        order.progressHours /= PROTOTYPE_HOURS_PER_HOUR;
-        order.totalHours /= PROTOTYPE_HOURS_PER_HOUR;
-      }
-    }
-    for (const country of Object.values(parsed.countries)) {
-      for (const key of Object.keys(country.income) as Array<keyof typeof country.income>) country.income[key] *= PROTOTYPE_HOURS_PER_HOUR;
-    }
-    for (const provinceId of Object.keys(parsed.provinceDevastation)) {
-      parsed.provinceDevastation[provinceId] /= PROTOTYPE_HOURS_PER_HOUR;
-    }
-    if (parsed.outcome) parsed.outcome.atGameHours /= PROTOTYPE_HOURS_PER_HOUR;
-    for (const army of Object.values(parsed.armies)) {
-      if (army.navalCrossing) army.navalCrossing.hoursRemaining /= PROTOTYPE_HOURS_PER_HOUR;
-    }
-  }
   parsed.clock.initialEpochMs ??= initialEpochMs;
   parsed.clock.generation ??= 0;
   parsed.nextFrontId ??= 1;
@@ -77,6 +64,14 @@ export function parseGameState(input: unknown, initialEpochMs = INITIAL_GAME_EPO
   parsed.nextDiplomacyId ??= 1;
   for (const country of Object.values(parsed.countries)) {
     country.warheads ??= 0;
+    country.upkeep ??= { funds: 0, manpower: 0, food: 0, stone: 0, metal: 0, oil: 0 };
+    country.netIncome ??= { ...country.income };
+    country.coverage ??= { funds: 1, food: 1, metal: 1, oil: 1 };
+    country.reserveHours ??= { funds: null, food: null, metal: null, oil: null };
+    country.shortages ??= {
+      funds: { severity: 0, notifiedThreshold: 0 }, food: { severity: 0, notifiedThreshold: 0 },
+      metal: { severity: 0, notifiedThreshold: 0 }, oil: { severity: 0, notifiedThreshold: 0 },
+    };
     // Computed from buildings already owned, not defaulted to 1 — an existing
     // save with an Ordnance Workshop or Missile Site must not be retroactively
     // locked out of what it already has.
@@ -84,10 +79,6 @@ export function parseGameState(input: unknown, initialEpochMs = INITIAL_GAME_EPO
   }
   for (const buildings of Object.values(parsed.provinceBuildings)) buildings.missileSite ??= 0;
   for (const army of Object.values(parsed.armies)) {
-    if (parsed.version === 2) {
-    army.battleFrontIds ??= []; army.lastGraphNodeId ??= null; army.suspendedOrder ??= null;
-    army.retreat ??= null; army.artillery ??= { targetArmyId: null, manualTarget: false };
-    }
     army.navalCrossing ??= null;
     army.organization ??= 100;
     army.entrenchment ??= 0;
@@ -103,5 +94,5 @@ export function parseGameState(input: unknown, initialEpochMs = INITIAL_GAME_EPO
   for (const [key, country] of Object.entries(parsed.countries)) if (String(country.id) !== key) throw new Error('Country key mismatch.');
   for (const [key, army] of Object.entries(parsed.armies)) if (army.id !== key) throw new Error('Army key mismatch.');
   for (const owner of Object.values(parsed.provinceOwners)) if (owner !== 0 && !parsed.countries[owner]) throw new Error('Unknown province owner.');
-  return { ...parsed, version: 3 };
+  return { ...parsed, version: 4 } as GameState;
 }

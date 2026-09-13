@@ -352,6 +352,17 @@ fn terrainFragment(input: TerrainVertexOutput) -> @location(0) vec4f {
     lit = mix(lit, vec3f(0.96, 0.61, 0.12), roadSignal);
     lit = mix(lit, vec3f(0.02, 0.77, 0.96), channels.r);
     lit = mix(lit, vec3f(0.18, 0.48, 0.98), channels.g * (1.0 - channels.r));
+  } else if (debugMode >= 10u && debugMode <= 13u) {
+    let potentials = resourcePotentialFor(provinceAt(input.mapUv));
+    let value = select(select(potentials.r, potentials.g, debugMode == 11u),
+      select(potentials.b, potentials.a, debugMode == 13u), debugMode >= 12u);
+    // Perceptually distinct low/mid/high heat ramp. Missing/redacted provinces
+    // stay near-black, which also makes projection leaks obvious during QA.
+    let low = vec3f(0.025, 0.045, 0.09);
+    let mid = vec3f(0.10, 0.74, 0.66);
+    let high = vec3f(1.0, 0.78, 0.12);
+    lit = select(mix(low, mid, smoothstep(0.0, 0.55, value)),
+      mix(mid, high, smoothstep(0.55, 1.0, value)), value > 0.55);
   }
 
   if (uniforms.terrainInfo.w > 0.5) {

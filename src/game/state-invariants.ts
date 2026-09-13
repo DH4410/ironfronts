@@ -68,8 +68,10 @@ export function validateWorldState(ctx: SimContext): void {
       const provinceId = Number(provinceIdText);
       if (!provinceIds.has(provinceId) || !queue.length) throw new Error('Invalid queue province.');
       for (const order of queue) {
+        const progress = order.progressWork ?? order.progressHours ?? -1;
+        const total = order.totalWork ?? order.totalHours ?? -1;
         if (!state.countries[order.ownerCountryId] || state.provinceOwners[provinceId] !== order.ownerCountryId
-          || order.progressHours < 0 || order.progressHours > order.totalHours || queueIds.has(order.id)) {
+          || progress < 0 || progress > total || total <= 0 || queueIds.has(order.id)) {
           throw new Error('Invalid production queue.');
         }
         queueIds.add(order.id);
@@ -78,6 +80,17 @@ export function validateWorldState(ctx: SimContext): void {
   }
   for (const provinceIdText of Object.keys(state.provinceBuildings)) {
     if (!provinceIds.has(Number(provinceIdText))) throw new Error('Invalid building province.');
+  }
+  for (const [provinceIdText, economy] of Object.entries(state.provinceEconomies ?? {})) {
+    if (!provinceIds.has(Number(provinceIdText)) || economy.productionCapacity !== 1 || economy.constructionCapacity !== 1) {
+      throw new Error('Invalid province economy.');
+    }
+    for (const value of Object.values(economy.resourcePotential)) {
+      if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error('Invalid resource potential.');
+    }
+    for (const tier of Object.values(economy.resourceBuildings)) {
+      if (!Number.isInteger(tier) || tier < 0 || tier > 3) throw new Error('Invalid resource building tier.');
+    }
   }
   for (const [provinceIdText, rally] of Object.entries(state.rallyPoints)) {
     const provinceId = Number(provinceIdText);

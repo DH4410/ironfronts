@@ -14,7 +14,7 @@
 import { parseGameState } from './state-schema';
 import { validateWorldState } from './state-invariants';
 import { FIXED_STEP_HOURS, PROTOTYPE_HOURS_PER_HOUR } from './time';
-import type { GameOutcome, GameState } from './game-state';
+import type { GameOutcome, GameState, PhysicalResource } from './game-state';
 import { cloneGameState, relationOf, serializeGameState, setRelation } from './game-state';
 import type { LandGraph } from './movement/graph';
 import type { ScenarioSelection } from './scenario';
@@ -35,17 +35,15 @@ import { stepWarheads } from './strike';
 import { stepVictory } from './victory';
 import { stepAi } from './ai/simple-ai';
 import { applyCommand as runCommand, type CommandResult, type GameCommand } from './commands';
-import { guaranteeStrategicBaseline } from './resource-bootstrap';
-import { visibleResourceNodes } from './player-view';
 import { wrappedDistance } from './geometry';
 
 /** Longest game-time step a single `tick` will integrate; larger dt is accumulated
  *  so a stall can't teleport armies through provinces. */
 const MAX_TICK_HOURS = FIXED_STEP_HOURS;
 /** Income is recomputed on this game-hour cadence, not every tick. */
-const INCOME_RECOMPUTE_INTERVAL = 1 / PROTOTYPE_HOURS_PER_HOUR;
+const INCOME_RECOMPUTE_INTERVAL = 1 / 60;
 /** AI re-plans on this game-hour cadence (cheap, not per tick). */
-const AI_INTERVAL = 2 / PROTOTYPE_HOURS_PER_HOUR;
+const AI_INTERVAL = 0.25;
 /** Supply reach is recomputed on this game-hour cadence — a straight-line
  *  distance scan per army, cheap but no reason to pay it every tick. */
 const SUPPLY_INTERVAL = 1 / PROTOTYPE_HOURS_PER_HOUR;
@@ -71,7 +69,7 @@ export class GameSession {
     this.graph = init.graph;
     this.world = world;
     this.diagnostics = init.diagnostics;
-    recomputeIncome(this.state, this.world);
+    recomputeIncome(this.state, this.world, this.graph);
   }
 
   static create(selection: ScenarioSelection, world: WorldData): GameSession {
@@ -121,7 +119,7 @@ export class GameSession {
     // --- economy -------------------------------------------------
     if (this.state.economyEnabled) {
       if (this.state.simulationTick % Math.round(INCOME_RECOMPUTE_INTERVAL / FIXED_STEP_HOURS) === 0) {
-        recomputeIncome(this.state, this.world);
+        recomputeIncome(this.state, this.world, this.graph);
         stepPhaseProgression(this);
       }
       applyIncome(this.state, dtHours);
@@ -180,25 +178,14 @@ export class GameSession {
     // reveal everything in the province; otherwise only deposits the player can
     // actually see (inside friendly vision) count — so the tooltip never
     // contradicts a deposit chip the player is looking at.
-    const visibleIds = fullDetail
-      ? null
-      : new Set(visibleResourceNodes(this.state, this.world, viewerCountryId).map((n) => n.id));
-
     let resources: { stone: number; metal: number; oil: number } | null = null;
     let controlled = false;
     let extracting = false;
-    {
-      const totals = { stone: 0, metal: 0, oil: 0 };
-      let any = false;
-      for (const node of Object.values(this.state.resourceNodes)) {
-        if (node.provinceId !== provinceId) continue;
-        if (visibleIds && !visibleIds.has(node.id)) continue;
-        any = true;
-        totals[node.kind] += node.remaining;
-        if (node.controllerCountryId === ownerId) controlled = true;
-        if (node.status === 'extracting') extracting = true;
-      }
-      resources = any ? totals : null;
+    const economy = this.state.provinceEconomies?.[provinceId];
+    if (economy && fullDetail) {
+      resources = { stone: economy.baseProduction.stone, metal: economy.baseProduction.metal, oil: economy.baseProduction.oil };
+      controlled = isOwn;
+      extracting = Object.values(this.state.armies).some((army) => army.extractionAssignment?.provinceId === provinceId);
     }
 
     return {
@@ -261,9 +248,9 @@ export class GameSession {
     }).ok;
   }
 
-  orderExtract(countryId: number, armyId: string) {
+  orderExtract(countryId: number, armyId: string, resource: PhysicalResource = 'food') {
     return this.applyCommand({
-      type: 'extract', countryId, armyId,
+      type: 'extract', countryId, armyId, resource,
     });
   }
 
@@ -322,11 +309,6 @@ export class GameSession {
       // The AI opponent now needs an economy too — give it the same strategic
       // baseline the player got at init (idempotent if its natural geography
       // already covers stone + metal).
-      guaranteeStrategicBaseline(
-        this.state.resourceNodes,
-        { world: this.world, graph: this.graph, provinceOwners: this.state.provinceOwners },
-        best, this.state.seed,
-      );
     }
     return best;
   }

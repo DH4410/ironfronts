@@ -156,9 +156,11 @@ export class GameplayGateway {
             throw new Error('Ticket does not match the authoritative seat.');
           }
           clearTimeout(authenticationTimeout);
-          const revision = this.options.revision();
-          const projection = this.options.runtime.projection(claims.countryId, this.options.devSimSpeed.get());
           const debugEnabled = claims.debugEntitled && this.options.debugControlsEnabled;
+          const revision = this.options.revision();
+          const projection = this.options.runtime.projection(
+            claims.countryId, this.options.devSimSpeed.get(), debugEnabled,
+          );
           connection = {
             socket, accountId: claims.accountId, countryId: claims.countryId, debugEnabled,
             projection, revision,
@@ -224,7 +226,9 @@ export class GameplayGateway {
           return;
         }
         if (message.type === 'resync') {
-          const projection = this.options.runtime.projection(connection.countryId, this.options.devSimSpeed.get());
+          const projection = this.options.runtime.projection(
+            connection.countryId, this.options.devSimSpeed.get(), connection.debugEnabled,
+          );
           connection.projection = projection;
           connection.revision = this.options.revision();
           this.sendSocket(socket, {

@@ -8,6 +8,7 @@ import { COMBAT_FRONTAGE, MIN_COMBAT_EFFECTIVENESS, OUT_OF_SUPPLY_COMBAT_MULTIPL
 import { organizationEffectiveness } from './organization';
 import { entrenchmentDamageMultiplier } from './entrenchment';
 import { stanceModifiers } from './stance';
+import { unitStatMultiplier } from '../economy/shortages';
 
 function supplyFactor(inSupply: boolean | undefined): number {
   return inSupply === false ? OUT_OF_SUPPLY_COMBAT_MULTIPLIER : 1;
@@ -73,8 +74,10 @@ export function calculateDamage(
     for (const group of army.units) {
       const pool = pooledByType.get(group.typeId)!;
       const health = pool.maxHp > 0 ? Math.max(MIN_COMBAT_EFFECTIVENESS, Math.min(1, pool.hp / pool.maxHp)) : 0;
+      const type = unitType(group.typeId);
       const orgFactor = organizationEffectiveness(army.organization ?? 100)
-        * stanceModifiers(army.stance).attackOutput * supplyFactor(army.inSupply);
+        * stanceModifiers(army.stance).attackOutput * supplyFactor(army.inSupply)
+        * unitStatMultiplier(type, 'combatOutput', army.shortageSeverity);
       const profile = profileFor(role, group);
       const score = health * orgFactor * (
         profile.soft * ratio.soft + profile.light * ratio.light + profile.heavy * ratio.heavy

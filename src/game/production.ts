@@ -57,20 +57,22 @@ export function queueUnit(
   }
   const country = session.state.countries[countryId];
   if (!country) return { ok: false, reason: 'Unknown country.' };
-  for (const [key, amount] of Object.entries(type.cost)) {
+  for (const [key, amount] of Object.entries(type.buildCost)) {
     if ((country.stockpile as Record<string, number>)[key] < (amount ?? 0)) {
       return { ok: false, reason: `Not enough ${key}.` };
     }
   }
-  for (const [key, amount] of Object.entries(type.cost)) {
+  for (const [key, amount] of Object.entries(type.buildCost)) {
     (country.stockpile as Record<string, number>)[key] -= amount ?? 0;
   }
   const order: ProductionOrder = {
     id: `ord-${session.state.nextOrderId}`,
     unitTypeId,
     ownerCountryId: countryId,
+    progressWork: 0,
+    totalWork: type.buildWork,
     progressHours: 0,
-    totalHours: type.buildTimeHours ,
+    totalHours: type.buildWork,
   };
   session.state.nextOrderId += 1;
   (session.state.productionQueues[provinceId] ??= []).push(order);
@@ -95,14 +97,17 @@ export function stepProduction(session: SimContext, dtHours: number): UnitComple
       queue.shift();
     }
     if (queue.length === 0) continue;
-    let remaining = dtHours;
+    let remaining = dtHours * (session.state.provinceEconomies?.[provinceId]?.productionCapacity ?? 1);
     while (queue.length > 0 && remaining > 1e-12) {
     const active = queue[0];
     if (active.ownerCountryId !== session.state.provinceOwners[provinceId]) { queue.shift(); continue; }
-    const used = Math.min(remaining, Math.max(0, active.totalHours - active.progressHours));
-    active.progressHours += used;
+    const total = active.totalWork ?? active.totalHours ?? 1;
+    const progress = active.progressWork ?? active.progressHours ?? 0;
+    const used = Math.min(remaining, Math.max(0, total - progress));
+    active.progressWork = progress + used;
+    active.progressHours = active.progressWork;
     remaining -= used;
-    if (active.progressHours + 1e-12 < active.totalHours) break;
+    if (active.progressWork + 1e-12 < total) break;
 
     queue.shift();
     const armyId = spawnUnit(session, provinceId, active.unitTypeId, active.ownerCountryId);
@@ -140,7 +145,7 @@ function spawnUnit(
   // Auto-stack onto a friendly idle army already at that node.
   const existing = Object.values(session.state.armies)
     .filter((a) => a.ownerCountryId === ownerCountryId
-      && armyAtNode(session, a, node) && a.graphNodeId === node && !a.order && a.extractingNodeId === null
+      && armyAtNode(session, a, node) && a.graphNodeId === node && !a.order && a.extractionAssignment == null
       && a.status !== 'engaged' && a.status !== 'retreating')
     .sort((a, b) => {
       const an = Number(a.id.replace(/^army-/, ''));
@@ -154,6 +159,7 @@ function spawnUnit(
       id: 'tmp', ownerCountryId, name: 'tmp',
       x: nx, z: nz, graphNodeId: node, units: [group],
       status: 'idle', order: null, extractingNodeId: null,
+      extractionAssignment: null,
     };
     mergeStacks(existing, fresh);
     return existing.id;
@@ -171,6 +177,7 @@ function spawnUnit(
     status: 'idle',
     order: null,
     extractingNodeId: null,
+    extractionAssignment: null,
   };
   return id;
 }

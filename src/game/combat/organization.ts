@@ -13,6 +13,7 @@ import {
   ORGANIZATION_REGEN_PER_HOUR, MIN_ORGANIZATION_EFFECTIVENESS, OUT_OF_SUPPLY_ORGANIZATION_REGEN_MULTIPLIER,
 } from './constants';
 import { stanceModifiers } from './stance';
+import { stackOrganizationCap } from '../economy/shortages';
 
 export function organizationEffectiveness(organization: number): number {
   const fraction = Math.max(0, Math.min(1, organization / ORGANIZATION_MAX));
@@ -27,7 +28,7 @@ export function regenOrganization(ctx: SimContext, dtHours: number): void {
     if (army.status === 'engaged') continue;
     const supplyRate = army.inSupply === false ? OUT_OF_SUPPLY_ORGANIZATION_REGEN_MULTIPLIER : 1;
     army.organization = Math.min(
-      ORGANIZATION_MAX, (army.organization ?? ORGANIZATION_MAX) + ORGANIZATION_REGEN_PER_HOUR * supplyRate * dtHours,
+      stackOrganizationCap(army), (army.organization ?? ORGANIZATION_MAX) + ORGANIZATION_REGEN_PER_HOUR * supplyRate * dtHours,
     );
   }
 }

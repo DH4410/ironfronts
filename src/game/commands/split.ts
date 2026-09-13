@@ -88,6 +88,7 @@ export function issueSplit(ctx: SimContext, command: SplitArmyCommand): CommandR
       node.status = node.remaining > 0 ? 'idle' : 'exhausted';
     }
     parent.extractingNodeId = null;
+    parent.extractionAssignment = null;
     parent.status = 'idle';
   }
   ctx.state.nextArmyId += 1;

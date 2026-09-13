@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-export const PROTOCOL_VERSION = 3 as const;
+export const PROTOCOL_VERSION = 4 as const;
 export const GAME_ID = 'world-at-war-2' as const;
-export const GAME_VERSION = 'world-at-war@3' as const;
+export const GAME_VERSION = 'world-at-war@4' as const;
 
 const confirmedWars = z.array(z.number().int().positive()).optional();
 const attackTargetSchema = z.discriminatedUnion('kind', [
@@ -27,9 +27,9 @@ export const commandPayloadSchema = z.discriminatedUnion('type', [
     type: z.literal('setStance'), armyId: z.string(),
     stance: z.enum(['attack', 'attack-defend', 'defend', 'defend-retreat', 'retreat']),
   }),
-  z.object({ type: z.literal('extract'), armyId: z.string() }),
+  z.object({ type: z.literal('extract'), armyId: z.string(), resource: z.enum(['food', 'stone', 'metal', 'oil']) }),
   z.object({ type: z.literal('produce'), provinceId: z.number().int().nonnegative(), unitTypeId: z.string() }),
-  z.object({ type: z.literal('build'), provinceId: z.number().int().nonnegative(), buildingId: z.enum(['barracks', 'tankPlant', 'ordnance', 'missileSite']) }),
+  z.object({ type: z.literal('build'), provinceId: z.number().int().nonnegative(), buildingId: z.enum(['barracks', 'tankPlant', 'ordnance', 'missileSite', 'fields', 'quarry', 'mine', 'oilPump']) }),
   z.object({ type: z.literal('setRally'), provinceId: z.number().int().nonnegative(), target: z.object({ x: z.number().finite(), z: z.number().finite() }).nullable() }),
   z.object({
     type: z.literal('sendDiplomaticMessage'),
@@ -158,7 +158,11 @@ export interface ProjectedArmy {
     route?: ReadonlyArray<{ x: number; z: number }>;
     sampledAtEpochMs?: number; generation?: number;
   };
-  actions?: { canExtract: boolean; extractableNodeId: number | null; extractReason?: string };
+  actions?: { canExtract: boolean; extractionProvinceId: number | null; extractableResources: Array<'food' | 'stone' | 'metal' | 'oil'>; extractReason?: string };
+  shortage?: {
+    severity: Record<'funds' | 'food' | 'metal' | 'oil', number>;
+    modifiers: Record<'combatOutput' | 'movementSpeed' | 'visionRange' | 'extractionOutput' | 'organizationCap', number>;
+  };
   suspendedOrder?: { x: number; z: number; intent: 'move' | 'attack' } | null;
   battleFronts?: ReadonlyArray<{
     id: string;
@@ -200,7 +204,7 @@ export interface PlayerProjection {
   provinceBuildings: Record<number, { barracks: number; tankPlant: number; ordnance: number; missileSite: number }>;
   provinceActions: Record<number, {
     production: ReadonlyArray<{ unitTypeId: string; available: boolean; affordable: boolean; reason?: string }>;
-    construction: ReadonlyArray<{ buildingId: 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite'; available: boolean; affordable: boolean; reason?: string }>;
+    construction: ReadonlyArray<{ buildingId: 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite' | 'fields' | 'quarry' | 'mine' | 'oilPump'; available: boolean; affordable: boolean; targetTier?: number; reason?: string }>;
     canSetRally: boolean;
     rallyReason?: string;
     /** Held by someone other than its original owner — produces less (see
@@ -214,7 +218,9 @@ export interface PlayerProjection {
   // per projection, not persisted; absent until the graph resolves one.
   rallyPoints: Record<number, { x: number; z: number; route?: Array<{ x: number; z: number }> }>;
   armies: Record<string, ProjectedArmy>;
-  resourceNodes: Record<number, unknown>;
+  provinceEconomies?: Record<number, unknown>;
+  /** Deprecated and empty in protocol v4. */
+  resourceNodes?: Record<number, unknown>;
   ownCountry: null | Record<string, unknown>;
   relations: Record<string, 'peace' | 'allied' | 'war'>;
   diplomacy?: {
@@ -255,7 +261,7 @@ export interface WorldDescriptor {
   assetBaseUrl: string;
 }
 
-export type ProjectionCollection = 'countries' | 'provinceOwners' | 'provinceBuildings' | 'provinceActions' | 'productionQueues' | 'constructionQueues' | 'rallyPoints' | 'armies' | 'resourceNodes' | 'relations';
+export type ProjectionCollection = 'countries' | 'provinceOwners' | 'provinceBuildings' | 'provinceEconomies' | 'provinceActions' | 'productionQueues' | 'constructionQueues' | 'rallyPoints' | 'armies' | 'relations';
 export type ProjectionDelta = {
   changed: Partial<Omit<PlayerProjection, ProjectionCollection>>;
   upserts: Partial<{ [K in ProjectionCollection]: Record<string, unknown> }>;
@@ -264,7 +270,7 @@ export type ProjectionDelta = {
 };
 
 export type ServerMessage =
-  | { type: 'hello'; gameId: string; gameVersion: string; protocolVersion: 3; capabilities: string[]; world: WorldDescriptor; countryId: number; debugEnabled: boolean }
+  | { type: 'hello'; gameId: string; gameVersion: string; protocolVersion: 4; capabilities: string[]; world: WorldDescriptor; countryId: number; debugEnabled: boolean }
   | { type: 'baseline'; revision: number; state: PlayerProjection; catalogs: PresentationCatalogs; clock: GameClockSync }
   | { type: 'delta'; fromRevision: number; revision: number; delta: ProjectionDelta; events: FilteredEvent[] }
   | { type: 'clockSync'; clock: GameClockSync }
@@ -292,7 +298,7 @@ type LocatedEvent = EventBase & { x: number; z: number };
 type CombatCountries = { attacker: number; defender: number };
 export type FilteredEvent =
   | LocatedEvent & { kind: 'unitCompleted'; ownerCountryId: number; provinceId: number; unitTypeId: string; armyId: string }
-  | LocatedEvent & { kind: 'buildingCompleted'; ownerCountryId: number; provinceId: number; buildingId: 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite' }
+  | LocatedEvent & { kind: 'buildingCompleted'; ownerCountryId: number; provinceId: number; buildingId: 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite' | 'fields' | 'quarry' | 'mine' | 'oilPump' }
   | LocatedEvent & { kind: 'capture'; provinceId: number; fromCountryId: number; toCountryId: number }
   | LocatedEvent & CombatCountries & { kind: 'engaged' | 'combatPulse' | 'retreat' | 'battleEnded'; battleId: string; frontId: string }
   | LocatedEvent & CombatCountries & { kind: 'reinforced'; battleId: string; frontId: string; armyId: string }
@@ -307,7 +313,7 @@ export interface GameTicketClaims {
   /** Account-derived eligibility. The game deployment applies its own gate. */
   debugEntitled: boolean;
   audience: 'game-server';
-  protocolVersion: 3;
+  protocolVersion: 4;
   expiresAt: number;
   nonce: string;
 }
@@ -317,7 +323,7 @@ export interface GameLobby {
   gameId: string;
   name: string;
   gameVersion: string;
-  protocolVersion: 3;
+  protocolVersion: 4;
   assignedCountryId: number | null;
   countries: LobbyCountry[];
 }
@@ -372,7 +378,7 @@ export interface SessionResponse {
   assignment?: { gameId: string; countryId: number } | null;
   profile?: CommanderProfile;
 }
-export interface ConnectResponse { ticket: string; websocketUrl: string; protocolVersion: 3 }
+export interface ConnectResponse { ticket: string; websocketUrl: string; protocolVersion: 4 }
 
 export const credentialsSchema = z.object({
   username: z.string().trim().min(3).max(32),

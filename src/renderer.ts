@@ -137,6 +137,8 @@ export class WorldRenderer {
   private heightTexture!: GPUTexture;
   private surfaceTexture!: GPUTexture;
   private terrainAlbedoTexture!: GPUTexture;
+  private provinceResourcePotentialTexture!: GPUTexture;
+  private provinceResourcePotentialWidth = 1;
   private provinceTexture!: GPUTexture;
   private coastTexture!: GPUTexture;
   private navigationTexture!: GPUTexture;
@@ -486,6 +488,7 @@ export class WorldRenderer {
     }
     this.waterwayMask = buildWaterwayMask(new Uint8Array(navigationBuffer), this.provinceData.length);
     this.provinceOwners = new Uint32Array(provinceOwnerData);
+    this.provinceResourcePotentialWidth = Math.max(1, this.provinceOwners.length + 1);
     this.countryColors = buildCountryColorBuffer(this.manifest.politics.countries);
     this.politicalCache = new PoliticalCache(
       this.manifest,
@@ -526,6 +529,11 @@ export class WorldRenderer {
     this.provincePoliticalColorTexture = uploadTexture(this.device,
       'province political colors', this.politicalCache.width, this.politicalCache.height,
       'rgba8unorm', this.politicalCache.colors, this.politicalCache.width * 4,
+    );
+    this.provinceResourcePotentialTexture = uploadTexture(this.device,
+      'province resource potential', this.provinceResourcePotentialWidth, 1,
+      'rgba8unorm', new Uint8Array(this.provinceResourcePotentialWidth * 4),
+      this.provinceResourcePotentialWidth * 4,
     );
     const diplomacyColors = buildDiplomacyColorData(
       this.manifest.politics.countries,
@@ -583,6 +591,7 @@ export class WorldRenderer {
         }) },
         { binding: 16, resource: this.armyUnitSilhouettesTexture.createView() },
         { binding: 17, resource: this.armyRosterPlateTexture.createView() },
+        { binding: 18, resource: this.provinceResourcePotentialTexture.createView() },
       ],
     });
 
@@ -709,6 +718,27 @@ export class WorldRenderer {
 
   setDebugView(mode: number): void {
     this.debugView = mode;
+  }
+
+  /** Uploads only the server-projected records. Normal players therefore see
+   * owned values; debug-entitled sessions receive the complete heatmap. */
+  setProvinceResourcePotentials(records: Record<number, unknown> | undefined): void {
+    if (!this.deviceReady || !this.provinceResourcePotentialTexture) return;
+    const pixels = new Uint8Array(this.provinceResourcePotentialWidth * 4);
+    for (const [rawId, raw] of Object.entries(records ?? {})) {
+      const id = Number(rawId) + 1;
+      if (!Number.isInteger(id) || id <= 0 || id >= this.provinceResourcePotentialWidth) continue;
+      const potential = (raw as { resourcePotential?: Record<string, number> })?.resourcePotential;
+      if (!potential) continue;
+      for (const [channel, resource] of ['food', 'stone', 'metal', 'oil'].entries()) {
+        pixels[id * 4 + channel] = Math.round(Math.max(0, Math.min(1, potential[resource] ?? 0)) * 255);
+      }
+    }
+    this.device.queue.writeTexture(
+      { texture: this.provinceResourcePotentialTexture }, pixels,
+      { bytesPerRow: this.provinceResourcePotentialWidth * 4 },
+      { width: this.provinceResourcePotentialWidth, height: 1 },
+    );
   }
 
   setTimeOfDay(hour: number): void {

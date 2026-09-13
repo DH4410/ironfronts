@@ -1,5 +1,6 @@
 import type { BuildingId } from '../units/unit-types';
 import type { ArmyStance } from '../units/army';
+import type { PhysicalResource } from '../game-state';
 
 export interface MoveArmyCommand {
   readonly type: 'moveArmy';
@@ -57,6 +58,7 @@ export interface ExtractCommand {
   readonly type: 'extract';
   readonly countryId: number;
   readonly armyId: string;
+  readonly resource: PhysicalResource;
 }
 
 export interface ProduceCommand {

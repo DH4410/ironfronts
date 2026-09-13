@@ -693,6 +693,35 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         const stack = el('span', 'ifg-res__stack');
         stack.append(el('b', 'ifg-res__value', ''), el('i', 'ifg-res__rate', ''));
         chip.append(stack);
+        bindTooltip(chip, () => {
+          const current = state.resources.find((resource) => resource.id === line.id);
+          if (!current || current.value === null) return null;
+          const percent = Math.round((current.coverage ?? 1) * 100);
+          const pressure = Number((current.shortageSeverity ?? 0).toFixed(1));
+          return {
+            title: current.label,
+            description: RESOURCE_DESCRIPTION[current.id],
+            children: [
+              { label: 'Production', value: `${current.production ?? 0} /h` },
+              { label: 'Upkeep demand', value: `${current.upkeep ?? 0} /h`, content: {
+                title: `${current.label} demand`,
+                description: 'Completed units consume upkeep continuously. Reserves cover deficits before shortage pressure rises.',
+              } },
+              { label: 'Net', value: `${(current.delta ?? 0) >= 0 ? '+' : ''}${current.delta ?? 0} /h` },
+              { label: 'Coverage', value: `${percent}%` },
+              { label: 'Reserve horizon', value: current.reserveHours == null ? 'Stable' : `${current.reserveHours.toFixed(1)} h` },
+              { label: 'Pressure', value: `${pressure}%`, content: {
+                title: `${current.label} shortage pressure`,
+                description: pressure > 0 ? 'Unit penalties grow from catalog-defined curves.' : 'No active shortage penalty.',
+                children: [
+                  { label: 'Trend', value: percent < 100 ? 'Rising' : pressure > 0 ? 'Recovering' : 'Stable' },
+                  { label: 'Zero-supply collapse', value: '24 h' },
+                  { label: 'Full recovery', value: '12 h' },
+                ],
+              } },
+            ],
+          };
+        });
         return chip;
       }));
       resourceSlots = slots;
@@ -719,7 +748,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         rateEl.classList.toggle('is-negative', rounded < 0);
       }
       const description = RESOURCE_DESCRIPTION[line.id];
-      chip.title = pending
+      chip.dataset.summary = pending
         ? `${line.label} — economy not implemented yet`
         : `${line.label}${line.demo ? ' (demo)' : ''}${
           rate === null || rate === undefined ? '' : ` · ${Number(rate.toFixed(1))} per game hour`}${
@@ -786,15 +815,24 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         ? (province.occupied ? 'Your command (occupied)' : 'Your command')
         : province.isOwn === false ? province.owner : '—';
       pvFieldValue.get('Terrain')!.textContent = province.terrain || '—';
-      pvFieldValue.get('Deposits')!.textContent = depositKinds.length
+      const physical = province.resourceEconomy;
+      pvFieldValue.get('Deposits')!.textContent = physical
+        ? (['food', 'stone', 'metal', 'oil'] as const).map((key) => {
+          const tier = physical.productionBreakdown?.[key];
+          const tierText = tier ? ` T${tier.currentTier}/${tier.maximumTier}` : '';
+          return `${key[0].toUpperCase()}${key.slice(1)} ${Math.round(physical.potential[key] * 100)}%${tierText}`;
+        }).join(' · ')
+        : depositKinds.length
         ? depositKinds.map((k) => k[0].toUpperCase() + k.slice(1)).join(' · ')
         : province.isOwn === false ? 'Unknown' : 'None';
       // Plain-language: either an engineer is mining, or the action the player
       // needs to take is to send one. "Controlled / Uncontrolled" read as jargon.
-      pvFieldValue.get('Extraction')!.textContent = !depositKinds.length ? '—'
-        : province.deposits?.extracting ? 'Engineer working it'
-        : province.isOwn === false ? '—'
-        : 'Idle — move an engineer here';
+      pvFieldValue.get('Extraction')!.textContent = physical?.productionBreakdown
+        ? (['food', 'stone', 'metal', 'oil'] as const).map((key) => {
+          const value = physical.productionBreakdown![key];
+          return `${key[0].toUpperCase()}${key.slice(1)} ${value.total.toFixed(1)}/h (${value.base.toFixed(1)} base + ${value.passive.toFixed(1)} infra + ${value.engineer.toFixed(1)} eng)`;
+        }).join(' · ')
+        : province.isOwn === false ? 'Unknown' : '—';
 
       // Facilities row — own provinces only, shown when at least one stands.
       const b = province.buildings;
@@ -820,6 +858,9 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         province.awaitingRallyTarget ? 'arm' : '',
         province.commandPending ? 'pending' : '',
         province.canSetRally ? 'rally-ok' : 'rally-blocked',
+        physical?.productionBreakdown
+          ? Object.values(physical.productionBreakdown).map((value) => `${value.total}:${value.currentTier}:${value.maximumTier}`).join(',')
+          : '-',
       ].join('|');
       if (nextPvResourceKey !== pvResourceKey) {
         pvResourceKey = nextPvResourceKey;

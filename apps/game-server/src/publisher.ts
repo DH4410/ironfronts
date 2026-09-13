@@ -23,13 +23,17 @@ export class ProjectionPublisher {
       this.eventBacklog.set(country.id, backlog.slice(-512));
     }
     const connections = [...this.connections()];
-    const projections = new Map<number, PlayerProjection>();
+    const projections = new Map<string, PlayerProjection>();
     const revision = this.revision + 1;
     let delivered = false;
     const eventDelivery = new Map<number, { attempted: number; succeeded: number }>();
     for (const connection of connections) {
-      let next = projections.get(connection.countryId);
-      if (!next) { next = this.runtime.projection(connection.countryId, this.speed()); projections.set(connection.countryId, next); }
+      const projectionKey = `${connection.countryId}:${connection.debugEnabled ? 'debug' : 'player'}`;
+      let next = projections.get(projectionKey);
+      if (!next) {
+        next = this.runtime.projection(connection.countryId, this.speed(), connection.debugEnabled);
+        projections.set(projectionKey, next);
+      }
       const delta = diffProjection(connection.projection, next);
       const events = this.eventBacklog.get(connection.countryId) ?? [];
       if (!delta && !events.length) continue;

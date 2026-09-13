@@ -13,7 +13,7 @@
 import { parseGameState } from './state-schema';
 import type { ArmyStack } from './units/army';
 
-export const GAME_STATE_VERSION = 3;
+export const GAME_STATE_VERSION = 4;
 
 export type ResourceKey = 'funds' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil';
 
@@ -22,6 +22,30 @@ export const RESOURCE_KEYS: readonly ResourceKey[] = [
 ];
 
 export type Stockpile = Record<ResourceKey, number>;
+export type PhysicalResource = 'food' | 'stone' | 'metal' | 'oil';
+export type UpkeepResource = 'funds' | 'food' | 'metal' | 'oil';
+export type ResourcePotential = Record<PhysicalResource, number>;
+export type ResourceBuildingId = 'fields' | 'quarry' | 'mine' | 'oilPump';
+export type ResourceBuildingTiers = Record<ResourceBuildingId, number>;
+
+export interface ResourceShortageState {
+  severity: number;
+  /** Highest alert threshold currently armed/issued. */
+  notifiedThreshold: 0 | 25 | 50 | 75;
+}
+
+export type ShortageLedger = Record<UpkeepResource, ResourceShortageState>;
+
+export interface ProvinceEconomy {
+  resourcePotential: ResourcePotential;
+  /** Permanent scenario-start baseline; it transfers with the province. */
+  baseProduction: Stockpile;
+  resourceBuildings: ResourceBuildingTiers;
+  productionCapacity: number;
+  constructionCapacity: number;
+  /** Playable-country fallback sites that may produce below the normal cutoff. */
+  normalizedOpeningSites?: PhysicalResource[];
+}
 
 /**
  * Who drives a country. The player/AI/neutral split is authoritative here so
@@ -38,6 +62,11 @@ export interface CountryState {
   stockpile: Stockpile;
   /** Passive per-game-hour income, recomputed by the economy system. */
   income: Stockpile;
+  upkeep?: Stockpile;
+  netIncome?: Stockpile;
+  coverage?: Record<UpkeepResource, number>;
+  reserveHours?: Record<UpkeepResource, number | null>;
+  shortages?: ShortageLedger;
   /** Abstract build-throughput stat, not a stockpile. */
   industryCapacity: number;
   /**
@@ -81,10 +110,16 @@ export interface ProvinceBuildings {
  *  the country that paid, and is voided if that country loses the province. */
 export interface ConstructionOrder {
   readonly id: string;
-  readonly buildingId: keyof ProvinceBuildings;
+  readonly buildingId: keyof ProvinceBuildings | ResourceBuildingId;
   readonly ownerCountryId: number;
-  progressHours: number;
-  readonly totalHours: number;
+  progressWork?: number;
+  readonly totalWork?: number;
+  /** Resource upgrades carry their intended level so future tiers may queue. */
+  readonly targetTier?: number;
+  /** @deprecated v3 fixture compatibility. */
+  progressHours?: number;
+  /** @deprecated v3 fixture compatibility. */
+  readonly totalHours?: number;
 }
 
 export interface ProductionOrder {
@@ -97,9 +132,13 @@ export interface ProductionOrder {
    */
   readonly ownerCountryId: number;
   /** Game-hours of work already applied. */
-  progressHours: number;
+  progressWork?: number;
   /** Total game-hours required (from the unit type, at this building level). */
-  readonly totalHours: number;
+  readonly totalWork?: number;
+  /** @deprecated v3 fixture compatibility. */
+  progressHours?: number;
+  /** @deprecated v3 fixture compatibility. */
+  readonly totalHours?: number;
 }
 
 export type ResourceNodeStatus = 'idle' | 'secured' | 'extracting' | 'exhausted';
@@ -217,6 +256,9 @@ export interface GameState {
   armies: Record<string, ArmyStack>;
   battles: Record<string, BattleState>;
   battleFronts: Record<string, BattleFrontState>;
+  /** Authoritative v4 province resource/development state. */
+  provinceEconomies?: Record<number, ProvinceEconomy>;
+  /** @deprecated v3 compatibility only; v4 runtime leaves this empty. */
   resourceNodes: Record<number, ResourceNodeState>;
 
   /** Undirected-pair relation key "a:b" with a < b (absent = peace). */

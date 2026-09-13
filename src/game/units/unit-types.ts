@@ -24,7 +24,9 @@ export interface DamageProfile {
 }
 
 /** Production buildings. */
-export type BuildingId = 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite';
+export type MilitaryBuildingId = 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite';
+export type ResourceBuildingId = 'fields' | 'quarry' | 'mine' | 'oilPump';
+export type BuildingId = MilitaryBuildingId | ResourceBuildingId;
 
 export interface ResourceCost {
   readonly funds?: number;
@@ -33,6 +35,23 @@ export interface ResourceCost {
   readonly oil?: number;
   readonly food?: number;
   readonly stone?: number;
+}
+
+export interface UnitUpkeep {
+  readonly fundsPerHour?: number;
+  readonly foodPerHour?: number;
+  readonly metalPerHour?: number;
+  readonly oilPerHour?: number;
+}
+
+export type UnitStat = 'combatOutput' | 'movementSpeed' | 'visionRange' | 'extractionOutput' | 'organizationCap';
+export type ShortageCurve = 'linear' | 'soft' | 'late';
+export interface ShortageEffect {
+  readonly resource: 'funds' | 'food' | 'metal' | 'oil';
+  readonly stat: UnitStat;
+  /** Fraction removed at severity 100 (0..1). */
+  readonly maxPenalty: number;
+  readonly curve?: ShortageCurve;
 }
 
 export interface UnitType {
@@ -54,13 +73,18 @@ export interface UnitType {
   /** Inner vision radius (composition reveal) in world units. */
   readonly visionInner: number;
   /** Resource-node extraction contribution per unit per game-hour. 0 = cannot extract. */
+  /** @deprecated Engineer production is governed by resource-production.ts. */
   readonly extractionRate: number;
   /** Engagement radius for ranged support units; melee units use 0 (artillery). */
   readonly engagementRange: number;
+  readonly buildCost: ResourceCost;
+  readonly buildWork: number;
+  readonly upkeep: UnitUpkeep;
+  readonly shortageEffects: readonly ShortageEffect[];
+  /** Compatibility aliases for presentation code during the v4 transition. */
   readonly cost: ResourceCost;
-  /** Build time in authoritative game-hours at a level-1 building. */
   readonly buildTimeHours: number;
-  readonly requiredBuilding: BuildingId;
+  readonly requiredBuilding: MilitaryBuildingId;
   /** Relative signature weight for "strongest unit on the stack" selection. */
   readonly stackPriority: number;
 }

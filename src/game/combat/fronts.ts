@@ -80,6 +80,7 @@ function joinArmy(army: ArmyStack, frontId: string): void {
     army.suspendedOrder = army.order;
     army.order = null;
     army.extractingNodeId = null;
+    army.extractionAssignment = null;
     army.status = 'engaged';
   }
 }

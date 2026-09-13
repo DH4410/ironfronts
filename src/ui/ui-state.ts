@@ -33,6 +33,11 @@ export interface ResourceLine {
   readonly value: number | null;
   /** Per-tick change, when known. */
   readonly delta?: number | null;
+  readonly production?: number;
+  readonly upkeep?: number;
+  readonly coverage?: number;
+  readonly reserveHours?: number | null;
+  readonly shortageSeverity?: number;
   /** Clearly-labelled demo value (dev/preview only), never a real save. */
   readonly demo?: boolean;
 }
@@ -90,6 +95,15 @@ export interface SelectedProvince {
    * detail must not leak.
    */
   readonly resources: ProvinceResourceTotals | null;
+  readonly resourceEconomy?: {
+    readonly potential: Record<'food' | 'stone' | 'metal' | 'oil', number>;
+    readonly baseProduction: Record<'funds' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil', number>;
+    readonly buildings: Record<'fields' | 'quarry' | 'mine' | 'oilPump', number>;
+    readonly productionBreakdown?: Record<'food' | 'stone' | 'metal' | 'oil', {
+      readonly base: number; readonly passive: number; readonly engineer: number; readonly total: number;
+      readonly assignedEngineers: number; readonly effectiveEngineers: number; readonly currentTier: number; readonly maximumTier: number;
+    }>;
+  } | null;
   /** True when the player commands this province — unlocks full detail. */
   readonly isOwn?: boolean;
   /** Held by this player but not its original owner — produces less. */
@@ -268,6 +282,7 @@ export interface ArmyStackView {
   readonly own?: boolean;
   /** Which order buttons are currently valid. */
   readonly canExtract?: boolean;
+  readonly extractableResources?: readonly ('food' | 'stone' | 'metal' | 'oil')[];
   /** UI is waiting for a map click to set the move destination. */
   readonly awaitingMoveTarget?: boolean;
   readonly targetingMode?: 'move' | 'attack' | 'retreat' | 'split' | null;
@@ -276,6 +291,10 @@ export interface ArmyStackView {
   readonly canRetreat?: boolean;
   readonly canSplit?: boolean;
   readonly canStop?: boolean;
+  readonly shortage?: {
+    severity: Record<'funds' | 'food' | 'metal' | 'oil', number>;
+    modifiers: Record<'combatOutput' | 'movementSpeed' | 'visionRange' | 'extractionOutput' | 'organizationCap', number>;
+  };
   readonly legalRetreatExits?: ReadonlyArray<{
     firstNodeId: number; destinationProvinceId: number; x: number; z: number;
     readonly bearing?: string;

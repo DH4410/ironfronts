@@ -37,7 +37,7 @@
   position: fixed;
   inset: 0;
   z-index: 30;
-  pointer-events: none;
+  pointer-events: auto;
   font-family: var(--ifg-sans);
   color: var(--ifg-text);
   font-size: 14px;
@@ -1764,6 +1764,13 @@
   color: #f1e2be;
   text-align: center;
 }
+.ifg-tip__branches { display: grid; gap: 2px; margin-top: 7px; padding-top: 5px; border-top: 1px solid rgba(241, 226, 190, 0.14); }
+.ifg-tip__branch { display: grid; grid-template-columns: minmax(72px, 1fr) auto auto; gap: 8px; align-items: center; width: 100%; padding: 3px 4px; border: 0; border-radius: 2px; background: transparent; color: #e6ddc4; text-align: left; font: inherit; }
+.ifg-tip__branch.has-child { cursor: pointer; }
+.ifg-tip__branch.has-child:hover, .ifg-tip__branch.has-child:focus-visible { outline: none; background: rgba(241, 226, 190, 0.10); }
+.ifg-tip__branch i { color: #9fac9f; font-size: 10px; font-style: normal; }
+.ifg-tip__branch b { font-size: 11px; font-weight: 700; }
+.ifg-tip__branch em { color: #d8cba9; font-size: 14px; font-style: normal; }
 
 /* ================= illustrated surface grammar =================
  * These skins replace generic square fills while preserving semantic layout.

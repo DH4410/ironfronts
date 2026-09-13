@@ -7,7 +7,9 @@
  */
 
 import type { UnitType } from './unit-types';
+import type { PhysicalResource, UpkeepResource } from '../game-state';
 import { unitType } from './unit-catalog';
+import { unitStatMultiplier } from '../economy/shortages';
 
 /**
  * Combat posture — see combat/stance.ts for what each one actually does.
@@ -70,6 +72,10 @@ export interface ArmyStack {
   order: MoveOrder | null;
   /** Resource node id this stack is extracting, or null. */
   extractingNodeId: number | null;
+  /** V4 renewable production assignment. */
+  extractionAssignment?: { provinceId: number; resource: PhysicalResource } | null;
+  /** Country pressure snapshot used by hot movement/combat/vision paths. */
+  shortageSeverity?: Record<UpkeepResource, number>;
   /** Node occupied before graphNodeId; defines the back edge for retreat. */
   lastGraphNodeId?: number | null;
   /** Order paused by close combat and resumed when every joined front clears. */
@@ -137,6 +143,8 @@ export function ensureArmyRuntimeState(stack: ArmyStack): void {
   stack.entrenchment ??= 0;
   stack.stance ??= 'attack-defend';
   stack.inSupply ??= true;
+  stack.extractionAssignment ??= null;
+  stack.shortageSeverity ??= { funds: 0, food: 0, metal: 0, oil: 0 };
 }
 
 export function stackUnitCount(stack: ArmyStack): number {
@@ -192,7 +200,8 @@ export function stackBaseSpeed(stack: ArmyStack): number {
   let slowest = Infinity;
   for (const group of stack.units) {
     if (group.count <= 0) continue;
-    slowest = Math.min(slowest, unitType(group.typeId).speed);
+    const type = unitType(group.typeId);
+    slowest = Math.min(slowest, type.speed * unitStatMultiplier(type, 'movementSpeed', stack.shortageSeverity));
   }
   return Number.isFinite(slowest) ? slowest : 0;
 }

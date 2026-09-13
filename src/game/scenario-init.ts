@@ -23,8 +23,9 @@ import { makeGroup } from './units/army';
 import { buildLandGraph, nearestNode, type LandGraph } from './movement/graph';
 import { wrappedDistance } from './geometry';
 import { mulberry32, hashString } from './rng';
-import { bootstrapResources, type ResourceBootstrapResult } from './resource-bootstrap';
 import { qualifyingPhaseFromBuildings } from './phase';
+import { createProvinceEconomies } from './economy/resource-generation';
+import { ensureCountryEconomy } from './economy/shortages';
 
 /**
  * Every selectable (five-city) country starts on this identical footing.
@@ -38,7 +39,7 @@ import { qualifyingPhaseFromBuildings } from './phase';
  * stockpile below.
  */
 export const SELECTABLE_START_STOCKPILE = {
-  funds: 1_100, manpower: 350, food: 320, stone: 90, metal: 120, oil: 70,
+  funds: 4_200, manpower: 500, food: 500, stone: 650, metal: 450, oil: 220,
 };
 export const MINOR_START_STOCKPILE = {
   funds: 700, manpower: 260, food: 220, stone: 70, metal: 85, oil: 55,
@@ -68,7 +69,7 @@ export interface InitResult {
     readonly eligibleCountryIds: readonly number[];
     readonly reachableResourceNodes: number;
     readonly unreachableResourceNodes: number;
-    readonly guaranteedDeposits: ResourceBootstrapResult['guarantees'];
+    readonly guaranteedDeposits: readonly { readonly provinceId: number }[];
     readonly totalArmies: number;
     readonly startCameras: Readonly<Record<number, { readonly x: number; readonly z: number; readonly distance: number }>>;
   };
@@ -91,7 +92,7 @@ function makeCountryState(
   const stockpile = sandbox
     ? { ...SANDBOX_STOCKPILE }
     : { ...(selectable ? SELECTABLE_START_STOCKPILE : MINOR_START_STOCKPILE) };
-  return {
+  const country: CountryState = {
     id: countryId,
     name: record?.name ?? `Country ${countryId}`,
     color: record?.color ?? '#888888',
@@ -103,6 +104,8 @@ function makeCountryState(
     // usable from turn one; minors start dry and must build an Ordnance Workshop.
     warheads: selectable && !sandbox ? 1 : 0,
   };
+  ensureCountryEconomy(country);
+  return country;
 }
 
 /** Deterministically choose which urban provinces get which starting building:
@@ -154,6 +157,7 @@ function spawnArmy(
     status: 'idle',
     order: null,
     extractingNodeId: null,
+    extractionAssignment: null,
     navalCrossing: null,
     organization: 100,
     entrenchment: 0,
@@ -251,11 +255,7 @@ export function initGameState(
   // its own guarantee when `GameSession` flips it on (enableNearbyAi); a
   // multiplayer server would call `guaranteeStrategicBaseline` per participant.
   // Every other neutral nation keeps whatever scarce natural geography it has.
-  const participantIds = sandbox ? [] : eligibleCountryIds;
-  const bootstrap = bootstrapResources(
-    world.resourceNodes, world, graph, provinceOwners, participantIds, seed,
-  );
-  const resourceNodes = bootstrap.nodes;
+  const provinceEconomies = createProvinceEconomies(world, seed, eligibleCountryIds);
 
   // ---- starting armies ----------------------------------------
   const armies: Record<string, ArmyStack> = {};
@@ -325,7 +325,8 @@ export function initGameState(
     armies,
     battles: {},
     battleFronts: {},
-    resourceNodes,
+    provinceEconomies,
+    resourceNodes: {},
     relations: {},
     provinceDevastation: {},
     diplomacyMessages: {},
@@ -373,9 +374,9 @@ export function initGameState(
     graph,
     diagnostics: {
       eligibleCountryIds,
-      reachableResourceNodes: bootstrap.diagnostics.reachable,
-      unreachableResourceNodes: bootstrap.diagnostics.unreachable,
-      guaranteedDeposits: bootstrap.guarantees,
+      reachableResourceNodes: 0,
+      unreachableResourceNodes: 0,
+      guaranteedDeposits: [],
       totalArmies: Object.keys(armies).length,
       startCameras,
     },

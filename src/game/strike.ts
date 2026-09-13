@@ -11,7 +11,7 @@ import { PROTOTYPE_HOURS_PER_HOUR } from './time';
  * Game-hours to accrue one warhead per Ordnance Workshop level a country holds.
  * ~30 game-days at level 1 — deliberately rare; two workshops halve the wait.
  */
-export const HOURS_PER_WARHEAD = (30 * 24) / PROTOTYPE_HOURS_PER_HOUR;
+export const HOURS_PER_WARHEAD = 168;
 /** Hard cap on stockpiled warheads so a runaway leader cannot hoard. */
 const MAX_WARHEADS = 3;
 /**
@@ -114,7 +114,12 @@ export function issueStrike(ctx: SimContext, command: StrikeCommand): CommandRes
     buildings.ordnance = Math.max(0, buildings.ordnance - 1);
     buildings.missileSite = Math.max(0, buildings.missileSite - 1);
   }
-  delete ctx.state.constructionQueues[provinceId];
+  const construction = ctx.state.constructionQueues[provinceId];
+  if (construction) {
+    const preserved = construction.filter((order) => ['fields', 'quarry', 'mine', 'oilPump'].includes(order.buildingId));
+    if (preserved.length) ctx.state.constructionQueues[provinceId] = preserved;
+    else delete ctx.state.constructionQueues[provinceId];
+  }
   delete ctx.state.productionQueues[provinceId];
 
   // Shatter the province's defences for a while — see stepCombat.

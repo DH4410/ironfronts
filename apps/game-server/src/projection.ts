@@ -1,7 +1,9 @@
 import {
-  extractionEligibility, movementEdgeAllowed, computeArmyVisibility, projectArmyView, visibleResourceNodes,
-  currentMovementLeg, legalRetreatPaths, stackExtractionRate, nearestNode, findPath,
-  UNIT_TYPES, BUILDINGS, buildOptions, producibleUnits, BUILDING_REQUIRED_PHASE, PHASE_LABELS,
+  extractionEligibility, movementEdgeAllowed, computeArmyVisibility, projectArmyView,
+  currentMovementLeg, legalRetreatPaths, nearestNode, findPath,
+  UNIT_TYPES, BUILDINGS, buildOptions, producibleUnits, armyShortageSummary,
+  provinceResourceOutputBreakdown,
+  buildEngineerAssignmentIndex, engineerAssignmentKey,
   type GameState, type LandGraph, type WorldData,
 } from '@ironfronts/game-core';
 import type { PlayerProjection, ProjectionDelta, PublicCountry } from '@ironfronts/protocol';
@@ -9,6 +11,7 @@ import type { PlayerProjection, ProjectionDelta, PublicCountry } from '@ironfron
 export function projectFor(
   state: GameState, world: WorldData, graph: LandGraph, viewerCountryId: number,
   gameHoursPerRealSecond = 1 / 3_600, movementSpeedMultiplier = 1, sampledAtEpochMs = Date.now(),
+  debugPotential = false,
 ): PlayerProjection {
   const aliveCountries = new Set(Object.values(state.provinceOwners));
   const countries: Record<number, PublicCountry> = {};
@@ -34,8 +37,13 @@ export function projectFor(
     let projected: import('@ironfronts/protocol').ProjectedArmy = army;
     if (graph && army.own) {
       const eligibility = extractionEligibility({ state, world, graph }, army.id);
-      projected = { ...projected, actions: { canExtract: eligibility.ok, extractableNodeId: eligibility.nodeId ?? null,
-        ...(eligibility.reason ? { extractReason: eligibility.reason } : {}) } };
+      projected = { ...projected, actions: { canExtract: eligibility.ok, extractionProvinceId: eligibility.provinceId ?? null,
+        extractableResources: [...(eligibility.resources ?? [])],
+        ...(eligibility.reason ? { extractReason: eligibility.reason } : {}) },
+        shortage: {
+          severity: { ...(state.armies[army.id]?.shortageSeverity ?? { funds: 0, food: 0, metal: 0, oil: 0 }) },
+          modifiers: armyShortageSummary(state.armies[army.id]),
+        } };
     }
     if (graph && army.own && army.status === 'engaged') {
       projected = {
@@ -69,23 +77,7 @@ export function projectFor(
     }
     return [[army.id, projected]];
   }));
-  const resourceNodes = Object.fromEntries(
-    visibleResourceNodes(state, world, viewerCountryId).map((node) => [node.id, node]),
-  );
   const own = state.countries[viewerCountryId];
-  // Live per-game-hour extraction rate for the viewer's own stacks, by resource
-  // kind. The passive `income` map only covers funds/manpower/food; stone/metal/
-  // oil come from physical extraction, so the HUD needs this to show a rate.
-  const extraction = { stone: 0, metal: 0, oil: 0 };
-  for (const army of Object.values(state.armies)) {
-    if (army.ownerCountryId !== viewerCountryId || army.status !== 'extracting') continue;
-    if (army.extractingNodeId === null) continue;
-    const node = state.resourceNodes[army.extractingNodeId];
-    if (!node || node.status !== 'extracting' || node.remaining <= 0) continue;
-    if (node.kind === 'stone' || node.kind === 'metal' || node.kind === 'oil') {
-      extraction[node.kind] += stackExtractionRate(army);
-    }
-  }
   const owned = world.provinces.filter((province) => state.provinceOwners[province.id] === viewerCountryId);
   const provinceActions = Object.fromEntries(owned.map((province) => {
     const productionAvailable = new Set(producibleUnits({ state, world, graph: graph! }, province.id, viewerCountryId));
@@ -93,18 +85,16 @@ export function projectFor(
     return [province.id, {
       production: UNIT_TYPES.map((unit) => {
         const available = productionAvailable.has(unit.id);
-        const affordable = Object.entries(unit.cost).every(([key, value]) => (own?.stockpile[key as keyof typeof own.stockpile] ?? 0) >= (value ?? 0));
+        const affordable = Object.entries(unit.buildCost).every(([key, value]) => (own?.stockpile[key as keyof typeof own.stockpile] ?? 0) >= (value ?? 0));
         return { unitTypeId: unit.id, available, affordable,
           ...(!available ? { reason: `Requires a ${unit.requiredBuilding}.` } : !affordable ? { reason: 'Insufficient resources.' } : {}) };
       }),
       construction: Object.keys(BUILDINGS).map((buildingId) => {
         const id = buildingId as keyof typeof BUILDINGS;
         const option = constructionOptions.get(id);
-        const phaseLocked = !option && (own?.phase ?? 1) < BUILDING_REQUIRED_PHASE[id];
-        return { buildingId: id, available: Boolean(option), affordable: option?.affordable ?? false,
-          ...(phaseLocked ? { reason: `Requires ${PHASE_LABELS[BUILDING_REQUIRED_PHASE[id]]}.` }
-            : !option ? { reason: 'Already built, queued, or unavailable here.' }
-            : !option.affordable ? { reason: 'Insufficient resources.' } : {}) };
+        return { buildingId: id, available: Boolean(option && !option.reason), affordable: option?.affordable ?? false,
+          targetTier: option?.targetTier,
+          ...(option?.reason ? { reason: option.reason } : {}) };
       }),
       canSetRally: Boolean(graph), ...(!graph ? { rallyReason: 'Movement network unavailable.' } : {}),
       // Anti-snowball economy penalty (see economy.ts) — surfaced here so the
@@ -124,6 +114,19 @@ export function projectFor(
       .map((proposal) => ({ ...proposal }))
       .sort((a, b) => a.createdAtTick - b.createdAtTick || a.id.localeCompare(b.id)),
   };
+  const visibleEconomies = debugPotential ? (state.provinceEconomies ?? {}) : privateMap(state.provinceEconomies ?? {});
+  const engineerAssignments = buildEngineerAssignmentIndex({ state, world, graph });
+  const provinceEconomies = Object.fromEntries(Object.entries(visibleEconomies).map(([rawId, economy]) => {
+    const provinceId = Number(rawId);
+    return [provinceId, {
+      ...economy,
+      productionBreakdown: Object.fromEntries((['food', 'stone', 'metal', 'oil'] as const)
+        .map((resource) => [resource, provinceResourceOutputBreakdown(
+          { state, world, graph }, provinceId, resource, economy,
+          engineerAssignments.get(engineerAssignmentKey(provinceId, resource)) ?? 0,
+        )])),
+    }];
+  }));
   return structuredClone({
     timeline: { elapsedSeconds: state.clock.gameTimeHours * 3_600, speed: gameHoursPerRealSecond * 3_600,
       movementSpeed: movementSpeedMultiplier, sampledAtEpochMs, generation: state.clock.generation ?? 0 },
@@ -137,6 +140,9 @@ export function projectFor(
     countries,
     provinceOwners: { ...state.provinceOwners },
     provinceBuildings: privateMap(state.provinceBuildings),
+    // Exact potential outside owned land is privileged developer information.
+    // Normal snapshots (including reconnects) only ever contain owned records.
+    provinceEconomies,
     provinceActions,
     productionQueues: privateMap(state.productionQueues),
     constructionQueues: privateMap(state.constructionQueues),
@@ -146,11 +152,12 @@ export function projectFor(
       ]))
       : privateMap(state.rallyPoints),
     armies,
-    resourceNodes,
     ownCountry: own ? {
       id: own.id, name: own.name, color: own.color, controller: own.controller,
       stockpile: { ...own.stockpile }, income: { ...own.income }, industryCapacity: own.industryCapacity,
-      extraction,
+      upkeep: { ...(own.upkeep ?? {}) }, netIncome: { ...(own.netIncome ?? {}) },
+      coverage: { ...(own.coverage ?? {}) }, reserveHours: { ...(own.reserveHours ?? {}) },
+      shortages: structuredClone(own.shortages ?? {}),
       warheads: Math.floor(own.warheads ?? 0),
       phase: own.phase ?? 1,
     } : null,
@@ -293,7 +300,7 @@ export function retreatExitsForClient(
 
 const COLLECTIONS = [
   'countries', 'provinceOwners', 'provinceBuildings', 'productionQueues',
-  'constructionQueues', 'provinceActions', 'rallyPoints', 'armies', 'resourceNodes', 'relations',
+  'constructionQueues', 'provinceEconomies', 'provinceActions', 'rallyPoints', 'armies', 'relations',
 ] as const;
 
 function same(a: unknown, b: unknown): boolean {
@@ -311,8 +318,8 @@ export function diffProjection(previous: PlayerProjection, next: PlayerProjectio
   if (!same(previous.diplomacy, next.diplomacy)) delta.changed.diplomacy = next.diplomacy;
   if (!same(previous.outcome, next.outcome)) delta.changed.outcome = next.outcome;
   for (const key of COLLECTIONS) {
-    const before = previous[key] as Record<string, unknown>;
-    const after = next[key] as Record<string, unknown>;
+    const before = (previous[key] ?? {}) as Record<string, unknown>;
+    const after = (next[key] ?? {}) as Record<string, unknown>;
     const upserts: Record<string, unknown> = {};
     const removals: string[] = [];
     for (const [id, value] of Object.entries(after)) {
@@ -321,7 +328,7 @@ export function diffProjection(previous: PlayerProjection, next: PlayerProjectio
     for (const id of Object.keys(before)) {
       if (!(id in after)) {
         removals.push(id);
-        if (key === 'armies' || key === 'resourceNodes') delta.redactions.push(`${key}.${id}`);
+        if (key === 'armies' || key === 'provinceEconomies') delta.redactions.push(`${key}.${id}`);
       }
     }
     if (Object.keys(upserts).length) delta.upserts[key] = upserts;

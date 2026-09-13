@@ -29,6 +29,8 @@ struct Uniforms {
 @group(0) @binding(11) var diplomacyColorTexture: texture_2d<f32>;
 @group(0) @binding(12) var<storage, read> visibleTerrainChunks: array<u32>;
 @group(0) @binding(13) var terrainAlbedoTexture: texture_2d<f32>;
+/** One texel per encoded province id: food, stone, metal, oil potential. */
+@group(0) @binding(18) var provinceResourcePotentialTexture: texture_2d<f32>;
 
 fn wrappedUv(uv: vec2f) -> vec2f {
   return vec2f(fract(uv.x + 1.0), clamp(uv.y, 0.0, 0.999999));
@@ -54,6 +56,12 @@ fn provinceAt(uvInput: vec2f) -> u32 {
   let dimensions = textureDimensions(provinceTexture);
   let coordinate = vec2i(min(i32(dimensions.x) - 1, i32(uv.x * f32(dimensions.x))), min(i32(dimensions.y) - 1, i32(uv.y * f32(dimensions.y))));
   return textureLoad(provinceTexture, coordinate, 0).r;
+}
+
+fn resourcePotentialFor(encodedProvinceId: u32) -> vec4f {
+  let dimensions = textureDimensions(provinceResourcePotentialTexture);
+  let x = min(i32(encodedProvinceId), i32(dimensions.x) - 1);
+  return textureLoad(provinceResourcePotentialTexture, vec2i(x, 0), 0);
 }
 
 fn politicalColorAt(uvInput: vec2f) -> vec4f {

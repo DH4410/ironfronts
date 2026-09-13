@@ -313,6 +313,7 @@ describe('WGSL programs', () => {
       { binding: 15, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
       { binding: 16, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 17, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 18, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
     ] });
     const layer = device.createBindGroupLayout({ entries: [
       { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'read-only-storage' } },

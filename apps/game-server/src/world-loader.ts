@@ -2,7 +2,6 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { buildWorldData, type WorldData } from '@ironfronts/game-core';
-import { generateResourceNodes } from '../../../src/resource-nodes';
 
 async function arrayBuffer(directory: string, name: string): Promise<ArrayBuffer> {
   const buffer = await readFile(path.join(directory, name));
@@ -35,13 +34,6 @@ export async function loadWorld(directory: string): Promise<{ world: WorldData; 
   const artifactNames = ['world.json', 'province-details.json', 'province-owners.u32', 'province-ids.u16', 'surface.rgba8', 'height.f32', 'connections.f32'];
   const artifactHashes = Object.fromEntries(await Promise.all(artifactNames.sort().map(async (name) => [name,
     createHash('sha256').update(await readFile(path.join(directory, name))).digest('hex')])));
-  const resourceNodes = generateResourceNodes({
-    surface: new Uint8Array(surface),
-    surfaceField: manifest.fields.surface,
-    height: new Float32Array(height),
-    heightField: manifest.fields.height,
-    world: manifest.world,
-  }).map((node) => ({ id: node.id, kind: node.kind, x: node.x, z: node.z, amount: node.amount }));
   return {
     world: buildWorldData({
       worldWidth: manifest.world.width,
@@ -54,7 +46,7 @@ export async function loadWorld(directory: string): Promise<{ world: WorldData; 
       surface: new Uint8Array(surface),
       surfaceField: manifest.fields.surface,
       connections: new Float32Array(connections),
-      resourceNodes,
+      resourceNodes: [],
     }),
     version: String(manifest.version),
     legacyHash: createHash('sha256').update(manifestBytes).digest('hex'),

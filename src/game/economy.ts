@@ -1,72 +1,51 @@
-/**
- * Passive macro economy.
- *
- * FUNDS and MANPOWER accrue from owned populated provinces; FOOD from owned
- * provinces generally (agriculture proxy). STONE / METAL / OIL are NOT passive —
- * they come only from physical extraction and are added by that system.
- *
- * `recomputeIncome` sets each country's per-game-hour `income`; `applyIncome`
- * adds `income * dtHours` to the stockpile. Split so the HUD can show a stable
- * rate without re-deriving it.
- */
-
-import { PROTOTYPE_HOURS_PER_HOUR } from './time';
+/** Authoritative province production, upkeep payment, and shortage pressure. */
 import type { GameState, Stockpile } from './game-state';
 import { emptyStockpile } from './game-state';
 import type { WorldData } from './world-data';
+import type { SimContext } from './sim-context';
+import { PHYSICAL_RESOURCES } from './economy/resources';
+import {
+  buildEngineerAssignmentIndex, engineerAssignmentKey, physicalResourceOutput, OCCUPIED_OUTPUT_MULTIPLIER,
+} from './economy/resource-production';
+import { applyUpkeepAndShortages, ensureCountryEconomy } from './economy/shortages';
 
-/** Per 100k population, per game-hour. Deliberately gentle. */
-const FUNDS_PER_100K = 0.9;
-const MANPOWER_PER_100K = 0.5;
-// econ-rebalance: infantry's food cost rose 20x (5 -> 100, steeper than
-// funds' 10x) while this rate stayed put, so food income silently became the
-// dominant bottleneck — a small nation's funds/manpower would balloon unspent
-// while food crawled back for tens of hours per unit. Raised ~2.7x so food's
-// time-to-afford-one-infantry roughly tracks funds' (still the tighter of the
-// two for a tank), not so far that it revives spam: a fresh selectable
-// country still takes hours per infantry from income alone, nowhere near the
-// near-instant old cadence.
-const FOOD_PER_PROVINCE = 0.4;
-const URBAN_FUNDS_BONUS = 4;
-/**
- * Anti-snowball: a province held by anyone other than its original owner
- * produces less — partisan friction, unfamiliar administration, redirected
- * output. Applies to passive income only (extraction is a separate,
- * army-driven system and is not discounted here). A province that started
- * unowned (world.provinceOwner === 0) isn't "occupied" when claimed — that's
- * ordinary expansion into unclaimed ground, not conquest.
- */
-const OCCUPIED_INCOME_MULTIPLIER = 0.5;
-
-export function recomputeIncome(state: GameState, world: WorldData): void {
+/** Recompute gross rates. Baked baselines ensure this never re-normalizes after capture. */
+export function recomputeIncome(state: GameState, world: WorldData, graph?: SimContext['graph']): void {
   const income = new Map<number, Stockpile>();
-  for (const countryId of Object.keys(state.countries)) {
-    income.set(Number(countryId), emptyStockpile());
-  }
+  for (const country of Object.values(state.countries)) income.set(country.id, emptyStockpile());
+  const context = graph ? { state, world, graph } as SimContext : null;
+  const engineerAssignments = context ? buildEngineerAssignmentIndex(context) : null;
   for (const province of world.provinces) {
     const owner = state.provinceOwners[province.id];
-    if (!owner) continue;
     const line = income.get(owner);
-    if (!line) continue;
+    const economy = state.provinceEconomies?.[province.id];
+    if (!owner || !line || !economy) continue;
     const originalOwner = world.provinceOwner(province.id);
     const occupied = originalOwner !== 0 && originalOwner !== owner;
-    const multiplier = occupied ? OCCUPIED_INCOME_MULTIPLIER : 1;
-    line.funds += (province.population / 100_000) * FUNDS_PER_100K * multiplier;
-    line.manpower += (province.population / 100_000) * MANPOWER_PER_100K * multiplier;
-    line.food += FOOD_PER_PROVINCE * multiplier;
-    if (province.urban) line.funds += URBAN_FUNDS_BONUS * multiplier;
+    const multiplier = occupied ? OCCUPIED_OUTPUT_MULTIPLIER : 1;
+    line.funds += economy.baseProduction.funds * multiplier;
+    line.manpower += economy.baseProduction.manpower * multiplier;
+    for (const resource of PHYSICAL_RESOURCES) {
+      line[resource] += context
+        ? physicalResourceOutput(context, province.id, resource, economy,
+          engineerAssignments?.get(engineerAssignmentKey(province.id, resource)) ?? 0)
+        : economy.baseProduction[resource] * multiplier;
+    }
   }
   for (const [countryId, line] of income) {
     const country = state.countries[countryId];
-    if (country) country.income = Object.fromEntries(Object.entries(line).map(([key, value]) => [key, value * PROTOTYPE_HOURS_PER_HOUR])) as Stockpile;
+    if (!country) continue;
+    ensureCountryEconomy(country);
+    country.income = line;
   }
 }
 
+/** Production is credited first, then upkeep is paid from the resulting reserve. */
 export function applyIncome(state: GameState, dtHours: number): void {
   for (const country of Object.values(state.countries)) {
-    country.stockpile.funds += country.income.funds * dtHours;
-    country.stockpile.manpower += country.income.manpower * dtHours;
-    country.stockpile.food += country.income.food * dtHours;
-    // stone/metal/oil intentionally excluded — physical extraction only.
+    for (const key of Object.keys(country.stockpile) as Array<keyof Stockpile>) {
+      country.stockpile[key] += country.income[key] * dtHours;
+    }
   }
+  applyUpkeepAndShortages(state, dtHours);
 }

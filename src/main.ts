@@ -20,7 +20,6 @@ import { autoDismissDelay, isSticky } from './ui/notification-lifecycle';
 import { DEMO_ARMY, type ArmyPanelCommand } from './ui/army';
 import { aggregateTroopStat, armyActivityLabel } from './ui/army-presentation';
 import { iconMarkup } from './ui/icons';
-import type { ProvinceResources } from './resource-nodes';
 import type { WorldRenderer, MapMode, TimeOfDayState } from './renderer';
 import { parseClock } from './time-of-day';
 import type { CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo } from './types';
@@ -37,22 +36,31 @@ import { buildBattleAnchors, combatHuddleOffset, groupEngagedByFront } from './c
 import { MISSILE_RANGE } from './game/strike';
 import { wrappedDistance, wrappedDeltaX } from './game/geometry';
 
-type BuildingId = 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite';
+type BuildingId = 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite' | 'fields' | 'quarry' | 'mine' | 'oilPump';
 
 const gameUnit = (typeId: string): Record<string, unknown> => activeSession?.unit(typeId) ?? { id: typeId, name: typeId, cost: {} };
 const gameUnitLabel = (typeId: string): string => String(gameUnit(typeId).name ?? typeId);
-const unitCostLabel = (typeId: string): string => Object.entries((gameUnit(typeId).cost ?? {}) as Record<string, number>)
+const unitCostLabel = (typeId: string): string => Object.entries((gameUnit(typeId).buildCost ?? gameUnit(typeId).cost ?? {}) as Record<string, number>)
   .map(([k, v]) => `${v} ${k}`).join(' · ');
 const buildingLabel = (id: BuildingId): string => String(activeSession?.building(id)?.label ?? id);
-const buildingCostLabel = (id: BuildingId): string => Object.entries((activeSession?.building(id)?.cost ?? {}) as Record<string, number>)
+const buildingCostLabel = (id: BuildingId, tier = 1): string => {
+  const definition = activeSession?.building(id);
+  const tiers = definition?.tiers as Array<{ cost?: Record<string, number> }> | undefined;
+  const cost = tiers?.[tier - 1]?.cost ?? definition?.cost ?? {};
+  return Object.entries(cost as Record<string, number>)
   .map(([k, v]) => `${v} ${k}`).join(' · ');
-const orderPercent = (o: { progressHours: number; totalHours: number }): number =>
-  o.totalHours > 0 ? Math.min(99, Math.floor((o.progressHours / o.totalHours) * 100)) : 0;
+};
+type WorkOrderView = { progressWork?: number; totalWork?: number; progressHours?: number; totalHours?: number };
+const orderPercent = (o: WorkOrderView): number => {
+  const progress = o.progressWork ?? o.progressHours ?? 0;
+  const total = o.totalWork ?? o.totalHours ?? 0;
+  return total > 0 ? Math.min(99, Math.floor((progress / total) * 100)) : 0;
+};
 /** At normal speed one real second advances one authoritative game second. */
 const GAME_HOURS_PER_REAL_SECOND = 1 / 3_600;
-const orderEtaSeconds = (o: { progressHours: number; totalHours: number }): number =>
-  activeSession?.devSimSpeed === 0 ? Infinity
-    : Math.max(0, (o.totalHours - o.progressHours) / (GAME_HOURS_PER_REAL_SECOND * (activeSession?.devSimSpeed ?? 1)));
+const orderEtaSeconds = (o: WorkOrderView): number => activeSession?.devSimSpeed === 0 ? Infinity
+  : Math.max(0, ((o.totalWork ?? o.totalHours ?? 0) - (o.progressWork ?? o.progressHours ?? 0))
+    / (GAME_HOURS_PER_REAL_SECOND * (activeSession?.devSimSpeed ?? 1)));
 
 /** Player queues a unit from the selected-province PRODUCE panel. */
 function handleProduce(provinceId: number, unitTypeId: string): void {
@@ -539,10 +547,12 @@ async function startGame(token: number): Promise<void> {
   // Hover deposits come from the fog-aware GameSession projection once it
   // exists; before that (and for water) show no deposit chips. The renderer's
   // own natural-resource table bypasses fog and must not drive player hover.
-  renderer.onHover = (info, x, y) =>
-    updateTooltip(info, x, y, info && activeSession
-      ? activeSession.describeProvince(info.id).resources
-      : null);
+  renderer.onHover = (info, x, y) => {
+    const economy = info && activeSession
+      ? activeSession.state.provinceEconomies?.[info.id] as { resourcePotential?: Record<string, number> } | undefined
+      : undefined;
+    updateTooltip(info, x, y, economy?.resourcePotential ?? null);
+  };
 
   // Attack-order cursor feedback. With an own army selected, the world cursor
   // becomes the 0 A.D. attack cursor over any detected enemy stack, and
@@ -1063,6 +1073,7 @@ async function bootstrapGameSession(
   renderer.setProvinceOwners(Object.entries(session.state.provinceOwners).map(([provinceId, countryId]) => ({
     provinceId: Number(provinceId), countryId,
   })));
+  renderer.setProvinceResourcePotentials(session.state.provinceEconomies);
   renderer.setPlayerCountryByName(player.name);
   renderer.setDiplomaticRelations(session.state.relations);
   const { x, z, distance } = session.state.startCamera;
@@ -1089,6 +1100,7 @@ async function bootstrapGameSession(
   const syncDiplomaticRelations = (): void => {
     renderer.setDiplomaticRelations(session.state.relations);
     renderer.setProvinceOwners(Object.entries(session.state.provinceOwners).map(([provinceId, countryId]) => ({ provinceId: Number(provinceId), countryId })));
+    renderer.setProvinceResourcePotentials(session.state.provinceEconomies);
     if (presentationGeneration !== session.baselineGeneration) {
       armyMotionInterpolator.clear(); combatEffects.clear(); presentationGeneration = session.baselineGeneration;
     }
@@ -2099,10 +2111,11 @@ function handleArmyCommand(command: ArmyPanelCommand): void {
     refreshSelectedArmy(session);
     return;
   }
-  if (command === 'extract') {
-    const result = session.orderExtract(selectedArmyId);
+  if (command.startsWith('extract-')) {
+    const resource = command.slice('extract-'.length) as 'food' | 'stone' | 'metal' | 'oil';
+    const result = session.orderExtract(selectedArmyId, resource);
     if (!result.ok) pushNotification('warning', 'Extract', result.reason ?? 'Cannot extract here.');
-    else pushNotification('information', 'Extraction started', 'Deposit is now feeding your stockpile.');
+    else pushNotification('information', 'Production amplified', `Engineers are increasing ${resource} output.`);
     refreshSelectedArmy(session);
     return;
   }
@@ -2154,6 +2167,7 @@ function refreshSelectedArmy(
       activity,
       own: view.own,
       canExtract: session.fresh && view.own && !view.moveOrder && session.extractableNodeAt(view.id) !== null,
+      extractableResources: view.actions?.extractableResources,
       awaitingMoveTarget: view.own && awaitingMoveTarget,
       // 'strike' is a nation-level order, not an army targeting mode — the army
       // card never reflects it.
@@ -2168,6 +2182,7 @@ function refreshSelectedArmy(
       canStop: session.fresh && view.own && view.status !== 'engaged' && view.status !== 'retreating'
         && !NAVAL_TRANSIT_STATUSES.has(view.status)
         && (Boolean(view.moveOrder) || view.status === 'extracting' || targetingMode !== null),
+      shortage: view.shortage,
       legalRetreatExits: view.legalRetreatExits,
       battleFronts: view.battleFronts,
       artillery: view.artillery,
@@ -2188,6 +2203,7 @@ function projectSelectedProvince(
     ownerColor: summary.ownerColor,
     terrain: selectedProvinceTerrain,
     resources: summary.resources,
+    resourceEconomy: summary.resourceEconomy,
     isOwn: summary.isOwn,
     occupied: summary.occupied,
     coastal: false,
@@ -2207,19 +2223,21 @@ function projectSelectedProvince(
       : [],
     // Only the head order is being worked; it carries live progress/eta.
     queue: summary.isOwn
-      ? (session.state.productionQueues[provinceId] as Array<{ unitTypeId: string; progressHours: number; totalHours: number }> ?? []).map((o, i) => ({
+      ? (session.state.productionQueues[provinceId] as Array<WorkOrderView & { unitTypeId: string }> ?? []).map((o, i) => ({
           id: o.unitTypeId, label: gameUnitLabel(o.unitTypeId), active: i === 0,
           progress: i === 0 ? orderPercent(o) / 100 : 0, etaSeconds: i === 0 ? orderEtaSeconds(o) : 0,
         }))
       : [],
     buildable: summary.isOwn
-      ? session.buildable(provinceId).map(({ id, available, affordable, reason }) => ({
-          id, name: buildingLabel(id), costLabel: buildingCostLabel(id), affordable, available, reason,
-        }))
+      ? session.buildable(provinceId).map(({ id, available, affordable, reason, targetTier }) => {
+          const tier = targetTier ?? 1;
+          return { id, name: `${buildingLabel(id)}${tier > 1 ? ` Tier ${tier}` : ''}`,
+            costLabel: buildingCostLabel(id, tier), affordable, available, reason };
+        })
       : [],
     construction: summary.isOwn
-      ? (session.state.constructionQueues[provinceId] as Array<{ buildingId: BuildingId; progressHours: number; totalHours: number }> ?? []).map((o, i) => ({
-          id: o.buildingId, label: buildingLabel(o.buildingId), active: i === 0,
+      ? (session.state.constructionQueues[provinceId] as Array<WorkOrderView & { buildingId: BuildingId; targetTier?: number }> ?? []).map((o, i) => ({
+          id: o.buildingId, label: `${buildingLabel(o.buildingId)}${(o.targetTier ?? 1) > 1 ? ` Tier ${o.targetTier}` : ''}`, active: i === 0,
           progress: i === 0 ? orderPercent(o) / 100 : 0, etaSeconds: i === 0 ? orderEtaSeconds(o) : 0,
         }))
       : [],
@@ -2379,6 +2397,12 @@ function drainSessionEvents(session: RemoteGameSession): void {
     uiStore.patch({ paused: true });
     void music.setState(won ? 'victory' : 'peace');
     void audio.playEffectCue(won ? 'victory' : 'defeat');
+  }
+
+  for (const alert of session.pendingShortages.splice(0)) {
+    const resource = alert.resource[0].toUpperCase() + alert.resource.slice(1);
+    pushNotification('warning', `${resource} shortage`,
+      `National shortage pressure crossed ${alert.threshold}%. Unit penalties are now taking effect.`);
   }
 
   for (const done of session.pendingCompletions.splice(0)) {
@@ -2817,21 +2841,25 @@ function playerResourceLines(session: RemoteGameSession): ResourceLine[] {
   const inc = country.income;
   // Live extraction rate per game hour for stone/metal/oil (0 when nothing is
   // being extracted). Server-projected; `?? 0` covers an older projection.
-  const ext = (country.extraction ?? {}) as Partial<Record<'stone' | 'metal' | 'oil', number>>;
   const line = (
-    id: ResourceLine['id'], label: string, value: number, delta?: number,
+    id: ResourceLine['id'], label: string, value: number, key?: keyof typeof s,
   ): ResourceLine => ({
     id, label, value: Math.round(value),
-    delta: delta === undefined ? undefined : Number(delta.toFixed(1)),
+    delta: key ? Number((country.netIncome?.[key] ?? inc[key]).toFixed(1)) : undefined,
+    production: key ? Number(inc[key].toFixed(1)) : undefined,
+    upkeep: key ? Number((country.upkeep?.[key] ?? 0).toFixed(1)) : undefined,
+    coverage: key && key !== 'manpower' && key !== 'stone' ? country.coverage?.[key] : 1,
+    reserveHours: key && key !== 'manpower' && key !== 'stone' ? country.reserveHours?.[key] : null,
+    shortageSeverity: key && key !== 'manpower' && key !== 'stone' ? country.shortages?.[key]?.severity : 0,
   });
   const lines = [
-    line('money', 'Funds', s.funds, inc.funds),
-    line('manpower', 'Manpower', s.manpower, inc.manpower),
-    line('food', 'Food', s.food, inc.food),
+    line('money', 'Funds', s.funds, 'funds'),
+    line('manpower', 'Manpower', s.manpower, 'manpower'),
+    line('food', 'Food', s.food, 'food'),
     // stone/metal/oil have no passive income — the rate is current extraction.
-    line('stone', 'Stone', s.stone, ext.stone ?? 0),
-    line('metal', 'Metal', s.metal, ext.metal ?? 0),
-    line('oil', 'Oil', s.oil, ext.oil ?? 0),
+    line('stone', 'Stone', s.stone, 'stone'),
+    line('metal', 'Metal', s.metal, 'metal'),
+    line('oil', 'Oil', s.oil, 'oil'),
   ];
   // Only surfaced once a warhead is ready — a rare mechanic, not permanent
   // clutter. The chip is the discovery hook for the N-to-strike order.
@@ -2883,14 +2911,12 @@ function setDiplomacyStatus(message: string, error = false): void {
   debugDiplomacyStatus.classList.toggle('is-error', error);
 }
 
-// Deposit abundance, not production/day. Icon art only, at most three chips,
-// row hidden when the province holds nothing.
 const RESOURCE_TOOLTIP_CHIPS = [
-  ['stone', 'node-stone'], ['metal', 'node-metal'], ['oil', 'node-oil'],
+  ['food', 'food'], ['stone', 'node-stone'], ['metal', 'node-metal'], ['oil', 'node-oil'],
 ] as const;
 
 function updateTooltip(
-  info: HoverInfo | null, x: number, y: number, resources: ProvinceResources | null,
+  info: HoverInfo | null, x: number, y: number, potential: Record<string, number> | null,
 ): void {
   if (!info) {
     tooltip.hidden = true;
@@ -2898,11 +2924,10 @@ function updateTooltip(
   }
   tooltipName.textContent = info.name;
   tooltipTerrain.textContent = `${info.country} · ${info.terrain}`;
-  const chips = resources
+  const chips = potential
     ? RESOURCE_TOOLTIP_CHIPS
-        .filter(([key]) => resources[key] > 0)
         .map(([key, icon]) =>
-          `<span class="tooltip-rchip">${iconMarkup(icon)}${compactNumber.format(resources[key])}</span>`)
+          `<span class="tooltip-rchip">${iconMarkup(icon)}${Math.round((potential[key] ?? 0) * 100)}%</span>`)
     : [];
   tooltipResources.hidden = chips.length === 0;
   tooltipResources.innerHTML = chips.join('');
@@ -2994,6 +3019,10 @@ const DEBUG_HELP: Record<number, { description: string; legend: Array<[string, s
   7: { description: 'Static land/coast classification and open-water depth.', legend: [['land', '#299e4c'], ['coast', '#bd6b29'], ['deep water', '#041c47']] },
   8: { description: 'Full dirt-road core and verge footprint independent of nearby 3D geometry.', legend: [['verge', '#ef9e1a'], ['core', '#f22e14']] },
   9: { description: 'Navigation composite for comparing roads, static water, rivers, and canals.', legend: [['road', '#f59c1e'], ['river', '#05c7f9'], ['canal', '#c46bf5'], ['ocean/lake', '#062e66']] },
+  10: { description: 'Server-generated food potential. Exact foreign values require debug entitlement.', legend: [['low', '#071017'], ['medium', '#1abcaa'], ['world class', '#ffca1f']] },
+  11: { description: 'Server-generated stone potential. Exact foreign values require debug entitlement.', legend: [['low', '#071017'], ['medium', '#1abcaa'], ['world class', '#ffca1f']] },
+  12: { description: 'Server-generated metal potential. Exact foreign values require debug entitlement.', legend: [['low', '#071017'], ['medium', '#1abcaa'], ['world class', '#ffca1f']] },
+  13: { description: 'Server-generated oil potential. Exact foreign values require debug entitlement.', legend: [['low', '#071017'], ['medium', '#1abcaa'], ['world class', '#ffca1f']] },
 };
 
 function updateDebugHelp(mode: number): void {

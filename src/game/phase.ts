@@ -14,8 +14,7 @@
  */
 import type { GameState } from './game-state';
 import type { SimContext } from './sim-context';
-import type { BuildingId } from './units/unit-types';
-import { PROTOTYPE_HOURS_PER_HOUR } from './time';
+import type { MilitaryBuildingId } from './units/unit-types';
 
 export const PHASE_MAX = 3;
 
@@ -28,7 +27,7 @@ export const PHASE_LABELS: Record<number, string> = {
 /** Minimum phase required to *start* each building. Barracks is available
  *  from turn one; the heavier industrial and strategic buildings require the
  *  country to have reached the matching tier first. */
-export const BUILDING_REQUIRED_PHASE: Record<BuildingId, number> = {
+export const BUILDING_REQUIRED_PHASE: Record<MilitaryBuildingId, number> = {
   barracks: 1,
   tankPlant: 2,
   ordnance: 2,
@@ -38,8 +37,8 @@ export const BUILDING_REQUIRED_PHASE: Record<BuildingId, number> = {
 /** Game-hours before Phase II / III unlock on their own even without the
  *  qualifying industry, so a country that never builds heavy industry isn't
  *  permanently stuck at Phase I. ~30 and ~90 game-days. */
-const PHASE_2_TIME_HOURS = (30 * 24) / PROTOTYPE_HOURS_PER_HOUR;
-const PHASE_3_TIME_HOURS = (90 * 24) / PROTOTYPE_HOURS_PER_HOUR;
+const PHASE_2_TIME_HOURS = 72;
+const PHASE_3_TIME_HOURS = 168;
 
 /** The phase a country's own buildings already qualify it for, independent of
  *  elapsed time — used both to migrate existing saves and, every tick, to let

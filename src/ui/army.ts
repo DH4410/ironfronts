@@ -91,7 +91,7 @@ export function describeArmy(army: ArmyStackView): Array<[string, string]> {
 }
 
 export type ArmyPanelCommand =
-  | 'move' | 'attack' | 'retreat' | 'split' | 'stop' | 'extract' | 'deselect'
+  | 'move' | 'attack' | 'retreat' | 'split' | 'stop' | 'extract-food' | 'extract-stone' | 'extract-metal' | 'extract-oil' | 'deselect'
   | 'stance-attack' | 'stance-attack-defend' | 'stance-defend' | 'stance-defend-retreat' | 'stance-retreat';
 
 const STANCE_OPTIONS: ReadonlyArray<{ command: ArmyPanelCommand; icon: IconName; label: string; description: string }> = [
@@ -274,11 +274,11 @@ export function renderSelectedArmyPanel(
         description: 'Cancel the current movement or order and hold position.',
         disabledReason: 'No active order to cancel.',
       }),
-      command('Extract', 'cmd-extract', 'extract', army.canExtract === true, false, {
-        description: 'Begin resource extraction at the deposit under this stack.',
-        disabledReason: 'No extractable resource deposit at this position.',
-      }),
     );
+    for (const resource of army.extractableResources ?? []) commands.append(command(
+      `Amplify ${resource}`, 'cmd-extract', `extract-${resource}` as ArmyPanelCommand, army.canExtract === true, false,
+      { description: `Assign this army's engineers to continuous ${resource} production at the province center.` },
+    ));
   }
 
   const composition = node('section', 'ifg-army-panel__composition');
@@ -315,6 +315,21 @@ export function renderSelectedArmyPanel(
     }
   }
   composition.append(unitRow);
+
+  if (army.own && army.shortage) {
+    const shortage = node('section', 'ifg-army-panel__shortage');
+    shortage.append(node('small', 'ifg-army-panel__eyebrow', 'Supply pressure'));
+    const active = Object.entries(army.shortage.severity).filter(([, value]) => value > 0.05);
+    shortage.append(node('span', 'ifg-army-panel__health-caption', active.length
+      ? active.map(([resource, value]) => `${resource} ${value.toFixed(1)}%`).join(' · ')
+      : 'No national shortages'));
+    const modifiers = army.shortage.modifiers;
+    const affected = Object.entries(modifiers).filter(([, value]) => value < 0.999);
+    if (affected.length) shortage.append(node('span', 'ifg-army-panel__health-caption', affected
+      .map(([stat, value]) => `${stat.replace(/([A-Z])/g, ' $1').toLowerCase()} ${Math.round(value * 100)}%`)
+      .join(' · ')));
+    composition.append(shortage);
+  }
 
   const report = node('section', 'ifg-army-panel__report');
 

@@ -4,7 +4,8 @@ import type {
 import { GameConnection } from './game-connection';
 import type { GameClockReading } from './game-clock';
 
-type BuildingId = 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite';
+type BuildingId = 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite' | 'fields' | 'quarry' | 'mine' | 'oilPump';
+type PhysicalResource = 'food' | 'stone' | 'metal' | 'oil';
 type ArmyStance = 'attack' | 'attack-defend' | 'defend' | 'defend-retreat' | 'retreat';
 
 interface Stockpile { funds: number; manpower: number; food: number; stone: number; metal: number; oil: number }
@@ -12,7 +13,10 @@ interface OwnCountry {
   id: number; name: string; color: string; controller: string;
   stockpile: Stockpile; income: Stockpile; industryCapacity: number;
   /** Live per-game-hour extraction rate by kind (stone/metal/oil); 0 when idle. */
-  extraction?: { stone: number; metal: number; oil: number };
+  upkeep?: Stockpile; netIncome?: Stockpile;
+  coverage?: Record<PhysicalResource | 'funds', number>;
+  reserveHours?: Record<PhysicalResource | 'funds', number | null>;
+  shortages?: Record<PhysicalResource | 'funds', { severity: number; notifiedThreshold: number }>;
   /** Ready strategic warheads (whole count). Absent on pre-strike projections. */
   warheads?: number;
   /** Progression tier — 1, 2, or 3. See game/phase.ts. */
@@ -23,6 +27,7 @@ export class RemoteGameSession extends EventTarget {
   get catalogs(): PresentationCatalogs { return this.connection.catalogs; }
   readonly pendingCompletions: Array<{ provinceId: number; unitTypeId: string }> = [];
   readonly pendingBuildings: Array<{ provinceId: number; buildingId: BuildingId }> = [];
+  readonly pendingShortages: Array<{ resource: 'funds' | 'food' | 'metal' | 'oil'; threshold: number }> = [];
   readonly pendingCombat: Array<{
     attacker: number; defender: number;
     kind: 'engaged' | 'reinforced' | 'combatPulse' | 'retreat' | 'destroyed'
@@ -119,7 +124,15 @@ export class RemoteGameSession extends EventTarget {
   }
 
   private rebuild(): void {
-    this.state = this.connection.state;
+    const previous = (this.state.ownCountry as unknown as OwnCountry | undefined)?.shortages;
+    const next = this.connection.state;
+    const current = (next.ownCountry as unknown as OwnCountry | undefined)?.shortages;
+    for (const resource of ['funds', 'food', 'metal', 'oil'] as const) {
+      const before = previous?.[resource]?.notifiedThreshold ?? 0;
+      const after = current?.[resource]?.notifiedThreshold ?? 0;
+      if (after > before) this.pendingShortages.push({ resource, threshold: after });
+    }
+    this.state = next;
     for (const [id, pending] of this.pendingCommands) {
       if (pending.appliedRevision !== undefined && this.connection.revision >= pending.appliedRevision) this.pendingCommands.delete(id);
     }
@@ -254,7 +267,11 @@ export class RemoteGameSession extends EventTarget {
     this.send({ type: 'setStance', armyId, stance });
     return true;
   }
-  orderExtract(armyId: string) { return this.send({ type: 'extract', armyId }); }
+  orderExtract(armyId: string, resource?: PhysicalResource) {
+    const selected = resource ?? this.state.armies[armyId]?.actions?.extractableResources[0];
+    return selected ? this.send({ type: 'extract', armyId, resource: selected })
+      : { ok: false, reason: 'Choose a resource.' };
+  }
   produce(provinceId: number, unitTypeId: string) { return this.send({ type: 'produce', provinceId, unitTypeId }); }
   build(provinceId: number, buildingId: BuildingId, onAccepted?: () => void) {
     return this.send({ type: 'build', provinceId, buildingId }, onAccepted);
@@ -266,14 +283,14 @@ export class RemoteGameSession extends EventTarget {
   }
 
   productionOptions(provinceId: number) { return this.state.provinceActions[provinceId]?.production ?? []; }
-  buildable(provinceId: number): Array<{ id: BuildingId; available: boolean; affordable: boolean; reason?: string }> {
+  buildable(provinceId: number): Array<{ id: BuildingId; available: boolean; affordable: boolean; targetTier?: number; reason?: string }> {
     return (this.state.provinceActions[provinceId]?.construction ?? [])
-      .map((option) => ({ id: option.buildingId, available: option.available, affordable: option.affordable, reason: option.reason }));
+      .map((option) => ({ id: option.buildingId, available: option.available, affordable: option.affordable, targetTier: option.targetTier, reason: option.reason }));
   }
   canSetRally(provinceId: number): boolean { return this.state.provinceActions[provinceId]?.canSetRally ?? false; }
   extractableNodeAt(armyId: string): number | null {
     const action = this.state.armies[armyId]?.actions;
-    return action?.canExtract ? action.extractableNodeId : null;
+    return action?.canExtract ? action.extractionProvinceId : null;
   }
   army(armyId: string): ProjectedArmy | null { return this.state.armies[armyId] ?? null; }
   describeProvince(provinceId: number) {
@@ -284,17 +301,30 @@ export class RemoteGameSession extends EventTarget {
     let any = false;
     let controlled = false;
     let extracting = false;
-    for (const value of Object.values(this.state.resourceNodes)) {
-      const node = value as { provinceId: number; kind: keyof typeof totals; remaining: number; controllerCountryId: number; status: string };
-      if (node.provinceId !== provinceId) continue;
-      any = true; totals[node.kind] += node.remaining;
-      controlled ||= node.controllerCountryId === ownerId;
-      extracting ||= node.status === 'extracting';
+    const economy = this.state.provinceEconomies?.[provinceId] as {
+      resourcePotential?: Record<PhysicalResource, number>; baseProduction?: Stockpile;
+      resourceBuildings?: Record<'fields' | 'quarry' | 'mine' | 'oilPump', number>;
+      productionBreakdown?: Record<PhysicalResource, {
+        base: number; passive: number; engineer: number; total: number;
+        assignedEngineers: number; effectiveEngineers: number; currentTier: number; maximumTier: number;
+      }>;
+    } | undefined;
+    if (economy?.baseProduction) {
+      any = true;
+      totals.stone = economy.baseProduction.stone;
+      totals.metal = economy.baseProduction.metal;
+      totals.oil = economy.baseProduction.oil;
+      controlled = isOwn;
+      extracting = Object.values(this.state.armies).some((army) => army.own && army.status === 'extracting');
     }
     const occupied = isOwn && (this.state.provinceActions[provinceId]?.occupied ?? false);
     return {
       ownerId, ownerName: owner?.name ?? `Country ${ownerId}`, ownerColor: owner?.color ?? '#888888', isOwn,
       resources: any ? totals : null, controlled, extracting, occupied,
+      resourceEconomy: isOwn && economy?.resourcePotential && economy.resourceBuildings && economy.baseProduction ? {
+        potential: economy.resourcePotential, baseProduction: economy.baseProduction, buildings: economy.resourceBuildings,
+        productionBreakdown: economy.productionBreakdown,
+      } : null,
     };
   }
 }

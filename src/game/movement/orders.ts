@@ -26,6 +26,7 @@ export function installOrder(
   army.order = { path: path.slice(1), destX, destZ, intent, target, edgeProgress: 0 };
   army.status = 'moving';
   army.extractingNodeId = null;
+  army.extractionAssignment = null;
 }
 
 /** Create a route and atomically declare every confirmed transit war. */
@@ -125,6 +126,7 @@ export function issueStop(session: SimContext, armyId: string): boolean {
   army.order = null;
   army.suspendedOrder = null;
   army.extractingNodeId = null;
+  army.extractionAssignment = null;
   if (army.status === 'moving' || army.status === 'extracting') army.status = 'idle';
   return true;
 }

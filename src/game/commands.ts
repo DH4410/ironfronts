@@ -51,7 +51,7 @@ export function applyCommand(ctx: SimContext, command: GameCommand): CommandResu
       ctx.state.armies[command.armyId]!.stance = command.stance;
       return { ok: true };
     case 'extract':
-      return issueExtract(ctx, command.armyId);
+      return issueExtract(ctx, command.armyId, command.resource);
     case 'produce':
       if (ctx.state.provinceOwners[command.provinceId] !== command.countryId) {
         return { ok: false, reason: 'Not your province.' };

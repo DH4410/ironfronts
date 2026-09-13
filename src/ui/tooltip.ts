@@ -1,157 +1,153 @@
-/**
- * Shared rich-tooltip system for the strategy HUD.
- *
- * One lazily-created panel, reused for every hoverable control (commands,
- * facilities, resources, unit portraits, map modes). Not a replacement for the
- * bespoke province `#tooltip` in main.ts — that one is map-anchored and paints
- * resource chips; this one is control-anchored and structured.
- *
- * Contract: `bindTooltip(el, content)` where `content` is a `TooltipContent`
- * or a getter returning one (or `null` to suppress). Shows ~170ms after
- * pointer-enter / focus, hides immediately on leave / blur / Escape / scroll.
- * Positioned above the anchor, flipped below when there is no room, and always
- * clamped inside the viewport.
- */
-
+/** Shared accessible popover tree used by every HUD control. */
+export interface TooltipBranch {
+  readonly label: string;
+  readonly value?: string;
+  readonly content?: TooltipContent;
+}
 export interface TooltipContent {
-  /** Bold heading — the control's name. Required. */
   readonly title: string;
-  /** One or two short sentences on what the control does. */
   readonly description?: string;
-  /** Keyboard shortcut, shown as its own row (e.g. "A"). */
   readonly shortcut?: string;
-  /**
-   * Why the control is currently unavailable. When set the tooltip is styled
-   * as a blocked action and the description line is replaced by this.
-   */
   readonly disabledReason?: string;
-  /** Resource / time cost line (already formatted, e.g. "120 manpower"). */
   readonly cost?: string;
-  /** Estimated duration line (already formatted, e.g. "~3:20"). */
   readonly eta?: string;
-  /** Current-state line (e.g. "Queued", "Active"). */
   readonly status?: string;
+  readonly children?: readonly TooltipBranch[];
 }
 
 const SHOW_DELAY_MS = 170;
+const CLOSE_DELAY_MS = 120;
 const GAP = 10;
-
 type ContentSource = TooltipContent | (() => TooltipContent | null);
+interface OpenPanel { element: HTMLElement; anchor: HTMLElement; depth: number }
 
-let panel: HTMLElement | null = null;
+let panels: OpenPanel[] = [];
 let showTimer: number | undefined;
+let closeTimer: number | undefined;
 let activeAnchor: HTMLElement | null = null;
 
-function ensurePanel(): HTMLElement {
-  if (panel) return panel;
-  const el = document.createElement('div');
-  el.className = 'ifg-tip';
-  el.setAttribute('role', 'tooltip');
-  el.hidden = true;
-  document.body.appendChild(el);
-  panel = el;
-  return el;
-}
-
-/** Escape user-facing strings — content can come from country/unit names. */
 function esc(value: string): string {
-  return value.replace(/[&<>"]/g, (c) => (
-    c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : '&quot;'
-  ));
+  return value.replace(/[&<>"]/g, (char) => char === '&' ? '&amp;' : char === '<' ? '&lt;' : char === '>' ? '&gt;' : '&quot;');
 }
 
 export function renderTooltipHtml(content: TooltipContent): string {
   const rows: string[] = [`<strong class="ifg-tip__title">${esc(content.title)}</strong>`];
   const detail = content.disabledReason ?? content.description;
-  if (detail) {
-    const cls = content.disabledReason ? 'ifg-tip__detail is-blocked' : 'ifg-tip__detail';
-    rows.push(`<span class="${cls}">${esc(detail)}</span>`);
-  }
+  if (detail) rows.push(`<span class="ifg-tip__detail${content.disabledReason ? ' is-blocked' : ''}">${esc(detail)}</span>`);
   const meta: string[] = [];
   if (content.cost) meta.push(`<span class="ifg-tip__meta"><i>Cost</i>${esc(content.cost)}</span>`);
   if (content.eta) meta.push(`<span class="ifg-tip__meta"><i>Time</i>${esc(content.eta)}</span>`);
   if (content.status) meta.push(`<span class="ifg-tip__meta"><i>Status</i>${esc(content.status)}</span>`);
   if (meta.length) rows.push(`<span class="ifg-tip__metas">${meta.join('')}</span>`);
-  if (content.shortcut) {
-    rows.push(`<span class="ifg-tip__key"><i>Key</i><kbd>${esc(content.shortcut)}</kbd></span>`);
-  }
+  if (content.shortcut) rows.push(`<span class="ifg-tip__key"><i>Key</i><kbd>${esc(content.shortcut)}</kbd></span>`);
   return rows.join('');
 }
 
-function place(anchor: HTMLElement): void {
-  const el = ensurePanel();
-  const a = anchor.getBoundingClientRect();
-  const w = el.offsetWidth;
-  const h = el.offsetHeight;
-  const vw = document.documentElement.clientWidth;
-  const vh = document.documentElement.clientHeight;
-
-  let top = a.top - h - GAP;
-  el.dataset.flip = 'up';
-  if (top < GAP) {
-    top = a.bottom + GAP;
-    el.dataset.flip = 'down';
-  }
-  top = Math.min(Math.max(GAP, top), vh - h - GAP);
-
-  let left = a.left + a.width / 2 - w / 2;
-  left = Math.min(Math.max(GAP, left), vw - w - GAP);
-
-  el.style.left = `${Math.round(left)}px`;
-  el.style.top = `${Math.round(top)}px`;
+function cancelClose(): void { window.clearTimeout(closeTimer); closeTimer = undefined; }
+function closeFrom(depth: number): void {
+  for (const item of panels.splice(depth)) item.element.remove();
+  if (!panels.length) activeAnchor = null;
+}
+function hide(): void {
+  window.clearTimeout(showTimer); showTimer = undefined; cancelClose(); closeFrom(0);
+}
+function scheduleClose(depth = 0): void {
+  cancelClose();
+  closeTimer = window.setTimeout(() => closeFrom(depth), CLOSE_DELAY_MS);
 }
 
-function hide(): void {
-  window.clearTimeout(showTimer);
-  showTimer = undefined;
-  activeAnchor = null;
-  if (panel) panel.hidden = true;
+function place(element: HTMLElement, anchor: HTMLElement, depth: number): void {
+  const rect = anchor.getBoundingClientRect();
+  const width = element.offsetWidth;
+  const height = element.offsetHeight;
+  const viewportWidth = document.documentElement.clientWidth;
+  const viewportHeight = document.documentElement.clientHeight;
+  let left: number;
+  let top: number;
+  if (depth === 0) {
+    left = rect.left + rect.width / 2 - width / 2;
+    top = rect.top - height - GAP;
+    if (top < GAP) top = rect.bottom + GAP;
+  } else {
+    left = rect.right + GAP;
+    if (left + width > viewportWidth - GAP) left = rect.left - width - GAP;
+    top = rect.top;
+  }
+  element.style.left = `${Math.round(Math.max(GAP, Math.min(left, viewportWidth - width - GAP)))}px`;
+  element.style.top = `${Math.round(Math.max(GAP, Math.min(top, viewportHeight - height - GAP)))}px`;
+}
+
+function openPanel(anchor: HTMLElement, content: TooltipContent, depth: number): void {
+  closeFrom(depth);
+  const element = document.createElement('div');
+  element.className = `ifg-tip${content.disabledReason ? ' is-blocked' : ''}`;
+  element.setAttribute('role', content.children?.length ? 'dialog' : 'tooltip');
+  element.dataset.depth = String(depth);
+  element.innerHTML = renderTooltipHtml(content);
+  if (content.children?.length) {
+    const list = document.createElement('span');
+    list.className = 'ifg-tip__branches';
+    for (const branch of content.children) {
+      const row = document.createElement(branch.content ? 'button' : 'span');
+      row.className = `ifg-tip__branch${branch.content ? ' has-child' : ''}`;
+      row.innerHTML = `<i>${esc(branch.label)}</i><b>${esc(branch.value ?? '')}</b>${branch.content ? '<em>›</em>' : ''}`;
+      if (branch.content) {
+        const enter = (): void => { cancelClose(); openPanel(row as HTMLElement, branch.content!, depth + 1); };
+        row.addEventListener('pointerenter', enter);
+        row.addEventListener('focus', enter);
+        row.addEventListener('click', enter);
+        row.addEventListener('keydown', (event) => {
+          const key = (event as KeyboardEvent).key;
+          if (key === 'ArrowRight' || key === 'Enter') { event.preventDefault(); enter(); }
+        });
+      }
+      list.append(row);
+    }
+    element.append(list);
+  }
+  element.addEventListener('pointerenter', cancelClose);
+  element.addEventListener('pointerleave', () => scheduleClose(depth));
+  document.body.append(element);
+  panels.push({ element, anchor, depth });
+  place(element, anchor, depth);
 }
 
 function show(anchor: HTMLElement, source: ContentSource): void {
   const content = typeof source === 'function' ? source() : source;
   if (!content) return;
-  const el = ensurePanel();
-  el.className = `ifg-tip${content.disabledReason ? ' is-blocked' : ''}`;
-  el.innerHTML = renderTooltipHtml(content);
-  el.hidden = false;
   activeAnchor = anchor;
-  place(anchor);
+  openPanel(anchor, content, 0);
 }
 
-/**
- * Attach the shared tooltip to a control. Returns a disposer that removes the
- * listeners and hides the panel if this anchor owns it.
- */
 export function bindTooltip(anchor: HTMLElement, source: ContentSource): () => void {
   const open = (): void => {
-    window.clearTimeout(showTimer);
+    cancelClose(); window.clearTimeout(showTimer);
     showTimer = window.setTimeout(() => show(anchor, source), SHOW_DELAY_MS);
   };
-  const close = (): void => {
-    if (activeAnchor === anchor || showTimer !== undefined) hide();
+  const close = (): void => { window.clearTimeout(showTimer); scheduleClose(0); };
+  const click = (event: Event): void => {
+    if (activeAnchor === anchor) hide();
+    else { event.stopPropagation(); window.clearTimeout(showTimer); show(anchor, source); }
   };
-  const onKey = (event: KeyboardEvent): void => { if (event.key === 'Escape') hide(); };
-
-  anchor.addEventListener('pointerenter', open);
-  anchor.addEventListener('pointerleave', close);
-  anchor.addEventListener('focus', open);
-  anchor.addEventListener('blur', close);
-  anchor.addEventListener('keydown', onKey);
-
+  anchor.addEventListener('pointerenter', open); anchor.addEventListener('pointerleave', close);
+  anchor.addEventListener('focus', open); anchor.addEventListener('blur', close); anchor.addEventListener('click', click);
   return () => {
-    anchor.removeEventListener('pointerenter', open);
-    anchor.removeEventListener('pointerleave', close);
-    anchor.removeEventListener('focus', open);
-    anchor.removeEventListener('blur', close);
-    anchor.removeEventListener('keydown', onKey);
+    anchor.removeEventListener('pointerenter', open); anchor.removeEventListener('pointerleave', close);
+    anchor.removeEventListener('focus', open); anchor.removeEventListener('blur', close); anchor.removeEventListener('click', click);
     if (activeAnchor === anchor) hide();
   };
 }
 
-// Dismiss on any scroll or press elsewhere so the panel never lingers over a
-// stale anchor. Guarded for non-DOM (unit test) import.
 if (typeof window !== 'undefined') {
-  window.addEventListener('scroll', hide, true);
-  window.addEventListener('pointerdown', hide, true);
+  window.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape' || !panels.length) return;
+    event.preventDefault(); closeFrom(Math.max(0, panels.length - 1));
+  });
+  window.addEventListener('pointerdown', (event) => {
+    const target = event.target as Node;
+    if (activeAnchor?.contains(target) || panels.some((item) => item.element.contains(target))) return;
+    hide();
+  }, true);
+  window.addEventListener('scroll', () => { for (const item of panels) place(item.element, item.anchor, item.depth); }, true);
+  window.addEventListener('resize', () => { for (const item of panels) place(item.element, item.anchor, item.depth); });
 }

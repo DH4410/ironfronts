@@ -1,86 +1,59 @@
-import { armyAtNode } from './movement/position';
-/**
- * Physical resource extraction.
- *
- * A friendly stack standing on a deposit's access node, with extraction-capable
- * units (engineers/infantry), can EXTRACT: the deposit drains into the
- * controlling country's stockpile over game time at a rate set by the stack's
- * composition. Tanks/cars contribute nothing but can guard the miners.
- */
-
+/** Renewable province production assignment for engineer armies. */
+import type { PhysicalResource } from './game-state';
 import type { SimContext } from './sim-context';
-import { canExtract, stackExtractionRate } from './units/army';
+import { nearestNode } from './movement/graph';
+import { PHYSICAL_RESOURCES } from './economy/resources';
+import { clearInvalidExtractionAssignments } from './economy/resource-production';
 
 export interface ExtractResult {
   readonly ok: boolean;
   readonly reason?: string;
+  readonly provinceId?: number;
+  readonly resources?: readonly PhysicalResource[];
 }
 
-/** Begin extracting at the resource node the army is standing on. */
-export function extractionEligibility(session: SimContext, armyId: string): ExtractResult & { nodeId?: number } {
+function centerProvinceAtArmy(session: SimContext, graphNodeId: number, ownerCountryId: number): number | null {
+  for (const province of session.world.provinces) {
+    if (session.state.provinceOwners[province.id] !== ownerCountryId) continue;
+    if (nearestNode(session.graph, province.center[0], province.center[1]) === graphNodeId) return province.id;
+  }
+  return null;
+}
+
+export function extractionEligibility(
+  session: SimContext, armyId: string, resource?: PhysicalResource,
+): ExtractResult {
   const army = session.state.armies[armyId];
   if (!army) return { ok: false, reason: 'No such army.' };
   if (army.status === 'engaged') return { ok: false, reason: 'Army is in close combat.' };
   if (army.status === 'retreating') return { ok: false, reason: 'Army is retreating.' };
-  if (army.order || !armyAtNode(session, army)) return { ok: false, reason: 'Army is moving.' };
-  if (!canExtract(army)) return { ok: false, reason: 'Engineers or infantry required.' };
-
-  const node = Object.values(session.state.resourceNodes).find(
-    (n) => n.accessNodeId === army.graphNodeId && n.remaining > 0,
-  );
-  if (!node) return { ok: false, reason: 'No reachable deposit here.' };
-  if (node.controllerCountryId !== army.ownerCountryId) {
-    return { ok: false, reason: 'Deposit is not under your control.' };
+  if (army.order) return { ok: false, reason: 'Army is moving.' };
+  if (!army.units.some((group) => group.typeId === 'engineer' && group.count > 0)) {
+    return { ok: false, reason: 'Engineers required.' };
   }
-
-  return { ok: true, nodeId: node.id };
+  const provinceId = centerProvinceAtArmy(session, army.graphNodeId, army.ownerCountryId);
+  if (provinceId === null) return { ok: false, reason: 'Move to an owned province center.' };
+  const economy = session.state.provinceEconomies?.[provinceId];
+  if (!economy) return { ok: false, reason: 'Province economy unavailable.' };
+  const resources = PHYSICAL_RESOURCES.filter((key) => economy.baseProduction[key] > 0);
+  if (resource && !resources.includes(resource)) return { ok: false, reason: `No ${resource} production here.`, provinceId, resources };
+  if (!resource) return resources.length
+    ? { ok: true, provinceId, resources }
+    : { ok: false, reason: 'No resource production here.', provinceId, resources };
+  return { ok: true, provinceId, resources };
 }
 
-export function issueExtract(session: SimContext, armyId: string): ExtractResult {
-  const eligible = extractionEligibility(session, armyId);
-  if (!eligible.ok || eligible.nodeId === undefined) return eligible;
-  const army = session.state.armies[armyId];
-  const node = session.state.resourceNodes[eligible.nodeId];
-  // Release any previous extractor of this node.
-  if (node.extractorArmyId && node.extractorArmyId !== armyId) {
-    const prev = session.state.armies[node.extractorArmyId];
-    if (prev) { prev.status = 'idle'; prev.extractingNodeId = null; }
-  }
+export function issueExtract(session: SimContext, armyId: string, resource?: PhysicalResource): ExtractResult {
+  const eligible = extractionEligibility(session, armyId, resource);
+  if (!eligible.ok || eligible.provinceId === undefined || !resource) return eligible;
+  const army = session.state.armies[armyId]!;
   army.status = 'extracting';
-  army.extractingNodeId = node.id;
-  node.extractorArmyId = armyId;
-  node.status = 'extracting';
-  return { ok: true };
+  army.extractingNodeId = null;
+  army.extractionAssignment = { provinceId: eligible.provinceId, resource };
+  return { ok: true, provinceId: eligible.provinceId, resources: eligible.resources };
 }
 
-/** Transfer deposit -> stockpile for every extracting stack this tick. */
-export function stepExtraction(session: SimContext, dtHours: number): void {
-  for (const node of Object.values(session.state.resourceNodes)) {
-    if (node.status !== 'extracting' || node.remaining <= 0) continue;
-    const army = node.extractorArmyId ? session.state.armies[node.extractorArmyId] : undefined;
-    if (!army || army.extractingNodeId !== node.id || army.order) {
-      // Extractor gone or moved off — stop.
-      node.status = node.remaining > 0 ? 'idle' : 'exhausted';
-      node.extractorArmyId = null;
-      if (army && army.extractingNodeId === node.id) {
-        army.extractingNodeId = null;
-        if (army.status === 'extracting') army.status = 'idle';
-      }
-      continue;
-    }
-    const rate = stackExtractionRate(army);
-    if (rate <= 0) continue;
-    const moved = Math.min(node.remaining, rate * dtHours);
-    node.remaining -= moved;
-    const country = session.state.countries[node.controllerCountryId];
-    if (country) country.stockpile[node.kind] += moved;
-
-    if (node.remaining <= 0) {
-      node.remaining = 0;
-      node.status = 'exhausted';
-      node.extractorArmyId = null;
-      army.extractingNodeId = null;
-      army.status = 'idle';
-    }
-  }
+/** Extraction is folded into recomputed province income; this pass only validates assignments. */
+export function stepExtraction(session: SimContext, _dtHours: number): void {
+  clearInvalidExtractionAssignments(session);
 }

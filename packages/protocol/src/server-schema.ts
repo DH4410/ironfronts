@@ -5,11 +5,11 @@ const finite = z.number().finite();
 const nonnegative = finite.nonnegative();
 const integer = z.number().int().nonnegative();
 const point = z.object({ x: finite, z: finite });
-const buildingId = z.enum(['barracks', 'tankPlant', 'ordnance', 'missileSite']);
+const buildingId = z.enum(['barracks', 'tankPlant', 'ordnance', 'missileSite', 'fields', 'quarry', 'mine', 'oilPump']);
 const stockpile = z.object({ funds: finite, manpower: finite, food: finite, stone: finite, metal: finite, oil: finite });
 const country = z.object({ id: integer, name: z.string(), color: z.string(), controller: z.enum(['player', 'ai', 'neutral']), alive: z.boolean() });
 const buildings = z.object({ barracks: integer, tankPlant: integer, ordnance: integer, missileSite: integer });
-const queue = z.object({ id: z.string(), ownerCountryId: integer, progressHours: nonnegative, totalHours: finite.positive() });
+const queue = z.object({ id: z.string(), ownerCountryId: integer, progressWork: nonnegative.optional(), totalWork: finite.positive().optional(), progressHours: nonnegative.optional(), totalHours: finite.positive().optional(), targetTier: integer.optional() });
 const unitQueue = queue.extend({ unitTypeId: z.string() });
 const buildingQueue = queue.extend({ buildingId });
 const resource = point.extend({ id: integer, kind: z.enum(['stone', 'metal', 'oil']), remaining: nonnegative,
@@ -32,7 +32,8 @@ const army = point.extend({
     groups: z.array(z.object({ typeId: z.string(), count: integer, health: nonnegative.max(1) })) }).nullable(),
   moveOrder: point.nullable(), moveRoute: z.array(point).optional(), moveIntent: z.enum(['move', 'attack']).optional(),
   motion: z.object({ targetX: finite, targetZ: finite, durationMs: nonnegative, route: z.array(point).optional(), sampledAtEpochMs: finite.optional(), generation: integer.optional() }).optional(),
-  actions: z.object({ canExtract: z.boolean(), extractableNodeId: integer.nullable(), extractReason: z.string().optional() }).optional(),
+  actions: z.object({ canExtract: z.boolean(), extractionProvinceId: integer.nullable(), extractableResources: z.array(z.enum(['food', 'stone', 'metal', 'oil'])), extractReason: z.string().optional() }).optional(),
+  shortage: z.object({ severity: z.record(z.string(), nonnegative), modifiers: z.record(z.string(), nonnegative) }).optional(),
   suspendedOrder: point.extend({ intent: z.enum(['move', 'attack']) }).nullable().optional(),
   battleFronts: z.array(z.object({ id: z.string(), directionNodeId: integer, role: z.enum(['attack', 'defense']),
     friendlyHp: nonnegative, friendlyBaselineHp: nonnegative, enemyHp: nonnegative, enemyBaselineHp: nonnegative,
@@ -46,7 +47,8 @@ const army = point.extend({
 const timeline = z.object({ elapsedSeconds: nonnegative, speed: nonnegative.max(32), movementSpeed: nonnegative.max(32), sampledAtEpochMs: finite, generation: integer });
 const ownCountry = z.object({ id: integer, name: z.string(), color: z.string(), controller: z.enum(['player', 'ai', 'neutral']),
   stockpile, income: stockpile, industryCapacity: nonnegative, warheads: nonnegative.optional(), phase: integer.optional(),
-  extraction: z.object({ stone: nonnegative, metal: nonnegative, oil: nonnegative }).optional() });
+  upkeep: stockpile.optional(), netIncome: stockpile.optional(), coverage: z.record(z.string(), nonnegative).optional(),
+  reserveHours: z.record(z.string(), nonnegative.nullable()).optional(), shortages: z.record(z.string(), z.object({ severity: nonnegative, notifiedThreshold: nonnegative })).optional() });
 const diplomacyMessage = z.object({ id: z.string(), fromCountryId: integer, toCountryId: integer, body: z.string(), sentAtTick: integer });
 const diplomacyProposal = z.object({ id: z.string(), fromCountryId: integer, toCountryId: integer,
   kind: z.enum(['alliance', 'peace']), status: z.enum(['pending', 'accepted', 'declined', 'withdrawn']),
@@ -56,15 +58,16 @@ export const projectionSchema = z.object({ simulationTick: integer, timeline: ti
   startCamera: point.extend({ distance: finite.positive() }), countries: record(country), provinceOwners: record(integer),
   provinceBuildings: record(buildings), provinceActions: record(z.object({
     production: z.array(z.object({ unitTypeId: z.string(), available: z.boolean(), affordable: z.boolean(), reason: z.string().optional() })),
-    construction: z.array(z.object({ buildingId, available: z.boolean(), affordable: z.boolean(), reason: z.string().optional() })),
+    construction: z.array(z.object({ buildingId, available: z.boolean(), affordable: z.boolean(), targetTier: integer.optional(), reason: z.string().optional() })),
     canSetRally: z.boolean(), rallyReason: z.string().optional(), occupied: z.boolean(),
   })), productionQueues: record(z.array(unitQueue)), constructionQueues: record(z.array(buildingQueue)),
-  rallyPoints: record(point.extend({ route: z.array(point).optional() })), armies: record(army), resourceNodes: record(resource),
+  rallyPoints: record(point.extend({ route: z.array(point).optional() })), armies: record(army),
+  provinceEconomies: record(z.unknown()).optional(), resourceNodes: record(resource).optional(),
   ownCountry: ownCountry.nullable(), relations: record(z.enum(['peace', 'allied', 'war'])),
   diplomacy: z.object({ messages: z.array(diplomacyMessage), proposals: z.array(diplomacyProposal) }).optional(),
   outcome: outcome.optional() });
 const collectionSchemas = projectionSchema.pick({ countries: true, provinceOwners: true, provinceBuildings: true, provinceActions: true,
-  productionQueues: true, constructionQueues: true, rallyPoints: true, armies: true, resourceNodes: true, relations: true });
+  productionQueues: true, constructionQueues: true, rallyPoints: true, armies: true, provinceEconomies: true, relations: true });
 const delta = z.object({ changed: projectionSchema.pick({ simulationTick: true, timeline: true, viewerCountryId: true, startCamera: true, ownCountry: true, diplomacy: true, outcome: true }).partial(),
   upserts: collectionSchemas.partial(), removals: z.object(Object.fromEntries(Object.keys(collectionSchemas.shape).map((key) => [key, z.array(z.string()).optional()]))),
   redactions: z.array(z.string()) });
@@ -72,8 +75,8 @@ const profile = z.object({ soft: nonnegative, light: nonnegative, heavy: nonnega
 const cost = stockpile.partial();
 const catalogs = z.object({ units: z.array(z.object({ id: z.string(), name: z.string(), category: z.enum(['infantry', 'engineer', 'recon', 'armor', 'artillery']),
   armorClass: z.enum(['soft', 'light', 'heavy']), icon: z.string(), maxHp: finite.positive(), speed: nonnegative, attack: profile, defense: profile,
-  visionOuter: nonnegative, visionInner: nonnegative, extractionRate: nonnegative, engagementRange: nonnegative, cost, buildTimeHours: finite.positive(), requiredBuilding: buildingId, stackPriority: finite })),
-  buildings: z.array(z.object({ id: buildingId, label: z.string(), cost, buildTimeHours: finite.positive() })) });
+  visionOuter: nonnegative, visionInner: nonnegative, extractionRate: nonnegative, engagementRange: nonnegative, buildCost: cost, buildWork: finite.positive(), upkeep: z.record(z.string(), nonnegative), shortageEffects: z.array(z.unknown()), cost, buildTimeHours: finite.positive(), requiredBuilding: buildingId, stackPriority: finite })),
+  buildings: z.array(z.object({ id: buildingId, label: z.string(), kind: z.enum(['military', 'resource']), tiers: z.array(z.unknown()), cost, buildWork: finite.positive(), buildTimeHours: finite.positive() })) });
 const eventBase = { id: z.string(), message: z.string().optional() };
 const locatedEvent = { ...eventBase, x: finite, z: finite };
 const combatCountries = { attacker: integer, defender: integer };
@@ -90,7 +93,7 @@ const event = z.discriminatedUnion('kind', [
 ]);
 const clock = z.object({ gameStartedAtEpochMs: finite, gameEpochMs: finite, serverEpochMs: finite, speed: nonnegative.max(32), generation: integer, utcOffsetMinutes: z.number().int() });
 export const serverMessageSchema: z.ZodType<ServerMessage> = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('hello'), gameId: z.string(), gameVersion: z.string(), protocolVersion: z.literal(3), capabilities: z.array(z.string()),
+  z.object({ type: z.literal('hello'), gameId: z.string(), gameVersion: z.string(), protocolVersion: z.literal(4), capabilities: z.array(z.string()),
     world: z.object({ version: z.string(), hash: z.string().regex(/^[a-f0-9]{64}$/), assetBaseUrl: z.url(),
       artifactHashes: record(z.string().regex(/^[a-f0-9]{64}$/)) }), countryId: integer, debugEnabled: z.boolean() }),
   z.object({ type: z.literal('baseline'), revision: integer, state: projectionSchema, catalogs, clock }),
