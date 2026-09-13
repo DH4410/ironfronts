@@ -299,3 +299,28 @@ describe('groupEngagedByFront + buildBattleAnchors + combatHuddleOffset end-to-e
     expect(anchors.has('bystander')).toBe(false);
   });
 });
+
+
+  it('culls transients and battle markers with the viewport visibility callback', () => {
+    const pool = new CombatEffectPool(32);
+    pool.spawn(EFFECT_KIND.explosion, 100, 100, { now: 1_000, lifetimeMs: 1_000 });
+    pool.spawn(EFFECT_KIND.smoke, 900, 900, { now: 1_000, lifetimeMs: 1_000 });
+    pool.setBattle('near', 110, 110);
+    pool.setBattle('far', 910, 910);
+
+    const visible = pool.collect(
+      1_200,
+      { x: 100, z: 100 },
+      5_000,
+      32,
+      (x, z) => x < 500 && z < 500,
+    );
+
+    expect(visible.count).toBe(2);
+    const kinds = [
+      visible.floats[2],
+      visible.floats[8 + 2],
+    ];
+    expect(kinds).toContain(EFFECT_KIND.battleMarker);
+    expect(kinds).toContain(EFFECT_KIND.explosion);
+  });
