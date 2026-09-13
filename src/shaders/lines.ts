@@ -191,10 +191,12 @@ fn lineFragment(input: LineOutput) -> @location(0) vec4f {
   let distanceFromCenter = abs(input.lineSide);
   let centerCoverage = 1.0 - smoothstep(0.43, 0.55, distanceFromCenter);
   let edgeCoverage = 1.0 - smoothstep(0.88, 1.0, distanceFromCenter);
-  if (input.borderMode > 0.5) {
+  if (input.borderMode > 0.5 && input.countryCasing < 0.5) {
     let riverSignal = max(waterwayAt(input.mapUv), visualRiverAt(input.mapUv));
-    // The river surface owns political boundaries over water. Suppressing the
-    // ordinary geometry prevents a separate line from appearing on each bank.
+    // The river surface owns plain province boundaries over water, avoiding a
+    // separate line on each bank — but a national border is load-bearing
+    // information (front lines, war declarations) and must stay visible even
+    // where it runs along or crosses a river for a long stretch.
     if (riverSignal >= 0.15) { discard; }
   }
   var styledColor = input.outerColor;
