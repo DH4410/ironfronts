@@ -1,0 +1,14 @@
+<!-- Source: https://commons.wikimedia.org/wiki/File:Flag_of_Venezuela_(1930%E2%80%932006).svg
+     Licence: Public domain. Seven-star national flag introduced in 1930. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 600">
+  <defs><path id="s" fill="#fff" d="M0-25 5.88-8.09 23.78-7.73 9.51 3.09 14.69 20.23 0 10-14.69 20.23-9.51 3.09-23.78-7.73-5.88-8.09z"/></defs>
+  <path fill="#f4d900" d="M0 0h900v200H0z"/>
+  <path fill="#0033a0" d="M0 200h900v200H0z"/>
+  <path fill="#cf142b" d="M0 400h900v200H0z"/>
+  <g transform="translate(450 300)">
+    <use href="#s" transform="translate(-115 38)"/><use href="#s" transform="translate(-82 -25)"/>
+    <use href="#s" transform="translate(-30 -62)"/><use href="#s" transform="translate(30 -62)"/>
+    <use href="#s" transform="translate(82 -25)"/><use href="#s" transform="translate(115 38)"/>
+    <use href="#s" transform="translate(0 62)"/>
+  </g>
+</svg>

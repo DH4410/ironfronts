@@ -10,8 +10,9 @@ The game partitions the 1939 world into 200 selectable countries. Only some are 
 
 | Entity kind | Flag shown |
 |---|---|
-| Sovereign belligerent | Its own 1939 flag |
-| Real colony / mandate / protectorate | Flag of the power that administered it in 1939 |
+| Sovereign / period state | Its own 1939-era flag |
+| Protectorate with a documented local flag | Its documented period flag |
+| Colony / mandate without a useful distinct period flag | Flag of the power that administered it in 1939 |
 | Gameplay subdivision | Flag of its historical sovereign or administering power |
 | Unknown input (not a country in this scenario) | Colour standard |
 
@@ -36,6 +37,29 @@ the file. Retrieved 2026-08-30 via `commons.wikimedia.org/wiki/Special:FilePath/
 | `et-empire.svg` | Ethiopia | Ethiopian Empire, Lion of Judah | `File:Flag of Ethiopia (1897-1974).svg` |
 | `cn-roc.svg` | Nationalist China | Republic of China, "Blue Sky with a White Sun" | `File:Flag of the Republic of China.svg` |
 | `manchukuo.svg` | Manchukuo | Japanese puppet state 1932–1945 | `File:Flag of Manchukuo.svg` |
+
+## Additional period-correct variants integrated from the historical-flags branch
+
+These assets were retained while keeping the newer centralized 200-country registry:
+
+| File | In-game use | Historical treatment |
+|---|---|---|
+| `es-1938-1945.svg` | Spain, Río de Oro | Nationalist state flag, 1938–1945 |
+| `af-1931-1973.svg` | Afghanistan | Kingdom of Afghanistan |
+| `lt-1918-1940.svg` | Lithuania | Independent Lithuania tricolour |
+| `np-pre1962.svg` | Nepal | Pre-1962 double-pennon flag |
+| `sy-1930-1958.svg` | Syria | Syrian Republic flag |
+| `tibet-1916-1951.svg` | Tibet | Historical Tibetan flag |
+| `ph-1936-1985.svg` | Philippines | Period geometry and colour treatment |
+| `brunei-1906-1959.svg` | Brunei | 1906–1959 protected-state flag |
+| `mengjiang-1939-1945.svg` | Mengjiang | Seven-stripe flag adopted 1 September 1939 |
+| `ve-1930-2006.svg` | Venezuela | Seven-star 1930 design |
+| `bo-1851.svg` | Bolivia | Red-yellow-green tricolour |
+| `om-muscat.svg` | Oman | Muscat plain-red period flag |
+| `pe-civil.svg` | Peru | Period-valid civil/national flag |
+| `tn.svg` | Tunisia | Long-standing Tunisian design |
+
+The source and reusable licence are embedded in each historical SVG. Some are public domain and some are CC BY-SA; retain those comments when optimizing or transforming the files.
 
 The project also vendors flat SVG country art from [flag-icons](https://github.com/lipis/flag-icons), version 7.5.0, under its MIT licence. The licence text is included as src/ui/assets/flags/FLAG-ICONS-LICENSE.txt. The existing period-specific art remains preferred for historical entities. The remaining flat flag-icons art is a compact visual identifier; small emblems and star counts can differ from the period version at the icon sizes used by the UI.
 

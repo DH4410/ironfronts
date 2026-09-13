@@ -1,0 +1,7 @@
+<!-- Source: https://commons.wikimedia.org/wiki/File:Flag_of_Brunei_1906-1959.svg
+     Licence: Public domain; original by Orange Tuesday. Historical flag used 1906-1959. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 500">
+  <path fill="#f7e017" d="M0 0h1000v500H0z"/>
+  <path stroke="#fff" stroke-width="100" d="M-75-25 1075 525"/>
+  <path stroke="#000" stroke-width="50" d="M-75-25 1075 525"/>
+</svg>

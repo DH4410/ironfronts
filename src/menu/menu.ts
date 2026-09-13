@@ -317,11 +317,17 @@ export function mountMenu(handlers: MenuHandlers): void {
       button.disabled = !claimable;
       const swatch = document.createElement('i');
       swatch.className = 'ifm__country-swatch';
+      swatch.setAttribute('aria-hidden', 'true');
       const flagUrl = resolveFlagUrl(country.name);
       if (flagUrl) {
-        swatch.classList.add('is-flag');
-        swatch.style.backgroundImage = `url("${flagUrl}")`;
+        const flag = document.createElement('img');
+        flag.src = flagUrl;
+        flag.alt = '';
+        flag.draggable = false;
+        swatch.append(flag);
       } else {
+        // Some intentionally fictional/sub-national scenario entities do not
+        // have a historical flag. Keep the country colour as their fallback.
         swatch.style.background = country.color;
       }
       const name = document.createElement('span');
