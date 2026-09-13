@@ -1,6 +1,6 @@
 # Ironfronts
 
-Ironfronts is an authoritative multiplayer grand-strategy prototype with a native WebGPU world renderer. It combines a persistent server simulation, account/country-seat flow, fog-filtered real-time replication, directional combat, and a deterministic offline compiler for a 3,303-province world.
+Hey! Ironfronts is an authoritative multiplayer grand-strategy prototype with a native WebGPU world renderer. It combines a persistent server simulation, account/country-seat flow, fog-filtered real-time replication, directional combat, and a deterministic offline compiler for a 3,303-province world.
 
 ## What is implemented
 
