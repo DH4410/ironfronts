@@ -708,6 +708,8 @@ async function startGame(token: number): Promise<void> {
       Date.now(),
       { x: stats.camera[0], z: stats.camera[1] },
       renderer.combatEffectMaxDistance,
+      undefined,
+      (x, z) => renderer.isWorldPointVisible(x, z, 160),
     );
     renderer.setCombatEffects(packed.floats, packed.count);
     if (!diagnostics.hidden) updateDiagnostics(stats);
@@ -2275,27 +2277,24 @@ function syncCombatMarkers(session: RemoteGameSession): void {
 
 /** Per-front cooldowns for the continuous fight FX below. */
 const lastBattleGunfireAt = new Map<string, number>();
+const lastBattleArmorAt = new Map<string, number>();
+const lastBattleArtilleryAt = new Map<string, number>();
 const lastBattleSmokeAt = new Map<string, number>();
 /** Per-province cooldown for the "city under siege" fire/smoke overlay. */
 const lastCityFireAt = new Map<number, number>();
 
 /**
- * While a battle front is live, spawn continuous gunshot + smoke FX at its
- * cluster centroid (the same authoritative-front grouping and point the
- * huddle above pulls every side toward — see groupEngagedByFront) every HUD
- * tick (called from the same 400ms timer as syncCombatMarkers), instead of
- * the single one-shot spawnVolley() the 'engaged'/'combatPulse' server events
- * already trigger. The smoke reuses the same EFFECT_KIND.smoke WGSL
- * composition as the nuke's smoke stalk, just smaller and spawned
- * continuously rather than one large mushroom.
- *
- * If the fight's centroid sits inside a province that has buildings, this
- * also lays a couple of fire/smoke puffs near the fight to read as "the city
- * is burning." This never touches provinceBuildings or any other game-state
- * field — purely client-side VFX that stops the moment the front resolves.
+ * Keep a live front visually active without mirroring every simulated round.
+ * Infantry gets frequent sampled tracers; armor/artillery only emit their
+ * heavier layered cues when that unit type actually exists in the visible
+ * front. All effects stay inside CombatEffectPool's hard instance cap.
  */
 function spawnOngoingBattleFx(session: RemoteGameSession, renderer: WorldRenderer): void {
-  if (effectDensityForDistance(lastCombatCameraDistance) <= 0) return;
+  // The renderer already suspends GPU frames for hidden tabs; also stop creating
+  // cosmetic battle records so background play costs essentially nothing here.
+  if (document.hidden) return;
+  const density = effectDensityForDistance(lastCombatCameraDistance);
+  if (density <= 0) return;
   const now = Date.now();
   const clusters = groupEngagedByFront(
     Object.values(session.state.armies)
@@ -2312,23 +2311,55 @@ function spawnOngoingBattleFx(session: RemoteGameSession, renderer: WorldRendere
       renderer.camera.target[0], renderer.camera.target[2], cluster.x, cluster.z, worldWidth,
     ) <= 700);
   if (closeBattle) void audio.playEffectCue('close-battle');
+
   const activeFronts = new Set<string>();
   const activeProvinces = new Set<number>();
   for (const [frontId, cluster] of clusters) {
-    // No owner-diversity check needed: a cluster only exists because some
-    // fully-visible army reported this front id, and a front id only exists
-    // because the sim built a real two-sided fight — so this is always a
-    // genuine clash, even when the other side is only fog-obscured (a
-    // 'contact' stack never reports engaged/battleFronts, so it can't be a
-    // cluster member, but the player's own engaged army still deserves FX).
     activeFronts.add(frontId);
+    // Distance alone is not enough: a close battle can still be behind or
+    // beside the camera. Do no cosmetic spawning unless it can enter the view.
+    if (!renderer.isWorldPointVisible(cluster.x, cluster.z, 220)) continue;
     const jitter = (spread: number): number => (Math.random() - 0.5) * spread;
+    const members = cluster.memberIds.flatMap((id) => {
+      const army = session.state.armies[id];
+      return army ? [army] : [];
+    });
+    const armorShooter = members.find((army) => army.composition?.groups.some((group) =>
+      group.count > 0 && (group.typeId === 'light-tank' || group.typeId === 'medium-tank')));
+    const artilleryShooter = members.find((army) => army.composition?.groups.some((group) =>
+      group.count > 0 && group.typeId === 'artillery'));
+    const targetFor = (shooter: (typeof members)[number]): { x: number; z: number } => {
+      const enemy = members.find((army) => army.ownerCountryId !== shooter.ownerCountryId);
+      if (enemy) return { x: enemy.x, z: enemy.z };
+      // Fog may hide the opposing stack while this side still reports the real
+      // front. Fire into a short point around the authoritative front centroid
+      // rather than suppressing the cue completely.
+      const fallbackDir = Math.random() * Math.PI * 2;
+      return {
+        x: cluster.x + Math.cos(fallbackDir) * 34,
+        z: cluster.z + Math.sin(fallbackDir) * 34,
+      };
+    };
 
-    if (now - (lastBattleGunfireAt.get(frontId) ?? 0) >= 420) {
+    if (now - (lastBattleGunfireAt.get(frontId) ?? 0) >= 420 && Math.random() <= density) {
       lastBattleGunfireAt.set(frontId, now);
       combatEffects.spawnVolley('infantry', cluster.x, cluster.z, Math.random() * Math.PI * 2, { now });
     }
-    if (now - (lastBattleSmokeAt.get(frontId) ?? 0) >= 1_100) {
+    if (armorShooter
+      && now - (lastBattleArmorAt.get(frontId) ?? 0) >= 10_000
+      && Math.random() <= density) {
+      lastBattleArmorAt.set(frontId, now);
+      const target = targetFor(armorShooter);
+      combatEffects.spawnTankShot(armorShooter.x, armorShooter.z, target.x, target.z, { now });
+    }
+    if (artilleryShooter
+      && now - (lastBattleArtilleryAt.get(frontId) ?? 0) >= 12_000
+      && Math.random() <= density) {
+      lastBattleArtilleryAt.set(frontId, now);
+      const target = targetFor(artilleryShooter);
+      combatEffects.spawnArtilleryShot(artilleryShooter.x, artilleryShooter.z, target.x, target.z, { now });
+    }
+    if (now - (lastBattleSmokeAt.get(frontId) ?? 0) >= 1_100 && Math.random() <= 0.45 + density * 0.55) {
       lastBattleSmokeAt.set(frontId, now);
       combatEffects.spawn(EFFECT_KIND.smoke, cluster.x + jitter(26), cluster.z + jitter(26),
         { now, scale: 0.9 + Math.random() * 0.4, lifetimeMs: 2_400 });
@@ -2342,7 +2373,7 @@ function spawnOngoingBattleFx(session: RemoteGameSession, renderer: WorldRendere
       : 0;
     if (buildingCount <= 0) continue;
     activeProvinces.add(provinceId);
-    if (now - (lastCityFireAt.get(provinceId) ?? 0) < 1_600) continue;
+    if (now - (lastCityFireAt.get(provinceId) ?? 0) < 6_000) continue;
     lastCityFireAt.set(provinceId, now);
     for (let i = 0; i < 2; i += 1) {
       const angle = Math.random() * Math.PI * 2;
@@ -2354,6 +2385,8 @@ function spawnOngoingBattleFx(session: RemoteGameSession, renderer: WorldRendere
     }
   }
   for (const id of [...lastBattleGunfireAt.keys()]) if (!activeFronts.has(id)) lastBattleGunfireAt.delete(id);
+  for (const id of [...lastBattleArmorAt.keys()]) if (!activeFronts.has(id)) lastBattleArmorAt.delete(id);
+  for (const id of [...lastBattleArtilleryAt.keys()]) if (!activeFronts.has(id)) lastBattleArtilleryAt.delete(id);
   for (const id of [...lastBattleSmokeAt.keys()]) if (!activeFronts.has(id)) lastBattleSmokeAt.delete(id);
   for (const id of [...lastCityFireAt.keys()]) if (!activeProvinces.has(id)) lastCityFireAt.delete(id);
 }
@@ -2536,14 +2569,15 @@ function drainSessionEvents(session: RemoteGameSession): void {
         } else if (ev.kind === 'combatPulse') {
           combatEffects.spawnVolley('infantry', spot.x, spot.z, Number.isFinite(dir) ? dir : 0);
         } else if (ev.kind === 'bombardment') {
-          if (atkSpot) {
-            combatEffects.spawnVolley('artillery', atkSpot.x, atkSpot.z, Number.isFinite(dir) ? dir : 0);
-          }
           const impactAt = defSpot ?? spot;
-          window.setTimeout(() => {
+          if (atkSpot) {
+            combatEffects.spawnArtilleryShot(atkSpot.x, atkSpot.z, impactAt.x, impactAt.z);
+          } else {
+            // Projection can hide the firing stack; keep the authoritative
+            // impact readable without inventing a fake launch position.
             combatEffects.spawn(EFFECT_KIND.explosion, impactAt.x, impactAt.z, { scale: 1.3 });
             combatEffects.spawn(EFFECT_KIND.smoke, impactAt.x, impactAt.z, { scale: 1.2, lifetimeMs: 2_400 });
-          }, 520);
+          }
         } else if (ev.kind === 'destroyed') {
           combatEffects.spawn(EFFECT_KIND.explosion, spot.x, spot.z, { scale: 1.5 });
           combatEffects.spawn(EFFECT_KIND.smoke, spot.x, spot.z, { scale: 1.6, lifetimeMs: 2_800 });
