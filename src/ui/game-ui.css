@@ -60,6 +60,38 @@
 .ifg button:disabled { cursor: default; }
 .ifg > * { pointer-events: auto; }
 
+.ifg-map-controls {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: auto;
+}
+.ifg-map-controls__button {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--ifg-brass);
+  border-radius: 4px;
+  background: rgba(20, 22, 15, 0.94);
+  color: var(--ifg-brass-lit);
+  font-size: 24px;
+  line-height: 1;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  touch-action: manipulation;
+}
+.ifg-map-controls__button:hover,
+.ifg-map-controls__button:focus-visible {
+  background: rgba(54, 48, 31, 0.98);
+  outline: 2px solid var(--ifg-brass-lit);
+  outline-offset: 2px;
+}
+.ifg-map-controls__button:active { transform: translateY(1px); }
+
 .ifg-icon { display: inline-flex; width: 1em; height: 1em; flex: none; }
 .ifg-icon[data-kind="img"] img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .ifg-icon[data-kind="svg"] svg { width: 100%; height: 100%; display: block; color: inherit; }

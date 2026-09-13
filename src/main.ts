@@ -686,6 +686,7 @@ async function startGame(token: number): Promise<void> {
     },
     armStrike: () => armStrike(session),
     focusWorld: (x, z) => renderer.focus(x, z, 900),
+    zoomMap: (factor) => renderer.zoomMap(factor),
     armyCommand: (command) => handleArmyCommand(command),
     produceUnit: (provinceId, unitTypeId) => handleProduce(provinceId, unitTypeId),
     buildStructure: (provinceId, buildingId) => handleBuild(provinceId, buildingId),

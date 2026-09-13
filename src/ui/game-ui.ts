@@ -44,6 +44,7 @@ export interface GameUiActions {
   focusSelected?: () => void;
   /** Re-centre the camera on a world point (locatable notifications). */
   focusWorld?: (x: number, z: number) => void;
+  zoomMap?: (factor: number) => void;
   /** Selected-army orders. 'deselect' clears the selection. */
   armyCommand(command: ArmyPanelCommand): void;
   /** Queue a unit in the selected (own) province. */
@@ -266,6 +267,21 @@ function el<K extends keyof HTMLElementTagNameMap>(
 export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandle {
   const root = el('div', 'ifg');
   root.hidden = true;
+
+  const mapControls = el('nav', 'ifg-map-controls');
+  mapControls.setAttribute('aria-label', 'Map controls');
+  const zoomOut = el('button', 'ifg-map-controls__button', '-');
+  zoomOut.type = 'button';
+  zoomOut.title = 'Zoom out';
+  zoomOut.setAttribute('aria-label', 'Zoom out');
+  zoomOut.addEventListener('click', () => actions.zoomMap?.(Math.exp(0.22)));
+  const zoomIn = el('button', 'ifg-map-controls__button', '+');
+  zoomIn.type = 'button';
+  zoomIn.title = 'Zoom in';
+  zoomIn.setAttribute('aria-label', 'Zoom in');
+  zoomIn.addEventListener('click', () => actions.zoomMap?.(Math.exp(-0.22)));
+  mapControls.append(zoomIn, zoomOut);
+  root.append(mapControls);
 
   // ---------------- top strategic bar ----------------
   const topbar = el('header', 'ifg-topbar');
