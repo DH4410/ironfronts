@@ -16,6 +16,7 @@ import { EnvironmentController, type TimeOfDayState } from './environment-contro
 import { FRAME_UNIFORM_BYTES, packFrameUniforms } from './frame-uniforms';
 import { align4, uploadMipmappedTexture, uploadTexture } from './gpu-utils';
 import { loadInfantryModel, type InfantryModel } from './infantry-model';
+import { loadTankModel, type TankModel } from './tank-model';
 import { createMaterialTexture, createTreeMaterialTexture } from './material-texture';
 import {
   createEmptyRenderWorkload, PerformanceMonitor,
@@ -93,6 +94,7 @@ export class WorldRenderer {
   private lineLayout!: GPUBindGroupLayout;
   private countryLabelLayout!: GPUBindGroupLayout;
   private infantryModelLayout!: GPUBindGroupLayout;
+  private tankModelLayout!: GPUBindGroupLayout;
   private commonBindGroup!: GPUBindGroup;
   private uniformBuffer!: GPUBuffer;
   private terrainPipeline!: GPURenderPipeline;
@@ -109,6 +111,7 @@ export class WorldRenderer {
   private armyCompositionPipeline!: GPURenderPipeline;
   private armyModelPipeline!: GPURenderPipeline;
   private infantryModelPipeline!: GPURenderPipeline;
+  private tankModelPipeline!: GPURenderPipeline;
   private combatEffectPipeline!: GPURenderPipeline;
   private countryLabelPipeline!: GPURenderPipeline;
   private countryLabelBuffer?: GPUBuffer;
@@ -170,15 +173,22 @@ export class WorldRenderer {
   private armyModels?: InstanceLayer;
   private infantryModels?: InstanceLayer;
   private infantryModel?: InfantryModel;
+  private lightTankModels?: InstanceLayer;
+  private lightTankModel?: TankModel;
+  private mediumTankModels?: InstanceLayer;
+  private mediumTankModel?: TankModel;
   private static readonly ARMY_MARKER_CAPACITY = 1_024;
   private static readonly ARMY_MODEL_CAPACITY = 4_096;
   private static readonly ARMY_MODEL_VERTEX_COUNT = 6 * 36;
   private readonly armyModelSource = new Float32Array(WorldRenderer.ARMY_MODEL_CAPACITY * 16);
   private armyModelSourceCount = 0;
   private armyModelSourceRevision = 0;
-  private visibleInfantrySourceRevision = -1;
-  private visibleInfantryCameraRevision = -1;
+  private readonly visibleInfantryState = { sourceRevision: -1, cameraRevision: -1 };
   private readonly visibleInfantryScratch = new Float32Array(WorldRenderer.ARMY_MODEL_CAPACITY * 16);
+  private readonly visibleLightTankState = { sourceRevision: -1, cameraRevision: -1 };
+  private readonly visibleLightTankScratch = new Float32Array(WorldRenderer.ARMY_MODEL_CAPACITY * 16);
+  private readonly visibleMediumTankState = { sourceRevision: -1, cameraRevision: -1 };
+  private readonly visibleMediumTankScratch = new Float32Array(WorldRenderer.ARMY_MODEL_CAPACITY * 16);
   /** Base camera distance for the strategic-marker <-> 3D-model LOD swap. */
   private static readonly ARMY_MODEL_RANGE_BASE = 1_900;
   /** The ONLY resource-deposit marker layer: fed the player-visible authoritative
@@ -596,6 +606,17 @@ export class WorldRenderer {
       // The procedural infantry remains enabled as the fallback in this case.
       console.warn('Could not load the skinned infantry model; using the procedural fallback.', error);
     }
+    report('Loading tank models', 0.7);
+    try {
+      this.lightTankModel = await loadTankModel(this.device, this.tankModelLayout, '/models/tank-light.glb');
+    } catch (error) {
+      console.warn('Could not load the skinned light tank model; using the procedural fallback.', error);
+    }
+    try {
+      this.mediumTankModel = await loadTankModel(this.device, this.tankModelLayout, '/models/tank-medium.glb');
+    } catch (error) {
+      console.warn('Could not load the skinned medium tank model; using the procedural fallback.', error);
+    }
     this.terrainMeshes = [this.manifest.terrain.gridResolution, 33, 17, 9]
       .map((resolution) => createTerrainMesh(this.device, resolution, true));
     this.polarCapMesh = createTerrainMesh(this.device, 65);
@@ -906,6 +927,7 @@ export class WorldRenderer {
     this.lineLayout = layouts.lines;
     this.countryLabelLayout = layouts.countryLabels;
     this.infantryModelLayout = layouts.infantryModel;
+    this.tankModelLayout = layouts.tankModel;
   }
 
   private createPipelines(): void {
@@ -915,6 +937,7 @@ export class WorldRenderer {
       lines: this.lineLayout,
       countryLabels: this.countryLabelLayout,
       infantryModel: this.infantryModelLayout,
+      tankModel: this.tankModelLayout,
     });
     this.terrainPipeline = pipelines.terrain;
     this.polarCapPipeline = pipelines.polarCaps;
@@ -930,6 +953,7 @@ export class WorldRenderer {
     this.armyCompositionPipeline = pipelines.armyComposition;
     this.armyModelPipeline = pipelines.armyModels;
     this.infantryModelPipeline = pipelines.infantryModels;
+    this.tankModelPipeline = pipelines.tankModels;
     this.combatEffectPipeline = pipelines.combatEffects;
     this.countryLabelPipeline = pipelines.countryLabels;
   }
@@ -1051,6 +1075,12 @@ export class WorldRenderer {
     );
     this.infantryModels = this.createInstanceLayer(
       'visible skinned infantry models', zeroModels.buffer as ArrayBuffer, 0, 0, this.lineLayout,
+    );
+    this.lightTankModels = this.createInstanceLayer(
+      'visible skinned light tank models', zeroModels.buffer as ArrayBuffer, 0, 4, this.lineLayout,
+    );
+    this.mediumTankModels = this.createInstanceLayer(
+      'visible skinned medium tank models', zeroModels.buffer as ArrayBuffer, 0, 2, this.lineLayout,
     );
     const zeroR = new Float32Array(WorldRenderer.RESOURCE_MARKER_CAPACITY * 4);
     this.gameResourceMarkers = this.createInstanceLayer(
@@ -1261,14 +1291,21 @@ export class WorldRenderer {
           modelRecords.buffer as ArrayBuffer, modelRecords.byteOffset, cappedModels * 16 * 4,
         );
       }
+      // mode is a bitmask of which kinds have a loaded skinned overlay, so the
+      // procedural fallback only hides for the kinds that are actually covered.
+      const modelMode = (this.infantryModel ? 1 : 0)
+        | (this.lightTankModel ? 2 : 0)
+        | (this.mediumTankModel ? 4 : 0);
       this.device.queue.writeBuffer(
-        this.armyModels.params, 0, new Uint32Array([Math.max(1, cappedModels), this.infantryModel ? 1 : 0, 1, 0]),
+        this.armyModels.params, 0, new Uint32Array([Math.max(1, cappedModels), modelMode, 1, 0]),
       );
       this.armyModels.count = cappedModels;
       this.armyModelSourceCount = cappedModels;
       if (cappedModels > 0) this.armyModelSource.set(modelRecords.subarray(0, cappedModels * 16));
       this.armyModelSourceRevision += 1;
-      this.visibleInfantrySourceRevision = -1;
+      this.visibleInfantryState.sourceRevision = -1;
+      this.visibleLightTankState.sourceRevision = -1;
+      this.visibleMediumTankState.sourceRevision = -1;
     }
     this.armyPicker.update(pickList, this.elapsed);
   }
@@ -1276,17 +1313,26 @@ export class WorldRenderer {
   /** Keep the high-poly skinned draw to infantry that can intersect the current
    * camera frustum. The procedural models are tiny; the imported mesh is not,
    * so submitting every army on the world map would waste millions of vertices. */
-  private updateVisibleInfantryModels(): void {
-    if (!this.infantryModel || !this.infantryModels) return;
-    if (this.visibleInfantrySourceRevision === this.armyModelSourceRevision
-      && this.visibleInfantryCameraRevision === this.camera.revision) return;
-    this.visibleInfantrySourceRevision = this.armyModelSourceRevision;
-    this.visibleInfantryCameraRevision = this.camera.revision;
+  /**
+   * Shared by every high-detail skinned overlay (infantry, light tank, medium
+   * tank): compact the shared `armyModelSource` set down to just the
+   * instances of one `kind` that intersect the camera frustum, so the costly
+   * skinned draw only ever processes what is actually on screen.
+   */
+  private updateVisibleModelKind(
+    kind: number, hasModel: boolean, layer: InstanceLayer | undefined,
+    state: { sourceRevision: number; cameraRevision: number }, scratch: Float32Array,
+  ): void {
+    if (!hasModel || !layer) return;
+    if (state.sourceRevision === this.armyModelSourceRevision
+      && state.cameraRevision === this.camera.revision) return;
+    state.sourceRevision = this.armyModelSourceRevision;
+    state.cameraRevision = this.camera.revision;
     let visibleCount = 0;
     const worldWidth = this.manifest.world.width;
     for (let index = 0; index < this.armyModelSourceCount; index += 1) {
       const sourceOffset = index * 16;
-      if (Math.round(this.armyModelSource[sourceOffset + 3]) !== 0) continue;
+      if (Math.round(this.armyModelSource[sourceOffset + 3]) !== kind) continue;
       const x = this.armyModelSource[sourceOffset];
       const z = this.armyModelSource[sourceOffset + 1];
       let visible = false;
@@ -1297,27 +1343,23 @@ export class WorldRenderer {
         }
       }
       if (!visible) continue;
-      this.visibleInfantryScratch.set(
-        this.armyModelSource.subarray(sourceOffset, sourceOffset + 16),
-        visibleCount * 16,
-      );
+      scratch.set(this.armyModelSource.subarray(sourceOffset, sourceOffset + 16), visibleCount * 16);
       visibleCount += 1;
     }
     if (visibleCount > 0) {
-      this.device.queue.writeBuffer(
-        this.infantryModels.buffer,
-        0,
-        this.visibleInfantryScratch.buffer as ArrayBuffer,
-        0,
-        visibleCount * 16 * 4,
-      );
+      this.device.queue.writeBuffer(layer.buffer, 0, scratch.buffer as ArrayBuffer, 0, visibleCount * 16 * 4);
     }
-    this.device.queue.writeBuffer(
-      this.infantryModels.params,
-      0,
-      new Uint32Array([Math.max(1, visibleCount), 0, 1, 0]),
-    );
-    this.infantryModels.count = visibleCount;
+    this.device.queue.writeBuffer(layer.params, 0, new Uint32Array([Math.max(1, visibleCount), 0, 1, 0]));
+    layer.count = visibleCount;
+  }
+
+  private updateVisibleUnitModels(): void {
+    this.updateVisibleModelKind(0, Boolean(this.infantryModel), this.infantryModels,
+      this.visibleInfantryState, this.visibleInfantryScratch);
+    this.updateVisibleModelKind(4, Boolean(this.lightTankModel), this.lightTankModels,
+      this.visibleLightTankState, this.visibleLightTankScratch);
+    this.updateVisibleModelKind(2, Boolean(this.mediumTankModel), this.mediumTankModels,
+      this.visibleMediumTankState, this.visibleMediumTankScratch);
   }
 
   private readonly armyPicker = new ArmyPicker();
@@ -1509,7 +1551,7 @@ export class WorldRenderer {
     this.camera.update(deltaMs / 1000);
     this.resize();
     this.updateVisibleTerrainChunks();
-    this.updateVisibleInfantryModels();
+    this.updateVisibleUnitModels();
     const cameraMs = performance.now() - phaseStarted;
 
     phaseStarted = performance.now();
@@ -1775,6 +1817,25 @@ export class WorldRenderer {
       pass.setIndexBuffer(model.indices, 'uint16');
       pass.drawIndexed(model.indexCount, instances);
       this.recordIndexedDraw('roadFurniture', model.indexCount, instances);
+    }
+    for (const tank of [
+      { model: this.lightTankModel, layer: this.lightTankModels },
+      { model: this.mediumTankModel, layer: this.mediumTankModels },
+    ]) {
+      if (!tank.model || !tank.layer || tank.layer.count === 0
+        || this.camera.distance >= this.armyModelDrawDistance) continue;
+      const instances = tank.layer.count * WORLD_COPY_INDICES.length;
+      pass.setPipeline(this.tankModelPipeline);
+      pass.setBindGroup(1, tank.layer.bindGroup);
+      pass.setBindGroup(2, tank.model.resources);
+      pass.setVertexBuffer(0, tank.model.positions);
+      pass.setVertexBuffer(1, tank.model.normals);
+      pass.setVertexBuffer(2, tank.model.colors);
+      pass.setVertexBuffer(3, tank.model.joints);
+      pass.setVertexBuffer(4, tank.model.weights);
+      pass.setIndexBuffer(tank.model.indices, 'uint16');
+      pass.drawIndexed(tank.model.indexCount, instances);
+      this.recordIndexedDraw('roadFurniture', tank.model.indexCount, instances);
     }
     if (this.armyMarkers && this.armyMarkers.count > 0 && this.camera.distance < 5_000) {
       pass.setBindGroup(1, this.armyMarkers.bindGroup);

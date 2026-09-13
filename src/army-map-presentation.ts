@@ -1,7 +1,9 @@
 /** Six silhouettes shown in the strategic counter atlas. */
 export type ArmyVisualKind = 0 | 1 | 2 | 3 | 4 | 5;
-/** Four close-range model families; engineers share infantry and light armour shares a hull. */
-export type ArmyModelKind = 0 | 1 | 2 | 3;
+/** Five close-range model families; engineers share infantry. Light tanks get
+ *  their own skinned model, so they are split from the armored-car hull they
+ *  used to share (kind 1) into kind 4. */
+export type ArmyModelKind = 0 | 1 | 2 | 3 | 4;
 
 export interface ProjectedTroopGroup {
   readonly typeId: string;
@@ -31,9 +33,10 @@ export function visualKindForUnit(typeId: string): ArmyVisualKind {
 }
 
 function modelKindForUnit(typeId: string): ArmyModelKind {
-  if (typeId === 'armored-car' || typeId === 'light-tank') return 1;
+  if (typeId === 'armored-car') return 1;
   if (typeId === 'medium-tank') return 2;
   if (typeId === 'artillery') return 3;
+  if (typeId === 'light-tank') return 4;
   return 0;
 }
 

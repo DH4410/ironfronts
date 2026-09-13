@@ -14,6 +14,21 @@ source exports in the repository root. The supplied model is treated as an
 Ironfronts project asset; confirm its original author/licence before public
 distribution.
 
+## User-provided tank models
+
+`public/models/tank-light.glb` and `public/models/tank-medium.glb` are
+converted from the project owner's supplied "Animated Tank Pack" FBX exports
+(`Tank_Pack_Light.fbx`, `Tank_Pack_Medium.fbx` in the repository root; two of
+the four hull designs in the source pack, picked for a lighter vs. heavier
+silhouette). Each contains the shared hull/track mesh, the 89-bone armature,
+and all four driving clips (`Tank_Forward`, `Tank_Backwards`,
+`Tank_TurningLeft`, `Tank_TurningRight`); only Forward and Backwards are
+currently wired into the game (see `src/tank-model.ts`). Run
+`npm run build:tank-model` to regenerate them via headless Blender — set
+`BLENDER_BIN` if Blender isn't in one of the default install locations. The
+supplied models are treated as Ironfronts project assets; confirm their
+original author/licence before public distribution.
+
 ---
 
 ## 0 A.D. — session UI icons
