@@ -119,7 +119,10 @@ panel and then a map click — there are no per-command keyboard shortcuts. Map
 modes, production/construction, rally points, resources, battle summaries, and
 artillery state are exposed through the HUD.
 
-Append `?debug` to enable the inspector. F3 toggles it and `[`/`]` cycle renderer views while open.
+On deployments with `IRONFRONTS_DEBUG_CONTROLS_ENABLED=true`, the signed
+`DimaTest1` account entitlement exposes the inspector after authentication. F3
+toggles it and `[`/`]` cycle renderer views while open. URL parameters and
+development mode do not grant debug access.
 
 ## World pipeline
 

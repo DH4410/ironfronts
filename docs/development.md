@@ -103,7 +103,9 @@ Current limitation: the application requires an authenticated seat, while the QA
 
 ## Performance check
 
-`scripts/performance-check.mjs` adds `?benchmark=1`, exposes timing handles, and measures overview, dense urban, rain, regional, pan, orbit, zoom, and layer ablations. Outputs:
+`scripts/performance-check.mjs` uses authenticated debug handles to measure
+overview, dense urban, rain, regional, pan, orbit, zoom, and layer ablations.
+Outputs:
 
 - `artifacts/performance-report.json`
 - `artifacts/performance-report.md`
@@ -121,7 +123,8 @@ The same authentication harness limitation as visual-check currently applies.
 
 ## Debug mode
 
-Launch the client with `?debug` to expose:
+Set `IRONFRONTS_DEBUG_CONTROLS_ENABLED=true` on an approved QA deployment and
+sign in as `DimaTest1` to expose:
 
 - F3 world/diplomacy/renderer inspector;
 - debug rendering views and layer toggles;
@@ -130,7 +133,11 @@ Launch the client with `?debug` to expose:
 - performance snapshot;
 - `window.__ironfrontsRenderer` and `window.__ironfrontsSession` automation handles.
 
-`?benchmark` enables the same internal handles for QA. Full projected session state is deliberately not exposed on ordinary player pages.
+The game ticket carries a signed, account-derived entitlement and the game
+server applies the deployment gate independently to every WebSocket
+connection. URL parameters, forged client messages, and development mode do
+not grant access. Full projected session state is not exposed on ordinary
+player pages.
 
 ## Change workflow
 

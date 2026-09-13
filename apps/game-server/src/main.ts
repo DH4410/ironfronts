@@ -68,7 +68,7 @@ const server = createInternalApiServer({
 // constant. The multiplier is a single live value shared by the whole server
 // process — every connected player sees the same pace, which is expected for
 // a one-tester dev/QA lever, not a per-player setting.
-const devControlsEnabled = process.env.NODE_ENV !== 'production';
+const devControlsEnabled = config.debugControlsEnabled;
 let simSpeedMultiplier = config.devSimSpeed;
 if (simSpeedMultiplier !== 1) log('warn', 'dev_sim_speed_active', { multiplier: simSpeedMultiplier });
 /** Clamped (see clampSimSpeed; 0 = paused). No-op outside dev, no matter who calls it. */
@@ -97,6 +97,7 @@ const gateway: GameplayGateway = new GameplayGateway({
   runtime,
   clientOrigin: config.clientOrigin,
   ticketSecret: config.ticketSecret,
+  debugControlsEnabled: config.debugControlsEnabled,
   world: { version: loaded.version, hash: loaded.hash, artifactHashes: loaded.artifactHashes, assetBaseUrl: config.worldPublicUrl },
   clock: gameClock,
   revision: () => publisher.revision,

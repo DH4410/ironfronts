@@ -22,6 +22,7 @@ export function verifyGameTicket(token: string, secret: string): GameTicketClaim
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) throw new Error('Invalid game ticket signature.');
   const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as GameTicketClaims;
+  if (typeof claims.debugEntitled !== 'boolean') throw new Error('Game ticket is missing its debug entitlement.');
   if (claims.audience !== 'game-server') throw new Error('Invalid game ticket audience.');
   if (claims.protocolVersion !== PROTOCOL_VERSION) throw new Error('Unsupported protocol version.');
   if (!Number.isFinite(claims.expiresAt) || claims.expiresAt <= Date.now()) throw new Error('Game ticket expired.');

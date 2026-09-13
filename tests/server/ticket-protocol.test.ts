@@ -9,7 +9,7 @@ const secret = 'a sufficiently long test secret';
 const claims = {
   accountId: 'account-1', gameId: GAME_ID, countryId: 7,
   audience: 'game-server' as const, protocolVersion: PROTOCOL_VERSION,
-  expiresAt: Date.now() + 30_000, nonce: 'nonce-1',
+  expiresAt: Date.now() + 30_000, nonce: 'nonce-1', debugEntitled: true,
 };
 
 describe('game tickets and command wire schema', () => {
@@ -18,6 +18,10 @@ describe('game tickets and command wire schema', () => {
     expect(() => verifyGameTicket(`${signGameTicket(claims, secret)}x`, secret)).toThrow(/signature/i);
     expect(() => verifyGameTicket(signGameTicket({ ...claims, expiresAt: Date.now() - 1 }, secret), secret)).toThrow(/expired/i);
     expect(() => verifyGameTicket(signGameTicket({ ...claims, audience: 'other' as never }, secret), secret)).toThrow(/audience/i);
+    const missingEntitlement = { ...claims } as Partial<typeof claims>;
+    delete missingEntitlement.debugEntitled;
+    expect(() => verifyGameTicket(signGameTicket(missingEntitlement as never, secret), secret))
+      .toThrow(/entitlement/i);
   });
 
   it('strips forged ownership fields from network commands', () => {

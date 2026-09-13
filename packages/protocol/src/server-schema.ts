@@ -17,6 +17,11 @@ const resource = point.extend({ id: integer, kind: z.enum(['stone', 'metal', 'oi
   extractorArmyId: z.string().nullable(), status: z.enum(['idle', 'secured', 'extracting', 'exhausted']),
   provenance: z.enum(['generatedNatural', 'scenarioGuarantee']) });
 const record = <T extends z.ZodType>(schema: T) => z.record(z.string(), schema);
+const combatRateModifiers = z.object({
+  frontageUsed: integer, frontageLimit: integer, coordination: nonnegative,
+  organization: nonnegative, stanceOutput: nonnegative, supply: nonnegative,
+  protection: nonnegative, terrain: nonnegative, devastation: nonnegative,
+});
 const army = point.extend({
   id: z.string(), name: z.string(), ownerCountryId: integer, ownerName: z.string(), ownerColor: z.string(), own: z.boolean(),
   contact: z.enum(['contact', 'visible']), status: z.enum(['idle', 'moving', 'extracting', 'engaged', 'retreating', 'embarking', 'atSea', 'disembarking', 'unknown']),
@@ -30,7 +35,11 @@ const army = point.extend({
   actions: z.object({ canExtract: z.boolean(), extractableNodeId: integer.nullable(), extractReason: z.string().optional() }).optional(),
   suspendedOrder: point.extend({ intent: z.enum(['move', 'attack']) }).nullable().optional(),
   battleFronts: z.array(z.object({ id: z.string(), directionNodeId: integer, role: z.enum(['attack', 'defense']),
-    friendlyHp: nonnegative, friendlyBaselineHp: nonnegative, enemyHp: nonnegative, enemyBaselineHp: nonnegative, reinforcementCount: integer })).optional(),
+    friendlyHp: nonnegative, friendlyBaselineHp: nonnegative, enemyHp: nonnegative, enemyBaselineHp: nonnegative,
+    reinforcementCount: integer, outgoingDamagePerGameHour: nonnegative, incomingDamagePerGameHour: nonnegative,
+    friendlyCasualties: nonnegative, enemyCasualties: nonnegative,
+    estimatedGameHours: nonnegative.nullable(), estimatedRealSeconds: nonnegative.nullable(),
+    friendlyModifiers: combatRateModifiers, enemyModifiers: combatRateModifiers })).optional(),
   legalRetreatExits: z.array(point.extend({ firstNodeId: integer, destinationProvinceId: integer, bearing: z.string().optional() })).optional(),
   artillery: z.object({ range: nonnegative, targetArmyId: z.string().nullable(), manualTarget: z.boolean() }).nullable().optional(),
 });
@@ -83,7 +92,7 @@ const clock = z.object({ gameStartedAtEpochMs: finite, gameEpochMs: finite, serv
 export const serverMessageSchema: z.ZodType<ServerMessage> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('hello'), gameId: z.string(), gameVersion: z.string(), protocolVersion: z.literal(3), capabilities: z.array(z.string()),
     world: z.object({ version: z.string(), hash: z.string().regex(/^[a-f0-9]{64}$/), assetBaseUrl: z.url(),
-      artifactHashes: record(z.string().regex(/^[a-f0-9]{64}$/)) }), countryId: integer }),
+      artifactHashes: record(z.string().regex(/^[a-f0-9]{64}$/)) }), countryId: integer, debugEnabled: z.boolean() }),
   z.object({ type: z.literal('baseline'), revision: integer, state: projectionSchema, catalogs, clock }),
   z.object({ type: z.literal('delta'), fromRevision: integer, revision: integer, delta, events: z.array(event) }),
   z.object({ type: z.literal('clockSync'), clock }),

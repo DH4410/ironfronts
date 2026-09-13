@@ -1,4 +1,6 @@
 import { installTimelineDebugControls } from './client/debug-timeline';
+import { setDebugHandles } from './client/debug-access';
+import { describeOrderFailure } from './ui/order-feedback';
 import './styles.css';
 import '@fontsource/bitter/latin-ext-800.css';
 import '@fontsource/special-elite/latin-ext-400.css';
@@ -171,14 +173,11 @@ const mapModeInputs = [...document.querySelectorAll<HTMLInputElement>('input[nam
 const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
-const urlParams = new URLSearchParams(window.location.search);
-// Debug / world-inspector affordances are opt-in only: ?debug (or the
-// ?benchmark automation hook). They are NOT auto-enabled by the dev server, so
-// `npm run dev` shows the real player experience by default.
-const debugEnabled = urlParams.has('debug') || urlParams.has('benchmark');
+// Starts locked. Only the authenticated game-server hello can grant access.
+let debugEnabled = false;
 
 // The single typed channel between renderer/game systems and the player HUD.
-const uiStore = createUiStore(createInitialState({ quality: loadQuality(), debugEnabled }));
+const uiStore = createUiStore(createInitialState({ quality: loadQuality() }));
 
 const audio = new AudioManager(safeLocalStorage());
 const music = new MusicDirector(audio, {
@@ -348,10 +347,7 @@ function showLoader(): void {
   loadingError.hidden = true;
   loadingFoot.hidden = false;
   loading.hidden = false;
-  // The panel itself still starts closed (so `npm run dev` opens on the real
-  // player view), but in dev the toggle is visible so the visual lighting /
-  // time controls are one click away without needing the ?debug URL param.
-  debugToggle.hidden = !(debugEnabled || import.meta.env.DEV);
+  debugToggle.hidden = true;
   mapModes.hidden = true;
 }
 
@@ -383,6 +379,11 @@ async function teardownPartialLaunch(): Promise<void> {
   try { activeRenderer?.dispose(); } catch (error) { console.warn('[launch] renderer dispose failed', error); }
   activeRenderer = undefined;
   activeSession = undefined;
+  debugEnabled = false;
+  diagnostics.hidden = true;
+  debugToggle.hidden = true;
+  uiStore.patch({ debugEnabled: false });
+  setDebugHandles(window as unknown as Record<string, unknown>, false, {});
   activeStopQuotes?.();
   activeStopQuotes = null;
   void audio.setWindEnabled(false);
@@ -483,12 +484,24 @@ async function startGame(token: number): Promise<void> {
   const renderer = new WorldRenderer(canvas, countryLabels, loadQuality());
   activeRenderer = renderer;
 
+  const syncDebugAccess = (): void => {
+    debugEnabled = session.debugEnabled;
+    debugToggle.hidden = !debugEnabled;
+    if (!debugEnabled) diagnostics.hidden = true;
+    uiStore.patch({ debugEnabled });
+    setDebugHandles(window as unknown as Record<string, unknown>, debugEnabled, {
+      renderer, combatEffects, session,
+    });
+  };
+  syncDebugAccess();
+
   // Every DOM/debug listener below belongs to this renderer attempt. Retry or
   // Return to Command aborts them in one shot so failed launches cannot retain
   // an old renderer or stack duplicate handlers onto the next attempt.
   const attemptEvents = new AbortController();
   const attemptListener = { signal: attemptEvents.signal } as const;
   launchDisposers.push(() => attemptEvents.abort());
+  connection.addEventListener('debug-access', syncDebugAccess, attemptListener);
 
   // The connection reconnects on its own (1s, then every 2.5s) but did so
   // silently — an unstable link just looked like a frozen game. Surface it, and
@@ -510,16 +523,6 @@ async function startGame(token: number): Promise<void> {
   };
   window.addEventListener('pagehide', disposeRendererOnPagehide);
   launchDisposers.push(() => window.removeEventListener('pagehide', disposeRendererOnPagehide));
-  if (import.meta.env.DEV || debugEnabled) {
-    // Invisible automation handle (QA capture / perf scripts). Not a player-
-    // facing affordance.
-    (window as Window & {
-      __ironfrontsRenderer?: WorldRenderer;
-      __ironfrontsCombatEffects?: CombatEffectPool;
-    }).__ironfrontsRenderer = renderer;
-    (window as Window & { __ironfrontsCombatEffects?: CombatEffectPool })
-      .__ironfrontsCombatEffects = combatEffects;
-  }
   // Hover deposits come from the fog-aware GameSession projection once it
   // exists; before that (and for water) show no deposit chips. The renderer's
   // own natural-resource table bypasses fog and must not drive player hover.
@@ -799,6 +802,7 @@ async function startGame(token: number): Promise<void> {
 
   debugPlayerForm.addEventListener('submit', (event) => {
     event.preventDefault();
+    if (!debugEnabled) return;
     const country = renderer.setPlayerCountryByName(debugPlayerInput.value);
     if (!country) {
       setDiplomacyStatus(`No country exactly matches “${debugPlayerInput.value.trim()}”.`, true);
@@ -815,6 +819,7 @@ async function startGame(token: number): Promise<void> {
   ) => {
     form.addEventListener('submit', (event) => {
       event.preventDefault();
+      if (!debugEnabled) return;
       const country = renderer.setDiplomaticRelationByName(input.value, relation);
       if (!country) {
         setDiplomacyStatus(`“${input.value.trim()}” is unknown or is your current country.`, true);
@@ -839,6 +844,7 @@ async function startGame(token: number): Promise<void> {
     if (selected && isMapMode(selected)) setMapModeUnified(selected);
   };
   const toggleDiagnostics = () => {
+    if (!debugEnabled) return;
     diagnostics.hidden = !diagnostics.hidden;
     debugToggle.setAttribute('aria-expanded', String(!diagnostics.hidden));
   };
@@ -1011,10 +1017,10 @@ async function bootstrapGameSession(
   awaitingMoveTarget = false;
   targetingMode = null;
   pendingSplitGroups = null;
-  if (import.meta.env.DEV || debugEnabled) {
+  if (debugEnabled) {
     // Authoritative-state inspection handle for QA / perf scripts. Exposing the
-    // full GameState defeats fog of war, so it is DEV / ?debug only — never the
-    // normal player build.
+    // full GameState defeats fog of war, so it is installed only after the
+    // authenticated server handshake grants debug access.
     (window as Window & { __ironfrontsSession?: RemoteGameSession }).__ironfrontsSession = session;
   }
 
@@ -1138,6 +1144,7 @@ async function bootstrapGameSession(
     session.removeEventListener('change', syncDiplomaticRelations);
     combatEffects.clear();
     if (activeSession === session) activeSession = undefined;
+    setDebugHandles(window as unknown as Record<string, unknown>, false, {});
   };
   const teardownSessionOnPagehide = (event: PageTransitionEvent): void => {
     if (!event.persisted) { teardownSession(); activeConnection?.close(); }
@@ -1898,29 +1905,6 @@ function handleMapClick(
   //    selection proceed on this same click.
   if (selectedArmyId) deselectArmy();
   return false;
-}
-
-/**
- * Turn a raw server/engine rejection reason into a concise headline + detail so
- * the player learns *why* an order failed instead of seeing "Command failed".
- */
-function describeOrderFailure(reason: string): { title: string; body?: string } {
-  const r = reason.toLowerCase();
-  if (r.includes('not your army')) return { title: 'Not your army', body: 'You can only order armies you command.' };
-  if (r.includes('not your province')) return { title: 'Not your province', body: reason };
-  if (r.includes('own force') || r.includes('own territory') || r.includes('already hold that province')) {
-    return { title: 'Invalid target', body: 'You cannot attack your own forces or territory.' };
-  }
-  if (r.includes('close combat') || r.includes('is engaged')) return { title: 'Army is fighting', body: 'It cannot take new orders until the battle ends.' };
-  if (r.includes('retreating')) return { title: 'Army is retreating', body: 'Wait for it to disengage before giving new orders.' };
-  if (r.includes('war declaration')) return { title: 'War not declared', body: 'That route crosses a country you are not at war with.' };
-  if (r.includes('separate landmass')) return { title: 'Unreachable', body: reason };
-  if (r.includes('off the road network') || r.includes('not on land')) return { title: 'No path there', body: reason };
-  if (r.includes('no legal route') || r.includes('no land route')) return { title: 'No route', body: reason };
-  if (r.includes('already there')) return { title: 'Already there', body: 'The army is already at that location.' };
-  if (r.includes('retreat direction')) return { title: 'Bad retreat', body: reason };
-  if (r.includes('not in close combat')) return { title: 'Not in combat', body: 'Only an engaged army can be ordered to retreat.' };
-  return { title: 'Order rejected', body: reason };
 }
 
 /**

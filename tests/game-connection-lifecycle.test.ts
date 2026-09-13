@@ -13,10 +13,10 @@ class Socket extends EventTarget {
 }
 const state = () => ({ simulationTick:0,viewerCountryId:1,startCamera:{x:0,z:0,distance:1},countries:{1:{id:1,name:'A',color:'#fff',controller:'player',alive:true}},
   provinceOwners:{},provinceBuildings:{},provinceActions:{},productionQueues:{},constructionQueues:{},rallyPoints:{},armies:{},resourceNodes:{},ownCountry:null,relations:{} });
-function handshake(socket: Socket, revision=0) {
+function handshake(socket: Socket, revision=0, debugEnabled=false) {
   socket.open();
   socket.message({type:'hello',gameId:'world-at-war-2',gameVersion:'world-at-war@3',protocolVersion:3,capabilities:[],
-    world:{version:'12',hash:'a'.repeat(64),assetBaseUrl:'http://world',artifactHashes:{}},countryId:1});
+    world:{version:'12',hash:'a'.repeat(64),assetBaseUrl:'http://world',artifactHashes:{}},countryId:1,debugEnabled});
   socket.message({type:'baseline',revision,state:state(),catalogs:{units:[],buildings:[]},clock:{gameStartedAtEpochMs:0,gameEpochMs:0,serverEpochMs:0,speed:1,generation:0,utcOffsetMinutes:120}});
 }
 beforeEach(()=>{
@@ -65,6 +65,19 @@ describe('connection handshake cleanup',()=>{
     expect(connection.revision).toBe(7);
     expect(connection.baselineGeneration).toBe(2);
     connection.close();
+  });
+  it('exposes debug access only when the authenticated hello grants it',async()=>{
+    const opened=GameConnection.open(); await Promise.resolve();
+    handshake(Socket.instances[0],0,true);
+    const connection=await opened;
+    expect(connection.debugEnabled).toBe(true);
+    connection.close();
+
+    const ordinaryOpened=GameConnection.open(); await Promise.resolve();
+    handshake(Socket.instances[1],0,false);
+    const ordinary=await ordinaryOpened;
+    expect(ordinary.debugEnabled).toBe(false);
+    ordinary.close();
   });
   it('requests one baseline for a revision gap and closes if resync stalls',async()=>{
     const opened=GameConnection.open(); await Promise.resolve(); handshake(Socket.instances[0],2);

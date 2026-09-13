@@ -7,7 +7,6 @@ const outputDirectory = fileURLToPath(new URL('../artifacts/', import.meta.url))
 const scenarioDuration = Number(process.env.IRONFRONTS_BENCHMARK_MS ?? 2_200);
 const warmupDuration = Number(process.env.IRONFRONTS_BENCHMARK_WARMUP_MS ?? 600);
 const targetUrl = new URL(process.argv[2] ?? 'http://127.0.0.1:5173/');
-targetUrl.searchParams.set('benchmark', '1');
 
 await mkdir(outputDirectory, { recursive: true });
 const { browser, page, errors, headless } = await launchCheckPage();

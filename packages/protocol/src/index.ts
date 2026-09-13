@@ -104,6 +104,18 @@ export interface DiplomacyProposal {
   resolvedAtTick?: number;
 }
 
+export interface CombatRateModifiers {
+  frontageUsed: number;
+  frontageLimit: number;
+  coordination: number;
+  organization: number;
+  stanceOutput: number;
+  supply: number;
+  protection: number;
+  terrain: number;
+  devastation: number;
+}
+
 export interface ProjectedArmy {
   id: string;
   name: string;
@@ -157,6 +169,14 @@ export interface ProjectedArmy {
     enemyHp: number;
     enemyBaselineHp: number;
     reinforcementCount: number;
+    outgoingDamagePerGameHour: number;
+    incomingDamagePerGameHour: number;
+    friendlyCasualties: number;
+    enemyCasualties: number;
+    estimatedGameHours: number | null;
+    estimatedRealSeconds: number | null;
+    friendlyModifiers: CombatRateModifiers;
+    enemyModifiers: CombatRateModifiers;
   }>;
   legalRetreatExits?: ReadonlyArray<{
     firstNodeId: number; destinationProvinceId: number; x: number; z: number;
@@ -244,7 +264,7 @@ export type ProjectionDelta = {
 };
 
 export type ServerMessage =
-  | { type: 'hello'; gameId: string; gameVersion: string; protocolVersion: 3; capabilities: string[]; world: WorldDescriptor; countryId: number }
+  | { type: 'hello'; gameId: string; gameVersion: string; protocolVersion: 3; capabilities: string[]; world: WorldDescriptor; countryId: number; debugEnabled: boolean }
   | { type: 'baseline'; revision: number; state: PlayerProjection; catalogs: PresentationCatalogs; clock: GameClockSync }
   | { type: 'delta'; fromRevision: number; revision: number; delta: ProjectionDelta; events: FilteredEvent[] }
   | { type: 'clockSync'; clock: GameClockSync }
@@ -284,6 +304,8 @@ export interface GameTicketClaims {
   accountId: string;
   gameId: string;
   countryId: number;
+  /** Account-derived eligibility. The game deployment applies its own gate. */
+  debugEntitled: boolean;
   audience: 'game-server';
   protocolVersion: 3;
   expiresAt: number;
