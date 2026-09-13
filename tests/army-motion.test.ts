@@ -63,6 +63,21 @@ describe('bounded authoritative army presentation', () => {
     expect(reversed.z).toBeCloseTo(0);
   });
 
+  it('interpolates correctly against real Date.now()-scale epoch timestamps', () => {
+    // sample()'s `nowMs` argument must be on the same clock as
+    // motion.sampledAtEpochMs (a server Date.now() value) — the caller in
+    // main.ts once passed performance.now() instead, a page-load-relative
+    // clock on a completely different scale. That silently clamped every
+    // interpolation fraction to 0, so the marker only ever snapped to each
+    // new sample instead of tweening toward it.
+    const motion = new ArmyMotionInterpolator();
+    const epoch = 1_789_300_000_000; // realistic Date.now() magnitude
+    motion.sample('a', 0, 0, { targetX: 100, targetZ: 0, durationMs: 1000, sampledAtEpochMs: epoch }, epoch, 1000);
+    const midway = motion.sample('a', 0, 0, { targetX: 100, targetZ: 0, durationMs: 1000, sampledAtEpochMs: epoch }, epoch + 500, 1000);
+    expect(midway.x).toBeCloseTo(30);
+    expect(midway.x).toBeGreaterThan(0);
+  });
+
   it('uses the presented marker position for CPU picking', () => {
     const picker = new ArmyPicker();
     picker.update([{ id:'a',x:0,z:0,targetX:100,targetZ:0,remainingMs:1000 }],0);

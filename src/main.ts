@@ -263,6 +263,14 @@ let selectedProvinceName = '';
 let selectedProvinceTerrain = '';
 /** True while the next map click places the selected province's rally point. */
 let awaitingRallyTarget = false;
+// Shift-click waypoint queue (client-side only — the server has no notion of
+// a multi-leg order). Each army's queued destinations wait until the army
+// reports 'idle' (its current order finished) before the next one is issued.
+// `armyWaypointIssuing` guards against re-firing the same waypoint on every
+// subsequent 'change' event while the just-sent order is still in flight and
+// the army's locally-known status has not yet flipped away from 'idle'.
+const armyWaypointQueues = new Map<string, Array<{ x: number; z: number }>>();
+const armyWaypointIssuing = new Set<string>();
 const authenticated = await getSession().catch((): SessionResponse => ({ authenticated: false }));
 if (!authenticated.authenticated || !authenticated.account) {
   window.location.replace('/login.html');
@@ -288,6 +296,11 @@ mountMenu({
   // In the lobby this only persists; once the renderer exists it applies live.
   onGraphicsQuality: (level) => activeRenderer?.setQuality(level),
 });
+// The menu is fully styled and wired by this point (mountMenu ran after the
+// session/lobby fetches resolved) — swap the boot spinner for it in one go so
+// there is never a frame of raw, unstyled HTML.
+required<HTMLElement>('menu-root').hidden = false;
+required<HTMLElement>('boot-loading').hidden = true;
 
 loadingRetry.addEventListener('click', () => {
   loadingError.hidden = true;
@@ -1060,7 +1073,7 @@ async function bootstrapGameSession(
   // Left-tap -> army selection / armed-order placement (does not also select a
   // province if it was consumed). Right-click -> direct move/attack order for
   // the selected army, the primary fast interaction.
-  renderer.onMapClick = (clientX, clientY) => handleMapClick(renderer, session, clientX, clientY);
+  renderer.onMapClick = (clientX, clientY, shiftKey) => handleMapClick(renderer, session, clientX, clientY, shiftKey);
   renderer.onMapCommand = (clientX, clientY) => handleMapCommand(renderer, session, clientX, clientY);
   session.addEventListener('war-confirmation', (event) => {
     const detail = (event as CustomEvent<{
@@ -1080,6 +1093,7 @@ async function bootstrapGameSession(
       armyMotionInterpolator.clear(); combatEffects.clear(); presentationGeneration = session.baselineGeneration;
     }
     syncArmyMarkers(session, renderer);
+    advanceWaypointQueues(session);
   };
   session.addEventListener('change', syncDiplomaticRelations);
   const onDiplomacySessionChange = (): void => syncDiplomacyView(session);
@@ -1153,6 +1167,8 @@ async function bootstrapGameSession(
     window.clearInterval(hudTimer);
     window.clearInterval(civilClockTimer);
     armyMotionInterpolator.clear();
+    armyWaypointQueues.clear();
+    armyWaypointIssuing.clear();
     clearAllNotificationTimers();
     session.dispose();
     window.removeEventListener('keydown', onKey);
@@ -1266,7 +1282,11 @@ function syncArmyMarkers(
   let modelCount = 0;
   let routeCursor = 0;
   let routeCount = 0;
-  const motionNow = performance.now();
+  // Must be the same epoch-ms clock as motion.sampledAtEpochMs (a server
+  // Date.now() timestamp) — performance.now() here compared cleanly-out-of-
+  // range against it, silently clamping every interpolation fraction to 0 and
+  // turning "smooth interpolation" into "snap to each new sample" instead.
+  const motionNow = Date.now();
   const activeArmyIds = new Set<string>();
   const activeModelKeys = new Set<string>();
   armyPickScratch.length = 0;
@@ -1775,6 +1795,29 @@ function armStrike(session: RemoteGameSession): void {
 /** A one-shot red reticle that snaps onto the click point and fades. Pure DOM,
  *  no renderer pipeline — the immediate "acknowledged" cue for an attack order. */
 let attackFlashEl: HTMLDivElement | null = null;
+/** Shift-click adds a waypoint instead of issuing the move immediately. */
+function queueWaypoint(armyId: string, x: number, z: number): void {
+  const queue = armyWaypointQueues.get(armyId) ?? [];
+  queue.push({ x, z });
+  armyWaypointQueues.set(armyId, queue);
+}
+
+/** Fire the next queued waypoint once an army's current order has finished. */
+function advanceWaypointQueues(session: RemoteGameSession): void {
+  for (const [armyId, queue] of armyWaypointQueues) {
+    const army = session.army(armyId);
+    if (!army || !army.own) { armyWaypointQueues.delete(armyId); armyWaypointIssuing.delete(armyId); continue; }
+    if (army.status !== 'idle') { armyWaypointIssuing.delete(armyId); continue; }
+    if (armyWaypointIssuing.has(armyId)) continue; // already issued; waiting for confirmation
+    if (!queue.length) { armyWaypointQueues.delete(armyId); continue; }
+    const next = queue.shift()!;
+    if (!queue.length) armyWaypointQueues.delete(armyId);
+    armyWaypointIssuing.add(armyId);
+    const result = session.orderMove(armyId, next.x, next.z, 'move');
+    if (!result.ok) armyWaypointIssuing.delete(armyId);
+  }
+}
+
 function flashAttackTarget(clientX: number, clientY: number): void {
   if (!attackFlashEl) {
     attackFlashEl = document.createElement('div');
@@ -1792,6 +1835,7 @@ function flashAttackTarget(clientX: number, clientY: number): void {
 
 function handleMapClick(
   renderer: WorldRenderer, session: RemoteGameSession, clientX: number, clientY: number,
+  shiftKey = false,
 ): boolean {
   // 0. Armed strategic strike -> confirm, then spend a warhead on the province.
   if (targetingMode === 'strike') {
@@ -1824,7 +1868,24 @@ function handleMapClick(
     });
     return true;
   }
-  // 1. Armed destination order -> issue to the clicked ground point.
+  // 1. Armed destination order -> issue to the clicked ground point. Holding
+  //    Shift queues it as a waypoint after the army's current/last-queued
+  //    order instead, and keeps the Move command armed for more waypoints —
+  //    like 0ad's shift-click move queue. A plain click always still cancels
+  //    aiming and issues (or replaces) the immediate order.
+  if (targetingMode === 'move' && shiftKey && selectedArmyId && session.ownsArmy(selectedArmyId)) {
+    const ground = renderer.groundPointAt(clientX, clientY);
+    if (ground) {
+      queueWaypoint(selectedArmyId, ground[0], ground[1]);
+      advanceWaypointQueues(session);
+      void audio.playUiCue('move');
+      pushNotification('information', 'Waypoint queued',
+        'Shift-click to add more, or click without Shift to stop aiming.');
+      syncArmyMarkers(session, renderer);
+      refreshSelectedArmy(session);
+      return true;
+    }
+  }
   if ((targetingMode === 'move' || targetingMode === 'split')
     && selectedArmyId && session.ownsArmy(selectedArmyId)) {
     const ground = renderer.groundPointAt(clientX, clientY);
@@ -1837,6 +1898,8 @@ function handleMapClick(
         pushNotification('warning', targetingMode === 'split' ? 'Split failed' : title, body);
       } else {
         void audio.playUiCue('move');
+        // A fresh, unqueued order supersedes anything still waiting.
+        armyWaypointQueues.delete(selectedArmyId);
       }
       awaitingMoveTarget = false;
       targetingMode = null;

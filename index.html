@@ -7,8 +7,30 @@
     <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin />
     <link rel="icon" href="data:," />
     <title>Ironfronts — World Renderer</title>
+    <style>
+      /* Critical, inline: applies on first paint, before the app bundle's own
+         CSS loads, so navigating here (e.g. from login) never shows a flash
+         of unstyled default HTML. #boot-loading is removed once the menu
+         (or an in-progress session) is ready to show itself. */
+      html, body { background: #060807; margin: 0; height: 100%; }
+      #boot-loading {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; align-items: center; justify-content: center;
+        background: #060807;
+      }
+      #boot-loading__mark {
+        width: 44px; height: 44px;
+        border: 2px solid rgba(232, 201, 136, .25);
+        border-top-color: #e8c988;
+        border-radius: 50%;
+        animation: boot-spin 0.9s linear infinite;
+      }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
+      #boot-loading[hidden] { display: none; }
+    </style>
   </head>
   <body>
+    <div id="boot-loading" aria-hidden="true"><i id="boot-loading__mark"></i></div>
     <canvas id="world" aria-label="Interactive 3D world map" hidden></canvas>
     <canvas id="country-labels" class="country-labels" aria-hidden="true" hidden></canvas>
 
@@ -17,7 +39,7 @@
       <span class="brand__title">IRONFRONTS</span>
     </header>
 
-    <div id="menu-root" class="ifm" role="dialog" aria-label="Ironfronts main menu">
+    <div id="menu-root" class="ifm" role="dialog" aria-label="Ironfronts main menu" hidden>
       <div class="ifm__backdrop" aria-hidden="true">
         <div class="ifm__map"></div>
         <div class="ifm__wash"></div>

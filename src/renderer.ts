@@ -74,7 +74,7 @@ export class WorldRenderer {
   onProvinceSelected?: (info: HoverInfo | null) => void;
   /** Gameplay-layer map tap handler. Return true to consume the click
    *  (army selection / move order) and suppress province selection. */
-  onMapClick?: (clientX: number, clientY: number) => boolean;
+  onMapClick?: (clientX: number, clientY: number, shiftKey: boolean) => boolean;
   /** Right-click / secondary tap: issue a move/attack order for the selected army. */
   onMapCommand?: (clientX: number, clientY: number) => boolean;
   onTimeOfDayChange?: (state: TimeOfDayState) => void;
@@ -1434,7 +1434,7 @@ export class WorldRenderer {
       if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > tapSlop) return;
       // Gameplay layer gets first refusal on a map tap (army pick / move
       // order). If it handled the click, do not also select a province.
-      if (this.onMapClick?.(event.clientX, event.clientY)) return;
+      if (this.onMapClick?.(event.clientX, event.clientY, event.shiftKey)) return;
       if (event.pointerType === 'touch') {
         this.pointer.x = event.clientX;
         this.pointer.y = event.clientY;
