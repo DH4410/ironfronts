@@ -64,7 +64,7 @@ interface GraphNodeInfo {
 }
 
 /** Nudge a resource node that landed on a coastline/void texel back onto land. */
-function resolveProvince(world: WorldData, x: number, z: number): number {
+export function resolveProvince(world: WorldData, x: number, z: number): number {
   const direct = world.provinceAt(x, z);
   if (direct >= 0) return direct;
   for (const radius of [8, 18, 32, 48]) {

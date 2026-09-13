@@ -1,6 +1,7 @@
 import type { SimContext } from './sim-context';
 import { armyAtNode } from './movement/position';
 import { wrappedDistance } from './geometry';
+import { resolveProvince } from './resource-bootstrap';
 
 /** Validate references after rebuilding immutable world indexes. */
 export function validateWorldState(ctx: SimContext): void {
@@ -110,8 +111,13 @@ export function validateWorldState(ctx: SimContext): void {
   }
   for (const [nodeId, node] of Object.entries(state.resourceNodes)) {
     if (Number(nodeId) !== node.id) throw new Error('Resource key mismatch.');
+    // Match the tolerance bootstrapResources() used to assign provinceId in the
+    // first place (resolveProvince nudges a coastline/void texel to the
+    // nearest land province within a few rings) — a direct-only lookup here
+    // would reject nodes that were always legitimately placed this way,
+    // failing every restore of a freshly created game.
     if (!provinceIds.has(node.provinceId) || !countryExists(node.controllerCountryId)
-      || node.remaining > node.initialAmount || world.provinceAt(node.x, node.z) !== node.provinceId
+      || node.remaining > node.initialAmount || resolveProvince(world, node.x, node.z) !== node.provinceId
       || (node.accessNodeId !== -1 && !nodeExists(node.accessNodeId))) throw new Error('Invalid resource node.');
     if (node.extractorArmyId && state.armies[node.extractorArmyId]?.extractingNodeId !== node.id) {
       node.extractorArmyId = null; node.status = node.remaining > 0 ? 'idle' : 'exhausted';
