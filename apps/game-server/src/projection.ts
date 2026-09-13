@@ -4,6 +4,7 @@ import {
   UNIT_TYPES, BUILDINGS, buildOptions, producibleUnits, armyShortageSummary,
   provinceResourceOutputBreakdown,
   buildEngineerAssignmentIndex, engineerAssignmentKey,
+  unitProductionWorkRate,
   type GameState, type LandGraph, type WorldData,
 } from '@ironfronts/game-core';
 import type { PlayerProjection, ProjectionDelta, PublicCountry } from '@ironfronts/protocol';
@@ -127,6 +128,11 @@ export function projectFor(
         )])),
     }];
   }));
+  const productionQueues = Object.fromEntries(Object.entries(privateMap(state.productionQueues)).map(([rawId, queue]) => {
+    const provinceId = Number(rawId);
+    return [provinceId, queue.map((order) => ({ ...order,
+      workRate: unitProductionWorkRate({ state, world, graph }, provinceId, order.unitTypeId) }))];
+  }));
   return structuredClone({
     timeline: { elapsedSeconds: state.clock.gameTimeHours * 3_600, speed: gameHoursPerRealSecond * 3_600,
       movementSpeed: movementSpeedMultiplier, sampledAtEpochMs, generation: state.clock.generation ?? 0 },
@@ -144,7 +150,7 @@ export function projectFor(
     // Normal snapshots (including reconnects) only ever contain owned records.
     provinceEconomies,
     provinceActions,
-    productionQueues: privateMap(state.productionQueues),
+    productionQueues,
     constructionQueues: privateMap(state.constructionQueues),
     rallyPoints: graph
       ? Object.fromEntries(Object.entries(privateMap(state.rallyPoints)).map(([id, point]) => [

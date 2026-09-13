@@ -21,12 +21,12 @@ const side = z.object({ countryId: id, directionNodeId: id, role: z.enum(['attac
 const queue = z.object({ id: z.string(), ownerCountryId: id, progressWork: positive.optional(), totalWork: number.positive().optional(), progressHours: positive.optional(), totalHours: number.positive().optional(), targetTier: id.optional() });
 const shortage = z.object({ severity: positive.max(100), notifiedThreshold: z.union([z.literal(0), z.literal(25), z.literal(50), z.literal(75)]) });
 const potential = z.object({ food: positive.max(1), stone: positive.max(1), metal: positive.max(1), oil: positive.max(1) });
-const resourceBuildings = z.object({ fields: id.max(3), quarry: id.max(3), mine: id.max(3), oilPump: id.max(3) });
+const resourceBuildings = z.object({ fields: id.max(5), quarry: id.max(5), mine: id.max(5), oilPump: id.max(5) });
 const stateSchema = z.object({ version: z.literal(4), seed: number, scenarioId: z.string(), mode: z.enum(['campaign', 'sandbox']),
   fogOfWar: z.boolean(), economyEnabled: z.boolean(),
   clock: z.object({ gameTimeHours: positive, startDate: z.string(), initialEpochMs: number.min(-8.64e15).max(8.64e15).optional(), generation: id.optional(), pendingHours: positive.optional() }), simulationTick: id,
   countries: record(z.object({ id, name: z.string(), color: z.string(), controller: z.enum(['player', 'ai', 'neutral']), stockpile, income: stockpile, industryCapacity: positive, upkeep: stockpile.optional(), netIncome: signedStockpile.optional(), coverage: z.object({ funds: positive.max(1), food: positive.max(1), metal: positive.max(1), oil: positive.max(1) }).optional(), reserveHours: z.object({ funds: positive.nullable(), food: positive.nullable(), metal: positive.nullable(), oil: positive.nullable() }).optional(), shortages: z.object({ funds: shortage, food: shortage, metal: shortage, oil: shortage }).optional(), warheads: positive.default(0), phase: id.optional() })),
-  provinceOwners: record(id), provinceBuildings: record(z.object({ barracks: id, tankPlant: id, ordnance: id, missileSite: id.default(0) })),
+  provinceOwners: record(id), provinceBuildings: record(z.object({ barracks: id.max(5), tankPlant: id.max(5), ordnance: id.max(5), missileSite: id.max(5).default(0) })),
   productionQueues: record(z.array(queue.extend({ unitTypeId: unit }))), constructionQueues: record(z.array(queue.extend({ buildingId: building }))), rallyPoints: record(point),
   armies: record(point.extend({ id: z.string(), ownerCountryId: id, name: z.string(), graphNodeId: id,
     edge: z.object({ from: id, to: id }).nullable().optional(),

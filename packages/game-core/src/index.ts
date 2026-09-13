@@ -13,7 +13,7 @@ export { stackExtractionRate } from '../../../src/game/units/army';
 export { currentMovementLeg } from '../../../src/game/units/movement';
 export { BUILDINGS } from '../../../src/game/construction';
 export { buildOptions } from '../../../src/game/construction';
-export { producibleUnits } from '../../../src/game/production';
+export { producibleUnits, unitProductionWorkRate, UNIT_PRODUCTION_RATE_BY_LEVEL } from '../../../src/game/production';
 export { BUILDING_REQUIRED_PHASE, PHASE_LABELS, PHASE_MAX } from '../../../src/game/phase';
 export {
   declareWar, endAlliance, proposeDiplomacy, respondDiplomacy, sendDiplomaticMessage,

@@ -50,7 +50,7 @@ const buildingCostLabel = (id: BuildingId, tier = 1): string => {
   return Object.entries(cost as Record<string, number>)
   .map(([k, v]) => `${v} ${k}`).join(' · ');
 };
-type WorkOrderView = { progressWork?: number; totalWork?: number; progressHours?: number; totalHours?: number };
+type WorkOrderView = { progressWork?: number; totalWork?: number; progressHours?: number; totalHours?: number; workRate?: number };
 const orderPercent = (o: WorkOrderView): number => {
   const progress = o.progressWork ?? o.progressHours ?? 0;
   const total = o.totalWork ?? o.totalHours ?? 0;
@@ -60,6 +60,7 @@ const orderPercent = (o: WorkOrderView): number => {
 const GAME_HOURS_PER_REAL_SECOND = 1 / 3_600;
 const orderEtaSeconds = (o: WorkOrderView): number => activeSession?.devSimSpeed === 0 ? Infinity
   : Math.max(0, ((o.totalWork ?? o.totalHours ?? 0) - (o.progressWork ?? o.progressHours ?? 0))
+    / Math.max(0.01, o.workRate ?? 1)
     / (GAME_HOURS_PER_REAL_SECOND * (activeSession?.devSimSpeed ?? 1)));
 
 /** Player queues a unit from the selected-province PRODUCE panel. */
@@ -2296,13 +2297,13 @@ function projectSelectedProvince(
     buildable: summary.isOwn
       ? session.buildable(provinceId).map(({ id, available, affordable, reason, targetTier }) => {
           const tier = targetTier ?? 1;
-          return { id, name: `${buildingLabel(id)}${tier > 1 ? ` Tier ${tier}` : ''}`,
+          return { id, name: `${buildingLabel(id)}${tier > 1 ? ` Level ${tier}` : ''}`,
             costLabel: buildingCostLabel(id, tier), affordable, available, reason };
         })
       : [],
     construction: summary.isOwn
       ? (session.state.constructionQueues[provinceId] as Array<WorkOrderView & { buildingId: BuildingId; targetTier?: number }> ?? []).map((o, i) => ({
-          id: o.buildingId, label: `${buildingLabel(o.buildingId)}${(o.targetTier ?? 1) > 1 ? ` Tier ${o.targetTier}` : ''}`, active: i === 0,
+          id: o.buildingId, label: `${buildingLabel(o.buildingId)}${(o.targetTier ?? 1) > 1 ? ` Level ${o.targetTier}` : ''}`, active: i === 0,
           progress: i === 0 ? orderPercent(o) / 100 : 0, etaSeconds: i === 0 ? orderEtaSeconds(o) : 0,
         }))
       : [],

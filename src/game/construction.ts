@@ -20,25 +20,45 @@ const definition = (label: string, kind: BuildingDef['kind'], tiers: readonly Ti
 });
 
 export const BUILDINGS: Record<BuildingId, BuildingDef> = {
-  barracks: definition('Barracks', 'military', [{ work: 4, cost: { funds: 700, stone: 180 } }]),
-  tankPlant: definition('Tank Plant', 'military', [{ work: 12, cost: { funds: 2200, stone: 400, metal: 300 } }]),
-  ordnance: definition('Ordnance Workshop', 'military', [{ work: 12, cost: { funds: 2500, stone: 450, metal: 350 } }]),
-  missileSite: definition('Missile Site', 'military', [{ work: 27, cost: { funds: 5000, stone: 900, metal: 900 } }]),
+  barracks: definition('Barracks', 'military', [
+    { work: 4, cost: { funds: 700, stone: 180 } }, { work: 8, cost: { funds: 1100, stone: 280 } },
+    { work: 14, cost: { funds: 1700, stone: 420 } }, { work: 26, cost: { funds: 2600, stone: 650 } },
+    { work: 42, cost: { funds: 4000, stone: 1000 } },
+  ]),
+  tankPlant: definition('Tank Plant', 'military', [
+    { work: 12, cost: { funds: 2200, stone: 400, metal: 300 } }, { work: 16, cost: { funds: 3200, stone: 600, metal: 450 } },
+    { work: 22, cost: { funds: 4500, stone: 850, metal: 650 } }, { work: 30, cost: { funds: 6500, stone: 1200, metal: 900 } },
+    { work: 42, cost: { funds: 9000, stone: 1700, metal: 1300 } },
+  ]),
+  ordnance: definition('Ordnance Workshop', 'military', [
+    { work: 12, cost: { funds: 2500, stone: 450, metal: 350 } }, { work: 17, cost: { funds: 3600, stone: 675, metal: 525 } },
+    { work: 23, cost: { funds: 5200, stone: 950, metal: 750 } }, { work: 31, cost: { funds: 7500, stone: 1400, metal: 1100 } },
+    { work: 43, cost: { funds: 10500, stone: 2000, metal: 1600 } },
+  ]),
+  missileSite: definition('Missile Site', 'military', [
+    { work: 27, cost: { funds: 5000, stone: 900, metal: 900 } }, { work: 30, cost: { funds: 7200, stone: 1300, metal: 1300 } },
+    { work: 34, cost: { funds: 10000, stone: 1800, metal: 1800 } }, { work: 38, cost: { funds: 14000, stone: 2500, metal: 2500 } },
+    { work: 44, cost: { funds: 20000, stone: 3500, metal: 3500 } },
+  ]),
   fields: definition('Fields', 'resource', [
     { work: 4, cost: { funds: 350, stone: 100 } }, { work: 8, cost: { funds: 750, stone: 180 } },
     { work: 12, cost: { funds: 1600, stone: 300 } },
+    { work: 24, cost: { funds: 3000, stone: 500 } }, { work: 42, cost: { funds: 5200, stone: 800 } },
   ]),
   quarry: definition('Quarry', 'resource', [
     { work: 4, cost: { funds: 400, stone: 120 } }, { work: 8, cost: { funds: 850, stone: 220 } },
     { work: 12, cost: { funds: 1800, stone: 400 } },
+    { work: 24, cost: { funds: 3400, stone: 700 } }, { work: 42, cost: { funds: 5800, stone: 1100 } },
   ]),
   mine: definition('Mine', 'resource', [
     { work: 4, cost: { funds: 500, stone: 130, metal: 40 } }, { work: 8, cost: { funds: 1050, stone: 250, metal: 100 } },
     { work: 12, cost: { funds: 2200, stone: 450, metal: 220 } },
+    { work: 24, cost: { funds: 4200, stone: 800, metal: 400 } }, { work: 42, cost: { funds: 7200, stone: 1300, metal: 700 } },
   ]),
   oilPump: definition('Oil Pump', 'resource', [
     { work: 4, cost: { funds: 600, stone: 140, metal: 60 } }, { work: 8, cost: { funds: 1250, stone: 280, metal: 140 } },
     { work: 12, cost: { funds: 2600, stone: 500, metal: 300 } },
+    { work: 24, cost: { funds: 5000, stone: 900, metal: 550 } }, { work: 42, cost: { funds: 8500, stone: 1500, metal: 950 } },
   ]),
 };
 
@@ -70,7 +90,7 @@ function eligibility(ctx: SimContext, provinceId: number, buildingId: BuildingId
   const urban = isUrban(ctx, provinceId);
   if (def.kind === 'military') {
     if (!urban) return { id: buildingId, targetTier, affordable: false, reason: 'Military buildings require an urban province.' };
-    if (targetTier > 1) return { id: buildingId, targetTier, affordable: false, reason: 'Already built or queued.' };
+    if (targetTier > 5) return { id: buildingId, targetTier: 5, affordable: false, reason: 'Maximum Level V reached.' };
     const required = BUILDING_REQUIRED_PHASE[buildingId as MilitaryBuildingId];
     if ((ctx.state.countries[countryId]?.phase ?? 1) < required) return { id: buildingId, targetTier, affordable: false, reason: `Requires phase ${required}.` };
   } else {
@@ -79,7 +99,10 @@ function eligibility(ctx: SimContext, provinceId: number, buildingId: BuildingId
     if (!record) return { id: buildingId, targetTier, affordable: false, reason: 'Province economy unavailable.' };
     const resource = RESOURCE_FOR_BUILDING[buildingId as ResourceBuildingId];
     const maxTier = maximumResourceTier(buildingId as ResourceBuildingId, record.resourcePotential[resource]);
-    if (targetTier > maxTier) return { id: buildingId, targetTier, affordable: false, reason: `Potential supports Tier ${maxTier}.` };
+    if (targetTier > 5 && maxTier === 5) {
+      return { id: buildingId, targetTier: 5, affordable: false, reason: 'Maximum Level V reached.' };
+    }
+    if (targetTier > maxTier) return { id: buildingId, targetTier, affordable: false, reason: `Potential supports Level ${maxTier}.` };
   }
   const recipe = def.tiers[targetTier - 1];
   const country = ctx.state.countries[countryId];
@@ -131,7 +154,7 @@ export function stepConstruction(ctx: SimContext, dtHours: number): BuildingComp
       const def = BUILDINGS[active.buildingId as BuildingId];
       if (def.kind === 'military') {
         const buildings = (ctx.state.provinceBuildings[provinceId] ??= { ...EMPTY_BUILDINGS });
-        buildings[active.buildingId as MilitaryBuildingId] = 1;
+        buildings[active.buildingId as MilitaryBuildingId] = active.targetTier ?? 1;
       } else {
         const tiers = ctx.state.provinceEconomies?.[provinceId]?.resourceBuildings;
         if (tiers) tiers[active.buildingId as ResourceBuildingId] = active.targetTier ?? 1;

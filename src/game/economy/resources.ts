@@ -14,16 +14,16 @@ export const RESOURCE_PRESENCE_CUTOFF: Record<PhysicalResource, number> = {
   food: 0.08, stone: 0.10, metal: 0.12, oil: 0.12,
 };
 
-export const RESOURCE_TIER_GATES: Record<ResourceBuildingId, readonly [number, number, number]> = {
-  fields: [0.18, 0.45, 0.72],
-  quarry: [0.20, 0.48, 0.74],
-  mine: [0.24, 0.52, 0.78],
-  oilPump: [0.25, 0.55, 0.82],
+export const RESOURCE_TIER_GATES: Record<ResourceBuildingId, readonly [number, number, number, number, number]> = {
+  fields: [0.18, 0.45, 0.72, 0.86, 0.96],
+  quarry: [0.20, 0.48, 0.74, 0.88, 0.97],
+  mine: [0.24, 0.52, 0.78, 0.90, 0.98],
+  oilPump: [0.25, 0.55, 0.82, 0.92, 0.98],
 };
 
-export const RESOURCE_TIER_PASSIVE = [0, 2, 5, 12] as const;
-export const RESOURCE_TIER_ENGINEER_CAP = [1, 2, 4, 8] as const;
-export const RESOURCE_TIER_ENGINEER_MULTIPLIER = [1, 1.5, 2, 2.5] as const;
+export const RESOURCE_TIER_PASSIVE = [0, 2, 5, 12, 20, 32] as const;
+export const RESOURCE_TIER_ENGINEER_CAP = [1, 2, 4, 8, 12, 18] as const;
+export const RESOURCE_TIER_ENGINEER_MULTIPLIER = [1, 1.5, 2, 2.5, 3.25, 4.25] as const;
 export const ENGINEER_PRODUCTION_PER_HOUR = 0.75;
 
 export function emptyPotential(): ResourcePotential {
@@ -36,9 +36,9 @@ export function emptyResourceBuildings(): ResourceBuildingTiers {
 
 export function maximumResourceTier(building: ResourceBuildingId, potential: number): number {
   const gates = RESOURCE_TIER_GATES[building];
-  if (potential >= gates[2]) return 3;
-  if (potential >= gates[1]) return 2;
-  if (potential >= gates[0]) return 1;
+  for (let tier = gates.length; tier >= 1; tier -= 1) {
+    if (potential >= gates[tier - 1]) return tier;
+  }
   return 0;
 }
 

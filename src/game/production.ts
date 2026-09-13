@@ -31,6 +31,20 @@ function hasBuilding(session: SimContext, provinceId: number, building: Building
     : b.ordnance) > 0;
 }
 
+/** Unit work completed per real game hour by the required facility level. */
+export const UNIT_PRODUCTION_RATE_BY_LEVEL = [0, 1, 1.35, 1.75, 2.25, 3] as const;
+
+export function unitProductionWorkRate(
+  session: SimContext, provinceId: number, unitTypeId: string,
+): number {
+  const type = UNIT_TYPE_BY_ID.get(unitTypeId);
+  if (!type) return 0;
+  const level = Math.max(0, Math.min(5,
+    session.state.provinceBuildings[provinceId]?.[type.requiredBuilding] ?? 0));
+  const base = session.state.provinceEconomies?.[provinceId]?.productionCapacity ?? 1;
+  return base * UNIT_PRODUCTION_RATE_BY_LEVEL[level];
+}
+
 /** Units `countryId` can produce in this province now. */
 export function producibleUnits(
   session: SimContext, provinceId: number, countryId: number,
@@ -97,16 +111,18 @@ export function stepProduction(session: SimContext, dtHours: number): UnitComple
       queue.shift();
     }
     if (queue.length === 0) continue;
-    let remaining = dtHours * (session.state.provinceEconomies?.[provinceId]?.productionCapacity ?? 1);
-    while (queue.length > 0 && remaining > 1e-12) {
+    let remainingHours = dtHours;
+    while (queue.length > 0 && remainingHours > 1e-12) {
     const active = queue[0];
     if (active.ownerCountryId !== session.state.provinceOwners[provinceId]) { queue.shift(); continue; }
+    const rate = unitProductionWorkRate(session, provinceId, active.unitTypeId);
+    if (rate <= 0) break;
     const total = active.totalWork ?? active.totalHours ?? 1;
     const progress = active.progressWork ?? active.progressHours ?? 0;
-    const used = Math.min(remaining, Math.max(0, total - progress));
+    const used = Math.min(remainingHours * rate, Math.max(0, total - progress));
     active.progressWork = progress + used;
     active.progressHours = active.progressWork;
-    remaining -= used;
+    remainingHours -= used / rate;
     if (active.progressWork + 1e-12 < total) break;
 
     queue.shift();

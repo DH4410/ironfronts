@@ -349,8 +349,8 @@ function developResources(session: SimContext, situation: Pick<EconomyAiSituatio
       const resource = ({ fields: 'food', quarry: 'stone', mine: 'metal', oilPump: 'oil' } as const)[buildingId];
       const recipe = BUILDINGS[buildingId].tiers[option.targetTier - 1];
       if (!recipe) continue;
-      const priorPassive = [0, 2, 5, 12][option.targetTier - 1] ?? 0;
-      const nextPassive = [0, 2, 5, 12][option.targetTier] ?? priorPassive;
+      const priorPassive = [0, 2, 5, 12, 20, 32][option.targetTier - 1] ?? 0;
+      const nextPassive = [0, 2, 5, 12, 20, 32][option.targetTier] ?? priorPassive;
       const pressure = resource === 'stone' ? 1 : 1 + (1 - (country.coverage?.[resource] ?? 1)) * 4
         + (country.shortages?.[resource]?.severity ?? 0) / 25;
       const costBurden = Object.values(recipe.cost).reduce((sum, value) => sum + (value ?? 0), 0) / 500;

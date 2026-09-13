@@ -822,7 +822,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       pvFieldValue.get('Deposits')!.textContent = physical
         ? (['food', 'stone', 'metal', 'oil'] as const).map((key) => {
           const tier = physical.productionBreakdown?.[key];
-          const tierText = tier ? ` T${tier.currentTier}/${tier.maximumTier}` : '';
+      const tierText = tier ? ` L${tier.currentTier}/${tier.maximumTier}` : '';
           return `${key[0].toUpperCase()}${key.slice(1)} ${Math.round(physical.potential[key] * 100)}%${tierText}`;
         }).join(' · ')
         : depositKinds.length
@@ -842,8 +842,11 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       const anyFacility = Boolean(b && (b.barracks > 0 || b.tankPlant > 0 || b.ordnance > 0 || b.missileSite > 0));
       pvFacilities.hidden = !anyFacility;
       if (b) {
-        for (const { key } of FACILITY_CHIPS) {
-          pvFacChipByKey.get(key)!.hidden = (b[key] ?? 0) <= 0;
+        for (const { key, label } of FACILITY_CHIPS) {
+          const chip = pvFacChipByKey.get(key)!;
+          chip.hidden = (b[key] ?? 0) <= 0;
+          const value = chip.querySelector<HTMLElement>('.ifg-rchip__value');
+          if (value) value.textContent = `${label} L${b[key] ?? 0}`;
         }
       }
       const res = province.resources;

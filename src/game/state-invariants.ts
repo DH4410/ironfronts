@@ -89,7 +89,7 @@ export function validateWorldState(ctx: SimContext): void {
       if (!Number.isFinite(value) || value < 0 || value > 1) throw new Error('Invalid resource potential.');
     }
     for (const tier of Object.values(economy.resourceBuildings)) {
-      if (!Number.isInteger(tier) || tier < 0 || tier > 3) throw new Error('Invalid resource building tier.');
+      if (!Number.isInteger(tier) || tier < 0 || tier > 5) throw new Error('Invalid resource building tier.');
     }
   }
   for (const [provinceIdText, rally] of Object.entries(state.rallyPoints)) {

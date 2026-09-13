@@ -74,7 +74,7 @@ export function provinceResourceOutputBreakdown(
   const record = economy ?? ctx.state.provinceEconomies?.[provinceId];
   if (!record) return { base: 0, passive: 0, engineer: 0, total: 0, assignedEngineers: 0, effectiveEngineers: 0, currentTier: 0, maximumTier: 0 };
   const building = BUILDING_FOR_RESOURCE[resource];
-  const tier = Math.max(0, Math.min(3, record.resourceBuildings[building] ?? 0));
+  const tier = Math.max(0, Math.min(5, record.resourceBuildings[building] ?? 0));
   const engineers = assignedEngineerCount ?? engineersAssignedTo(ctx, provinceId, resource);
   const effective = effectiveEngineerCount(engineers, RESOURCE_TIER_ENGINEER_CAP[tier]);
   const owner = ctx.state.provinceOwners[provinceId];
