@@ -107,6 +107,14 @@ export interface CityStatus {
   readonly threatStrength: number;
 }
 
+export interface ThreatenedFront {
+  readonly id: string;
+  readonly x: number;
+  readonly z: number;
+  readonly friendlyStrength: number;
+  readonly enemyStrength: number;
+}
+
 export interface Assessment {
   readonly countryId: number;
   readonly armies: readonly ArmyStack[];
@@ -117,6 +125,10 @@ export interface Assessment {
   readonly enemyIds: ReadonlySet<number>;
   readonly enemyArmies: readonly ArmyStack[];
   readonly enemyProvinces: readonly WorldProvince[];
+  /** Originally ours, currently held by a belligerent. */
+  readonly lostProvinces: readonly WorldProvince[];
+  /** Active combat fronts where enemy fighting weight exceeds ours. */
+  readonly threatenedFronts: readonly ThreatenedFront[];
   /** enemy country id -> provinces it holds, for "who is the strongest enemy". */
   readonly enemySizes: ReadonlyMap<number, number>;
   /** Enemy capital province ids — the objectives worth weighting. */
@@ -211,6 +223,25 @@ export function assess(
   const anchor = capital?.province ?? provinces[0] ?? null;
   const frontTarget = anchor ? nearestProvince(enemyProvinces, anchor, world.width) : null;
   const staging = frontTarget ? nearestProvince(provinces, frontTarget, world.width) : null;
+  const lostProvinces = world.provinces.filter((province) => world.provinceOwner(province.id) === countryId
+    && enemyIds.has(state.provinceOwners[province.id] ?? 0));
+  const threatenedFronts: ThreatenedFront[] = [];
+  for (const front of Object.values(state.battleFronts)) {
+    const friendly = front.sideA.countryId === countryId ? front.sideA
+      : front.sideB.countryId === countryId ? front.sideB : null;
+    if (!friendly) continue;
+    const enemy = friendly === front.sideA ? front.sideB : front.sideA;
+    if (!enemyIds.has(enemy.countryId)) continue;
+    const strength = (ids: readonly string[]): number => ids.reduce(
+      (sum, id) => sum + (state.armies[id] ? combatStrength(state.armies[id]) : 0), 0,
+    );
+    const friendlyStrength = strength(friendly.armyIds);
+    const enemyStrength = strength(enemy.armyIds);
+    if (enemyStrength <= friendlyStrength) continue;
+    threatenedFronts.push({ id: front.id, x: front.x, z: front.z, friendlyStrength, enemyStrength });
+  }
+  threatenedFronts.sort((a, b) => (b.enemyStrength - b.friendlyStrength)
+    - (a.enemyStrength - a.friendlyStrength) || a.id.localeCompare(b.id));
 
   const baseline = memory.baselineProvinces.get(countryId);
   if (baseline === undefined) memory.baselineProvinces.set(countryId, provinces.length);
@@ -224,6 +255,8 @@ export function assess(
     enemyIds,
     enemyArmies,
     enemyProvinces,
+    lostProvinces,
+    threatenedFronts,
     enemySizes,
     enemyCapitals,
     frontTarget,
