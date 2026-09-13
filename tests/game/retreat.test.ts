@@ -154,4 +154,15 @@ describe('retreat', () => {
     // it died in place rather than retreating
     expect(c.state.armies.weak).toBeUndefined();
   });
+
+  it('reports battleEnded with the surviving country once one side is wiped out', () => {
+    const c = ctx(false); // country 2 owns no province
+    const events: ReturnType<typeof stepCombat> = [];
+    for (let i = 0; i < 20 && c.state.armies.weak; i += 1) {
+      events.push(...stepCombat(c, 0.05));
+    }
+    const ended = events.find((e) => e.kind === 'battleEnded');
+    expect(ended?.kind).toBe('battleEnded');
+    expect((ended as { survivorCountryId: number | null }).survivorCountryId).toBe(1);
+  });
 });

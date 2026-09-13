@@ -28,7 +28,7 @@ export class RemoteGameSession extends EventTarget {
     kind: 'engaged' | 'reinforced' | 'combatPulse' | 'retreat' | 'destroyed'
       | 'bombardment' | 'battleEnded' | 'strike';
     armyId?: string; targetArmyId?: string; battleId?: string; frontId?: string; x?: number; z?: number;
-    provinceId?: number;
+    provinceId?: number; survivorCountryId?: number | null;
   }> = [];
   readonly pendingCaptures: Array<{ provinceId: number; fromCountryId: number; toCountryId: number }> = [];
   readonly pendingCommands = new Map<string, { command: CommandPayload; appliedRevision?: number }>();
@@ -71,6 +71,7 @@ export class RemoteGameSession extends EventTarget {
           battleId: detail.battleId as string | undefined, frontId: detail.frontId as string | undefined,
           x: detail.x as number | undefined, z: detail.z as number | undefined,
           provinceId: detail.provinceId as number | undefined,
+          survivorCountryId: typeof detail.survivorCountryId === 'number' ? detail.survivorCountryId : null,
         });
       }
     }, { signal: this.listeners.signal });

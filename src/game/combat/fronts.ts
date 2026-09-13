@@ -242,9 +242,11 @@ export function cleanupFronts(session: SimContext, events: CombatEvent[]): void 
       battle.frontIds = battle.frontIds.filter((id) => id !== front.id);
       if (battle.frontIds.length === 0) delete session.state.battles[battle.id];
     }
+    const survivorCountryId = front.sideA.armyIds.length > 0 ? front.sideA.countryId
+      : front.sideB.armyIds.length > 0 ? front.sideB.countryId : null;
     events.push({
       kind: 'battleEnded', attacker: front.sideA.countryId, defender: front.sideB.countryId,
-      battleId: front.battleId, frontId: front.id, x: front.x, z: front.z,
+      battleId: front.battleId, frontId: front.id, x: front.x, z: front.z, survivorCountryId,
     });
     delete session.state.battleFronts[front.id];
   }

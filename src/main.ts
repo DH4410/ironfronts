@@ -2534,7 +2534,16 @@ function drainSessionEvents(session: RemoteGameSession): void {
     } else if (ev.kind === 'reinforced') {
       pushNotification('combat', 'Battle reinforced', 'Another army has joined an active direction.');
     } else if (ev.kind === 'battleEnded') {
-      pushNotification('information', 'Battle ended', 'Surviving armies are resuming valid orders.');
+      const involved = ev.attacker === player || ev.defender === player;
+      if (!involved) {
+        pushNotification('information', 'Battle ended', 'Surviving armies are resuming valid orders.');
+      } else if (ev.survivorCountryId === player) {
+        pushNotification('combat', 'Battle won', 'Your forces held the field; survivors are resuming orders.');
+      } else if (ev.survivorCountryId === null) {
+        pushNotification('combat', 'Battle ended in mutual destruction', 'Neither side held the field.');
+      } else {
+        pushNotification('warning', 'Battle lost', 'Your forces were driven from the field.');
+      }
     }
   }
   for (const cap of session.pendingCaptures.splice(0)) {
