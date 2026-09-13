@@ -10,6 +10,23 @@ export interface BattleFrontPresentationSource {
   readonly enemyHp: number;
   readonly enemyBaselineHp: number;
   readonly reinforcementCount: number;
+  readonly outgoingDamagePerGameHour: number;
+  readonly incomingDamagePerGameHour: number;
+  readonly friendlyCasualties: number;
+  readonly enemyCasualties: number;
+  readonly estimatedGameHours: number | null;
+  readonly estimatedRealSeconds: number | null;
+  readonly friendlyModifiers: {
+    readonly frontageUsed: number;
+    readonly frontageLimit: number;
+    readonly coordination: number;
+    readonly organization: number;
+    readonly stanceOutput: number;
+    readonly supply: number;
+    readonly protection: number;
+    readonly terrain: number;
+    readonly devastation: number;
+  };
 }
 
 export interface BattleSidePresentation {
@@ -24,6 +41,13 @@ export interface BattleOverviewPresentation {
   readonly reinforcementCount: number;
   readonly friendly: BattleSidePresentation;
   readonly enemy: BattleSidePresentation;
+  readonly outgoingDamagePerGameHour: number;
+  readonly incomingDamagePerGameHour: number;
+  readonly friendlyCasualties: number;
+  readonly enemyCasualties: number;
+  readonly estimatedGameHours: number | null;
+  readonly estimatedRealSeconds: number | null;
+  readonly modifiers: readonly string[];
 }
 
 const finiteNonNegative = (value: number): number => Number.isFinite(value) ? Math.max(0, value) : 0;
@@ -50,6 +74,17 @@ export function summarizeBattleFronts(
     };
   };
   const firstRole = fronts[0].role;
+  const sum = (value: (front: BattleFrontPresentationSource) => number): number => fronts.reduce(
+    (total, front) => total + finiteNonNegative(value(front)), 0,
+  );
+  const average = (value: (front: BattleFrontPresentationSource) => number): number => sum(value) / fronts.length;
+  const minimumDuration = (field: 'estimatedGameHours' | 'estimatedRealSeconds'): number | null => {
+    const values = fronts.map((front) => front[field]).filter(
+      (value): value is number => value !== null && Number.isFinite(value) && value >= 0,
+    );
+    return values.length ? Math.min(...values) : null;
+  };
+  const factor = (value: number): string => `×${value.toFixed(2)}`;
   return {
     role: fronts.every((front) => front.role === firstRole) ? firstRole : 'mixed',
     frontCount: fronts.length,
@@ -58,6 +93,22 @@ export function summarizeBattleFronts(
     ),
     friendly: side(true),
     enemy: side(false),
+    outgoingDamagePerGameHour: sum((front) => front.outgoingDamagePerGameHour),
+    incomingDamagePerGameHour: sum((front) => front.incomingDamagePerGameHour),
+    friendlyCasualties: sum((front) => front.friendlyCasualties),
+    enemyCasualties: sum((front) => front.enemyCasualties),
+    estimatedGameHours: minimumDuration('estimatedGameHours'),
+    estimatedRealSeconds: minimumDuration('estimatedRealSeconds'),
+    modifiers: [
+      `Frontage ${sum((front) => front.friendlyModifiers.frontageUsed)} / ${sum((front) => front.friendlyModifiers.frontageLimit)}`,
+      `Coordination ${factor(average((front) => front.friendlyModifiers.coordination))}`,
+      `Organization ${factor(average((front) => front.friendlyModifiers.organization))}`,
+      `Stance output ${factor(average((front) => front.friendlyModifiers.stanceOutput))}`,
+      `Supply ${factor(average((front) => front.friendlyModifiers.supply))}`,
+      `Protection ${factor(average((front) => front.friendlyModifiers.protection))}`,
+      `Terrain ${factor(average((front) => front.friendlyModifiers.terrain))}`,
+      `Devastation ${factor(average((front) => front.friendlyModifiers.devastation))}`,
+    ],
   };
 }
 

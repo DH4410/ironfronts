@@ -4,7 +4,7 @@
  * These render the fog-aware `ArmyStackView` projection that `main.ts` builds
  * from authoritative GameState (see `game/player-view.ts`) — an unidentified
  * contact shows a '?' counter and a strength-unknown readout. `DEMO_ARMY` is a
- * dev / `?debug` fixture only, gated by the caller.
+ * authenticated-debug fixture only, gated by the caller.
  */
 
 import { createIcon, iconMarkup, type IconName } from './icons';
@@ -28,6 +28,19 @@ function formatDamageRate(value: number): string {
   // in game/combat/constants.ts) — not a 0..1 fraction, so no percentage sign.
   if (value <= 0) return '0';
   return value < 10 ? value.toFixed(1) : String(Math.round(value));
+}
+
+function formatGameDuration(hours: number | null): string {
+  if (hours === null || !Number.isFinite(hours)) return 'indeterminate';
+  return hours < 10 ? `${hours.toFixed(1)} game h` : `${Math.round(hours)} game h`;
+}
+
+function formatRealDuration(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds)) return 'indeterminate real time';
+  if (seconds < 60) return `${Math.max(1, Math.round(seconds))} sec real`;
+  if (seconds < 3_600) return `${Math.round(seconds / 60)} min real`;
+  const hours = seconds / 3_600;
+  return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)} hr real`;
 }
 
 /**
@@ -151,7 +164,12 @@ export function renderSelectedArmyPanel(
   const statTable = node('table', 'ifg-army-panel__stat-table');
   const statHead = node('thead');
   const headingRow = node('tr');
-  headingRow.append(node('th', undefined, 'Damage / h'), node('th', undefined, 'S'), node('th', undefined, 'L'), node('th', undefined, 'H'));
+  headingRow.append(
+    node('th', undefined, 'Base damage / game hour'),
+    node('th', undefined, 'Soft'),
+    node('th', undefined, 'Light'),
+    node('th', undefined, 'Heavy'),
+  );
   statHead.append(headingRow);
   const statBody = node('tbody');
   const appendProfile = (label: string, icon: IconName, value: typeof army.attack): void => {
@@ -342,6 +360,15 @@ export function renderSelectedArmyPanel(
     appendSide(army.own ? 'Your forces' : 'Selected forces', battle.friendly, army.own ? 'friendly' : 'enemy');
     appendSide(army.own ? 'Enemy forces' : 'Opposing forces', battle.enemy, army.own ? 'enemy' : 'friendly');
 
+    const battleLive = node('div', 'ifg-battle__live');
+    battleLive.append(
+      node('span', undefined, `Outgoing ${formatDamageRate(battle.outgoingDamagePerGameHour)} HP / game h`),
+      node('span', undefined, `Incoming ${formatDamageRate(battle.incomingDamagePerGameHour)} HP / game h`),
+      node('span', undefined, `Losses ${roundDisplayedHp(battle.friendlyCasualties)} friendly / ${roundDisplayedHp(battle.enemyCasualties)} enemy HP`),
+      node('span', undefined, `Estimated ${formatGameDuration(battle.estimatedGameHours)} · ${formatRealDuration(battle.estimatedRealSeconds)}`),
+    );
+    const battleModifiers = node('div', 'ifg-battle__modifiers', battle.modifiers.join(' · '));
+
     const battleMeta = node('div', 'ifg-battle__meta');
     battleMeta.append(
       node('span', undefined, battle.reinforcementCount
@@ -351,7 +378,7 @@ export function renderSelectedArmyPanel(
         ? `${army.legalRetreatExits.length} retreat ${army.legalRetreatExits.length === 1 ? 'route' : 'routes'} available`
         : 'No safe retreat'),
     );
-    activity.append(battleHeader, battleSides, battleMeta);
+    activity.append(battleHeader, battleSides, battleLive, battleModifiers, battleMeta);
   } else {
     activity.append(node('small', 'ifg-army-panel__eyebrow', 'Activity'));
     const activityValue = node('strong', 'ifg-army-panel__activity-value', army.activity);

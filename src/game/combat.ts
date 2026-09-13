@@ -1,28 +1,124 @@
 /** Authoritative combat phase; subsystems share stable front membership. */
 import type { SimContext } from './sim-context';
-import { stackUnitCount } from './units/army';
+import type { BattleFrontState, BattleRole } from './game-state';
+import { stackUnitCount, type ArmyStack } from './units/army';
 import { addDamage, applyPendingDamage, calculateDamage, type GroupRef, type PendingDamage } from './combat/damage';
 import { initializeState, detectEngagements, sideArmies, removeArmyFromAllFronts, cleanupFronts } from './combat/fronts';
-import { DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER } from './combat/constants';
+import {
+  COMBAT_FRONTAGE, DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER, OUT_OF_SUPPLY_COMBAT_MULTIPLIER,
+} from './combat/constants';
 import { autoRetreat } from './combat/retreat';
 import { stepArtillery } from './combat/artillery';
-import { drainOrganizationFromCombat } from './combat/organization';
+import { drainOrganizationFromCombat, organizationEffectiveness } from './combat/organization';
 import { terrainDefenseMultiplier } from './combat/terrain';
+import { entrenchmentDamageMultiplier } from './combat/entrenchment';
+import { stanceModifiers } from './combat/stance';
 import type { CombatEvent } from './combat/events';
 export type { CombatEvent } from './combat/events';
 export { COMBAT_FRONTAGE } from './combat/constants';
 export { stepCapture, type CaptureEvent } from './combat/capture';
 export { legalRetreatPaths, issueManualRetreat } from './combat/retreat';
 
-function isDevastated(session: SimContext, provinceId: number | null): boolean {
+function isDevastated(session: Pick<SimContext, 'state'>, provinceId: number | null): boolean {
   return provinceId !== null
     && (session.state.provinceDevastation?.[provinceId] ?? 0) > session.state.clock.gameTimeHours;
+}
+
+export interface CombatRateModifiers {
+  readonly frontageUsed: number;
+  readonly frontageLimit: number;
+  readonly coordination: number;
+  readonly organization: number;
+  readonly stanceOutput: number;
+  readonly supply: number;
+  /** Combined entrenchment, defensive-stance, and supply multiplier on damage received. */
+  readonly protection: number;
+  readonly terrain: number;
+  readonly devastation: number;
+}
+
+export interface FrontDamageRates {
+  readonly sideAToB: ReadonlyArray<{ ref: GroupRef; amount: number }>;
+  readonly sideBToA: ReadonlyArray<{ ref: GroupRef; amount: number }>;
+  readonly sideAOutgoingPerGameHour: number;
+  readonly sideBOutgoingPerGameHour: number;
+  readonly sideAModifiers: CombatRateModifiers;
+  readonly sideBModifiers: CombatRateModifiers;
+}
+
+function weightedAverage(armies: readonly ArmyStack[], value: (army: ArmyStack) => number): number {
+  let total = 0;
+  let weight = 0;
+  for (const army of armies) {
+    const units = stackUnitCount(army);
+    total += value(army) * units;
+    weight += units;
+  }
+  return weight > 0 ? total / weight : 1;
+}
+
+function rateModifiers(
+  session: Pick<SimContext, 'state' | 'world'>,
+  front: BattleFrontState,
+  armies: readonly ArmyStack[],
+  role: BattleRole,
+): CombatRateModifiers {
+  const frontageUsed = Math.min(COMBAT_FRONTAGE, armies.reduce((sum, army) => sum + stackUnitCount(army), 0));
+  const supply = (army: ArmyStack): number => army.inSupply === false ? OUT_OF_SUPPLY_COMBAT_MULTIPLIER : 1;
+  return {
+    frontageUsed,
+    frontageLimit: COMBAT_FRONTAGE,
+    coordination: 1 / Math.sqrt(Math.max(1, frontageUsed)),
+    organization: weightedAverage(armies, (army) => organizationEffectiveness(army.organization ?? 100)),
+    stanceOutput: weightedAverage(armies, (army) => stanceModifiers(army.stance).attackOutput),
+    supply: weightedAverage(armies, supply),
+    protection: weightedAverage(armies, (army) => entrenchmentDamageMultiplier(army.entrenchment ?? 0)
+      * stanceModifiers(army.stance).damageTaken / supply(army)),
+    terrain: role === 'defense' ? terrainDefenseMultiplier(session.world, front.x, front.z) : 1,
+    devastation: role === 'defense' && isDevastated(session, front.provinceId)
+      ? DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER : 1,
+  };
 }
 
 function scaledDamage(
   damage: Array<{ ref: GroupRef; amount: number }>, multiplier: number,
 ): Array<{ ref: GroupRef; amount: number }> {
   return multiplier === 1 ? damage : damage.map(({ ref, amount }) => ({ ref, amount: amount * multiplier }));
+}
+
+/** The exact pre-damage front calculation shared by simulation and player projection. */
+export function calculateFrontDamageRates(
+  session: Pick<SimContext, 'state' | 'world'>,
+  front: BattleFrontState,
+  dtHours = 1,
+): FrontDamageRates {
+  const a = sideArmies(session, front.sideA);
+  const b = sideArmies(session, front.sideB);
+  const devastationMultiplier = isDevastated(session, front.provinceId)
+    ? DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER : 1;
+  const terrainMultiplier = terrainDefenseMultiplier(session.world, front.x, front.z);
+  const sideAToB = scaledDamage(
+    calculateDamage(a, front.sideA.role, b, dtHours),
+    (front.sideA.role === 'defense' ? devastationMultiplier : 1)
+      * (front.sideB.role === 'defense' ? terrainMultiplier : 1),
+  );
+  const sideBToA = scaledDamage(
+    calculateDamage(b, front.sideB.role, a, dtHours),
+    (front.sideB.role === 'defense' ? devastationMultiplier : 1)
+      * (front.sideA.role === 'defense' ? terrainMultiplier : 1),
+  );
+  const total = (entries: ReadonlyArray<{ amount: number }>): number => entries.reduce(
+    (sum, entry) => sum + entry.amount, 0,
+  );
+  const perGameHour = dtHours > 0 ? 1 / dtHours : 0;
+  return {
+    sideAToB,
+    sideBToA,
+    sideAOutgoingPerGameHour: total(sideAToB) * perGameHour,
+    sideBOutgoingPerGameHour: total(sideBToA) * perGameHour,
+    sideAModifiers: rateModifiers(session, front, a, front.sideA.role),
+    sideBModifiers: rateModifiers(session, front, b, front.sideB.role),
+  };
 }
 
 /** Detach a stack from every combat front and remove it from authoritative state. */
@@ -39,24 +135,12 @@ export function stepCombat(session: SimContext, dtHours: number): CombatEvent[] 
   const pending = new Map<string, PendingDamage>();
   const activeFronts = Object.values(session.state.battleFronts);
   for (const front of activeFronts) {
-    const a = sideArmies(session, front.sideA);
-    const b = sideArmies(session, front.sideB);
-    const devastationMultiplier = isDevastated(session, front.provinceId)
-      ? DEVASTATED_DEFENDER_STRENGTH_MULTIPLIER : 1;
+    const damage = calculateFrontDamageRates(session, front, dtHours);
     // Terrain protects whichever side is defending at this front by cutting
     // the damage that lands on it — the mirror image of devastation, which
     // instead cuts a devastated defender's own output.
-    const terrainMultiplier = terrainDefenseMultiplier(session.world, front.x, front.z);
-    addDamage(pending, scaledDamage(
-      calculateDamage(a, front.sideA.role, b, dtHours),
-      (front.sideA.role === 'defense' ? devastationMultiplier : 1)
-        * (front.sideB.role === 'defense' ? terrainMultiplier : 1),
-    ));
-    addDamage(pending, scaledDamage(
-      calculateDamage(b, front.sideB.role, a, dtHours),
-      (front.sideB.role === 'defense' ? devastationMultiplier : 1)
-        * (front.sideA.role === 'defense' ? terrainMultiplier : 1),
-    ));
+    addDamage(pending, damage.sideAToB);
+    addDamage(pending, damage.sideBToA);
   }
   applyPendingDamage(pending);
   drainOrganizationFromCombat(session, pending, dtHours);

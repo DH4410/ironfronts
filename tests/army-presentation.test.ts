@@ -41,11 +41,17 @@ describe('selected army presentation', () => {
     const summary = summarizeBattleFronts([
       {
         role: 'attack', friendlyHp: 80, friendlyBaselineHp: 100, enemyHp: 30, enemyBaselineHp: 60,
-        reinforcementCount: 1,
+        reinforcementCount: 1, outgoingDamagePerGameHour: 12, incomingDamagePerGameHour: 5,
+        friendlyCasualties: 20, enemyCasualties: 30, estimatedGameHours: 2.5, estimatedRealSeconds: 9_000,
+        friendlyModifiers: { frontageUsed: 5, frontageLimit: 10, coordination: 0.45,
+          organization: 0.8, stanceOutput: 1.25, supply: 1, protection: 1, terrain: 1, devastation: 1 },
       },
       {
         role: 'defense', friendlyHp: 40, friendlyBaselineHp: 50, enemyHp: 20, enemyBaselineHp: 40,
-        reinforcementCount: 2,
+        reinforcementCount: 2, outgoingDamagePerGameHour: 8, incomingDamagePerGameHour: 7,
+        friendlyCasualties: 10, enemyCasualties: 20, estimatedGameHours: 3, estimatedRealSeconds: 10_800,
+        friendlyModifiers: { frontageUsed: 3, frontageLimit: 10, coordination: 0.6,
+          organization: 1, stanceOutput: 1, supply: 0.6, protection: 0.8, terrain: 0.7, devastation: 0.4 },
       },
     ]);
     expect(summary).toEqual({
@@ -56,6 +62,15 @@ describe('selected army presentation', () => {
       enemy: {
         hp: 50, baselineHp: 100, healthPercent: 50,
       },
+      outgoingDamagePerGameHour: 20,
+      incomingDamagePerGameHour: 12,
+      friendlyCasualties: 30,
+      enemyCasualties: 50,
+      estimatedGameHours: 2.5,
+      estimatedRealSeconds: 9_000,
+      modifiers: ['Frontage 8 / 20', 'Coordination ×0.53', 'Organization ×0.90',
+        'Stance output ×1.13', 'Supply ×0.80', 'Protection ×0.90',
+        'Terrain ×0.85', 'Devastation ×0.70'],
     });
     expect(summarizeBattleFronts([])).toBeNull();
   });
@@ -63,5 +78,15 @@ describe('selected army presentation', () => {
   it('rounds fractional authoritative HP only for display', () => {
     expect(roundDisplayedHp(21.56666)).toBe(22);
     expect(roundDisplayedHp(21.4)).toBe(21);
+  });
+
+  it('spells out base armor damage columns per game hour', async () => {
+    const source = await import('node:fs/promises').then((fs) => fs.readFile(
+      new URL('../src/ui/army.ts', import.meta.url), 'utf8',
+    ));
+    expect(source).toContain('Base damage / game hour');
+    expect(source).toContain("node('th', undefined, 'Soft')");
+    expect(source).toContain("node('th', undefined, 'Light')");
+    expect(source).toContain("node('th', undefined, 'Heavy')");
   });
 });

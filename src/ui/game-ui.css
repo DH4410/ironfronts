@@ -1213,6 +1213,24 @@
   background: linear-gradient(90deg, #73382d, #bd6048);
   box-shadow: 0 0 5px rgba(177, 76, 55, 0.2);
 }
+.ifg-battle__live {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 8px;
+  margin-top: 6px;
+  color: #d8ccb2;
+  font-size: 7.5px;
+  font-variant-numeric: tabular-nums;
+}
+.ifg-battle__modifiers {
+  margin-top: 5px;
+  overflow: hidden;
+  color: var(--ifg-dim);
+  font-size: 7px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ifg-battle__meta {
   min-width: 0;
   display: flex;
