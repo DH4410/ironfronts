@@ -124,20 +124,19 @@ The same authentication harness limitation as visual-check currently applies.
 ## Debug mode
 
 Set `IRONFRONTS_DEBUG_CONTROLS_ENABLED=true` on an approved QA deployment and
-sign in as `DimaTest1` to expose:
+authenticate normally to expose:
 
-- F3 world/diplomacy/renderer inspector;
+- the hidden Ctrl+D+E world/server/cheat/renderer inspector;
 - debug rendering views and layer toggles;
-- civil time and weather preview controls;
+- the unified IANA-aware civil clock and persistent weather controls;
 - lazy movement/waterway graph overlays;
-- performance snapshot;
+- scheduler health, performance snapshots, and explicit cheat commands;
 - `window.__ironfrontsRenderer` and `window.__ironfrontsSession` automation handles.
 
-The game ticket carries a signed, account-derived entitlement and the game
-server applies the deployment gate independently to every WebSocket
-connection. URL parameters, forged client messages, and development mode do
-not grant access. Full projected session state is not exposed on ordinary
-player pages.
+The game server applies the deployment gate independently to every
+authenticated WebSocket connection. URL parameters, forged client messages,
+and development mode do not grant access. Full projected session state is not
+exposed on ordinary player pages.
 
 ## Change workflow
 

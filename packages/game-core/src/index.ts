@@ -21,7 +21,9 @@ export {
 export type {
   GameState, CountryState, DiplomacyMessage, DiplomacyProposal, Relation, ResourceNodeState,
   ProvinceEconomy, PhysicalResource, ResourceBuildingId, ResourcePotential, UpkeepResource,
+  WorldWeather,
 } from '../../../src/game/game-state';
+export { automaticWeatherForDay, updateRealWeather, setWeatherMode } from '../../../src/game/weather';
 export {
   generateResourcePotential, createProvinceEconomies, deterministicResourceNoise,
   gaussianHubContribution, resourceHubSpread, wrappedWorldDistance,

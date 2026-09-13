@@ -183,4 +183,18 @@ describe('applyCommand ownership gate', () => {
     expect(c.state.relations['1:2']).toBe('war');
     expect(c.state.armies.a1.order).not.toBeNull();
   });
+
+  it('allows movement through allied territory without declaring war', () => {
+    const base = ctx();
+    base.state.provinceOwners = { 10: 1, 20: 2, 30: 1 };
+    base.state.relations['1:2'] = 'allied';
+    const c: SimContext = { ...base, world: { ...base.world,
+      provinces: [
+        { id: 10, center: [100, 100], terrainId: 4, population: 500, coastal: false, urban: true },
+        { id: 20, center: [300, 100], terrainId: 4, population: 500, coastal: false, urban: true },
+        { id: 30, center: [500, 100], terrainId: 4, population: 500, coastal: false, urban: true },
+      ], provinceAt: (x) => x < 200 ? 10 : x < 400 ? 20 : 30 } };
+    expect(applyCommand(c, { type: 'moveArmy', countryId: 1, armyId: 'a1', x: 500, z: 100 })).toMatchObject({ ok: true });
+    expect(c.state.relations['1:2']).toBe('allied');
+  });
 });

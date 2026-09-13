@@ -39,7 +39,6 @@ export interface GameUiActions {
   dismissNotification(id: string): void;
   togglePause(open: boolean): void;
   returnToMenu(): void;
-  openDebugInspector(): void;
   /** Arm map-click targeting for a strategic strike (the Warheads chip / N key). */
   armStrike?: () => void;
   focusSelected?: () => void;
@@ -397,13 +396,6 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     modeButtons.set(mode, button);
     modeCluster.append(button);
   }
-  const inspectorButton = el('button', 'ifg-modes__inspector', 'F3');
-  inspectorButton.type = 'button';
-  inspectorButton.title = 'World inspector';
-  inspectorButton.hidden = true;
-  inspectorButton.addEventListener('click', () => actions.openDebugInspector());
-  modeCluster.append(inspectorButton);
-
   // ---------------- notifications ----------------
   const notifyStack = el('div', 'ifg-notify');
   notifyStack.setAttribute('aria-live', 'polite');
@@ -638,8 +630,6 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   const render = (state: StrategicUiState): void => {
     root.hidden = state.phase !== 'in-game';
     root.dataset.phase = state.phase;
-    inspectorButton.hidden = !state.debugEnabled;
-
     const diplomacyOpen = state.activeSidePanel === 'diplomacy';
     const diplomacyDockButton = dockButtons.get('diplomacy');
     if (diplomacyDockButton) {

@@ -232,8 +232,18 @@ export interface GameClock {
   visualEpochMs?: number;
   visualAnchorRealEpochMs?: number;
   visualUtcOffsetMinutes?: number;
+  /** IANA timezone used by linked visual time, including daylight-saving changes. */
+  visualTimeZone?: string;
   visualTimezoneLinked?: boolean;
   visualGeneration?: number;
+}
+
+export interface WorldWeather {
+  mode: 'automatic' | 'forced-clear' | 'forced-rain';
+  raining: boolean;
+  scheduleDay: string;
+  rainStartMinute: number;
+  rainDurationMinutes: number;
 }
 
 export interface GameState {
@@ -245,6 +255,8 @@ export interface GameState {
   readonly economyEnabled: boolean;
 
   clock: GameClock;
+  /** Persistent real-time weather; automatic rain occurs once per UTC day for 1–2 hours. */
+  weather?: WorldWeather;
   /** Fixed authoritative 10 Hz step number, used for sequencing and presentation effects. */
   simulationTick: number;
 

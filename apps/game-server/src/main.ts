@@ -68,6 +68,7 @@ if (persisted) {
 }
 const gameClock = new AuthoritativeGameClock(() => runtime.session.state);
 const scheduler = new SimulationScheduler((hours) => runtime.tick(hours));
+runtime.updateWeather();
 
 function persistedGame(): PersistedGame {
   return {
@@ -112,14 +113,22 @@ function setDevSimSpeed(multiplier: number): void {
   log('info', 'dev_sim_speed_changed', { multiplier: simSpeedMultiplier });
 }
 
-// Same one-value-for-the-whole-process model as devSimSpeed above: a debug
-// weather change from any connected player is visible to all of them,
-// not a per-player preference.
-let devRaining = false;
-function setDevEnvironment(next: { raining?: boolean }): void {
-  if (!devControlsEnabled) return;
-  if (next.raining !== undefined) devRaining = next.raining;
-  log('info', 'dev_environment_changed', { raining: devRaining });
+let lastPumpSteps = 0;
+let lastPumpMilliseconds = 0;
+let effectiveSpeed = 1;
+let previousPumpAt = performance.now();
+function pumpSimulation(): void {
+  const started = performance.now();
+  const realElapsedSeconds = Math.max(0, started - previousPumpAt) / 1_000;
+  const gameBefore = runtime.session.gameTimeHours;
+  lastPumpSteps = scheduler.pump(simSpeedMultiplier);
+  const finished = performance.now();
+  lastPumpMilliseconds = finished - started;
+  previousPumpAt = started;
+  if (realElapsedSeconds >= 0.01) {
+    const measured = (runtime.session.gameTimeHours - gameBefore) * 3_600 / realElapsedSeconds;
+    effectiveSpeed = effectiveSpeed * 0.8 + measured * 0.2;
+  }
 }
 
 const gateway: GameplayGateway = new GameplayGateway({
@@ -133,20 +142,20 @@ const gateway: GameplayGateway = new GameplayGateway({
   revision: () => publisher.revision,
   saveGameInBackground,
   publishNow: () => publisher.publish(),
-  beforeDebugChange: () => scheduler.pump(simSpeedMultiplier),
+  beforeDebugChange: pumpSimulation,
   devSimSpeed: { get: () => simSpeedMultiplier, set: setDevSimSpeed, enabled: devControlsEnabled },
-  devEnvironment: {
-    get: () => ({ raining: devRaining }),
-    set: setDevEnvironment,
-    enabled: devControlsEnabled,
-  },
+  devDiagnostics: { get: () => ({
+    requestedSpeed: simSpeedMultiplier, effectiveSpeed: Math.max(0, effectiveSpeed),
+    pendingSimulationSeconds: scheduler.pendingSeconds, lastPumpSteps, lastPumpMilliseconds,
+    overloaded: scheduler.pendingSeconds > 1,
+  }) },
   log,
 });
 
 const publisher: ProjectionPublisher = new ProjectionPublisher(runtime, () => gateway.connections,
   (connection, message) => gateway.send(connection, message), () => simSpeedMultiplier);
 const simulationTimer = setInterval(
-  () => scheduler.pump(simSpeedMultiplier),
+  pumpSimulation,
   SIMULATION_INTERVAL_MS,
 );
 const persistenceTimer = setInterval(saveGameInBackground, 5_000);
@@ -157,6 +166,12 @@ const clockSyncTimer = setInterval(() => {
   gateway.broadcast({ type: 'clockSync', clock });
 }, CLOCK_SYNC_INTERVAL_MS);
 const publishTimer = setInterval(() => publisher.publish(), 250);
+const weatherTimer = setInterval(() => {
+  if (!runtime.updateWeather()) return;
+  publisher.publish();
+  saveGameInBackground();
+}, 60_000);
+const debugDiagnosticsTimer = setInterval(() => gateway.broadcastDebugState(), 1_000);
 
 server.listen(config.port, '127.0.0.1', () => log('info', 'listening', { port: config.port, gameId: GAME_ID }));
 
@@ -169,6 +184,8 @@ function shutdown(signal: string): void {
   clearInterval(persistenceTimer);
   clearInterval(clockSyncTimer);
   clearInterval(publishTimer);
+  clearInterval(weatherTimer);
+  clearInterval(debugDiagnosticsTimer);
   gateway.closeAll();
   void saveGame().then(() => gamePersistence.flush()).then(() => {
     server.close(() => process.exit(0));

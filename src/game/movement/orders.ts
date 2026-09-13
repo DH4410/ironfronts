@@ -84,7 +84,8 @@ export function issueMoveOrder(
     ? [] : warsRequiredForPath(session, army.ownerCountryId, unrestricted));
   for (const countryId of forcedWarCountryIds) {
     if (countryId > 0 && countryId !== army.ownerCountryId
-      && relationOf(session.state, army.ownerCountryId, countryId) !== 'war') {
+      && relationOf(session.state, army.ownerCountryId, countryId) !== 'war'
+      && relationOf(session.state, army.ownerCountryId, countryId) !== 'allied') {
       required.add(countryId);
     }
   }

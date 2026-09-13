@@ -19,6 +19,7 @@ function state(fog: boolean, armies: ArmyStack[]): GameState {
     countries: {
       1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
       2: { id: 2, name: 'B', color: '#000', controller: 'neutral', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
+      3: { id: 3, name: 'C', color: '#888', controller: 'neutral', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
     },
     provinceOwners: {}, provinceBuildings: {}, productionQueues: {}, constructionQueues: {}, rallyPoints: {},
     armies: Object.fromEntries(armies.map((a) => [a.id, a])),
@@ -61,6 +62,14 @@ describe('fog of war visibility', () => {
   it('wraps X for the vision check', () => {
     const s = state(true, [army('p', 1, 20, 0), army('e', 2, 9_980, 0)]); // 40 apart across seam
     expect(computeArmyVisibility(s, world, 1).get('e')).toBe('visible');
+  });
+
+  it('shares allied army vision and reveals allied forces', () => {
+    const s = state(true, [army('p', 1, 2_000, 0), army('ally', 2, 0, 0), army('enemy', 3, 70, 0)]);
+    s.relations['1:2'] = 'allied';
+    const visibility = computeArmyVisibility(s, world, 1);
+    expect(visibility.get('ally')).toBe('visible');
+    expect(visibility.get('enemy')).toBe('visible');
   });
 
   it('does not leak an enemy stack sitting in its own land with no friendly eyes nearby', () => {

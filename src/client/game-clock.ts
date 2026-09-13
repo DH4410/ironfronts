@@ -11,6 +11,7 @@ export interface GameClockReading {
   readonly second: number;
   readonly utcOffsetMinutes: number;
   readonly timezoneLinked: boolean;
+  readonly timeZone?: string;
 }
 
 /**
@@ -25,6 +26,7 @@ export class InterpolatedGameClock {
   private fresh = true;
   private utcOffsetMinutes = 120;
   private timezoneLinked = false;
+  private timeZone?: string;
   private campaignElapsedSeconds = 0;
   private targetEpochMs = 0;
   private targetAtMonotonicMs = 0;
@@ -43,6 +45,7 @@ export class InterpolatedGameClock {
     }
     this.utcOffsetMinutes = sync.utcOffsetMinutes;
     this.timezoneLinked = sync.timezoneLinked ?? false;
+    this.timeZone = sync.timeZone;
     this.campaignElapsedSeconds = sync.campaignElapsedSeconds ?? 0;
     this.targetEpochMs = sync.gameEpochMs;
     this.speed = sync.speed;
@@ -68,6 +71,7 @@ export class InterpolatedGameClock {
       second: date.getUTCSeconds() + date.getUTCMilliseconds() / 1_000,
       utcOffsetMinutes: this.utcOffsetMinutes,
       timezoneLinked: this.timezoneLinked,
+      timeZone: this.timeZone,
     };
   }
 

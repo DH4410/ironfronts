@@ -47,7 +47,7 @@ export function movementEdgeAllowed(
   prospectiveWars: ReadonlySet<number> = new Set(),
 ): EdgeAllowed {
   return (from, to) => countriesOnEdge(session, from, to).every((ownerId) => (
-    ownerId === countryId || (!friendlyOnly && (
+    ownerId === countryId || relationOf(session.state, countryId, ownerId) === 'allied' || (!friendlyOnly && (
       relationOf(session.state, countryId, ownerId) === 'war' || prospectiveWars.has(ownerId)
     ))
   ));
@@ -57,7 +57,8 @@ export function warsRequiredForPath(session: SimContext, countryId: number, path
   const required = new Set<number>();
   for (let i = 1; i < path.length; i += 1) {
     for (const ownerId of countriesOnEdge(session, path[i - 1], path[i])) {
-      if (ownerId !== countryId && relationOf(session.state, countryId, ownerId) !== 'war') {
+      const relation = relationOf(session.state, countryId, ownerId);
+      if (ownerId !== countryId && relation !== 'war' && relation !== 'allied') {
         required.add(ownerId);
       }
     }

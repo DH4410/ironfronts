@@ -21,9 +21,11 @@ export class GameConnection extends EventTarget {
   debugEnabled = false;
   devSimSpeed = 1;
   devSimSpeedEnabled = false;
-  /** Server-wide debug weather override. */
-  devRaining = false;
-  devEnvironmentEnabled = false;
+  devDiagnostics = {
+    requestedSpeed: 1, effectiveSpeed: 1, pendingSimulationSeconds: 0,
+    lastPumpSteps: 0, lastPumpMilliseconds: 0, overloaded: false,
+  };
+  lastDevCheatResult?: { action: 'build' | 'spawn' | 'resource'; ok: boolean; message: string };
   private readonly gameClock = new InterpolatedGameClock();
   private socket: WebSocket | null = null;
   private closed = false;
@@ -141,10 +143,12 @@ export class GameConnection extends EventTarget {
           this.devSimSpeed = message.multiplier;
           this.devSimSpeedEnabled = message.devControlsEnabled;
           this.dispatchEvent(new Event('dev-sim-speed'));
-        } else if (message.type === 'devEnvironment') {
-          this.devRaining = message.raining;
-          this.devEnvironmentEnabled = message.devControlsEnabled;
-          this.dispatchEvent(new Event('dev-environment'));
+        } else if (message.type === 'devDiagnostics') {
+          this.devDiagnostics = message;
+          this.dispatchEvent(new Event('dev-diagnostics'));
+        } else if (message.type === 'devCheatResult') {
+          this.lastDevCheatResult = message;
+          this.dispatchEvent(new CustomEvent('dev-cheat-result', { detail: message }));
         } else if (message.type === 'error') {
           if (!ready) settleError(new Error(message.message), 1008, 'Server rejected connection');
           else this.dispatchEvent(new CustomEvent('connection-error', { detail: message.message }));
@@ -210,11 +214,20 @@ export class GameConnection extends EventTarget {
   readClock(): GameClockReading { return this.gameClock.read(); }
   setDevSimSpeed(multiplier: number): void { this.send({ type: 'devSetSimSpeed', multiplier }); }
   setDevClock(epochMs: number): void { this.send({ type: 'devSetClock', epochMs }); }
-  linkDevClockToTimezone(utcOffsetMinutes: number): void {
-    this.send({ type: 'devLinkClockTimezone', utcOffsetMinutes });
+  linkDevClockToTimezone(timeZone: string): void {
+    this.send({ type: 'devLinkClockTimezone', timeZone });
   }
-  setDevEnvironment(next: { raining?: boolean }): void {
-    this.send({ type: 'devSetEnvironment', ...next });
+  setDevWeather(mode: 'automatic' | 'forced-clear' | 'forced-rain'): void {
+    this.send({ type: 'devSetWeather', mode });
+  }
+  devCheatBuild(provinceId: number, buildingId: 'barracks' | 'tankPlant' | 'ordnance' | 'missileSite' | 'fields' | 'quarry' | 'mine' | 'oilPump', level: number): void {
+    this.send({ type: 'devCheatBuild', provinceId, buildingId, level });
+  }
+  devCheatSpawnUnit(provinceId: number, countryId: number, unitTypeId: string): void {
+    this.send({ type: 'devCheatSpawnUnit', provinceId, countryId, unitTypeId });
+  }
+  devCheatGiveResource(countryId: number, resource: 'funds' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil', amount: number): void {
+    this.send({ type: 'devCheatGiveResource', countryId, resource, amount });
   }
   private failPending(reason: string): void {
     for (const entry of this.pending.values()) { window.clearTimeout(entry.timer); entry.settle(false, reason); }

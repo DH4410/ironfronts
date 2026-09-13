@@ -1,4 +1,3 @@
-import { installTimelineDebugControls } from './client/debug-timeline';
 import { setDebugHandles } from './client/debug-access';
 import { describeOrderFailure } from './ui/order-feedback';
 import './styles.css';
@@ -21,8 +20,7 @@ import { DEMO_ARMY, type ArmyPanelCommand } from './ui/army';
 import { aggregateTroopStat, armyActivityLabel } from './ui/army-presentation';
 import { iconMarkup } from './ui/icons';
 import type { WorldRenderer, MapMode, TimeOfDayState } from './renderer';
-import { parseClock } from './time-of-day';
-import type { CountryRecord, DiplomacyState, DiplomaticRelation, FrameStats, HoverInfo } from './types';
+import type { FrameStats, HoverInfo } from './types';
 import { LOADING_QUOTES } from './loadingQuotes';
 import { getGame, getSession, joinGame, logout } from './client/auth-api';
 import { GameConnection } from './client/game-connection';
@@ -127,19 +125,23 @@ const tooltip = required<HTMLElement>('tooltip');
 const tooltipName = required<HTMLElement>('tooltip-name');
 const tooltipTerrain = required<HTMLElement>('tooltip-terrain');
 const tooltipResources = required<HTMLElement>('tooltip-resources');
-const debugToggle = required<HTMLButtonElement>('debug-toggle');
 const diagnostics = required<HTMLElement>('diagnostics');
 const diagnosticsStats = required<HTMLElement>('diagnostics-stats');
 const diagnosticsPerformance = required<HTMLElement>('diagnostics-performance');
-const debugTime = required<HTMLInputElement>('debug-time');
+const debugDateTime = required<HTMLInputElement>('debug-datetime');
 const debugTimeState = required<HTMLOutputElement>('debug-time-state');
-const debugTimeUnlink = required<HTMLButtonElement>('debug-time-unlink');
+const debugTimeApply = required<HTMLButtonElement>('debug-time-apply');
+const debugTimeLink = required<HTMLButtonElement>('debug-time-link');
 const debugTimePresets = [...document.querySelectorAll<HTMLButtonElement>('[data-debug-time]')];
-const debugRain = required<HTMLInputElement>('debug-rain');
+const debugWeatherMode = required<HTMLSelectElement>('debug-weather-mode');
+const debugWeatherState = required<HTMLOutputElement>('debug-weather-state');
 const debugThunder = required<HTMLButtonElement>('debug-thunder');
 const debugSimSpeedState = required<HTMLOutputElement>('debug-sim-speed-state');
 const debugSimSpeedInput = required<HTMLInputElement>('debug-sim-speed');
+const debugSimSpeedNumber = required<HTMLInputElement>('debug-sim-speed-number');
 const debugSimSpeedButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-sim-speed]')];
+const debugServerHealth = required<HTMLElement>('debug-server-health');
+const debugServerWarning = required<HTMLElement>('debug-server-warning');
 const debugView = required<HTMLSelectElement>('debug-view');
 const debugConnections = required<HTMLInputElement>('debug-connections');
 const debugRivers = required<HTMLInputElement>('debug-rivers');
@@ -154,32 +156,32 @@ const debugDescription = required<HTMLElement>('debug-description');
 const debugLegend = required<HTMLElement>('debug-legend');
 const debugTabs = [...document.querySelectorAll<HTMLButtonElement>('[data-debug-tab]')];
 const debugPanels = [...document.querySelectorAll<HTMLElement>('[data-debug-panel]')];
-const debugPlayerCountry = required<HTMLElement>('debug-player-country');
-const debugCountryFlag = required<HTMLElement>('debug-country-flag');
-const debugPlayerForm = required<HTMLFormElement>('debug-player-form');
+const debugCheatBuilding = required<HTMLFormElement>('debug-cheat-building');
+const debugCheatBuildingProvince = required<HTMLInputElement>('debug-cheat-building-province');
+const debugCheatBuildingChoice = required<HTMLSelectElement>('debug-cheat-building-choice');
+const debugCheatUnit = required<HTMLFormElement>('debug-cheat-unit');
+const debugCheatUnitProvince = required<HTMLInputElement>('debug-cheat-unit-province');
+const debugCheatUnitCountry = required<HTMLInputElement>('debug-cheat-unit-country');
+const debugCheatUnitChoice = required<HTMLSelectElement>('debug-cheat-unit-choice');
+const debugCheatResource = required<HTMLFormElement>('debug-cheat-resource');
+const debugCheatResourceCountry = required<HTMLInputElement>('debug-cheat-resource-country');
+const debugCheatResourceKind = required<HTMLSelectElement>('debug-cheat-resource-kind');
+const debugCheatResourceAmount = required<HTMLInputElement>('debug-cheat-resource-amount');
+const debugCheatStatus = required<HTMLElement>('debug-cheat-status');
 
-/** Last server devEnvironment applied locally, so the 400ms HUD poll only
+/** Last server weather state applied locally, so the 400ms HUD poll only
  *  touches the renderer/audio when a broadcast actually changed something —
  *  including when this client itself is the one that just sent it. */
-let lastAppliedDevEnvironment: { raining: boolean } | null = null;
+let lastAppliedWeather: { raining: boolean; mode: string } | null = null;
 /** Mirrors units/movement.ts's NAVAL_STATUSES — a stack mid sea-crossing
  *  can't be moved, attacked with, split, or stopped from the HUD. */
 const NAVAL_TRANSIT_STATUSES = new Set(['embarking', 'atSea', 'disembarking']);
-const debugPlayerInput = required<HTMLInputElement>('debug-player-input');
-const debugWarForm = required<HTMLFormElement>('debug-war-form');
-const debugWarInput = required<HTMLInputElement>('debug-at-war');
-const debugAlliedForm = required<HTMLFormElement>('debug-allied-form');
-const debugAlliedInput = required<HTMLInputElement>('debug-allied');
-const debugWarList = required<HTMLElement>('debug-war-list');
-const debugAlliedList = required<HTMLElement>('debug-allied-list');
-const debugDiplomacyStatus = required<HTMLElement>('debug-diplomacy-status');
-const debugCountryNames = required<HTMLDataListElement>('debug-country-names');
 const mapModes = required<HTMLFieldSetElement>('map-modes');
 const mapModeInputs = [...document.querySelectorAll<HTMLInputElement>('input[name="map-mode"]')];
 const unsupported = required<HTMLElement>('unsupported');
 const compactNumber = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 });
 
-// Starts locked. Only the authenticated game-server hello can grant access.
+// Starts locked. The game-server deployment gate grants access after handshake.
 let debugEnabled = false;
 
 // The single typed channel between renderer/game systems and the player HUD.
@@ -366,7 +368,6 @@ function showLoader(): void {
   loadingError.hidden = true;
   loadingFoot.hidden = false;
   loading.hidden = false;
-  debugToggle.hidden = true;
   mapModes.hidden = true;
 }
 
@@ -398,9 +399,9 @@ async function teardownPartialLaunch(): Promise<void> {
   try { activeRenderer?.dispose(); } catch (error) { console.warn('[launch] renderer dispose failed', error); }
   activeRenderer = undefined;
   activeSession = undefined;
+  lastAppliedWeather = null;
   debugEnabled = false;
   diagnostics.hidden = true;
-  debugToggle.hidden = true;
   uiStore.patch({ debugEnabled: false });
   setDebugHandles(window as unknown as Record<string, unknown>, false, {});
   activeStopQuotes?.();
@@ -505,7 +506,6 @@ async function startGame(token: number): Promise<void> {
 
   const syncDebugAccess = (): void => {
     debugEnabled = session.debugEnabled;
-    debugToggle.hidden = !debugEnabled;
     if (!debugEnabled) diagnostics.hidden = true;
     uiStore.patch({ debugEnabled });
     setDebugHandles(window as unknown as Record<string, unknown>, debugEnabled, {
@@ -684,9 +684,6 @@ async function startGame(token: number): Promise<void> {
         rendererStarted = false;
       })();
     },
-    openDebugInspector: () => {
-      if (debugEnabled) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3', key: 'F3' }));
-    },
     armStrike: () => armStrike(session),
     focusWorld: (x, z) => renderer.focus(x, z, 900),
     armyCommand: (command) => handleArmyCommand(command),
@@ -729,7 +726,6 @@ async function startGame(token: number): Promise<void> {
     if (!diagnostics.hidden) updateDiagnostics(stats);
   };
   renderer.onDiplomacyChange = (state) => {
-    renderDiplomacyState(renderer, state);
     uiStore.patch({ playerCountry: { name: state.player.name, color: state.player.color } });
     if (state.enemies.length > 0 && music.getState() !== 'victory') {
       void music.setState('war');
@@ -783,8 +779,8 @@ async function startGame(token: number): Promise<void> {
     updateTimeControls(state);
   };
 
-  debugTimeUnlink.addEventListener('click', () => {
-    session.linkDevClockToTimezone(-new Date().getTimezoneOffset());
+  debugTimeLink.addEventListener('click', () => {
+    session.linkDevClockToTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
   }, attemptListener);
 
   const setVisualHour = (hour: number): void => {
@@ -796,11 +792,10 @@ async function startGame(token: number): Promise<void> {
     session.setDevClock(shifted.getTime() - offsetMs);
   };
 
-  debugTime.addEventListener('change', () => {
-    const hour = parseClock(debugTime.value);
-    if (hour !== undefined) {
-      setVisualHour(hour);
-    }
+  debugTimeApply.addEventListener('click', () => {
+    const reading = session.readClock();
+    const localEpoch = Date.parse(`${debugDateTime.value}Z`);
+    if (Number.isFinite(localEpoch)) session.setDevClock(localEpoch - reading.utcOffsetMinutes * 60_000);
   }, attemptListener);
   for (const preset of debugTimePresets) {
     preset.addEventListener('click', () => {
@@ -808,11 +803,8 @@ async function startGame(token: number): Promise<void> {
       setVisualHour(hour);
     }, attemptListener);
   }
-  debugRain.addEventListener('change', () => {
-    renderer.setRainEnabled(debugRain.checked);
-    void audio.setRainEnabled(debugRain.checked);
-    uiStore.patch({ weather: { raining: debugRain.checked, label: debugRain.checked ? 'Rain' : 'Clear' } });
-    session.setDevEnvironment({ raining: debugRain.checked });
+  debugWeatherMode.addEventListener('change', () => {
+    session.setDevWeather(debugWeatherMode.value as 'automatic' | 'forced-clear' | 'forced-rain');
   }, attemptListener);
   debugThunder.addEventListener('click', () => {
     void audio.playThunder();
@@ -826,39 +818,43 @@ async function startGame(token: number): Promise<void> {
     }, attemptListener);
   }
 
-  debugPlayerForm.addEventListener('submit', (event) => {
+  const buildingIds: BuildingId[] = ['barracks', 'tankPlant', 'ordnance', 'missileSite', 'fields', 'quarry', 'mine', 'oilPump'];
+  debugCheatBuildingChoice.replaceChildren(...buildingIds.flatMap((buildingId) =>
+    Array.from({ length: 5 }, (_, index) => {
+      const option = document.createElement('option');
+      option.value = `${buildingId}:${index + 1}`;
+      option.textContent = `${buildingLabel(buildingId)} — Level ${index + 1}`;
+      return option;
+    })));
+  debugCheatUnitChoice.replaceChildren(...['infantry', 'engineer', 'armored-car', 'light-tank', 'artillery', 'medium-tank'].map((unitId) => {
+    const option = document.createElement('option');
+    option.value = unitId; option.textContent = gameUnitLabel(unitId); return option;
+  }));
+  debugCheatBuilding.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (!debugEnabled) return;
-    const country = renderer.setPlayerCountryByName(debugPlayerInput.value);
-    if (!country) {
-      setDiplomacyStatus(`No country exactly matches “${debugPlayerInput.value.trim()}”.`, true);
-      return;
-    }
-    debugPlayerInput.value = '';
-    setDiplomacyStatus(`Country flag switched to ${country.name}. Diplomatic placeholders were cleared.`);
+    const [buildingId, rawLevel] = debugCheatBuildingChoice.value.split(':');
+    session.devCheatBuild(Number(debugCheatBuildingProvince.value), buildingId as BuildingId, Number(rawLevel));
+    debugCheatStatus.textContent = 'Applying building cheat…';
   }, attemptListener);
-
-  const bindRelationForm = (
-    form: HTMLFormElement,
-    input: HTMLInputElement,
-    relation: Exclude<DiplomaticRelation, 'neutral'>,
-  ) => {
-    form.addEventListener('submit', (event) => {
-      event.preventDefault();
-      if (!debugEnabled) return;
-      const country = renderer.setDiplomaticRelationByName(input.value, relation);
-      if (!country) {
-        setDiplomacyStatus(`“${input.value.trim()}” is unknown or is your current country.`, true);
-        return;
-      }
-      input.value = '';
-      setDiplomacyStatus(relation === 'war'
-        ? `${country.name} is now at war with you. Click its provinces to take them.`
-        : `${country.name} is now allied with you.`);
-    }, attemptListener);
-  };
-  bindRelationForm(debugWarForm, debugWarInput, 'war');
-  bindRelationForm(debugAlliedForm, debugAlliedInput, 'allied');
+  debugCheatUnit.addEventListener('submit', (event) => {
+    event.preventDefault();
+    session.devCheatSpawnUnit(Number(debugCheatUnitProvince.value), Number(debugCheatUnitCountry.value), debugCheatUnitChoice.value);
+    debugCheatStatus.textContent = 'Spawning unit…';
+  }, attemptListener);
+  debugCheatResource.addEventListener('submit', (event) => {
+    event.preventDefault();
+    session.devCheatGiveResource(
+      Number(debugCheatResourceCountry.value),
+      debugCheatResourceKind.value as 'funds' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil',
+      Number(debugCheatResourceAmount.value),
+    );
+    debugCheatStatus.textContent = 'Granting resource…';
+  }, attemptListener);
+  session.addEventListener('dev-cheat-result', (event) => {
+    const result = (event as CustomEvent<{ ok: boolean; message: string }>).detail;
+    debugCheatStatus.textContent = result.message;
+    debugCheatStatus.classList.toggle('is-error', !result.ok);
+  }, attemptListener);
 
   const applyDebugView = () => {
     const mode = Number(debugView.value);
@@ -872,13 +868,17 @@ async function startGame(token: number): Promise<void> {
   const toggleDiagnostics = () => {
     if (!debugEnabled) return;
     diagnostics.hidden = !diagnostics.hidden;
-    debugToggle.setAttribute('aria-expanded', String(!diagnostics.hidden));
   };
-  debugToggle.addEventListener('click', toggleDiagnostics, attemptListener);
+  let debugChordArmed = false;
   window.addEventListener('keydown', (event) => {
-    if (event.code === 'F3') {
-      if (!debugEnabled) return;
+    if (event.ctrlKey && event.code === 'KeyD') {
       event.preventDefault();
+      debugChordArmed = true;
+      return;
+    }
+    if (event.ctrlKey && debugChordArmed && event.code === 'KeyE') {
+      event.preventDefault();
+      debugChordArmed = false;
       toggleDiagnostics();
       return;
     }
@@ -888,6 +888,9 @@ async function startGame(token: number): Promise<void> {
     const count = debugView.options.length;
     debugView.selectedIndex = (debugView.selectedIndex + direction + count) % count;
     applyDebugView();
+  }, attemptListener);
+  window.addEventListener('keyup', (event) => {
+    if (event.code === 'ControlLeft' || event.code === 'ControlRight' || !event.ctrlKey) debugChordArmed = false;
   }, attemptListener);
   for (const input of mapModeInputs) input.addEventListener('change', applyMapMode, attemptListener);
   applyMapMode();
@@ -903,6 +906,10 @@ async function startGame(token: number): Promise<void> {
     debugConnections.disabled = true;
     try {
       await renderer.setConnectionsVisible(debugConnections.checked);
+    } catch (error) {
+      debugConnections.checked = false;
+      await renderer.setConnectionsVisible(false);
+      pushNotification('warning', 'Debug overlay', `Movement graph failed to load: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       debugConnections.disabled = false;
     }
@@ -911,6 +918,10 @@ async function startGame(token: number): Promise<void> {
     debugRivers.disabled = true;
     try {
       await renderer.setWaterwayNetworkVisible(debugRivers.checked);
+    } catch (error) {
+      debugRivers.checked = false;
+      await renderer.setWaterwayNetworkVisible(false);
+      pushNotification('warning', 'Debug overlay', `Waterway graph failed to load: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       debugRivers.disabled = false;
     }
@@ -923,14 +934,6 @@ async function startGame(token: number): Promise<void> {
     'Preparing the renderer',
   );
   if (token !== launchToken) return;
-  debugCountryNames.replaceChildren(...renderer.getCountries()
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map((country) => {
-      const option = document.createElement('option');
-      option.value = country.name;
-      return option;
-    }));
   applyDebugView();
   void audio.setWindEnabled(true);
   setLoadingStage('Deploying forces', 0.95);
@@ -968,11 +971,10 @@ async function startGame(token: number): Promise<void> {
 
 function updateTimeControls(state: TimeOfDayState): void {
   debugTimeState.textContent = `${state.stage} · ${state.clock}`;
-  if (document.activeElement !== debugTime) debugTime.value = state.clock;
 }
 
 const simSpeedGroup = debugSimSpeedButtons[0]?.closest<HTMLElement>('.sim-speed-controls');
-const syncTimelineDebug = installTimelineDebugControls(simSpeedGroup, () => activeSession);
+const clampDebugSpeed = (value: number): number => Math.max(1, Math.min(10_000, Math.round(value * 10) / 10));
 /**
  * Dev-only simulation-speed control: server-authoritative, shared by every
  * connected player. Hidden (not just disabled) against a production server so
@@ -981,18 +983,29 @@ const syncTimelineDebug = installTimelineDebugControls(simSpeedGroup, () => acti
  * HUD timer, which runs in a different function scope than these buttons.
  */
 function syncSimSpeedUi(): void {
-  syncTimelineDebug();
   const session = activeSession;
   if (simSpeedGroup) simSpeedGroup.hidden = !session || !session.devSimSpeedEnabled;
   if (!session) return;
-  debugSimSpeedState.textContent = `${session.devSimSpeed.toLocaleString()}×`;
-  if (document.activeElement !== debugSimSpeedInput) debugSimSpeedInput.value = String(session.devSimSpeed);
+  debugSimSpeedState.textContent = `${session.devSimSpeed.toLocaleString(undefined, { maximumFractionDigits: 1 })}×`;
+  if (document.activeElement !== debugSimSpeedInput) debugSimSpeedInput.value = String(Math.log10(session.devSimSpeed));
+  if (document.activeElement !== debugSimSpeedNumber) debugSimSpeedNumber.value = session.devSimSpeed.toFixed(1);
   for (const button of debugSimSpeedButtons) {
     button.setAttribute('aria-pressed', String(Number(button.dataset.simSpeed) === session.devSimSpeed));
   }
 }
+debugSimSpeedInput.addEventListener('input', () => {
+  const multiplier = clampDebugSpeed(10 ** Number(debugSimSpeedInput.value));
+  debugSimSpeedNumber.value = multiplier.toFixed(1);
+  debugSimSpeedState.textContent = `${multiplier.toLocaleString(undefined, { maximumFractionDigits: 1 })}×`;
+});
 debugSimSpeedInput.addEventListener('change', () => {
-  const multiplier = Math.max(1, Math.min(10_000, Number(debugSimSpeedInput.value) || 1));
+  const multiplier = clampDebugSpeed(10 ** Number(debugSimSpeedInput.value));
+  activeSession?.setDevSimSpeed(multiplier);
+});
+debugSimSpeedNumber.addEventListener('change', () => {
+  const multiplier = clampDebugSpeed(Number(debugSimSpeedNumber.value) || 1);
+  debugSimSpeedNumber.value = multiplier.toFixed(1);
+  debugSimSpeedInput.value = String(Math.log10(multiplier));
   activeSession?.setDevSimSpeed(multiplier);
 });
 for (const button of debugSimSpeedButtons) {
@@ -1010,15 +1023,29 @@ for (const button of debugSimSpeedButtons) {
  * touches the renderer when the broadcast value actually changed, so it is a
  * no-op for a server with no active override (the common case).
  */
-function syncDevEnvironmentUi(session: RemoteGameSession, renderer: WorldRenderer): void {
-  const next = { raining: session.devRaining };
-  if (lastAppliedDevEnvironment
-    && lastAppliedDevEnvironment.raining === next.raining) return;
-  lastAppliedDevEnvironment = next;
+function syncWeatherUi(session: RemoteGameSession, renderer: WorldRenderer): void {
+  const weather = session.state.weather;
+  const next = { raining: weather?.raining ?? false, mode: weather?.mode ?? 'automatic' };
+  if (lastAppliedWeather
+    && lastAppliedWeather.raining === next.raining && lastAppliedWeather.mode === next.mode) return;
+  lastAppliedWeather = next;
   renderer.setRainEnabled(next.raining);
   void audio.setRainEnabled(next.raining);
-  debugRain.checked = next.raining;
+  debugWeatherMode.value = next.mode;
+  debugWeatherState.textContent = next.raining ? 'Raining now' : 'Clear now';
   uiStore.patch({ weather: { raining: next.raining, label: next.raining ? 'Rain' : 'Clear' } });
+}
+
+function syncServerDiagnostics(session: RemoteGameSession): void {
+  const d = session.devDiagnostics;
+  debugServerHealth.textContent = [
+    `requested  ${d.requestedSpeed.toFixed(1)}×`,
+    `effective  ${d.effectiveSpeed.toFixed(1)}×`,
+    `debt       ${d.pendingSimulationSeconds.toFixed(2)} sim seconds`,
+    `last pump  ${d.lastPumpSteps} steps / ${d.lastPumpMilliseconds.toFixed(2)} ms`,
+  ].join('\n');
+  debugServerWarning.hidden = !d.overloaded;
+  debugServerWarning.textContent = d.overloaded ? 'Server is accumulating simulation debt and cannot currently maintain the requested speed.' : '';
 }
 
 async function bootstrapGameSession(
@@ -1107,8 +1134,12 @@ async function bootstrapGameSession(
     const clock = session.readClock();
     uiStore.patch({ clock });
     renderer.setTimeOfDay(clock.hour + clock.minute / 60 + clock.second / 3_600);
-    debugTimeUnlink.setAttribute('aria-pressed', String(clock.timezoneLinked));
-    debugTimeUnlink.textContent = clock.timezoneLinked ? 'Timezone linked' : 'Link timezone';
+    debugTimeLink.setAttribute('aria-pressed', String(clock.timezoneLinked));
+    debugTimeLink.textContent = clock.timezoneLinked
+      ? `Timezone linked: ${clock.timeZone ?? 'browser'}` : 'Use browser timezone';
+    if (document.activeElement !== debugDateTime) {
+      debugDateTime.value = new Date(session.readEpochMs() + clock.utcOffsetMinutes * 60_000).toISOString().slice(0, 19);
+    }
   };
   updateCivilClock();
   const civilClockTimer = window.setInterval(updateCivilClock, 250);
@@ -1125,7 +1156,8 @@ async function bootstrapGameSession(
     refreshSelectedProvince(session); // keep production / construction % live
     drainSessionEvents(session);
     syncSimSpeedUi();
-    syncDevEnvironmentUi(session, renderer);
+    syncWeatherUi(session, renderer);
+    syncServerDiagnostics(session);
   }, 400);
   const typingInField = (target: EventTarget | null): boolean => {
     const el = target as HTMLElement | null;
@@ -2967,49 +2999,6 @@ function playerResourceLines(session: RemoteGameSession): ResourceLine[] {
   return lines;
 }
 
-function renderDiplomacyState(renderer: WorldRenderer, state: DiplomacyState): void {
-  debugPlayerCountry.textContent = state.player.name;
-  debugCountryFlag.style.setProperty('--player-country-color', state.player.color);
-  renderRelationList(renderer, debugWarList, state.enemies, 'No wars');
-  renderRelationList(renderer, debugAlliedList, state.allies, 'No allies');
-}
-
-function renderRelationList(
-  renderer: WorldRenderer,
-  container: HTMLElement,
-  countries: CountryRecord[],
-  emptyLabel: string,
-): void {
-  if (!countries.length) {
-    const empty = document.createElement('span');
-    empty.className = 'relation-list__empty';
-    empty.textContent = emptyLabel;
-    container.replaceChildren(empty);
-    return;
-  }
-  container.replaceChildren(...countries.map((country) => {
-    const chip = document.createElement('span');
-    chip.className = 'relation-chip';
-    chip.append(country.name);
-    const remove = document.createElement('button');
-    remove.type = 'button';
-    remove.title = `Remove ${country.name}`;
-    remove.setAttribute('aria-label', `Remove ${country.name}`);
-    remove.textContent = '×';
-    remove.addEventListener('click', () => {
-      renderer.clearDiplomaticRelation(country.id);
-      setDiplomacyStatus(`${country.name} is neutral again.`);
-    });
-    chip.append(remove);
-    return chip;
-  }));
-}
-
-function setDiplomacyStatus(message: string, error = false): void {
-  debugDiplomacyStatus.textContent = message;
-  debugDiplomacyStatus.classList.toggle('is-error', error);
-}
-
 const RESOURCE_TOOLTIP_CHIPS = [
   ['food', 'food'], ['stone', 'node-stone'], ['metal', 'node-metal'], ['oil', 'node-oil'],
 ] as const;
@@ -3022,7 +3011,10 @@ function updateTooltip(
     return;
   }
   tooltipName.textContent = info.name;
-  tooltipTerrain.textContent = `${info.country} · ${info.terrain}`;
+  const ownerId = activeSession?.state.provinceOwners[info.id];
+  tooltipTerrain.textContent = debugEnabled
+    ? `${info.country} · Country #${ownerId ?? 0} · ${info.terrain} · Province #${info.id}`
+    : `${info.country} · ${info.terrain}`;
   const chips = potential
     ? RESOURCE_TOOLTIP_CHIPS
         .map(([key, icon]) =>
@@ -3118,10 +3110,10 @@ const DEBUG_HELP: Record<number, { description: string; legend: Array<[string, s
   7: { description: 'Static land/coast classification and open-water depth.', legend: [['land', '#299e4c'], ['coast', '#bd6b29'], ['deep water', '#041c47']] },
   8: { description: 'Full dirt-road core and verge footprint independent of nearby 3D geometry.', legend: [['verge', '#ef9e1a'], ['core', '#f22e14']] },
   9: { description: 'Navigation composite for comparing roads, static water, rivers, and canals.', legend: [['road', '#f59c1e'], ['river', '#05c7f9'], ['canal', '#c46bf5'], ['ocean/lake', '#062e66']] },
-  10: { description: 'Server-generated food potential. Exact foreign values require debug entitlement.', legend: [['low', '#071017'], ['medium', '#1abcaa'], ['world class', '#ffca1f']] },
-  11: { description: 'Server-generated stone potential. Exact foreign values require debug entitlement.', legend: [['low', '#071017'], ['medium', '#1abcaa'], ['world class', '#ffca1f']] },
-  12: { description: 'Server-generated metal potential. Exact foreign values require debug entitlement.', legend: [['low', '#071017'], ['medium', '#1abcaa'], ['world class', '#ffca1f']] },
-  13: { description: 'Server-generated oil potential. Exact foreign values require debug entitlement.', legend: [['low', '#071017'], ['medium', '#1abcaa'], ['world class', '#ffca1f']] },
+  10: { description: 'Server-generated food potential. Exact foreign values require a debug-enabled deployment.', legend: [['low', '#071017'], ['medium', '#1abcaa'], ['world class', '#ffca1f']] },
+  11: { description: 'Server-generated stone potential. Exact foreign values require a debug-enabled deployment.', legend: [['low', '#071017'], ['medium', '#1abcaa'], ['world class', '#ffca1f']] },
+  12: { description: 'Server-generated metal potential. Exact foreign values require a debug-enabled deployment.', legend: [['low', '#071017'], ['medium', '#1abcaa'], ['world class', '#ffca1f']] },
+  13: { description: 'Server-generated oil potential. Exact foreign values require a debug-enabled deployment.', legend: [['low', '#071017'], ['medium', '#1abcaa'], ['world class', '#ffca1f']] },
 };
 
 function updateDebugHelp(mode: number): void {

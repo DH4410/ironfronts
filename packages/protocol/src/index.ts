@@ -66,14 +66,16 @@ export const clientMessageSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('devSetClock'), epochMs: z.number().finite().min(-8.64e15).max(8.64e15) }),
   z.object({ type: z.literal('ping'), sentAt: z.number().finite() }),
   z.object({ type: z.literal('devSetSimSpeed'), multiplier: z.number().finite().min(1).max(10_000) }),
-  z.object({ type: z.literal('devLinkClockTimezone'), utcOffsetMinutes: z.number().int().min(-840).max(840) }),
-  // Same dev/test-only, server-wide semantics as devSetSimSpeed above: applies
-  // to every connected player, ignored in production. Fields are independently
-  // optional so a caller can change just the clock or just the rain.
-  z.object({
-    type: z.literal('devSetEnvironment'),
-    raining: z.boolean().optional(),
-  }),
+  z.object({ type: z.literal('devLinkClockTimezone'), timeZone: z.string().min(1).max(100) }),
+  z.object({ type: z.literal('devSetWeather'), mode: z.enum(['automatic', 'forced-clear', 'forced-rain']) }),
+  z.object({ type: z.literal('devCheatBuild'), provinceId: z.number().int().nonnegative(),
+    buildingId: z.enum(['barracks', 'tankPlant', 'ordnance', 'missileSite', 'fields', 'quarry', 'mine', 'oilPump']),
+    level: z.number().int().min(1).max(5) }),
+  z.object({ type: z.literal('devCheatSpawnUnit'), provinceId: z.number().int().nonnegative(),
+    countryId: z.number().int().positive(), unitTypeId: z.string().min(1).max(50) }),
+  z.object({ type: z.literal('devCheatGiveResource'), countryId: z.number().int().positive(),
+    resource: z.enum(['funds', 'manpower', 'food', 'stone', 'metal', 'oil']),
+    amount: z.number().finite().positive().max(1_000_000_000) }),
 ]);
 export type ClientMessage = z.infer<typeof clientMessageSchema>;
 
@@ -222,6 +224,8 @@ export interface PlayerProjection {
   resourceNodes?: Record<number, unknown>;
   ownCountry: null | Record<string, unknown>;
   relations: Record<string, 'peace' | 'allied' | 'war'>;
+  weather?: { mode: 'automatic' | 'forced-clear' | 'forced-rain'; raining: boolean;
+    scheduleDay: string; rainStartMinute: number; rainDurationMinutes: number };
   diplomacy?: {
     messages: DiplomacyMessage[];
     proposals: DiplomacyProposal[];
@@ -247,6 +251,7 @@ export interface GameClockSync {
   serverEpochMs: number;
   utcOffsetMinutes: number;
   timezoneLinked?: boolean;
+  timeZone?: string;
 }
 
 export interface PresentationCatalogs {
@@ -283,12 +288,9 @@ export type ServerMessage =
   // devSetSimSpeed there regardless, but the client uses this to hide the
   // control entirely rather than offer a lever that silently does nothing.
   | { type: 'devSimSpeed'; multiplier: number; devControlsEnabled: boolean }
-  // Sent right after `baseline` and whenever debug weather changes. Visual
-  // time is synchronized independently through GameClockSync.
-  | {
-    type: 'devEnvironment'; raining: boolean;
-    devControlsEnabled: boolean;
-  };
+  | { type: 'devDiagnostics'; requestedSpeed: number; effectiveSpeed: number; pendingSimulationSeconds: number;
+      lastPumpSteps: number; lastPumpMilliseconds: number; overloaded: boolean; devControlsEnabled: boolean }
+  | { type: 'devCheatResult'; action: 'build' | 'spawn' | 'resource'; ok: boolean; message: string };
 
 export { serverMessageSchema } from './server-schema';
 
@@ -309,8 +311,6 @@ export interface GameTicketClaims {
   accountId: string;
   gameId: string;
   countryId: number;
-  /** Account-derived eligibility. The game deployment applies its own gate. */
-  debugEntitled: boolean;
   audience: 'game-server';
   protocolVersion: 4;
   expiresAt: number;

@@ -240,40 +240,43 @@
       <span id="tooltip-resources" class="tooltip-resources" hidden></span>
     </div>
 
-    <button id="debug-toggle" class="debug-toggle" type="button" aria-controls="diagnostics" aria-expanded="false" hidden>
-      <span aria-hidden="true">⌁</span> Debug
-    </button>
-
     <aside id="diagnostics" class="diagnostics" hidden>
-      <div class="diagnostics__head"><strong>WORLD INSPECTOR</strong><span>F3</span></div>
+      <div class="diagnostics__head"><strong>WORLD INSPECTOR</strong><span>CTRL+D+E</span></div>
       <nav class="diagnostics__tabs" aria-label="Inspector sections">
         <button type="button" data-debug-tab="world" aria-selected="true">World</button>
-        <button type="button" data-debug-tab="diplomacy" aria-selected="false">Diplomacy</button>
+        <button type="button" data-debug-tab="server" aria-selected="false">Server</button>
+        <button type="button" data-debug-tab="cheat" aria-selected="false">Cheat</button>
         <button type="button" data-debug-tab="renderer" aria-selected="false">Renderer</button>
       </nav>
 
       <div class="diagnostics__panel" data-debug-panel="world">
         <div class="time-controls">
-          <div class="time-controls__heading"><strong>LIGHTING &mdash; VISUAL ONLY</strong><output id="debug-time-state">Morning · 08:00</output></div>
-          <label class="time-controls__clock" for="debug-time">Lighting clock
-            <input id="debug-time" type="time" value="08:00" step="60" />
+          <div class="time-controls__heading"><strong>WORLD CLOCK &mdash; VISUAL ONLY</strong><output id="debug-time-state">Morning · 08:00</output></div>
+          <label class="time-controls__clock" for="debug-datetime">World date and time
+            <input id="debug-datetime" type="datetime-local" step="1" />
           </label>
           <div class="time-controls__presets" aria-label="Jump to time of day">
             <button type="button" data-debug-time="6">Dawn</button>
             <button type="button" data-debug-time="12">Noon</button>
             <button type="button" data-debug-time="18">Sunset</button>
             <button type="button" data-debug-time="0">Night</button>
-            <button id="debug-time-unlink" type="button" aria-pressed="false" title="Link the world clock to this browser's timezone">Link timezone</button>
+            <button id="debug-time-apply" type="button">Set</button>
           </div>
+          <button id="debug-time-link" type="button" class="diagnostics__wide-button" aria-pressed="false">Use browser timezone</button>
           <small>This persistent world clock controls sunlight only. Set any time manually or link it to your timezone; gameplay always uses the separate simulation clock.</small>
         </div>
         <div class="diagnostics__group sim-speed-controls">
           <div class="time-controls__heading"><strong>SIMULATION SPEED &mdash; DEV ONLY</strong><output id="debug-sim-speed-state">1&times;</output></div>
-          <label for="debug-sim-speed">Unified multiplier
-            <input id="debug-sim-speed" type="range" min="1" max="10000" step="1" value="1" />
+          <label for="debug-sim-speed">Unified logarithmic multiplier
+            <input id="debug-sim-speed" type="range" min="0" max="4" step="0.001" value="0" />
+          </label>
+          <label for="debug-sim-speed-number">Exact speed
+            <span class="diagnostics__number-suffix"><input id="debug-sim-speed-number" type="number" min="1" max="10000" step="0.1" value="1.0" /><b>×</b></span>
           </label>
           <div class="sim-speed-controls__buttons" role="group" aria-label="Simulation speed">
             <button type="button" data-sim-speed="1" aria-pressed="true">1&times;</button>
+            <button type="button" data-sim-speed="2">2&times;</button>
+            <button type="button" data-sim-speed="4">4&times;</button>
             <button type="button" data-sim-speed="10">10&times;</button>
             <button type="button" data-sim-speed="100">100&times;</button>
             <button type="button" data-sim-speed="1000">1,000&times;</button>
@@ -283,45 +286,52 @@
         </div>
         <div class="diagnostics__group weather-controls">
           <strong>WEATHER</strong>
-          <label><input id="debug-rain" type="checkbox" /> Rain</label>
-          <button id="debug-thunder" type="button">Thunder preview</button>
-          <small>Rain ambience follows the weather toggle. Thunder preview uses headphone HRTF spatialization.</small>
-        </div>
-        <pre id="diagnostics-stats"></pre>
-        <div class="diagnostics__group diagnostics__performance">
-          <strong>PERFORMANCE</strong>
-          <pre id="diagnostics-performance"></pre>
+          <label for="debug-weather-mode">Weather mode
+            <select id="debug-weather-mode"><option value="automatic">Automatic</option><option value="forced-clear">Force clear</option><option value="forced-rain">Force rain</option></select>
+          </label>
+          <output id="debug-weather-state">Clear</output>
+          <small>Automatic weather creates one deterministic 1–2 hour rain window per real UTC day and survives server restarts.</small>
         </div>
       </div>
 
-      <div class="diagnostics__panel" data-debug-panel="diplomacy" hidden>
-        <div class="country-flag">
-          <span id="debug-country-flag" class="country-flag__mark" aria-hidden="true"></span>
-          <div><small>COUNTRY FLAG</small><strong id="debug-player-country">Spain</strong></div>
+      <div class="diagnostics__panel" data-debug-panel="server" hidden>
+        <div class="diagnostics__group diagnostics__performance">
+          <strong>SIMULATION HEALTH</strong>
+          <pre id="debug-server-health">Waiting for server sample…</pre>
+          <p id="debug-server-warning" class="diagnostics__status" hidden></p>
         </div>
-        <form id="debug-player-form" class="diplomacy-form">
-          <label for="debug-player-input">Play as country</label>
-          <div><input id="debug-player-input" type="text" list="debug-country-names" placeholder="Exact country name" autocomplete="off" /><button type="submit">Switch</button></div>
+      </div>
+
+      <div class="diagnostics__panel" data-debug-panel="cheat" hidden>
+        <form id="debug-cheat-building" class="debug-cheat-form">
+          <strong>INSTANT BUILDING</strong>
+          <label>Province ID <input id="debug-cheat-building-province" type="number" min="0" step="1" required /></label>
+          <label>Building and level <select id="debug-cheat-building-choice"></select></label>
+          <button type="submit">Build instantly</button>
         </form>
-        <div class="diagnostics__group">
-          <strong>AT WAR WITH</strong>
-          <form id="debug-war-form" class="diplomacy-form diplomacy-form--relation">
-            <div><input id="debug-at-war" type="text" list="debug-country-names" placeholder="Country name" autocomplete="off" /><button type="submit">Add</button></div>
-          </form>
-          <div id="debug-war-list" class="relation-list relation-list--war"><span class="relation-list__empty">No wars</span></div>
-        </div>
-        <div class="diagnostics__group">
-          <strong>ALLIED WITH</strong>
-          <form id="debug-allied-form" class="diplomacy-form diplomacy-form--relation">
-            <div><input id="debug-allied" type="text" list="debug-country-names" placeholder="Country name" autocomplete="off" /><button type="submit">Add</button></div>
-          </form>
-          <div id="debug-allied-list" class="relation-list relation-list--allied"><span class="relation-list__empty">No allies</span></div>
-        </div>
-        <p id="debug-diplomacy-status" class="diplomacy-status" aria-live="polite">Neutral countries are grey. Click an enemy province to take it.</p>
-        <datalist id="debug-country-names"></datalist>
+        <form id="debug-cheat-unit" class="debug-cheat-form diagnostics__group">
+          <strong>SPAWN UNIT</strong>
+          <label>Province ID <input id="debug-cheat-unit-province" type="number" min="0" step="1" required /></label>
+          <label>Country ID <input id="debug-cheat-unit-country" type="number" min="1" step="1" required /></label>
+          <label>Unit <select id="debug-cheat-unit-choice"></select></label>
+          <button type="submit">Spawn unit</button>
+        </form>
+        <form id="debug-cheat-resource" class="debug-cheat-form diagnostics__group">
+          <strong>GIVE RESOURCE</strong>
+          <label>Country ID <input id="debug-cheat-resource-country" type="number" min="1" step="1" required /></label>
+          <label>Resource <select id="debug-cheat-resource-kind"><option>funds</option><option>manpower</option><option>food</option><option>stone</option><option>metal</option><option>oil</option></select></label>
+          <label>Amount <input id="debug-cheat-resource-amount" type="number" min="0.1" max="1000000000" step="0.1" value="1000" required /></label>
+          <button type="submit">Give resource</button>
+        </form>
+        <p id="debug-cheat-status" class="diagnostics__status" aria-live="polite">Cheats are authoritative and saved immediately.</p>
       </div>
 
       <div class="diagnostics__panel" data-debug-panel="renderer" hidden>
+        <div class="diagnostics__group diagnostics__performance">
+          <strong>FRAME</strong>
+          <pre id="diagnostics-stats"></pre>
+          <pre id="diagnostics-performance"></pre>
+        </div>
         <label>View
           <select id="debug-view">
             <option value="0">Beauty</option>
@@ -356,6 +366,11 @@
           <label><input id="debug-waterways" type="checkbox" checked /> Waterways</label>
           <label><input id="debug-props" type="checkbox" checked /> Cities and props</label>
           <label><input id="debug-wireframe" type="checkbox" /> Terrain grid</label>
+        </div>
+        <div class="diagnostics__group weather-controls">
+          <strong>AUDIO PREVIEW</strong>
+          <button id="debug-thunder" type="button">Thunder preview</button>
+          <small>Uses headphone HRTF spatialization and does not alter weather.</small>
         </div>
         <p class="diagnostics__hint"><kbd>[</kbd> <kbd>]</kbd> cycle views</p>
       </div>

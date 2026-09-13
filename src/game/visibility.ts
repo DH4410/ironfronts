@@ -30,6 +30,7 @@ import type { WorldData } from './world-data';
 import { unitType } from './units/unit-catalog';
 import { unitStatMultiplier } from './economy/shortages';
 import { wrappedDistanceSq } from './geometry';
+import { relationOf } from './game-state';
 
 export type ContactLevel = 'hidden' | 'contact' | 'visible';
 
@@ -47,7 +48,8 @@ export function friendlyVisionSources(
 ): VisionSource[] {
   const sources: VisionSource[] = [];
   for (const army of Object.values(state.armies)) {
-    if (army.ownerCountryId !== viewerCountryId) continue;
+    if (army.ownerCountryId !== viewerCountryId
+      && relationOf(state, viewerCountryId, army.ownerCountryId) !== 'allied') continue;
     const living = army.units.filter((g) => g.count > 0 && g.hp > 0);
     const outer = Math.max(0, ...living.map((g) => {
       const type = unitType(g.typeId);
@@ -67,7 +69,9 @@ export function ownsGroundAt(
   state: GameState, world: WorldData, viewerCountryId: number, x: number, z: number,
 ): boolean {
   const provinceId = world.provinceAt(x, z);
-  return provinceId >= 0 && state.provinceOwners[provinceId] === viewerCountryId;
+  if (provinceId < 0) return false;
+  const owner = state.provinceOwners[provinceId];
+  return owner === viewerCountryId || (owner > 0 && relationOf(state, viewerCountryId, owner) === 'allied');
 }
 
 /** Highest contact level a world point reaches against the given vision set. */
@@ -97,7 +101,8 @@ export function computeArmyVisibility(
   const positions = new SpatialIndex(sources, world.width);
   const radius = Math.sqrt(Math.max(0, ...sources.map((source) => Math.max(source.outerSq, source.innerSq))));
   for (const army of Object.values(state.armies)) {
-    if (army.ownerCountryId === viewerCountryId) {
+    if (army.ownerCountryId === viewerCountryId
+      || relationOf(state, viewerCountryId, army.ownerCountryId) === 'allied') {
       result.set(army.id, 'visible');
       continue;
     }

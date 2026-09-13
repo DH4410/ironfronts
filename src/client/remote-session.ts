@@ -47,6 +47,11 @@ export class RemoteGameSession extends EventTarget {
     this.state = structuredClone(connection.state);
     connection.addEventListener('state', () => this.rebuild(), { signal: this.listeners.signal });
     connection.addEventListener('connection-status', () => this.dispatchEvent(new Event('change')), { signal: this.listeners.signal });
+    connection.addEventListener('dev-cheat-result', (event) => {
+      this.dispatchEvent(new CustomEvent('dev-cheat-result', {
+        detail: (event as CustomEvent).detail,
+      }));
+    }, { signal: this.listeners.signal });
     connection.addEventListener('game-event', (event) => {
       const detail = (event as CustomEvent<Record<string, unknown>>).detail;
       const kind = String(detail.kind ?? '');
@@ -107,12 +112,19 @@ export class RemoteGameSession extends EventTarget {
   get debugEnabled(): boolean { return this.connection.debugEnabled; }
   get devSimSpeedEnabled(): boolean { return this.connection.devSimSpeedEnabled; }
   setDevSimSpeed(multiplier: number): void { this.connection.setDevSimSpeed(multiplier); }
+  setDevClock(epochMs: number): void { this.connection.setDevClock(epochMs); }
+  linkDevClockToTimezone(timeZone: string): void { this.connection.linkDevClockToTimezone(timeZone); }
 
-  /** Dev/test only. See GameConnection.setDevEnvironment. */
-  get devRaining(): boolean { return this.connection.devRaining; }
-  get devEnvironmentEnabled(): boolean { return this.connection.devEnvironmentEnabled; }
-  setDevEnvironment(next: { raining?: boolean }): void {
-    this.connection.setDevEnvironment(next);
+  get devDiagnostics() { return this.connection.devDiagnostics; }
+  setDevWeather(mode: 'automatic' | 'forced-clear' | 'forced-rain'): void { this.connection.setDevWeather(mode); }
+  devCheatBuild(provinceId: number, buildingId: BuildingId, level: number): void {
+    this.connection.devCheatBuild(provinceId, buildingId, level);
+  }
+  devCheatSpawnUnit(provinceId: number, countryId: number, unitTypeId: string): void {
+    this.connection.devCheatSpawnUnit(provinceId, countryId, unitTypeId);
+  }
+  devCheatGiveResource(countryId: number, resource: 'funds' | 'manpower' | 'food' | 'stone' | 'metal' | 'oil', amount: number): void {
+    this.connection.devCheatGiveResource(countryId, resource, amount);
   }
 
   unit(typeId: string): Record<string, unknown> | undefined {
@@ -227,10 +239,6 @@ export class RemoteGameSession extends EventTarget {
   get fresh(): boolean { return this.connection.fresh; }
   get baselineGeneration(): number { return this.connection.baselineGeneration; }
   serverNow(): number { return this.connection.serverNow(); }
-  setDevClock(epochMs: number): void { this.connection.setDevClock(epochMs); }
-  linkDevClockToTimezone(utcOffsetMinutes: number): void {
-    this.connection.linkDevClockToTimezone(utcOffsetMinutes);
-  }
   dispose(): void { this.listeners.abort(); this.pendingCommands.clear(); }
   pendingForArmy(armyId: string): boolean { return [...this.pendingCommands.values()].some(({ command }) => 'armyId' in command && command.armyId === armyId); }
   pendingForProvince(provinceId: number): boolean {

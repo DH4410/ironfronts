@@ -750,7 +750,7 @@ export class WorldRenderer {
   }
 
   /** Uploads only the server-projected records. Normal players therefore see
-   * owned values; debug-entitled sessions receive the complete heatmap. */
+   * owned values; debug-enabled deployments receive the complete heatmap. */
   setProvinceResourcePotentials(records: Record<number, unknown> | undefined): void {
     if (!this.deviceReady || !this.provinceResourcePotentialTexture) return;
     const pixels = new Uint8Array(this.provinceResourcePotentialWidth * 4);
@@ -858,21 +858,6 @@ export class WorldRenderer {
       && [...next].every(([id, relation]) => this.diplomaticRelations.get(id) === relation)) return;
     this.diplomaticRelations.clear();
     for (const [id, relation] of next) this.diplomaticRelations.set(id, relation);
-    this.refreshDiplomacyTexture();
-    this.notifyDiplomacyChange();
-  }
-
-  setDiplomaticRelationByName(name: string, relation: Exclude<DiplomaticRelation, 'neutral'>): CountryRecord | undefined {
-    const country = this.findCountry(name);
-    if (!country || country.id === this.playerCountryId) return undefined;
-    this.diplomaticRelations.set(country.id, relation);
-    this.refreshDiplomacyTexture();
-    this.notifyDiplomacyChange();
-    return country;
-  }
-
-  clearDiplomaticRelation(countryId: number): void {
-    if (!this.diplomaticRelations.delete(countryId)) return;
     this.refreshDiplomacyTexture();
     this.notifyDiplomacyChange();
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll } from 'vitest';
 import { GameSession } from '../../src/game/game-session';
 import { HOURS_PER_WARHEAD, stepWarheads } from '../../src/game/strike';
-import { emptyStockpile, relationOf } from '../../src/game/game-state';
+import { emptyStockpile, relationOf, setRelation } from '../../src/game/game-state';
 import { BUILDINGS, queueBuilding } from '../../src/game/construction';
 import { buildScenarioSelection } from '../../src/game/scenario-catalog';
 import { CATALOG_COUNTRY_BY_NAME } from '../../src/game/data/countries.generated';
@@ -137,6 +137,20 @@ describe('strategic strike', () => {
     });
     expect(res.ok).toBe(false);
     expect(s.state.countries[SPAIN].warheads).toBe(1);
+  });
+
+  it('rejects a strike on allied territory without spending a warhead', () => {
+    const s = session();
+    const { province, ownerId } = strikeableForeignProvince(s);
+    const [x, z] = province.center;
+    setRelation(s.state, SPAIN, ownerId, 'allied');
+    s.state.countries[SPAIN].warheads = 1;
+
+    const result = s.applyCommand({ type: 'strike', countryId: SPAIN, provinceId: province.id, x, z });
+
+    expect(result).toMatchObject({ ok: false, reason: 'You cannot strike an allied province.' });
+    expect(s.state.countries[SPAIN].warheads).toBe(1);
+    expect(relationOf(s.state, SPAIN, ownerId)).toBe('allied');
   });
 
   it('accrues warheads while holding an Ordnance Workshop, and not without one', () => {

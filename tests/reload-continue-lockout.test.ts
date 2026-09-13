@@ -168,9 +168,10 @@ describe('reload / Continue lockout', () => {
       const setup = main.slice(start, start + 400);
       expect(setup).toContain('launchDisposers.push(() => attemptEvents.abort())');
       expect(setup).toContain('const attemptListener = { signal: attemptEvents.signal }');
-      // The renderer-scoped debug listeners opt into the attempt's AbortSignal.
-      expect(main).toContain("debugToggle.addEventListener('click', toggleDiagnostics, attemptListener)");
-      expect(main).toMatch(/window\.addEventListener\('keydown', \(event\) => \{[\s\S]{0,700}\}, attemptListener\);/);
+      // The renderer-scoped hidden debug chord opts into the attempt's AbortSignal.
+      expect(main).toContain("event.code === 'KeyD'");
+      expect(main).toContain("event.code === 'KeyE'");
+      expect(main).toMatch(/window\.addEventListener\('keydown', \(event\) => \{[\s\S]{0,1200}\}, attemptListener\);/);
     });
   });
 });

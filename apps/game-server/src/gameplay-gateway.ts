@@ -12,8 +12,8 @@ import type { AuthoritativeGameClock } from './game-clock';
 import { TicketNonceStore } from './ticket-nonces';
 
 const DEBUG_MESSAGE_TYPES = new Set([
-  'devSetSimSpeed', 'devSetClock', 'devLinkClockTimezone', 'devSetEnvironment',
-  'devSetRelation', 'devInspectState', 'devGetFullState',
+  'devSetSimSpeed', 'devSetClock', 'devLinkClockTimezone', 'devSetWeather',
+  'devCheatBuild', 'devCheatSpawnUnit', 'devCheatGiveResource',
 ]);
 
 function requestedMessageType(value: unknown): string | null {
@@ -35,7 +35,7 @@ export interface GameplayGatewayOptions {
   readonly runtime: GameRuntime;
   readonly clientOrigin: string;
   readonly ticketSecret: string;
-  /** Explicit deployment gate; a signed account claim is still required. */
+  /** Explicit deployment gate. Debug access is intentionally account-agnostic. */
   readonly debugControlsEnabled: boolean;
   readonly world: WorldDescriptor;
   readonly clock: AuthoritativeGameClock;
@@ -44,11 +44,10 @@ export interface GameplayGatewayOptions {
   readonly beforeDebugChange: () => void;
   readonly saveGameInBackground: () => void;
   readonly devSimSpeed: { get(): number; set(multiplier: number): void; enabled: boolean };
-  readonly devEnvironment: {
-    get(): { raining: boolean };
-    set(next: { raining?: boolean }): void;
-    enabled: boolean;
-  };
+  readonly devDiagnostics: { get(): {
+    requestedSpeed: number; effectiveSpeed: number; pendingSimulationSeconds: number;
+    lastPumpSteps: number; lastPumpMilliseconds: number; overloaded: boolean;
+  } };
   readonly log: (
     level: 'info' | 'warn' | 'error', event: string, fields?: Record<string, unknown>,
   ) => void;
@@ -91,12 +90,12 @@ export class GameplayGateway {
       devControlsEnabled: connection.debugEnabled,
     });
     this.send(connection, {
-      type: 'devEnvironment', ...this.options.devEnvironment.get(),
+      type: 'devDiagnostics', ...this.options.devDiagnostics.get(),
       devControlsEnabled: connection.debugEnabled,
     });
   }
 
-  private broadcastDebugState(): void {
+  broadcastDebugState(): void {
     for (const connection of this.connections) this.sendDebugState(connection);
   }
 
@@ -139,7 +138,7 @@ export class GameplayGateway {
           && !connection.debugEnabled) {
           this.sendSocket(socket, {
             type: 'error', code: 'unauthorized_debug',
-            message: 'This account is not authorized to use debug controls.',
+            message: 'Debug controls are disabled on this deployment.',
           });
           return;
         }
@@ -155,7 +154,7 @@ export class GameplayGateway {
             throw new Error('Ticket does not match the authoritative seat.');
           }
           clearTimeout(authenticationTimeout);
-          const debugEnabled = claims.debugEntitled && this.options.debugControlsEnabled;
+          const debugEnabled = this.options.debugControlsEnabled;
           const revision = this.options.revision();
           const projection = this.options.runtime.projection(
             claims.countryId, this.options.devSimSpeed.get(), debugEnabled,
@@ -198,30 +197,43 @@ export class GameplayGateway {
           if (!connection.debugEnabled) {
             this.sendSocket(socket, {
               type: 'error', code: 'unauthorized_debug',
-              message: 'This account is not authorized to use debug controls.',
+              message: 'Debug controls are disabled on this deployment.',
             });
             return;
           }
           this.options.beforeDebugChange();
           if (message.type === 'devSetSimSpeed') this.options.devSimSpeed.set(message.multiplier);
           else if (message.type === 'devSetClock') this.options.clock.setEpoch(message.epochMs);
-          else this.options.clock.linkTimezone(message.utcOffsetMinutes);
+          else this.options.clock.linkTimezone(message.timeZone);
           this.options.publishNow();
           this.broadcast({ type: 'clockSync', clock: this.options.clock.snapshot() });
           this.options.saveGameInBackground();
           this.broadcastDebugState();
           return;
         }
-        if (message.type === 'devSetEnvironment') {
-          if (!connection.debugEnabled) {
-            this.sendSocket(socket, {
-              type: 'error', code: 'unauthorized_debug',
-              message: 'This account is not authorized to use debug controls.',
-            });
-            return;
+        if (message.type === 'devSetWeather') {
+          this.options.runtime.setWeatherMode(message.mode);
+          this.options.publishNow();
+          this.options.saveGameInBackground();
+          return;
+        }
+        if (message.type === 'devCheatBuild' || message.type === 'devCheatSpawnUnit'
+          || message.type === 'devCheatGiveResource') {
+          const result = message.type === 'devCheatBuild'
+            ? this.options.runtime.cheatBuild(message.provinceId, message.buildingId, message.level)
+            : message.type === 'devCheatSpawnUnit'
+              ? this.options.runtime.cheatSpawnUnit(message.provinceId, message.countryId, message.unitTypeId)
+              : this.options.runtime.cheatGiveResource(message.countryId, message.resource, message.amount);
+          const action = message.type === 'devCheatBuild' ? 'build'
+            : message.type === 'devCheatSpawnUnit' ? 'spawn' : 'resource';
+          this.options.log(result.ok ? 'info' : 'warn', 'debug_cheat', {
+            action, accountId: connection.accountId, countryId: connection.countryId, result: result.message,
+          });
+          if (result.ok) {
+            this.options.publishNow();
+            this.options.saveGameInBackground();
           }
-          this.options.devEnvironment.set(message);
-          this.broadcastDebugState();
+          this.send(connection, { type: 'devCheatResult', action, ...result });
           return;
         }
         if (message.type === 'resync') {

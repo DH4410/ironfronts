@@ -66,6 +66,10 @@ export function issueAttack(ctx: SimContext, command: AttackCommand): CommandRes
     if ((ctx.state.provinceOwners[province.id] ?? 0) === army.ownerCountryId) {
       return { ok: false, reason: 'You already hold that province — move there instead.' };
     }
+    const provinceOwner = ctx.state.provinceOwners[province.id] ?? 0;
+    if (provinceOwner > 0 && relationOf(ctx.state, army.ownerCountryId, provinceOwner) === 'allied') {
+      return { ok: false, reason: 'That province belongs to an ally — move there instead.' };
+    }
     const destination = reachableProvinceNode(ctx, army, province.id, destinationX, destinationZ);
     if ('ok' in destination) return destination;
     return issueMoveOrder(
@@ -79,10 +83,9 @@ export function issueAttack(ctx: SimContext, command: AttackCommand): CommandRes
 
   const target = ctx.state.armies[command.target.armyId];
   if (!target) return { ok: false, reason: 'No valid hostile force.' };
-  // No alliance system yet, so "friendly" is exactly "same country". A strike on
-  // your own force is always rejected here regardless of what the client sent.
-  if (target.ownerCountryId === army.ownerCountryId) {
-    return { ok: false, reason: 'That is one of your own forces.' };
+  if (target.ownerCountryId === army.ownerCountryId) return { ok: false, reason: 'That is one of your own forces.' };
+  if (relationOf(ctx.state, army.ownerCountryId, target.ownerCountryId) === 'allied') {
+    return { ok: false, reason: 'That is an allied force.' };
   }
   const contact = computeArmyVisibility(ctx.state, ctx.world, army.ownerCountryId).get(target.id);
   // Any currently detected contact can be targeted. Its detailed composition

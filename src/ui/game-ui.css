@@ -604,17 +604,6 @@
   border-color: var(--ifg-brass);
 }
 .ifg-modes__item.is-active .ifg-modes__label { max-width: 96px; opacity: 1; margin-left: 7px; }
-.ifg-modes__inspector {
-  height: 28px;
-  padding: 0 8px;
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  color: var(--ifg-dim);
-  border-radius: 3px;
-  border-left: 1px solid var(--ifg-rule-soft);
-}
-.ifg-modes__inspector:hover { color: var(--ifg-brass-lit); }
-
 /* ================= notifications ================= */
 .ifg-notify {
   position: absolute;

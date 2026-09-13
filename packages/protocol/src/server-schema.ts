@@ -54,6 +54,8 @@ const diplomacyProposal = z.object({ id: z.string(), fromCountryId: integer, toC
   kind: z.enum(['alliance', 'peace']), status: z.enum(['pending', 'accepted', 'declined', 'withdrawn']),
   createdAtTick: integer, resolvedAtTick: integer.optional() });
 const outcome = z.object({ result: z.enum(['victory', 'defeat']), reason: z.string(), atGameHours: nonnegative });
+const weather = z.object({ mode: z.enum(['automatic', 'forced-clear', 'forced-rain']), raining: z.boolean(),
+  scheduleDay: z.string(), rainStartMinute: integer.max(1439), rainDurationMinutes: integer.min(60).max(120) });
 export const projectionSchema = z.object({ simulationTick: integer, timeline: timeline.optional(), viewerCountryId: integer,
   startCamera: point.extend({ distance: finite.positive() }), countries: record(country), provinceOwners: record(integer),
   provinceBuildings: record(buildings), provinceActions: record(z.object({
@@ -64,11 +66,12 @@ export const projectionSchema = z.object({ simulationTick: integer, timeline: ti
   rallyPoints: record(point.extend({ route: z.array(point).optional() })), armies: record(army),
   provinceEconomies: record(z.unknown()).optional(), resourceNodes: record(resource).optional(),
   ownCountry: ownCountry.nullable(), relations: record(z.enum(['peace', 'allied', 'war'])),
+  weather: weather.optional(),
   diplomacy: z.object({ messages: z.array(diplomacyMessage), proposals: z.array(diplomacyProposal) }).optional(),
   outcome: outcome.optional() });
 const collectionSchemas = projectionSchema.pick({ countries: true, provinceOwners: true, provinceBuildings: true, provinceActions: true,
   productionQueues: true, constructionQueues: true, rallyPoints: true, armies: true, provinceEconomies: true, relations: true });
-const delta = z.object({ changed: projectionSchema.pick({ simulationTick: true, timeline: true, viewerCountryId: true, startCamera: true, ownCountry: true, diplomacy: true, outcome: true }).partial(),
+const delta = z.object({ changed: projectionSchema.pick({ simulationTick: true, timeline: true, viewerCountryId: true, startCamera: true, ownCountry: true, weather: true, diplomacy: true, outcome: true }).partial(),
   upserts: collectionSchemas.partial(), removals: z.object(Object.fromEntries(Object.keys(collectionSchemas.shape).map((key) => [key, z.array(z.string()).optional()]))),
   redactions: z.array(z.string()) });
 const profile = z.object({ soft: nonnegative, light: nonnegative, heavy: nonnegative });
@@ -95,6 +98,7 @@ const clock = z.object({
   gameStartedAtEpochMs: finite, gameEpochMs: finite, campaignElapsedSeconds: nonnegative.default(0),
   serverEpochMs: finite, speed: z.literal(1), generation: integer,
   utcOffsetMinutes: z.number().int().min(-840).max(840), timezoneLinked: z.boolean().default(false),
+  timeZone: z.string().min(1).max(100).optional(),
 });
 export const serverMessageSchema: z.ZodType<ServerMessage> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('hello'), gameId: z.string(), gameVersion: z.string(), protocolVersion: z.literal(4), capabilities: z.array(z.string()),
@@ -108,5 +112,9 @@ export const serverMessageSchema: z.ZodType<ServerMessage> = z.discriminatedUnio
   z.object({ type: z.literal('pong'), sentAt: finite, serverEpochMs: finite }),
   z.object({ type: z.literal('error'), code: z.string(), message: z.string(), retryable: z.boolean().optional() }),
   z.object({ type: z.literal('devSimSpeed'), multiplier: finite.min(1).max(10_000), devControlsEnabled: z.boolean() }),
-  z.object({ type: z.literal('devEnvironment'), raining: z.boolean(), devControlsEnabled: z.boolean() }),
+  z.object({ type: z.literal('devDiagnostics'), requestedSpeed: finite.min(1).max(10_000), effectiveSpeed: nonnegative,
+    pendingSimulationSeconds: nonnegative, lastPumpSteps: integer, lastPumpMilliseconds: nonnegative,
+    overloaded: z.boolean(), devControlsEnabled: z.boolean() }),
+  z.object({ type: z.literal('devCheatResult'), action: z.enum(['build', 'spawn', 'resource']),
+    ok: z.boolean(), message: z.string() }),
 ]);

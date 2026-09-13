@@ -105,6 +105,19 @@ describe('single authoritative game runtime', () => {
     expect(runtime.projection(1).provinceActions[provinceId].production.length).toBeGreaterThan(0);
   });
 
+  it('applies validated authoritative debug cheats', () => {
+    const runtime = new GameRuntime(tinyWorld());
+    expect(runtime.cheatBuild(0, 'barracks', 5)).toMatchObject({ ok: true });
+    expect(runtime.session.state.provinceBuildings[0].barracks).toBe(5);
+    const beforeArmies = Object.keys(runtime.session.state.armies).length;
+    expect(runtime.cheatSpawnUnit(0, 2, 'medium-tank')).toMatchObject({ ok: true });
+    expect(Object.keys(runtime.session.state.armies)).toHaveLength(beforeArmies + 1);
+    const beforeFunds = runtime.session.state.countries[2].stockpile.funds;
+    expect(runtime.cheatGiveResource(2, 'funds', 1234.5)).toMatchObject({ ok: true });
+    expect(runtime.session.state.countries[2].stockpile.funds).toBe(beforeFunds + 1234.5);
+    expect(runtime.cheatBuild(999, 'mine', 5)).toMatchObject({ ok: false });
+  });
+
   it('round-trips authoritative state and permanent seats through game.json', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'ironfronts-game-'));
     const persistence = new GamePersistence(path.join(directory, 'game.json'));

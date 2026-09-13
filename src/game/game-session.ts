@@ -96,6 +96,12 @@ export class GameSession {
     return this.state.clock.gameTimeHours;
   }
 
+  /** Recompute economy immediately after an authorized developer mutation. */
+  refreshDerivedState(): void {
+    recomputeIncome(this.state, this.world, this.graph);
+    stepSupply(this);
+  }
+
   /** Advance the simulation by `dtHours` of game time. Safe to call with
    *  a large dt (e.g. after a stall) — it is accumulated and sub-stepped. */
   tick(dtHours: number): void {

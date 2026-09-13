@@ -34,7 +34,7 @@ The root `npm run check` covers every workspace, architecture checks, script lin
 | `DATA_DIRECTORY` | `data` | Default state directory when `GAME_DATA_PATH` is absent. |
 | `TICKET_SECRET` | local development value | HMAC secret used to verify gameplay tickets. Required to differ from the fallback in production. Must match the issuer. |
 | `INTERNAL_SERVICE_SECRET` | local development value | Bearer secret protecting `/internal/v2/*`. Required to differ from the fallback in production. Must match callers. |
-| `IRONFRONTS_DEBUG_CONTROLS_ENABLED` | `false` | Explicit deployment gate for debug controls. Access still requires the signed `DimaTest1` account entitlement. |
+| `IRONFRONTS_DEBUG_CONTROLS_ENABLED` | `false` | Explicit deployment gate for hidden debug controls and cheat commands. Authenticated clients open the inspector with Ctrl+D+E. |
 | `NODE_ENV` | unset | When equal to `production`, startup rejects either fallback secret. |
 
 Paths are resolved against `process.cwd()`. Start the process from the repository root unless explicit absolute paths are supplied.

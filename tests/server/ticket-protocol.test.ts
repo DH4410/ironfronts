@@ -9,7 +9,7 @@ const secret = 'a sufficiently long test secret';
 const claims = {
   accountId: 'account-1', gameId: GAME_ID, countryId: 7,
   audience: 'game-server' as const, protocolVersion: PROTOCOL_VERSION,
-  expiresAt: Date.now() + 30_000, nonce: 'nonce-1', debugEntitled: true,
+  expiresAt: Date.now() + 30_000, nonce: 'nonce-1',
 };
 
 describe('game tickets and command wire schema', () => {
@@ -18,10 +18,6 @@ describe('game tickets and command wire schema', () => {
     expect(() => verifyGameTicket(`${signGameTicket(claims, secret)}x`, secret)).toThrow(/signature/i);
     expect(() => verifyGameTicket(signGameTicket({ ...claims, expiresAt: Date.now() - 1 }, secret), secret)).toThrow(/expired/i);
     expect(() => verifyGameTicket(signGameTicket({ ...claims, audience: 'other' as never }, secret), secret)).toThrow(/audience/i);
-    const missingEntitlement = { ...claims } as Partial<typeof claims>;
-    delete missingEntitlement.debugEntitled;
-    expect(() => verifyGameTicket(signGameTicket(missingEntitlement as never, secret), secret))
-      .toThrow(/entitlement/i);
   });
 
   it('strips forged ownership fields from network commands', () => {
@@ -67,16 +63,20 @@ describe('game tickets and command wire schema', () => {
     })).toThrow();
   });
 
-  it('keeps visual-clock controls separate from debug weather', () => {
+  it('validates visual-clock, weather, and cheat controls', () => {
     expect(clientMessageSchema.parse({ type: 'devSetClock', epochMs: 13.5 }))
       .toEqual({ type: 'devSetClock', epochMs: 13.5 });
-    expect(clientMessageSchema.parse({ type: 'devLinkClockTimezone', utcOffsetMinutes: 120 }))
-      .toEqual({ type: 'devLinkClockTimezone', utcOffsetMinutes: 120 });
-    expect(clientMessageSchema.parse({ type: 'devSetEnvironment', raining: true }))
-      .toEqual({ type: 'devSetEnvironment', raining: true });
+    expect(clientMessageSchema.parse({ type: 'devLinkClockTimezone', timeZone: 'Europe/Amsterdam' }))
+      .toEqual({ type: 'devLinkClockTimezone', timeZone: 'Europe/Amsterdam' });
+    expect(clientMessageSchema.parse({ type: 'devSetWeather', mode: 'automatic' }))
+      .toEqual({ type: 'devSetWeather', mode: 'automatic' });
     expect(serverMessageSchema.parse({
-      type: 'devEnvironment', raining: false, devControlsEnabled: true,
-    })).toMatchObject({ type: 'devEnvironment', raining: false });
+      type: 'devDiagnostics', requestedSpeed: 100, effectiveSpeed: 99.5,
+      pendingSimulationSeconds: 0, lastPumpSteps: 2, lastPumpMilliseconds: 1,
+      overloaded: false, devControlsEnabled: true,
+    })).toMatchObject({ type: 'devDiagnostics', requestedSpeed: 100 });
+    expect(clientMessageSchema.parse({ type: 'devCheatBuild', provinceId: 4, buildingId: 'mine', level: 5 }))
+      .toMatchObject({ type: 'devCheatBuild', level: 5 });
   });
 
   it('requires kind-specific event identity and ownership fields', () => {

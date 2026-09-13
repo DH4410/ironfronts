@@ -12,8 +12,8 @@ describe('separate simulation and visual clocks', () => {
     expect(clock.snapshot(2_500).gameEpochMs).toBe(Date.UTC(1940,0,1)+1_500);
     expect(c.state.clock.gameTimeHours).toBe(2);
     expect(clock.snapshot(2_500).generation).toBe(1);
-    clock.linkTimezone(-300, 3_000);
-    expect(clock.snapshot(9_000)).toMatchObject({gameEpochMs:9_000,utcOffsetMinutes:-300,timezoneLinked:true});
+    clock.linkTimezone('America/New_York', 3_000);
+    expect(clock.snapshot(9_000)).toMatchObject({gameEpochMs:9_000,utcOffsetMinutes:-300,timezoneLinked:true,timeZone:'America/New_York'});
   });
   it('interpolates visual time at 1x while campaign day comes from simulation', () => {
     let now=0; const clock=new InterpolatedGameClock(() => now);

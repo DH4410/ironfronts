@@ -1,4 +1,8 @@
-import { GameSession, UNIT_TYPES, BUILDINGS, type GameCommand, type GameState, type WorldData } from '@ironfronts/game-core';
+import {
+  GameSession, UNIT_TYPES, BUILDINGS, nearestNode, unitType,
+  setWeatherMode, updateRealWeather,
+  type GameCommand, type GameState, type WorldData,
+} from '@ironfronts/game-core';
 import {
   GAME_ID, GAME_VERSION, PROTOCOL_VERSION,
   type CommandPayload, type GameLobby, type PlayerProjection, type PresentationCatalogs,
@@ -112,6 +116,73 @@ export class GameRuntime {
     }
     const command = { ...payload, countryId } as GameCommand;
     return this.session.applyCommand(command);
+  }
+
+  updateWeather(nowEpochMs = Date.now()): boolean {
+    return updateRealWeather(this.session.state, nowEpochMs);
+  }
+
+  setWeatherMode(mode: 'automatic' | 'forced-clear' | 'forced-rain', nowEpochMs = Date.now()): void {
+    setWeatherMode(this.session.state, mode, nowEpochMs);
+  }
+
+  cheatBuild(provinceId: number, buildingId: keyof typeof BUILDINGS, level: number): { ok: boolean; message: string } {
+    const province = this.world.provinces.find((entry) => entry.id === provinceId);
+    if (!province) return { ok: false, message: `Province ${provinceId} does not exist.` };
+    const definition = BUILDINGS[buildingId];
+    if (!definition || !Number.isInteger(level) || level < 1 || level > 5) {
+      return { ok: false, message: 'Invalid building or level.' };
+    }
+    if (definition.kind === 'military') {
+      const buildings = this.session.state.provinceBuildings[provinceId] ??= {
+        barracks: 0, tankPlant: 0, ordnance: 0, missileSite: 0,
+      };
+      buildings[buildingId as 'barracks'] = Math.max(buildings[buildingId as 'barracks'], level);
+    } else {
+      const economy = this.session.state.provinceEconomies?.[provinceId];
+      if (!economy) return { ok: false, message: `Province ${provinceId} has no economy record.` };
+      economy.resourceBuildings[buildingId as 'fields'] = Math.max(
+        economy.resourceBuildings[buildingId as 'fields'], level,
+      );
+    }
+    const queue = this.session.state.constructionQueues[provinceId];
+    if (queue) this.session.state.constructionQueues[provinceId] = queue.filter(
+      (order) => order.buildingId !== buildingId || (order.targetTier ?? 1) > level,
+    );
+    this.session.refreshDerivedState();
+    return { ok: true, message: `${definition.label} Level ${level} completed in province ${provinceId}.` };
+  }
+
+  cheatSpawnUnit(provinceId: number, countryId: number, unitTypeId: string): { ok: boolean; message: string } {
+    const province = this.world.provinces.find((entry) => entry.id === provinceId);
+    const country = this.session.state.countries[countryId];
+    const definition = UNIT_TYPES.find((entry) => entry.id === unitTypeId);
+    if (!province) return { ok: false, message: `Province ${provinceId} does not exist.` };
+    if (!country) return { ok: false, message: `Country ${countryId} does not exist.` };
+    if (!definition) return { ok: false, message: `Unit ${unitTypeId} does not exist.` };
+    const nodeId = nearestNode(this.session.graph, province.center[0], province.center[1]);
+    if (nodeId < 0) return { ok: false, message: `Province ${provinceId} has no reachable road node.` };
+    const id = `army-${this.session.state.nextArmyId++}`;
+    this.session.state.armies[id] = {
+      id, ownerCountryId: countryId, name: `${definition.name} ${id}`,
+      x: this.session.graph.nodeX[nodeId], z: this.session.graph.nodeZ[nodeId], graphNodeId: nodeId,
+      edge: null, units: [{ typeId: unitTypeId, count: 1, hp: unitType(unitTypeId).maxHp, experience: 0 }],
+      status: 'idle', order: null, extractingNodeId: null, extractionAssignment: null,
+      shortageSeverity: { funds: 0, food: 0, metal: 0, oil: 0 }, lastGraphNodeId: null,
+      suspendedOrder: null, battleFrontIds: [], retreat: null,
+      artillery: { targetArmyId: null, manualTarget: false }, navalCrossing: null,
+      organization: 100, entrenchment: 0, stance: 'attack-defend', inSupply: true,
+    };
+    this.session.refreshDerivedState();
+    return { ok: true, message: `${definition.name} spawned for country ${countryId} in province ${provinceId}.` };
+  }
+
+  cheatGiveResource(countryId: number, resource: keyof GameState['countries'][number]['stockpile'], amount: number): { ok: boolean; message: string } {
+    const country = this.session.state.countries[countryId];
+    if (!country) return { ok: false, message: `Country ${countryId} does not exist.` };
+    if (!Number.isFinite(amount) || amount <= 0) return { ok: false, message: 'Amount must be positive.' };
+    country.stockpile[resource] += amount;
+    return { ok: true, message: `Added ${amount.toLocaleString()} ${resource} to ${country.name} (${countryId}).` };
   }
 }
 

@@ -75,6 +75,9 @@ export function issueStrike(ctx: SimContext, command: StrikeCommand): CommandRes
   }
   const owner = ctx.state.provinceOwners[provinceId] ?? 0;
   if (owner === countryId) return { ok: false, reason: 'That is your own province.' };
+  if (owner && relationOf(ctx.state, countryId, owner) === 'allied') {
+    return { ok: false, reason: 'You cannot strike an allied province.' };
+  }
 
   // The aim point must sit within reach of one of the country's Missile Sites.
   const sites: Array<readonly [number, number]> = [];
