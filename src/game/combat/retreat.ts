@@ -12,10 +12,13 @@ import { ORGANIZATION_RETREAT_THRESHOLD } from './constants';
 function legalFirstNodes(session: SimContext, army: ArmyStack, front: BattleFrontState): number[] {
   const edge = occupiedEdge(session, army);
   if (edge) return [edge.from];
-  if (front.kind === 'road') {
-    return army.lastGraphNodeId === null || army.lastGraphNodeId === undefined
-      ? [] : [army.lastGraphNodeId];
+  if (front.kind === 'road' && army.lastGraphNodeId !== null && army.lastGraphNodeId !== undefined) {
+    return [army.lastGraphNodeId];
   }
+  // A stationary defender that never moved has no lastGraphNodeId and a road
+  // front has no province context either, so neither can name "the way it
+  // came" as the sole exit. Fall back to any adjacent node that isn't itself
+  // a hostile approach, same as a province front.
   const hostileApproaches = new Set<number>();
   for (const other of Object.values(session.state.battleFronts)) {
     if (other.battleId !== front.battleId) continue;

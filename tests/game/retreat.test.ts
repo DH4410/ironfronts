@@ -94,6 +94,58 @@ describe('retreat', () => {
     expect(weak.order!.destX).toBeGreaterThan(500);
   });
 
+  it('offers a retreat route for a stationary defender that never moved (road front, no lastGraphNodeId)', () => {
+    // Battle node (500,100) deliberately does not coincide with any province
+    // center, so provinceAtNode returns null and the front is kind:'road' —
+    // the branch that used to require lastGraphNodeId and returned no exits
+    // at all for an army that had never moved (see src/game/combat/retreat.ts).
+    const roadGraph = buildLandGraph(new Float32Array([500, 100, 900, 100, 1, 0, 0, 0]), 10_000, 5_000);
+    const provinces = [prov(10, 100, 100), prov(20, 900, 100)];
+    const world: WorldData = {
+      width: 10_000, height: 5_000, provinces,
+      countries: [
+        { id: 1, name: 'A', color: '#fff', capitalProvinceId: 10 },
+        { id: 2, name: 'B', color: '#000', capitalProvinceId: 20 },
+      ],
+      provinceOwner: () => 0, provinceAt: () => -1, terrainClassAt: () => 0,
+      connections: new Float32Array(0), resourceNodes: [],
+    };
+    const state: GameState = {
+      version: GAME_STATE_VERSION, seed: 1, scenarioId: 'OP-1939-01', mode: 'campaign',
+      fogOfWar: false, economyEnabled: false,
+      clock: { gameTimeHours: 0, startDate: 'x' }, simulationTick: 0,
+      countries: {
+        1: { id: 1, name: 'A', color: '#fff', controller: 'player', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
+        2: { id: 2, name: 'B', color: '#000', controller: 'ai', stockpile: emptyStockpile(), income: emptyStockpile(), industryCapacity: 1 },
+      },
+      provinceOwners: { 10: 1, 20: 2 },
+      provinceBuildings: {}, productionQueues: {}, constructionQueues: {}, rallyPoints: {},
+      armies: {
+        fist: {
+          id: 'fist', ownerCountryId: 1, name: 'Fist', x: 500, z: 100, graphNodeId: 0,
+          units: [{ typeId: 'medium-tank', count: 1, hp: 190, experience: 0 }],
+          status: 'idle', order: null, extractingNodeId: null,
+        } satisfies ArmyStack,
+        weak: {
+          id: 'weak', ownerCountryId: 2, name: 'Militia', x: 500, z: 100, graphNodeId: 0,
+          units: [{ typeId: 'infantry', count: 3, hp: 300, experience: 0 }],
+          status: 'idle', order: null, extractingNodeId: null,
+        } satisfies ArmyStack,
+      },
+      resourceNodes: {}, relations: { '1:2': 'war' }, battles: {}, battleFronts: {},
+      nextArmyId: 1, nextBattleId: 1, nextOrderId: 1, nextEventId: 1,
+    };
+    const c: SimContext = { state, graph: roadGraph, world };
+    expect(c.state.armies.weak.lastGraphNodeId).toBeUndefined();
+    stepCombat(c, 0.25);
+    const front = Object.values(c.state.battleFronts)[0];
+    expect(front?.kind).toBe('road');
+    const routes = legalRetreatPaths(c, 'weak');
+    expect(routes).toHaveLength(1);
+    expect(routes[0].firstNodeId).toBe(1);
+    expect(routes[0].destinationProvinceId).toBe(20);
+  });
+
   it('fights to the end when there is nowhere to retreat', () => {
     const c = ctx(false); // country 2 owns no province
     for (let i = 0; i < 20 && c.state.armies.weak; i += 1) {
