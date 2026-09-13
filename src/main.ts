@@ -638,7 +638,22 @@ async function startGame(token: number): Promise<void> {
     },
     dismissNotification: (id) => removeNotification(id),
     togglePause: (open) => uiStore.patch({ paused: open }),
-    returnToMenu: () => { /* Disabled in the UI until a safe menu-return path exists. */ },
+    returnToMenu: () => {
+      void (async () => {
+        const confirmed = await showGameConfirmation(
+          'Return to main menu?',
+          'The operation autosaves continuously in the background, so nothing is lost. End this session and return to the menu?',
+        );
+        if (!confirmed) return;
+        uiStore.patch({ paused: false });
+        launchToken += 1;
+        await teardownPartialLaunch();
+        hideLoader();
+        canvas.hidden = true;
+        uiStore.patch({ phase: 'lobby' });
+        rendererStarted = false;
+      })();
+    },
     openDebugInspector: () => {
       if (debugEnabled) window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F3', key: 'F3' }));
     },
