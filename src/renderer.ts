@@ -1189,6 +1189,22 @@ export class WorldRenderer {
   }
 
   /**
+   * True when a world-space effect around this point can actually contribute
+   * pixels to the current camera view. Horizontal world wrapping is handled by
+   * checking the previous/current/next copies, matching the renderer draw path.
+   * Hidden tabs return false so callers avoid even spawning cosmetic work.
+   */
+  isWorldPointVisible(worldX: number, worldZ: number, radius = 120): boolean {
+    if (this.renderingSuspended || !this.initialized) return false;
+    const width = this.manifest.world.width;
+    for (const copy of WORLD_COPY_INDICES) {
+      const copyX = worldX + (copy - 1) * width;
+      if (this.chunkIntersectsView(copyX, worldZ, radius)) return true;
+    }
+    return false;
+  }
+
+  /**
    * Replace the drawn order-route polylines. `records` is 8 floats per segment
    * (LineRecord: a = x0,z0,x1,z1; b = colorFlag, dim, retreatFlag, 0), where
    * colorFlag 0 = move / 1 = attack, dim > 0.5 = a non-selected army's route,
