@@ -350,6 +350,7 @@ export class CombatEffectPool {
     camera: { x: number; z: number },
     maxDistance: number,
     budget = this.capacity,
+    isVisible?: (x: number, z: number) => boolean,
   ): CollectResult {
     const cap = Math.min(budget, this.capacity);
     const out = this.packed;
@@ -367,6 +368,7 @@ export class CombatEffectPool {
 
     for (const b of this.battles.values()) {
       if (count >= cap) break;
+      if (isVisible && !isVisible(b.x, b.z)) continue;
       // A gentle pulse so the marker breathes; the shader reads age01 as phase.
       const phase = ((now * 0.001) % 2) / 2;
       write(EFFECT_KIND.battleMarker, b.x, b.z, phase, b.seed, 1, b.intensity, b.dir);
@@ -380,6 +382,7 @@ export class CombatEffectPool {
       const dx = r.x - camera.x;
       const dz = r.z - camera.z;
       if (dx * dx + dz * dz > maxSq) continue;
+      if (isVisible && !isVisible(r.x, r.z)) continue;
       write(r.kind, r.x, r.z, age / r.lifetime, r.seed, r.scale, r.intensity, r.dir);
     }
     return { floats: out, count };
