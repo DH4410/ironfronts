@@ -162,7 +162,14 @@ export type NavId =
   | 'armies' | 'provinces' | 'production' | 'research'
   | 'diplomacy' | 'economy' | 'intelligence' | 'events';
 
-export type SidePanelId = 'diplomacy';
+export type SidePanelId = 'diplomacy' | 'research';
+export type TechnologyBranch = 'infantry' | 'resources' | 'training' | 'hybrid' | 'armored';
+
+export interface TechnologyView {
+  readonly levels: Record<TechnologyBranch, number>;
+  readonly active?: { readonly branch: TechnologyBranch; readonly targetLevel: number; readonly progress: number; readonly etaSeconds: number };
+  readonly pending?: boolean;
+}
 
 export type DiplomacyRelation = 'neutral' | 'allied' | 'war';
 
@@ -345,6 +352,7 @@ export interface StrategicUiState {
    *  with `phase` above (lobby/loading/in-game) — named distinctly for that
    *  reason. */
   readonly countryPhase?: number;
+  readonly technology: TechnologyView;
 }
 
 /** Resources are declared up-front so the top bar has stable slots. */
@@ -383,6 +391,7 @@ export function createInitialState(overrides: Partial<StrategicUiState> = {}): S
     paused: false,
     resourceOverlay: false,
     debugEnabled: false,
+    technology: { levels: { infantry: 1, resources: 1, training: 1, hybrid: 1, armored: 1 } },
     ...overrides,
   };
 }

@@ -24,6 +24,7 @@ export interface ArmyCompositionRow {
 }
 
 export function visualKindForUnit(typeId: string): ArmyVisualKind {
+  typeId = typeId.replace(/-l[2-8]$/, '');
   if (typeId === 'engineer') return 1;
   if (typeId === 'armored-car') return 2;
   if (typeId === 'light-tank') return 3;
@@ -33,6 +34,7 @@ export function visualKindForUnit(typeId: string): ArmyVisualKind {
 }
 
 function modelKindForUnit(typeId: string): ArmyModelKind {
+  typeId = typeId.replace(/-l[2-8]$/, '');
   if (typeId === 'armored-car') return 1;
   if (typeId === 'medium-tank') return 2;
   if (typeId === 'artillery') return 3;
