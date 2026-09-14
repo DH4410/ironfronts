@@ -1561,6 +1561,17 @@ function syncArmyMarkers(
         compositionRows = buildArmyCompositionRows(groups);
         armyPresentationCache.set(army.id, { key, formation, compositionRows });
       }
+      // A stack becomes one transport silhouette only for the underway phase.
+      // During embark/disembark it remains visibly represented by its troops on
+      // the coastal node; reaching land therefore restores the troop models
+      // immediately, even while the short unloading dwell finishes.
+      if (army.status === 'atSea' && formation.length) {
+        formation = [{
+          kind: 5,
+          count: army.composition?.unitCount ?? 0,
+          health: army.composition?.health ?? 0,
+        }];
+      }
     }
     armyMarkerScratch.fill(0, cursor, cursor + 28);
     armyMarkerScratch[cursor] = armyMotion.x;
