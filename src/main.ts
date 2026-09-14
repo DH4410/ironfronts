@@ -877,7 +877,7 @@ async function startGame(token: number): Promise<void> {
       debugChordArmed = true;
       return;
     }
-    if (event.ctrlKey && debugChordArmed && event.code === 'KeyE') {
+    if (debugChordArmed && event.code === 'KeyE') {
       event.preventDefault();
       debugChordArmed = false;
       toggleDiagnostics();
@@ -891,7 +891,7 @@ async function startGame(token: number): Promise<void> {
     applyDebugView();
   }, attemptListener);
   window.addEventListener('keyup', (event) => {
-    if (event.code === 'ControlLeft' || event.code === 'ControlRight' || !event.ctrlKey) debugChordArmed = false;
+    if (event.code === 'Escape') debugChordArmed = false;
   }, attemptListener);
   for (const input of mapModeInputs) input.addEventListener('change', applyMapMode, attemptListener);
   applyMapMode();
