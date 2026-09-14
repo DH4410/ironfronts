@@ -21,7 +21,7 @@ import { groupQueueItems, type QueueGroup } from './queue-presentation';
 import { bindTooltip } from './tooltip';
 import { createUnitPortrait, UNIT_ROLE_NOTE } from './unit-portraits';
 import type {
-  MapMode, NavId, ProvinceResourceTotals, StrategicUiState, UiStore,
+  MapMode, NavId, ProvinceResourceTotals, QueueItem, StrategicUiState, UiStore,
 } from './ui-state';
 
 export interface GameUiActions {
@@ -78,8 +78,6 @@ const RESOURCE_CHIPS: ReadonlyArray<{ key: keyof ProvinceResourceTotals; label: 
   { key: 'metal', label: 'Metal', icon: 'node-metal' },
   { key: 'oil', label: 'Oil', icon: 'node-oil' },
 ];
-
-const PROVINCE_ACTIONS = ['Build', 'Produce', 'Rally', 'Inspect'] as const;
 
 /** Mirrors game/phase.ts's PHASE_LABELS — kept local rather than imported
  *  since the UI only ever sees the projected tier number, never game-core. */
@@ -464,13 +462,14 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   pvFacilities.hidden = true;
   pvFacilities.append(el('small', 'ifg-card__restitle', 'Facilities'));
   const pvFacChips = el('div', 'ifg-card__facchips');
-  const pvFacChipByKey = new Map<string, HTMLElement>();
+  const pvFacChipByKey = new Map<string, { card: HTMLElement; level: HTMLElement }>();
   for (const { key, label, icon } of FACILITY_CHIPS) {
-    const chip = el('span', 'ifg-rchip');
-    chip.title = label;
-    chip.append(createIcon(icon, 'ifg-rchip__icon'), el('b', 'ifg-rchip__value', label));
-    pvFacChipByKey.set(key, chip);
-    pvFacChips.append(chip);
+    const card = el('article', 'ifg-facility-card');
+    card.title = label;
+    const level = el('small', 'ifg-facility-card__level', 'L1');
+    card.append(createIcon(icon, 'ifg-facility-card__icon'), el('b', 'ifg-facility-card__name', label), level);
+    pvFacChipByKey.set(key, { card, level });
+    pvFacChips.append(card);
   }
   pvFacilities.append(pvFacChips);
 
@@ -501,11 +500,9 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   pvResources.append(pvResStatus);
 
   // PRODUCE — real unit queue for an owned province with the right building.
-  const pvProduce = el('div', 'ifg-card__resources');
+  const pvProduce = el('div', 'ifg-card__resources ifg-card__queue-section');
   pvProduce.hidden = true;
-  pvProduce.append(el('small', 'ifg-card__restitle', 'Produce'));
-  const pvProduceList = el('div', 'ifg-card__prodlist');
-  pvProduce.append(pvProduceList);
+  pvProduce.append(el('small', 'ifg-card__restitle', 'Training'));
   const pvQueue = el('div', 'ifg-queue ifg-queue--production');
   pvQueue.setAttribute('role', 'list');
   pvQueue.setAttribute('aria-label', 'Unit production queue');
@@ -522,34 +519,127 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   pvProduce.append(pvRally);
 
   // BUILD — construct a production building in an owned urban province.
-  const pvBuild = el('div', 'ifg-card__resources');
+  const pvBuild = el('div', 'ifg-card__resources ifg-card__queue-section');
   pvBuild.hidden = true;
   const pvBuildTitle = el('small', 'ifg-card__restitle', 'Build');
   pvBuild.append(pvBuildTitle);
-  const pvBuildList = el('div', 'ifg-card__prodlist ifg-card__prodlist--buildings');
-  pvBuild.append(pvBuildList);
   const pvConstruction = el('div', 'ifg-queue ifg-queue--construction');
   pvConstruction.setAttribute('role', 'list');
   pvConstruction.setAttribute('aria-label', 'Building construction queue');
   pvConstruction.hidden = true;
   pvBuild.append(pvConstruction);
 
-  const pvActions = el('div', 'ifg-card__actions');
-  for (const label of PROVINCE_ACTIONS) {
-    if (label === 'Produce' || label === 'Build') continue; // real panels above
-    const b = el('button', 'ifg-card__act');
-    b.type = 'button';
-    b.textContent = label;
-    b.disabled = true;
-    b.title = `${label} — not available yet`;
-    pvActions.append(b);
-  }
-  const pvDetails = el('div', 'ifg-card__details');
-  pvDetails.append(pvResources, pvProduce, pvBuild);
-  // Facilities is a slim inline strip, not its own details column — with only
-  // ever a couple of chips it left a tall, mostly-empty column beside the
-  // taller Produce/Build ones.
-  provinceCard.append(pvHead, pvGrid, pvFacilities, pvDetails, pvActions);
+  const pvOverview = el('div', 'ifg-card__overview');
+  pvOverview.append(pvFacilities, pvResources);
+  const pvActivity = el('div', 'ifg-card__activity');
+  pvActivity.append(pvProduce, pvBuild, pvRally);
+  const pvBody = el('div', 'ifg-card__body');
+  pvBody.append(pvGrid, pvOverview, pvActivity);
+  provinceCard.append(pvHead, pvBody);
+
+  // Large, thumb-friendly commands float above the compact card. They open a
+  // client-only chooser and continue to call the existing game actions.
+  const pvCommandBar = el('div', 'ifg-province-commands');
+  pvCommandBar.hidden = true;
+  const makeProvinceCommand = (label: string, icon: IconName): HTMLButtonElement => {
+    const button = el('button', 'ifg-province-command');
+    button.type = 'button';
+    button.append(createIcon(icon, 'ifg-province-command__icon'), el('span', 'ifg-province-command__label', label));
+    const progress = el('span', 'ifg-province-command__progress');
+    progress.append(el('i'));
+    button.append(progress);
+    return button;
+  };
+  const pvTrainCommand = makeProvinceCommand('Train', 'stat-troops');
+  const pvBuildCommand = makeProvinceCommand('Build', 'industry');
+  pvCommandBar.append(pvTrainCommand, pvBuildCommand);
+  const paintProvinceCommand = (
+    button: HTMLButtonElement, defaultLabel: string, defaultIcon: IconName,
+    active: QueueItem | undefined, itemIcon: IconName | undefined,
+  ): void => {
+    const icon = itemIcon ? createIcon(itemIcon, 'ifg-province-command__icon')
+      : active ? createUnitPortrait(active.id, active.label)
+      : createIcon(defaultIcon, 'ifg-province-command__icon');
+    icon.classList.add('ifg-province-command__icon');
+    const label = el('span', 'ifg-province-command__label', active ? active.label : defaultLabel);
+    const progress = el('span', 'ifg-province-command__progress');
+    const fill = el('i');
+    fill.style.width = `${Math.round((active?.progress ?? 0) * 100)}%`;
+    progress.append(fill);
+    if (active) {
+      button.classList.add('is-progressing');
+      button.setAttribute('aria-label', `${active.label}, ${Math.round(active.progress * 100)} percent, ${formatEta(active.etaSeconds)} remaining`);
+    } else {
+      button.classList.remove('is-progressing');
+      button.setAttribute('aria-label', defaultLabel);
+    }
+    button.replaceChildren(icon, label, progress);
+  };
+
+  const pvPicker = el('div', 'ifg-province-picker');
+  pvPicker.hidden = true;
+  pvPicker.setAttribute('role', 'dialog');
+  pvPicker.setAttribute('aria-modal', 'true');
+  const pvPickerCard = el('section', 'ifg-province-picker__card');
+  const pvPickerTitle = el('h2', 'ifg-province-picker__title');
+  const pvPickerClose = el('button', 'ifg-province-picker__close');
+  pvPickerClose.type = 'button';
+  pvPickerClose.setAttribute('aria-label', 'Close');
+  pvPickerClose.append(createIcon('close'));
+  const pvPickerHead = el('header', 'ifg-province-picker__head');
+  pvPickerHead.append(pvPickerTitle, pvPickerClose);
+  const pvPickerList = el('div', 'ifg-province-picker__list');
+  pvPickerCard.append(pvPickerHead, pvPickerList);
+  pvPicker.append(pvPickerCard);
+  const closeProvincePicker = (): void => { pvPicker.hidden = true; };
+  let optimisticTrain: QueueItem | undefined;
+  let optimisticBuild: QueueItem | undefined;
+  pvPickerClose.addEventListener('click', closeProvincePicker);
+  pvPicker.addEventListener('click', (event) => { if (event.target === pvPicker) closeProvincePicker(); });
+
+  const openProvincePicker = (mode: 'train' | 'build'): void => {
+    const selected = store.get().selectedProvince;
+    if (!selected || !selected.isOwn) return;
+    const options = mode === 'train' ? (selected.producible ?? []) : (selected.buildable ?? []);
+    pvPickerTitle.textContent = mode === 'train' ? `Train in ${selected.name}` : `Build in ${selected.name}`;
+    pvPicker.setAttribute('aria-label', pvPickerTitle.textContent);
+    pvPickerList.replaceChildren(...options.map((option) => {
+      const button = el('button', 'ifg-province-picker__option');
+      button.type = 'button';
+      const icon = mode === 'build' ? FACILITY_ICON[option.id] : UNIT_PRODUCTION_ICON[option.id];
+      const thumb = icon ? createIcon(icon, 'ifg-province-picker__thumb') : createUnitPortrait(option.id, option.name);
+      thumb.classList.add('ifg-province-picker__thumb');
+      const copy = el('span', 'ifg-province-picker__copy');
+      copy.append(el('b', undefined, option.name), el('small', undefined, option.costLabel));
+      button.append(thumb, copy);
+      button.disabled = selected.commandPending === true || !option.affordable || !option.available;
+      button.classList.toggle('is-locked', !option.available);
+      bindTooltip(button, () => ({
+        title: option.name,
+        description: mode === 'build' ? FACILITY_NOTE[option.id] : UNIT_ROLE_NOTE[option.id],
+        cost: option.costLabel,
+        disabledReason: option.reason ?? (!option.affordable ? `Not enough resources — needs ${option.costLabel}.` : undefined),
+      }));
+      if (option.affordable && option.available) button.addEventListener('click', () => {
+        closeProvincePicker();
+        const optimistic: QueueItem = { id: option.id, label: option.name, active: true, progress: 0, etaSeconds: 0 };
+        if (mode === 'train') {
+          optimisticTrain = optimistic;
+          paintProvinceCommand(pvTrainCommand, 'Train', 'stat-troops', optimistic, UNIT_PRODUCTION_ICON[option.id]);
+          actions.produceUnit(selected.id, option.id);
+        } else {
+          optimisticBuild = optimistic;
+          paintProvinceCommand(pvBuildCommand, 'Build', 'industry', optimistic, FACILITY_ICON[option.id]);
+          actions.buildStructure(selected.id, option.id);
+        }
+      });
+      return button;
+    }));
+    pvPicker.hidden = false;
+    pvPickerList.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true });
+  };
+  pvTrainCommand.addEventListener('click', () => openProvincePicker('train'));
+  pvBuildCommand.addEventListener('click', () => openProvincePicker('build'));
 
   // ---------------- centered selected-army command overlay ----------------
   const armyCard = el('section', 'ifg-army-panel');
@@ -614,11 +704,16 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     if (event.target === overlay) actions.togglePause(false);
   });
 
-  root.append(topbar, dock, diplomacyPanel.element, modeCluster, notifyStack, provinceCard, armyCard, overlay);
+  root.append(topbar, dock, diplomacyPanel.element, modeCluster, notifyStack, pvCommandBar, provinceCard, armyCard, pvPicker, overlay);
   document.body.append(root);
 
   const onKey = (event: KeyboardEvent): void => {
     if (event.key === 'Escape' && store.get().phase === 'in-game') {
+      if (!pvPicker.hidden) {
+        event.preventDefault();
+        closeProvincePicker();
+        return;
+      }
       if (store.get().activeSidePanel) {
         event.preventDefault();
         event.stopImmediatePropagation();
@@ -641,6 +736,7 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
   let weatherKey = '';
   let pvFlagKey = '';
   let pvResourceKey = '';
+  let selectedProvinceId: number | null = null;
   let renderedSidePanel: StrategicUiState['activeSidePanel'] = null;
 
   const render = (state: StrategicUiState): void => {
@@ -801,15 +897,21 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
     // Selected province card.
     const province = state.selectedProvince;
     const army = state.selectedArmy;
+    if ((province?.id ?? null) !== selectedProvinceId) {
+      selectedProvinceId = province?.id ?? null;
+      optimisticTrain = undefined;
+      optimisticBuild = undefined;
+      closeProvincePicker();
+    }
     provinceCard.hidden = !province;
+    pvCommandBar.hidden = !province?.isOwn;
+    if (!province) closeProvincePicker();
     if (province) {
       const ownTag = province.isOwn === true ? ' · Your territory'
         : province.isOwn === false ? ' · Foreign' : '';
       pvName.textContent = province.name;
       pvSub.textContent = `${province.owner} · ${province.terrain}${ownTag}`;
       provinceCard.classList.toggle('is-foreign', province.isOwn === false);
-      // Command actions only make sense on land the player controls.
-      pvActions.hidden = province.isOwn === false;
       const nextPvFlagKey = `${province.owner}|${province.ownerColor}`;
       if (nextPvFlagKey !== pvFlagKey) {
         pvFlagKey = nextPvFlagKey;
@@ -850,11 +952,10 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
       const anyFacility = Boolean(b && (b.barracks > 0 || b.tankPlant > 0 || b.ordnance > 0 || b.missileSite > 0));
       pvFacilities.hidden = !anyFacility;
       if (b) {
-        for (const { key, label } of FACILITY_CHIPS) {
+        for (const { key } of FACILITY_CHIPS) {
           const chip = pvFacChipByKey.get(key)!;
-          chip.hidden = (b[key] ?? 0) <= 0;
-          const value = chip.querySelector<HTMLElement>('.ifg-rchip__value');
-          if (value) value.textContent = `${label} L${b[key] ?? 0}`;
+          chip.card.hidden = (b[key] ?? 0) <= 0;
+          chip.level.textContent = `Level ${b[key] ?? 0}`;
         }
       }
       const res = province.resources;
@@ -895,31 +996,8 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         // PRODUCE panel.
         const prod = province.producible ?? [];
         const q = province.queue ?? [];
-        pvProduce.hidden = !(province.isOwn && prod.length > 0);
+        pvProduce.hidden = !(province.isOwn && q.length > 0);
         if (province.isOwn && prod.length > 0) {
-          pvProduceList.replaceChildren(...prod.map((u) => {
-            // Text-free RTS button: a dedicated painted unit mark wins
-            // when available; the full name, role, and cost stay on tooltip.
-            const b = el('button', 'ifg-buildbtn');
-            b.type = 'button';
-            const productionIcon = UNIT_PRODUCTION_ICON[u.id];
-            const thumb = productionIcon
-              ? createIcon(productionIcon, 'ifg-buildbtn__thumb')
-              : createUnitPortrait(u.id, u.name);
-            b.disabled = province.commandPending === true || !u.affordable || !u.available;
-            b.classList.toggle('is-locked', !u.available);
-            thumb.classList.add('ifg-buildbtn__thumb');
-            b.append(thumb);
-            b.setAttribute('aria-label', `${u.name} — ${u.costLabel}`);
-            bindTooltip(b, () => ({
-              title: u.name,
-              description: UNIT_ROLE_NOTE[u.id],
-              cost: u.costLabel,
-              disabledReason: u.reason,
-            }));
-            if (u.affordable && u.available) b.addEventListener('click', () => actions.produceUnit(province.id, u.id));
-            return b;
-          }));
           // Rally point: where finished units march. Placed by a map click.
           pvRally.hidden = false;
           pvRallyBtn.textContent = province.awaitingRallyTarget
@@ -944,33 +1022,10 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
         // BUILD panel — offered buildings and anything under construction.
         const buildable = province.buildable ?? [];
         const construction = province.construction ?? [];
-        pvBuild.hidden = !province.isOwn || (buildable.length === 0 && construction.length === 0);
+        pvBuild.hidden = !province.isOwn || construction.length === 0;
         if (!pvBuild.hidden) {
           const phaseLabel = state.countryPhase ? COUNTRY_PHASE_LABELS[state.countryPhase] : undefined;
-          pvBuildTitle.textContent = phaseLabel ? `Build — ${phaseLabel}` : 'Build';
-          pvBuildList.replaceChildren(...buildable.map((b) => {
-            // Large, text-free facility tile. Unaffordable buildings stay on
-            // the list with name, cost, and reason available on hover/focus.
-            const btn = el('button', 'ifg-buildbtn');
-            btn.type = 'button';
-            const icon = FACILITY_ICON[b.id];
-            if (icon) btn.append(createIcon(icon, 'ifg-buildbtn__thumb'));
-            btn.disabled = !b.available || !b.affordable || province.commandPending === true;
-            btn.classList.toggle('is-locked', !b.available);
-            btn.setAttribute('aria-label', `${b.name} — ${b.costLabel}`);
-            bindTooltip(btn, () => ({
-              title: b.name,
-              description: FACILITY_NOTE[b.id],
-              cost: b.costLabel,
-              disabledReason: !b.available
-                ? b.reason
-                : b.affordable ? undefined : `Not enough resources — needs ${b.costLabel}.`,
-            }));
-            if (b.available && b.affordable) {
-              btn.addEventListener('click', () => actions.buildStructure(province.id, b.id));
-            }
-            return btn;
-          }));
+          pvBuildTitle.textContent = phaseLabel ? `Construction · ${phaseLabel}` : 'Construction';
         }
         pvConstruction.hidden = construction.length === 0;
         updateQueue(pvConstruction, construction, (id, label) => {
@@ -979,6 +1034,23 @@ export function mountGameUi(store: UiStore, actions: GameUiActions): GameUiHandl
           if (!icon) thumb.textContent = label.slice(0, 1);
           return thumb;
         });
+
+        const queuedTraining = q.find((item) => item.active) ?? q[0];
+        const queuedConstruction = construction.find((item) => item.active) ?? construction[0];
+        if (queuedTraining) optimisticTrain = undefined;
+        if (queuedConstruction) optimisticBuild = undefined;
+        const activeTraining = queuedTraining ?? (province.commandPending ? optimisticTrain : undefined);
+        const activeConstruction = queuedConstruction ?? (province.commandPending ? optimisticBuild : undefined);
+        paintProvinceCommand(
+          pvTrainCommand, 'Train', 'stat-troops', activeTraining,
+          activeTraining ? UNIT_PRODUCTION_ICON[activeTraining.id] : undefined,
+        );
+        paintProvinceCommand(
+          pvBuildCommand, 'Build', 'industry', activeConstruction,
+          activeConstruction ? FACILITY_ICON[activeConstruction.id] : undefined,
+        );
+        pvTrainCommand.disabled = province.commandPending === true || prod.length === 0;
+        pvBuildCommand.disabled = province.commandPending === true || buildable.length === 0;
 
         if (dep && hasDeposits) {
           pvResStatus.hidden = false;
